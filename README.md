@@ -2,7 +2,7 @@
 
 A very crude attempt at an editor & assembler for Atmel ATmega88 microcontrollers... very much work in progress and and horribly broken. 
 
-(https://raw.githubusercontent.com/toby1984/javr/master/screenshot.png)
+<img src="https://raw.githubusercontent.com/toby1984/javr/master/screenshot.png" width="640" height="480" />
 
 ## Requirements
 
