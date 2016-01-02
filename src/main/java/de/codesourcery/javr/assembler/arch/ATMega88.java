@@ -521,7 +521,7 @@ public class ATMega88 implements IArchitecture
             default:
                 throw new RuntimeException( "Unreachable code reached");
         }
-        System.out.println( node.instruction.getMnemonic().toUpperCase()+" "+dstValue+" , "+srcValue+" [ "+node+" ]"+
+        System.err.println( node.instruction.getMnemonic().toUpperCase()+" "+dstValue+" , "+srcValue+" [ "+node+" ]"+
                             " compiled => "+prettyPrint(hex,2)+" ( "+prettyPrint(bin,4)+" )");
         System.out.println( "ENCODING: "+encoding);
     }
@@ -669,13 +669,7 @@ public class ATMega88 implements IArchitecture
         return result;
     }
     
-    private int getRegisterNumber(String name) {
-        final int result = internalGetRegisterNumber(name);
-        System.out.println("getRegisterNumber( "+name+") => "+result);
-        return result;
-    }
-    
-    private int internalGetRegisterNumber(String name) 
+    private int getRegisterNumber(String name) 
     {
         name = name.toLowerCase();
         
