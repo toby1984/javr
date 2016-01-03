@@ -20,7 +20,7 @@ import java.util.List;
 
 public enum Operator 
 {
-    PLUS("+"),MINUS("-"),TIMES("*"),DIVIDE("/");
+    PLUS("+"),MINUS("-"),TIMES("*"),DIVIDE("/"),EQUALS("=");
     
     private final String symbol;
 

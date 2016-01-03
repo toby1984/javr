@@ -94,6 +94,7 @@ public class Assembler
         @Override
         public void writeAsBytes(int value, int numberOfBytes) 
         {
+            // // little endian
             switch( numberOfBytes ) 
             {
                 case 1:
@@ -103,12 +104,12 @@ public class Assembler
                     writeWord( value );
                     break;
                 case 3:
-                    writeWord( value >> 8);
                     writeByte( value );
+                    writeWord( value >> 8);
                     break;
                 case 4:
-                    writeWord( value >> 16);
                     writeWord( value );
+                    writeWord( value >> 16);
                     break;
                 default:
                     throw new RuntimeException("Invalid byte count: "+numberOfBytes);
@@ -150,8 +151,8 @@ public class Assembler
         
         @Override
         public void writeWord(int value) {
+            writeByte( value ); // little endian
             writeByte( value >> 8 );
-            writeByte( value );
         }
 
         @Override

@@ -118,6 +118,7 @@ outer:
                 case '\'': parseBuffer(offset) ; addToken( TokenType.SINGLE_QUOTE , c , scanner.offset()-1 );    break outer;
                 case '"':  parseBuffer(offset) ; addToken( TokenType.DOUBLE_QUOTE , c , scanner.offset()-1 );    break outer;
                 case '.':  parseBuffer(offset) ; addToken( TokenType.DOT   , c , scanner.offset()-1 );    break outer;
+                case '#':  parseBuffer(offset) ; addToken( TokenType.HASH , c , scanner.offset()-1 );    break outer;
                 case ',':  parseBuffer(offset) ; addToken( TokenType.COMMA , c , scanner.offset()-1 );    break outer;
                 case '\n': parseBuffer(offset) ; addToken( TokenType.EOL   , c , scanner.offset()-1 );    break outer;
                 case ':':  parseBuffer(offset) ; addToken( TokenType.COLON , ':' , scanner.offset()-1 );  break outer;

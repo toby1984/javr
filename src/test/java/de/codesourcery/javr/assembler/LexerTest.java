@@ -69,14 +69,15 @@ public class LexerTest {
     @Test
     public void testLexSingleCharacters() 
     {
-        final List<Token> tokens = lexAll(":.,\"';");
-        assertEquals(6,tokens.size());
+        final List<Token> tokens = lexAll(":.,\"';#");
+        assertEquals(7,tokens.size());
         assertEquals( token(TokenType.COLON,":" , 0) , tokens.get(0) );
         assertEquals( token(TokenType.DOT  ,"." , 1) , tokens.get(1) );
         assertEquals( token(TokenType.COMMA,"," , 2) , tokens.get(2) );
         assertEquals( token(TokenType.DOUBLE_QUOTE,"\"", 3) , tokens.get(3) );
         assertEquals( token(TokenType.SINGLE_QUOTE,"'" , 4) , tokens.get(4) );
         assertEquals( token(TokenType.SEMICOLON,";" , 5) , tokens.get(5) );
+        assertEquals( token(TokenType.HASH,"#" , 6) , tokens.get(6) );
         assertEOF();
     }     
     
@@ -104,12 +105,13 @@ public class LexerTest {
     @Test
     public void testLexOperators() 
     {
-        final List<Token> tokens = lexAll("+-*/");
-        assertEquals(4,tokens.size());
+        final List<Token> tokens = lexAll("+-*/=");
+        assertEquals(5,tokens.size());
         assertEquals( token(TokenType.OPERATOR,"+" , 0) , tokens.get(0) );        
         assertEquals( token(TokenType.OPERATOR,"-" , 1) , tokens.get(1) );        
         assertEquals( token(TokenType.OPERATOR,"*" , 2) , tokens.get(2) );        
         assertEquals( token(TokenType.OPERATOR,"/" , 3) , tokens.get(3) );        
+        assertEquals( token(TokenType.OPERATOR,"=" , 4) , tokens.get(4) );        
         assertEOF();
     }  
     

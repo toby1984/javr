@@ -22,11 +22,15 @@ import de.codesourcery.javr.assembler.arch.ATMega88;
 import de.codesourcery.javr.assembler.ast.AST;
 import de.codesourcery.javr.assembler.ast.CharacterLiteralNode;
 import de.codesourcery.javr.assembler.ast.CommentNode;
+import de.codesourcery.javr.assembler.ast.EquLabelNode;
+import de.codesourcery.javr.assembler.ast.EquNode;
 import de.codesourcery.javr.assembler.ast.IdentifierNode;
+import de.codesourcery.javr.assembler.ast.InitMemNode;
 import de.codesourcery.javr.assembler.ast.InstructionNode;
 import de.codesourcery.javr.assembler.ast.LabelNode;
 import de.codesourcery.javr.assembler.ast.NumberLiteralNode;
 import de.codesourcery.javr.assembler.ast.RegisterNode;
+import de.codesourcery.javr.assembler.ast.ReserveMemNode;
 import de.codesourcery.javr.assembler.ast.SegmentNode;
 import de.codesourcery.javr.assembler.ast.SegmentNode.Segment;
 import de.codesourcery.javr.assembler.ast.StatementNode;
@@ -365,6 +369,102 @@ public class ParserTest
         Assert.assertEquals( 0x123 , num.getValue().intValue()  );
         Assert.assertEquals( NumberLiteralNode.LiteralType.HEXADECIMAL , num.getType() );
     }    
+    
+    @Test
+    public void testParseReserveBytes() 
+    {
+        AST ast = parse(".byte 10");
+        Assert.assertNotNull(ast);
+        Assert.assertTrue( ast.hasChildren() );
+        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        
+        final StatementNode stmt = (StatementNode) ast.child(0);
+        Assert.assertNotNull(stmt);
+        Assert.assertEquals( 1 , stmt.childCount() );
+        
+        final ReserveMemNode node = (ReserveMemNode) stmt.child(0);
+        Assert.assertNotNull(node);
+        Assert.assertEquals( 1 , node.childCount() );
+        
+        final NumberLiteralNode num = (NumberLiteralNode) node.child( 0 );
+        Assert.assertEquals( 10 , num.getValue().intValue()  );
+        Assert.assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num.getType() );
+    }
+    
+    @Test
+    public void testParseInitBytes() 
+    {
+        AST ast = parse(".db 1,2");
+        Assert.assertNotNull(ast);
+        Assert.assertTrue( ast.hasChildren() );
+        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        
+        final StatementNode stmt = (StatementNode) ast.child(0);
+        Assert.assertNotNull(stmt);
+        Assert.assertEquals( 1 , stmt.childCount() );
+        
+        final InitMemNode node = (InitMemNode) stmt.child(0);
+        Assert.assertNotNull(node);
+        Assert.assertEquals( 2 , node.childCount() );
+        Assert.assertEquals( InitMemNode.ElementSize.BYTE , node.elementSize );
+        
+        final NumberLiteralNode num = (NumberLiteralNode) node.child( 0 );
+        Assert.assertEquals( 1 , num.getValue().intValue()  );
+        Assert.assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num.getType() );
+        
+        final NumberLiteralNode num2 = (NumberLiteralNode) node.child( 1 );
+        Assert.assertEquals( 2 , num2.getValue().intValue()  );
+        Assert.assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num2.getType() );        
+    }  
+    
+    @Test
+    public void testParseInitWords() 
+    {
+        AST ast = parse(".dw 1,2");
+        Assert.assertNotNull(ast);
+        Assert.assertTrue( ast.hasChildren() );
+        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        
+        final StatementNode stmt = (StatementNode) ast.child(0);
+        Assert.assertNotNull(stmt);
+        Assert.assertEquals( 1 , stmt.childCount() );
+        
+        final InitMemNode node = (InitMemNode) stmt.child(0);
+        Assert.assertNotNull(node);
+        Assert.assertEquals( 2 , node.childCount() );
+        Assert.assertEquals( InitMemNode.ElementSize.WORD , node.elementSize );
+        
+        final NumberLiteralNode num = (NumberLiteralNode) node.child( 0 );
+        Assert.assertEquals( 1 , num.getValue().intValue()  );
+        Assert.assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num.getType() );
+        
+        final NumberLiteralNode num2 = (NumberLiteralNode) node.child( 1 );
+        Assert.assertEquals( 2 , num2.getValue().intValue()  );
+        Assert.assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num2.getType() );        
+    }      
+    
+    @Test
+    public void testParseEQU() 
+    {
+        AST ast = parse(".equ A = 1");
+        Assert.assertNotNull(ast);
+        Assert.assertTrue( ast.hasChildren() );
+        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        
+        final StatementNode stmt = (StatementNode) ast.child(0);
+        Assert.assertNotNull(stmt);
+        Assert.assertEquals( 1 , stmt.childCount() );
+        
+        final EquNode node = (EquNode) stmt.child(0);
+        Assert.assertNotNull(node);
+        Assert.assertEquals( 2 , node.childCount() );
+
+        final EquLabelNode label = (EquLabelNode) node.child(0);
+        final NumberLiteralNode num2 = (NumberLiteralNode) node.child(1);
+        
+        Assert.assertEquals( new Identifier("A") , label.name );
+        Assert.assertEquals( 1 , num2.getValue().intValue() );
+    }     
     
     @Test
     public void testParseInstructionWithOneBinaryNumberOperand() 

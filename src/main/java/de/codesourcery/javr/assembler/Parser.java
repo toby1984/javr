@@ -15,13 +15,10 @@
  */
 package de.codesourcery.javr.assembler;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 import org.apache.commons.lang3.Validate;
 
@@ -29,11 +26,16 @@ import de.codesourcery.javr.assembler.ast.AST;
 import de.codesourcery.javr.assembler.ast.ASTNode;
 import de.codesourcery.javr.assembler.ast.CharacterLiteralNode;
 import de.codesourcery.javr.assembler.ast.CommentNode;
+import de.codesourcery.javr.assembler.ast.EquLabelNode;
+import de.codesourcery.javr.assembler.ast.EquNode;
 import de.codesourcery.javr.assembler.ast.IdentifierNode;
+import de.codesourcery.javr.assembler.ast.InitMemNode;
+import de.codesourcery.javr.assembler.ast.InitMemNode.ElementSize;
 import de.codesourcery.javr.assembler.ast.InstructionNode;
 import de.codesourcery.javr.assembler.ast.LabelNode;
 import de.codesourcery.javr.assembler.ast.NumberLiteralNode;
 import de.codesourcery.javr.assembler.ast.RegisterNode;
+import de.codesourcery.javr.assembler.ast.ReserveMemNode;
 import de.codesourcery.javr.assembler.ast.SegmentNode;
 import de.codesourcery.javr.assembler.ast.SegmentNode.Segment;
 import de.codesourcery.javr.assembler.ast.StatementNode;
@@ -184,15 +186,17 @@ public class Parser
         Token tok = lexer.peek();
         if ( tok.hasType( TokenType.DOT ) ) 
         {
-            lexer.next();
+            final TextRegion region = lexer.next().region();
+            
             final Token tok2 = lexer.peek();
             if ( tok2.hasType(TokenType.TEXT ) ) 
             {
+                lexer.next();
                 final ASTNode result = parseDirective2( tok2 );
                 if ( result != null ) 
                 {
-                    lexer.next();
-                    result.getTextRegion().merge( tok.region() );
+                    region.merge( tok2 );
+                    result.setRegion( region );
                     return result;                    
                 }
             }
@@ -206,14 +210,71 @@ public class Parser
         final String value = tok2.value;
         switch( value.toLowerCase() ) 
         {
-            case "cseg": return new SegmentNode(Segment.FLASH, tok2.region() );
-            case "dseg": return new SegmentNode(Segment.SRAM, tok2.region() );
-            case "eseg": return new SegmentNode(Segment.EEPROM, tok2.region() );
             case "byte":
-                
+                final ASTNode expr = parseExpression();
+                if ( expr != null ) 
+                {
+                    final ReserveMemNode result = new ReserveMemNode();
+                    result.add( expr );
+                    return result;
+                }
                 break;
+            case "cseg": return new SegmentNode(Segment.FLASH, tok2.region() );
+            case "db":
+            case "dw":
+                final List<ASTNode> values = parseExpressionList();
+                if ( ! values.isEmpty() )
+                {
+                    final ElementSize size = value.toLowerCase().equals("db") ? ElementSize.BYTE : ElementSize.WORD;
+                    final InitMemNode result = new InitMemNode( size );
+                    result.add( values );
+                    return result;
+                }
+                break;            
+            case "dseg": 
+                return new SegmentNode(Segment.SRAM, tok2.region() );
+            case "eseg": 
+                return new SegmentNode(Segment.EEPROM, tok2.region() );
+            case "equ":
+                if ( lexer.peek(TokenType.TEXT ) && Identifier.isValidIdentifier( lexer.peek().value ) ) 
+                {
+                    final Token tok = lexer.next();
+                    final Identifier name = new Identifier( tok.value );
+                    if ( lexer.peek( TokenType.OPERATOR ) && lexer.peek().value.equals("=") ) 
+                    {
+                        lexer.next();
+                        final ASTNode expr2 = parseExpression();
+                        if ( expr2 != null ) {
+                            final EquNode result = new EquNode();
+                            result.add( new EquLabelNode( name , tok.region() ) );
+                            result.add( expr2 );
+                            return result;
+                        }
+                        throw new ParseException("Expected an expression",lexer.peek());
+                    } 
+                    throw new ParseException("Expected '='",lexer.peek());
+                }
+                break;
+            default:
+                throw new RuntimeException("Unknown directive: ."+tok2.value);
         }
         return null;
+    }
+    
+    private List<ASTNode> parseExpressionList() 
+    {
+        final List<ASTNode> result = new ArrayList<>();
+        while(true)
+        {
+            ASTNode expr = parseExpression();
+            if ( expr == null ) {
+                return result;
+            }
+            result.add( expr );
+            if ( lexer.peek( TokenType.COMMA ) ) {
+                lexer.next();
+            }
+        } 
     }
 
     private int currentOffset() 

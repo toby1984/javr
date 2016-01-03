@@ -42,6 +42,11 @@ public abstract class ASTNode
         this.region = region;
     }
     
+    public void setRegion(TextRegion region) {
+        Validate.notNull(region, "region must not be NULL");
+        this.region = region;
+    }
+    
     public ASTNode getParent() {
         return parent;
     }

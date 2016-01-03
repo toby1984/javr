@@ -24,6 +24,7 @@ public enum TokenType
     DIGITS,
     OPERATOR,
 // single character     
+    HASH,
     EOF, 
     COLON,
     SEMICOLON,

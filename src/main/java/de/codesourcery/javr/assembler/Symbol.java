@@ -24,7 +24,7 @@ public abstract class Symbol<T>
     private Type type;
     
     public static enum Type {
-        LABEL
+        LABEL,EQU
     }
     
     public Symbol(Identifier name,Type type,T node) 
