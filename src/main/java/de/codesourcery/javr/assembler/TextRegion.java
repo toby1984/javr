@@ -53,11 +53,21 @@ public class TextRegion {
         return false;
     }
 
-    public void merge(TextRegion other) {
+    public TextRegion merge(Token tok) {
+        return merge( tok.region() );
+    }
+    
+    /**
+     * 
+     * @param other
+     * @return this instance (for chaining)
+     */
+    public TextRegion merge(TextRegion other) {
         final int newStart = Math.min(this.start,other.start);
         final int newEnd = Math.max( this.end(), other.end() );
         this.start = newStart;
         this.len = newEnd-newStart;
+        return this;
     }
     
     public int start() {

@@ -15,19 +15,27 @@
  */
 package de.codesourcery.javr.assembler.ast;
 
+import java.util.Optional;
+
 import org.apache.commons.lang3.Validate;
 
+import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.ICompilationContext;
-import de.codesourcery.javr.assembler.Identifier;
-import de.codesourcery.javr.assembler.TextRegion;
 import de.codesourcery.javr.assembler.ICompilationContext.Phase;
+import de.codesourcery.javr.assembler.Identifier;
+import de.codesourcery.javr.assembler.LabelSymbol;
 import de.codesourcery.javr.assembler.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.Parser.Severity;
+import de.codesourcery.javr.assembler.Symbol;
+import de.codesourcery.javr.assembler.Symbol.Type;
+import de.codesourcery.javr.assembler.TextRegion;
 
-public class IdentifierNode extends ASTNode {
+public class IdentifierNode extends ASTNode implements IValueNode {
 
     public final Identifier value;
 
+    private Address resolvedValue;
+    
     public IdentifierNode(Identifier id,TextRegion region) {
         super(region);
         Validate.notNull(id, "id must not be NULL");
@@ -37,17 +45,36 @@ public class IdentifierNode extends ASTNode {
     @Override
     public void compile(ICompilationContext ctx) 
     {
-        if ( ctx.phase() == Phase.RESOLVE_SYMBOLS ) 
+        if ( ctx.isInPhase( Phase.RESOLVE_SYMBOLS ) ) 
         {
             if ( ! ctx.getSymbolTable().isDefined( value ) ) 
             {
                 ctx.message( new CompilationMessage( Severity.ERROR , "Unknown symbol: '"+value.value+"'" , this ) );
-            }            
-        }
+            } 
+            resolveValue( ctx );
+        } 
     }
     
     @Override
     public String getAsString() {
         return value.value;
+    }
+
+    @Override
+    public void resolveValue(ICompilationContext context) 
+    {
+        final Optional<Symbol<?>> symbol = context.getSymbolTable().maybeGet( this.value );
+        if ( symbol.isPresent() && symbol.get().hasType( Type.LABEL ) ) 
+        {
+            final LabelSymbol label = (LabelSymbol) symbol.get();
+            resolvedValue = label.getAddress();
+        } else {
+            resolvedValue = null;
+        }
+    }    
+    @Override
+    public Address getValue()
+    {
+        return resolvedValue;
     }
 }

@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
@@ -157,8 +159,11 @@ public class InstructionEncoder
     private static Encoding toEncoding(int[] bitMapping) 
     {
         final List<BitRange> ranges = toBitRanges( bitMapping );
-        if ( ranges.isEmpty() || ranges.size() > 2 ) {
-            throw new RuntimeException("Internal error, don't know how to create encoding for "+ranges);
+        if ( ranges.isEmpty() ) {
+            throw new RuntimeException("Internal error, no range in bit mapping?");
+        }
+        if( ranges.size() > 2 ) {
+            return new FreeFormEncoding(bitMapping);
         }
         final BitRange range1 = ranges.get(0);
         if ( ranges.size() == 1 ) {
@@ -349,6 +354,38 @@ public class InstructionEncoder
             return "Shifted( "+getBitCount()+" bits, shifted by "+bitsToShift+")";
         }          
     }
+    
+    protected static final class FreeFormEncoding extends AbstractEncoding {
+
+        private final int[] bitMapping;
+        
+        public FreeFormEncoding(int[] bitMapping) {
+            super(bitMapping.length);
+            this.bitMapping = new int[ bitMapping.length ];
+            System.arraycopy( bitMapping , 0 , this.bitMapping , 0 , bitMapping.length);
+        }
+
+        @Override
+        protected int doEncode(int value) 
+        {
+            int result = 0;
+            for ( int i = 0 ; i < bitMapping.length ; i++ ) 
+            {
+                int readMask = 1<<i;
+                if ( (value & readMask) != 0 ) 
+                {
+                    int writeMask = 1<<bitMapping[i];
+                    result |= writeMask;
+                }
+            }
+            return result;
+        }
+        
+        @Override
+        public String getDescription() {
+            return "FreeForm( "+getBitCount()+" bits: "+Stream.of( bitMapping ).map( s -> ""+s ).collect( Collectors.joining(","));
+        }          
+    }    
     
     protected static final class BitRange {
 

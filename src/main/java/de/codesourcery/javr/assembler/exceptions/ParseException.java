@@ -15,6 +15,8 @@
  */
 package de.codesourcery.javr.assembler.exceptions;
 
+import de.codesourcery.javr.assembler.Token;
+
 public class ParseException extends RuntimeException {
 
     private final int offset;
@@ -23,6 +25,11 @@ public class ParseException extends RuntimeException {
         super(msg);
         this.offset = offset;
     }
+    
+    public ParseException(String msg,Token tok) {
+        super(msg);
+        this.offset = tok.offset;
+    }    
     
     public ParseException(String msg,int offset,Throwable t) {
         super(msg,t);

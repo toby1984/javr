@@ -32,6 +32,6 @@ public class RegisterNode extends ASTNode {
     
     @Override
     public String getAsString() {
-        return register.name();
+        return register.toString();
     }
 }

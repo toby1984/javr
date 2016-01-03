@@ -15,12 +15,25 @@
  */
 package de.codesourcery.javr.assembler;
 
+import org.apache.commons.lang3.Validate;
+
 import de.codesourcery.javr.assembler.ast.LabelNode;
 
-public class LabelSymbol extends Symbol<LabelNode> {
-
+public class LabelSymbol extends Symbol<LabelNode> 
+{
+    private Address address;
+    
     public LabelSymbol(LabelNode node) 
     {
         super(node.identifier, Type.LABEL, node);
+    }
+    
+    public Address getAddress() {
+        return address;
+    }
+    
+    public void setAddress(Address address) {
+        Validate.notNull(address, "address must not be NULL");
+        this.address = address;
     }
 }

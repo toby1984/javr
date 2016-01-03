@@ -15,9 +15,11 @@
  */
 package de.codesourcery.javr.assembler;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import org.junit.Before;
@@ -38,6 +40,15 @@ public class LexerTest {
         lexAll("");
         assertEOF();
     }
+    
+    @Test
+    public void testLexOperators2() 
+    {
+        final List<Token> tokens = lexAll("Z+");
+        assertEquals(2,tokens.size());
+        assertEquals( token(TokenType.TEXT,"Z",0) , tokens.get(0) );
+        assertEquals( token(TokenType.OPERATOR,"+",1) , tokens.get(1) );
+    }     
     
     @Test
     public void testLexUnixEOL() 
@@ -63,8 +74,8 @@ public class LexerTest {
         assertEquals( token(TokenType.COLON,":" , 0) , tokens.get(0) );
         assertEquals( token(TokenType.DOT  ,"." , 1) , tokens.get(1) );
         assertEquals( token(TokenType.COMMA,"," , 2) , tokens.get(2) );
-        assertEquals( token(TokenType.QUOTE,"\"", 3) , tokens.get(3) );
-        assertEquals( token(TokenType.QUOTE,"'" , 4) , tokens.get(4) );
+        assertEquals( token(TokenType.DOUBLE_QUOTE,"\"", 3) , tokens.get(3) );
+        assertEquals( token(TokenType.SINGLE_QUOTE,"'" , 4) , tokens.get(4) );
         assertEquals( token(TokenType.SEMICOLON,";" , 5) , tokens.get(5) );
         assertEOF();
     }     
@@ -113,6 +124,22 @@ public class LexerTest {
         assertEquals( token(TokenType.TEXT,"ab12" , 14) , tokens.get(3) );
         assertEOF();
     }
+    
+    // LDD r0,Y+42
+    @Test
+    public void testLexLDD() 
+    {
+        final List<Token> tokens = lexAll("LDD r0,Y+42");
+        assertEquals(6,tokens.size());
+        final Iterator<Token> it = tokens.iterator();
+        assertEquals( token(TokenType.TEXT,"LDD" , 0) , it.next() );
+        assertEquals( token(TokenType.TEXT,"r0" , 4) , it.next() );
+        assertEquals( token(TokenType.COMMA,"," , 6) , it.next() );
+        assertEquals( token(TokenType.TEXT,"Y" , 7) , it.next() );
+        assertEquals( token(TokenType.OPERATOR,"+" , 8) , it.next() );
+        assertEquals( token(TokenType.DIGITS,"42" , 9) , it.next() );
+        assertEOF();
+    }    
     
     @Test
     public void testLexDigits() 

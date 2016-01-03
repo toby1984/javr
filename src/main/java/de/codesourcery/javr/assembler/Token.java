@@ -64,6 +64,23 @@ public final class Token {
         return t.equals( this.type );
     }
     
+    public boolean hasType(TokenType t1,TokenType... t2) 
+    {
+        if ( t1.equals( this.type ) ) {
+            return true;
+        }
+        if ( t2 != null ) 
+        {
+            for ( int i = 0, len=t2.length ; i < len ; i++ ) 
+            {
+                if ( t2[i].equals( this.type ) ) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }    
+    
     @Override
     public String toString() 
     {

@@ -22,6 +22,8 @@ import org.apache.commons.lang3.Validate;
 
 public class Lexer 
 {
+    public static final boolean DEBUG = true;
+    
     private final Scanner scanner;
     
     private final List<Token> tokens = new ArrayList<>();
@@ -105,13 +107,16 @@ outer:
                 buffer.setLength(0);
                 scanner.pushBack();
                 break;
+            } else if ( Operator.isValidOperatorOrOperatorPrefix( c ) ) {
+                scanner.pushBack();
+                break;
             }
             
             switch( c ) 
             {
                 case ';':  parseBuffer(offset) ; addToken( TokenType.SEMICOLON, c , scanner.offset()-1 ); break outer;
-                case '\'': parseBuffer(offset) ; addToken( TokenType.QUOTE , c , scanner.offset()-1 );    break outer;
-                case '"':  parseBuffer(offset) ; addToken( TokenType.QUOTE , c , scanner.offset()-1 );    break outer;
+                case '\'': parseBuffer(offset) ; addToken( TokenType.SINGLE_QUOTE , c , scanner.offset()-1 );    break outer;
+                case '"':  parseBuffer(offset) ; addToken( TokenType.DOUBLE_QUOTE , c , scanner.offset()-1 );    break outer;
                 case '.':  parseBuffer(offset) ; addToken( TokenType.DOT   , c , scanner.offset()-1 );    break outer;
                 case ',':  parseBuffer(offset) ; addToken( TokenType.COMMA , c , scanner.offset()-1 );    break outer;
                 case '\n': parseBuffer(offset) ; addToken( TokenType.EOL   , c , scanner.offset()-1 );    break outer;
@@ -171,15 +176,26 @@ outer:
     
     private void addToken(TokenType t, char value,int offset) 
     {
-        tokens.add( new Token( t , Character.toString( value ) , offset ) );
+        final Token token = new Token( t , Character.toString( value ) , offset );
+        if ( DEBUG ) {
+            System.out.println("PARSED: "+token);
+        }        
+        tokens.add( token );
     }    
     
     private void addToken(TokenType t, String value,int offset) {
-        tokens.add( new Token( t , value , offset ) );
+        final Token token = new Token( t , value , offset );
+        if ( DEBUG ) {
+            System.out.println("PARSED: "+token);
+        }
+        tokens.add( token );
     }
     
     public void setIgnoreWhitespace(boolean ignoreWhitespace) 
     {
+        if ( DEBUG ) {
+            System.out.println("setIgnoreWhitespace( "+ignoreWhitespace+" )");
+        }
         this.ignoreWhitespace = ignoreWhitespace;
         if ( ! tokens.isEmpty() ) 
         {
@@ -198,5 +214,11 @@ outer:
     {
         Validate.notNull(tok, "token must not be NULL");
         this.tokens.add(0,tok);
+    }
+    
+    public String toString() 
+    {
+        parseTokens();
+        return tokens.get(0).toString();
     }
 }

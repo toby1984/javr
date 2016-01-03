@@ -17,8 +17,6 @@ package de.codesourcery.javr.assembler;
 
 import org.apache.commons.lang3.Validate;
 
-import de.codesourcery.javr.assembler.ast.ASTNode;
-
 public abstract class Symbol<T> 
 {
     private final Identifier name;

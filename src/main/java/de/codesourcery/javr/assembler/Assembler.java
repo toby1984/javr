@@ -15,13 +15,15 @@
  */
 package de.codesourcery.javr.assembler;
 
-import java.util.Optional;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext.Phase;
 import de.codesourcery.javr.assembler.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.ast.AST;
+import de.codesourcery.javr.assembler.ast.SegmentNode.Segment;
 import de.codesourcery.javr.ui.IConfig;
 
 public class Assembler 
@@ -31,9 +33,11 @@ public class Assembler
     
     private boolean debug;
     
+    private final List<Phase> phases = new ArrayList<>();
+    
     private final class CompilationContext implements ICompilationContext 
     {
-        private Segment segment = Segment.CODE;
+        private Segment segment = Segment.FLASH;
         private final SymbolTable symbolTable = new SymbolTable();
         
         private int codeOffset = 0;
@@ -53,17 +57,23 @@ public class Assembler
         public SymbolTable getSymbolTable() {
             return symbolTable;
         }
+        
+        @Override
+        public Address currentAddress() 
+        {
+            return Address.byteAddress( currentSegment() , currentOffset() );
+        }
 
         @Override
         public int currentOffset() 
         {
             switch( segment ) 
             {
-                case CODE:
+                case FLASH:
                     return codeOffset;
-                case INITIALIZED_DATA:
+                case SRAM:
                     return initDataOffset;
-                case UNINITIALIZED_DATA:
+                case EEPROM:
                     return uninitDataOffset;
                 default:
                     throw new RuntimeException("Unhandled segment type:"+segment);
@@ -110,19 +120,19 @@ public class Assembler
         {
             switch( segment ) 
             {
-                case CODE:
+                case FLASH:
                     if ( codeOffset+1 >= codeSegment.length ) {
                         codeSegment = realloc( codeSegment , codeOffset+1);
                     }
                     codeSegment[ codeOffset++ ] = (byte) value;
                     break;
-                case INITIALIZED_DATA:
+                case SRAM:
                     if ( initDataOffset+1 >= initDataSegment.length ) {
                         initDataSegment = realloc( initDataSegment , initDataOffset+1 );
                     }
                     initDataSegment[ initDataOffset++ ] = (byte) value;
                     break;
-                case UNINITIALIZED_DATA:
+                case EEPROM:
                     uninitDataOffset += 1;
                     break;
                 default:
@@ -149,12 +159,6 @@ public class Assembler
             ast.addMessage( msg );
         }
 
-        @Override
-        public Phase phase() 
-        {
-            return phase;
-        }
-        
         public void setPhase(Phase phase) 
         {
             this.phase = phase;
@@ -168,20 +172,20 @@ public class Assembler
         @Override
         public void allocateByte() 
         {
-            allocate(1);
+            allocateBytes(1);
         }
         
-        private void allocate(int bytes) 
+        public void allocateBytes(int bytes)
         {
             switch( segment ) 
             {
-                case CODE:
+                case FLASH:
                     codeOffset+=bytes;
                     break;
-                case INITIALIZED_DATA:
+                case SRAM:
                     initDataOffset+=bytes;
                     break;
-                case UNINITIALIZED_DATA:
+                case EEPROM:
                     uninitDataOffset += bytes;
                     break;
                 default:
@@ -191,25 +195,32 @@ public class Assembler
 
         @Override
         public void allocateWord() {
-            allocate(2);
+            allocateBytes(2);
+        }
+
+        @Override
+        public boolean isInPhase(Phase p) {
+            return p.equals( this.phase );
+        }
+
+        @Override
+        public Phase currentPhase() {
+            return phase;
         }
     }
     
-    private Optional<Phase> nextPhase(Phase current) 
+    public Assembler() 
     {
-        if( current.equals( Phase.GATHER_SYMBOLS ) ){
-            return Optional.of( Phase.RESOLVE_SYMBOLS );
-        } else if( current.equals( Phase.RESOLVE_SYMBOLS ) ){
-            return Optional.of( Phase.GENERATE_CODE );
-        }
-        return Optional.empty();
+        phases.add( Phase.VALIDATE1 );
+        phases.add( Phase.GATHER_SYMBOLS );
+        phases.add( Phase.RESOLVE_SYMBOLS );
+        phases.add( Phase.VALIDATE2 );
+        phases.add( Phase.GENERATE_CODE );
     }
     
     public void assemble(AST ast,IConfig config) 
     {
         this.compilationContext = new CompilationContext( ast );
-        this.compilationContext.setPhase( Phase.GATHER_SYMBOLS );
-        
         this.config = config;
         
         if ( ast.hasErrors() ) 
@@ -217,25 +228,17 @@ public class Assembler
             return;
         }
         
-        while(true)
+        for ( Phase p : phases )
         {
-            logDebug("Assembler phase: "+compilationContext.phase());
+            logDebug("Assembler phase: "+compilationContext.currentPhase());
             
-            compilationContext.phase().onEnter(compilationContext);
-
+            this.compilationContext.setPhase( p );
+            
             ast.compile( compilationContext );
-            
-            compilationContext.phase().onExit(compilationContext);
             
             if ( ast.hasErrors() ) {
                 return;
             }
-            
-            final Optional<Phase> next = nextPhase( compilationContext.phase );
-            if ( ! next.isPresent() ) {
-                break;
-            }
-            compilationContext.setPhase( next.get() );
         } 
     }
     

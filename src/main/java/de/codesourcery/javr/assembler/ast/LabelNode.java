@@ -19,10 +19,10 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.ICompilationContext.Phase;
-import de.codesourcery.javr.assembler.ICompilationContext.Segment;
 import de.codesourcery.javr.assembler.Identifier;
 import de.codesourcery.javr.assembler.LabelSymbol;
 import de.codesourcery.javr.assembler.TextRegion;
+import de.codesourcery.javr.assembler.ast.SegmentNode.Segment;
 
 public class LabelNode extends ASTNode 
 {
@@ -39,9 +39,14 @@ public class LabelNode extends ASTNode
     @Override
     public void compile(ICompilationContext ctx) 
     {
-        if ( ctx.phase() == Phase.GATHER_SYMBOLS ) 
+        if ( ctx.isInPhase( Phase.GATHER_SYMBOLS ) ) 
         {
             ctx.getSymbolTable().defineSymbol( new LabelSymbol( this ) );
+        } 
+        else if ( ctx.isInPhase( Phase.RESOLVE_SYMBOLS ) ) 
+        {
+            final LabelSymbol symbol = (LabelSymbol) ctx.getSymbolTable().get( this.identifier );
+            symbol.setAddress( ctx.currentAddress() );
         }
     }
     

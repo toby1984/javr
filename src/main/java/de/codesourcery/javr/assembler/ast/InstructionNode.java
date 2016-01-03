@@ -15,15 +15,14 @@
  */
 package de.codesourcery.javr.assembler.ast;
 
-import java.util.List;
-
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
+import de.codesourcery.javr.assembler.ICompilationContext.Phase;
+import de.codesourcery.javr.assembler.Parser.CompilationMessage;
+import de.codesourcery.javr.assembler.ast.SegmentNode.Segment;
 import de.codesourcery.javr.assembler.Instruction;
 import de.codesourcery.javr.assembler.TextRegion;
-import de.codesourcery.javr.assembler.ICompilationContext.Phase;
-import de.codesourcery.javr.assembler.ICompilationContext.Segment;
 
 public class InstructionNode extends ASTNode 
 {
@@ -39,18 +38,33 @@ public class InstructionNode extends ASTNode
     @Override
     public void compile(ICompilationContext ctx) 
     {
-        if ( ctx.phase() == Phase.GENERATE_CODE ) 
+        if ( ctx.isInPhase( Phase.VALIDATE1 ) ) 
         {
-            ctx.setSegment( Segment.CODE );
-            final List<LabelNode> labels = ((StatementNode) getParent()).findLabels();
-            for ( LabelNode label : labels ) 
-            {
-                label.setSegment( Segment.CODE );
-                label.setAddress( ctx.currentOffset() );
+            if ( ctx.currentSegment() != Segment.FLASH ) {
+                ctx.message( CompilationMessage.error("Instructions need to be placed in CODE segment",this) );
             }
-            ctx.getArchitecture().compile( this , ctx );
-        }
+        } 
+        else if ( ctx.isInPhase( Phase.VALIDATE2 ) ) 
+        {
+            ctx.getArchitecture().validate( this , ctx );
+        } 
+        else if ( ctx.isInPhase( Phase.GATHER_SYMBOLS ) ) 
+        {
+            ctx.allocateBytes( ctx.getArchitecture().getInstructionLengthInBytes( this , ctx , true ) );
+        } 
+        else if ( ctx.isInPhase( Phase.GENERATE_CODE) ) 
+        {
+            ctx.getArchitecture().compile(this, ctx );
+        }        
     }
+    
+    public ASTNode src() {
+        return child(1);
+    }
+    
+    public ASTNode dst() {
+        return child(0);
+    }    
     
     @Override
     public String getAsString() {

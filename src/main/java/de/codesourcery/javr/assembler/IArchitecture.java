@@ -36,15 +36,24 @@ public interface IArchitecture {
     public int getSRAMMemorySize();
     
     // --
-    public boolean isValidRegister(String s);
-    
-    public Register parseRegister(String s);
-    
-    // --
     
     public boolean isValidInstruction(String s);
     
-    public Instruction parseInstruction(String s);    
+    public boolean validate(InstructionNode node,ICompilationContext context);
+    
+    /**
+     * Get/estimate instruction length.
+     * 
+     * <p>If the AST contains all required information this method will return the actual instruction length. If
+     * the AST does not contain all information required to select the shortest encoding, this method will return the length
+     * of the worst-case (=longest encoding).</p>
+     * 
+     * @param node
+     * @param context
+     * @param estimate
+     * @return
+     */
+    public int getInstructionLengthInBytes(InstructionNode node,ICompilationContext context,boolean estimate);    
     
     public void compile(InstructionNode node,ICompilationContext context);
 }

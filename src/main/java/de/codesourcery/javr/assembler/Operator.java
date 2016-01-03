@@ -53,13 +53,13 @@ public enum Operator
         return false;
     }
     
-    public static boolean isValidOperatorOrOperatorPrefix(String s) 
+    public static boolean isValidOperatorOrOperatorPrefix(char s) 
     {
         final Operator[] values = values();
         for (int i = 0 , len = values.length ; i < len ; i++) 
         {
             final Operator op = values[i];
-            if ( op.symbol.startsWith( s ) ) {
+            if ( op.symbol.charAt(0) == s ) {
                 return true;
             }
         }

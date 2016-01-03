@@ -20,34 +20,37 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ast.AST;
 import de.codesourcery.javr.assembler.ast.ASTNode;
+import de.codesourcery.javr.assembler.ast.CharacterLiteralNode;
 import de.codesourcery.javr.assembler.ast.CommentNode;
 import de.codesourcery.javr.assembler.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.ast.InstructionNode;
 import de.codesourcery.javr.assembler.ast.LabelNode;
 import de.codesourcery.javr.assembler.ast.NumberLiteralNode;
 import de.codesourcery.javr.assembler.ast.RegisterNode;
+import de.codesourcery.javr.assembler.ast.SegmentNode;
+import de.codesourcery.javr.assembler.ast.SegmentNode.Segment;
 import de.codesourcery.javr.assembler.ast.StatementNode;
+import de.codesourcery.javr.assembler.ast.StringLiteral;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
 
-public class Parser {
-
+public class Parser 
+{
     private Lexer lexer;
     private IArchitecture arch; 
     private AST ast = new AST();
-    
-    private final Set<TokenType> recoveryTokens = new HashSet<>(); 
-    
+
     public static enum Severity 
     {
         INFO,WARNING,ERROR;
     }
-    
+
     public static final class CompilationMessage 
     {
         public final Severity severity;
@@ -62,7 +65,7 @@ public class Parser {
             this.region = region;
             this.node = null;
         }
-        
+
         public CompilationMessage(Severity severity, String message,ASTNode node) 
         {
             this.severity = severity;
@@ -75,31 +78,55 @@ public class Parser {
         {
             this( severity , message , (TextRegion) null );
         }        
+        
+        public static CompilationMessage error(String msg,ASTNode node) {
+            return new CompilationMessage(Severity.ERROR , msg , node ); 
+        }
+        
+        public static CompilationMessage error(String msg,TextRegion region) {
+            return new CompilationMessage(Severity.ERROR , msg , region ); 
+        }        
+        
+        public static CompilationMessage info(String msg,ASTNode node) {
+            return new CompilationMessage(Severity.INFO , msg , node ); 
+        }
+        
+        public static CompilationMessage info(String msg,TextRegion region) {
+            return new CompilationMessage(Severity.INFO, msg , region ); 
+        }        
+        
+        public static CompilationMessage warning(String msg,ASTNode node) {
+            return new CompilationMessage(Severity.WARNING , msg , node ); 
+        }        
+        
+        public static CompilationMessage warning(String msg,TextRegion region) {
+            return new CompilationMessage(Severity.WARNING, msg , region ); 
+        }        
     }
-    
+
     public Parser() {
     }
-    
+
     public void setArchitecture(IArchitecture arch) {
-        
+
         Validate.notNull(arch, "arch must not be NULL");
         this.arch = arch;
     }
-    
+
     public AST parse(Lexer lexer) 
     {
         Validate.notNull(lexer, "lexer must not be NULL");
         if ( arch == null ) {
             throw new IllegalStateException("architecture must be set");
         }
-        
+
         this.lexer = lexer;
         this.ast = new AST();
-        
+
         // skip leading newlines since parseStatement()
         // only consumes trailing newlines
         parseEOL();
-        
+
         while ( ! lexer.eof() ) 
         {
             try {
@@ -109,67 +136,91 @@ public class Parser {
             {
                 e.printStackTrace();
                 ast.addMessage( new CompilationMessage(Severity.ERROR,e.getMessage(),lexer.peek().region() ) );
-                recoveryTokens.add(TokenType.EOL);
-                recover();
+                break; // TODO: Implement parse recovery
             }
         }
         return ast;
     }
-    
-    private void recover() 
-    {
-        if ( ! recoveryTokens.isEmpty() && ! lexer.eof() ) 
-        {
-            while ( ! lexer.eof() && ! recoveryTokens.contains( lexer.peek().type ) ) 
-            {
-                lexer.next();
-            }
-        }
-    }
-    
+
     private StatementNode parseStatement() 
     {
         final StatementNode result = new StatementNode();
-        
+
         // parse label
         final LabelNode label = parseLabel();
         if ( label != null ) {
             result.add( label );
         }
-        
-        // parse instruction
-        final InstructionNode insn = parseInstruction();
-        if ( insn!= null ) {
-            result.add( insn );
-        }        
-        
+
+        // parse .XXXX directive
+        final ASTNode directive = parseDirective();
+        if ( directive != null ) {
+            result.add( directive );
+        } 
+        else 
+        {
+            // parse instruction
+            final InstructionNode insn = parseInstruction();
+            if ( insn!= null ) {
+                result.add( insn );
+            }       
+        }
+
         // parse comment
         final CommentNode comment = parseComment();
         if ( comment != null ) {
             result.add( comment );
         }           
-        
+
         // parse EOF/EOL
         if ( ! parseEOL() ) {
             throw new ParseException("Expected EOF/EOL but got "+lexer.peek(),currentOffset());
         }
         return result;
     }
-    
-    private void recover(TokenType t1,TokenType...t2) 
+
+    private ASTNode parseDirective() 
     {
-        recoveryTokens.add(t1);
-        if ( t2 != null ) {
-            Stream.of( t2 ).forEach( t -> recoveryTokens.add( t ) );
+        Token tok = lexer.peek();
+        if ( tok.hasType( TokenType.DOT ) ) 
+        {
+            lexer.next();
+            final Token tok2 = lexer.peek();
+            if ( tok2.hasType(TokenType.TEXT ) ) 
+            {
+                final ASTNode result = parseDirective2( tok2 );
+                if ( result != null ) 
+                {
+                    lexer.next();
+                    result.getTextRegion().merge( tok.region() );
+                    return result;                    
+                }
+            }
+            lexer.pushBack( tok );
         }
-        recover();        
+        return null;
     }
-    
+
+    private ASTNode parseDirective2(Token tok2) 
+    {
+        final String value = tok2.value;
+        switch( value.toLowerCase() ) 
+        {
+            case "cseg": return new SegmentNode(Segment.FLASH, tok2.region() );
+            case "dseg": return new SegmentNode(Segment.SRAM, tok2.region() );
+            case "eseg": return new SegmentNode(Segment.EEPROM, tok2.region() );
+            case "byte":
+                
+                break;
+        }
+        return null;
+    }
+
     private int currentOffset() 
     {
         return lexer.peek().offset;
     }
-    
+
     private LabelNode parseLabel() 
     {
         final Token tok = lexer.peek();
@@ -185,21 +236,21 @@ public class Parser {
         }
         return null;
     }
-    
+
     private InstructionNode parseInstruction() 
     {
         Token tok = lexer.peek();
         if ( tok.hasType( TokenType.TEXT ) && arch.isValidInstruction( tok.value ) ) 
         {
             lexer.next();
-            final Instruction instruction = arch.parseInstruction( tok.value );
+            final Instruction instruction = new Instruction( tok.value );
             final InstructionNode result = new InstructionNode(instruction, tok.region());
             result.add( parseOperands() );
             return result;
         }
         return null;
     }
-    
+
     private List<ASTNode> parseOperands() {
         ASTNode n1 = parseOperand();
         if ( n1 == null ) {
@@ -216,42 +267,197 @@ public class Parser {
         } 
         return Arrays.asList(n1);
     }
-    
+
     private ASTNode parseOperand() 
     {
-        // number literal
+        // register ref
         ASTNode result = parseRegisterRef();
         if ( result != null ) {
             return result;
-        }          
-        
-        result = parseNumber();
-        if ( result != null ) {
-            return result;
-        }
-        
-        // identifier
-        return parseIdentifier();
+        } 
+        return parseExpression();
     }    
-    
+
+    private CharacterLiteralNode parseCharLiteral() 
+    {
+        final Token tok = lexer.peek();
+        if ( tok.hasType( TokenType.SINGLE_QUOTE ) ) 
+        {
+            lexer.setIgnoreWhitespace( false );
+            try 
+            {            
+                lexer.next();
+                final Token tok2 = lexer.next();
+                if ( tok2.value.length() != 1 ) 
+                {
+                    throw new ParseException("Expected a single character", tok2.offset);
+                }
+                final Token tok3 = lexer.next();
+                if ( ! tok3.hasType( TokenType.SINGLE_QUOTE ) ) {
+                    throw new ParseException("Expected closing single-quote" , tok3.offset);
+                }
+                return new CharacterLiteralNode( tok2.value.charAt(0) , tok.region().merge( tok2 ).merge( tok3 ) );
+            } finally {
+                lexer.setIgnoreWhitespace(true);
+            }
+        }
+        return null;
+    }
+
+    private StringLiteral parseStringLiteral() 
+    {
+        final Token tok = lexer.peek();
+        if ( tok.hasType( TokenType.DOUBLE_QUOTE ) ) 
+        {
+            lexer.setIgnoreWhitespace( false );
+            try 
+            {
+                lexer.next();
+                final StringBuilder buffer = new StringBuilder();
+                do 
+                {
+                    final Token tok2 = lexer.peek();
+                    if ( tok2.hasType( TokenType.EOL ,TokenType.EOF , TokenType.DOUBLE_QUOTE ) ) 
+                    {
+                        break;
+                    }
+                    lexer.next();
+                    buffer.append( tok2.value );
+                } while ( ! lexer.eof() );
+
+                if ( ! lexer.peek( TokenType.DOUBLE_QUOTE ) ) {
+                    throw new ParseException("Unterminated string literal", lexer.peek().offset );
+                }
+                final Token tok3 = lexer.next();
+                return new StringLiteral( buffer.toString() , tok.region().merge( tok3) );
+            } finally {
+                lexer.setIgnoreWhitespace( true );
+            }
+        }
+        return null;
+    }    
+
     private RegisterNode parseRegisterRef() 
     {
-        Token tok = lexer.peek();
-        if ( arch.isValidRegister( tok.value ) ) 
+        final Token tok = lexer.peek();
+        TextRegion region = tok.region();
+        boolean preDecrement = tok.hasType( TokenType.OPERATOR ) && tok.value.equals("-");
+        if ( preDecrement) {
+            lexer.next();
+        }
+        String name = parseRegisterName(region);
+        if ( name != null ) 
         {
-            final StringBuilder buffer = new StringBuilder();
-            final TextRegion region = tok.region();
-            buffer.append( lexer.next().value );
-            while ( ! lexer.eof() && arch.isValidRegister( buffer.toString() + lexer.peek().value ) ) {
-                tok = lexer.next();
-                region.merge( tok.region() );
-                buffer.append( tok.value );
+            if ( ! isCompoundRegister( name ) ) 
+            {
+                if ( lexer.peek(TokenType.COLON ) ) {
+                    region.merge( lexer.next() );
+                    final String otherName = parseRegisterName( region );
+                    if ( otherName == null ) {
+                        throw new ParseException("Expected another register name",lexer.peek());
+                    }
+                    name = name +":" + otherName;
+                }
             }
-            return new RegisterNode( arch.parseRegister( buffer.toString() ) , region );
+            final boolean postIncrement = lexer.peek(TokenType.OPERATOR) && lexer.peek().value.equals("+");
+            ASTNode displacement = null;
+            if ( postIncrement ) 
+            {
+                if ( preDecrement ) {
+                    throw new ParseException("Either pre-decrement or post-increment are possible but not both",lexer.peek());
+                }
+                region.merge( lexer.next() );
+                displacement = parseExpression();
+            }            
+            final Register reg = new Register( name , postIncrement && displacement == null , preDecrement );
+            final RegisterNode result = new RegisterNode( reg , region );
+            if ( displacement != null ) {
+                result.add( displacement );
+            }
+            return result;
+        }
+        if ( preDecrement ) {
+            lexer.pushBack( tok );
         }
         return null;
     }
     
+    private ASTNode parseExpression() 
+    {
+        // character literal
+        ASTNode result = parseCharLiteral();
+        if ( result != null ) {
+            return result;
+        }
+
+        // string literal
+        result = parseStringLiteral();
+        if ( result != null ) {
+            return result;
+        }
+
+        // number literal
+        result = parseNumber();
+        if ( result != null ) {
+            return result;
+        }
+
+        // identifier
+        return parseIdentifier(); 
+    }
+    
+    private boolean isCompoundRegister(String name) {
+        switch( name.toLowerCase() ) {
+            case "x":
+            case "y":
+            case "z":
+                return true;
+            default:
+                return false;
+        }
+    }
+    
+    private String parseRegisterName(TextRegion region) 
+    {
+        final Token tok = lexer.peek();
+        if ( tok.hasType(TokenType.TEXT) )
+        {
+            lexer.next();
+            final String lower = tok.value.toLowerCase();
+            if ( lower.charAt(0) == 'r' ) 
+            {
+                final String sub = tok.value.substring(1);
+                if ( isNumber(sub) ) 
+                {
+                    region.merge( tok );
+                    return tok.value;
+                }
+            }
+            switch( lower ) {
+                case "x":
+                case "y":
+                case "z":
+                    region.merge( tok );
+                    return tok.value;
+            }
+            lexer.pushBack( tok );
+        }
+        return null;
+    }
+    
+    private static final boolean isNumber(String s) 
+    {
+        if ( s == null || s.length() == 0) {
+            return false;
+        }
+        for ( int i = 0 , len=s.length() ; i < len ; i++ ) {
+            if ( ! Character.isDigit( s.charAt(i) ) ) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private NumberLiteralNode parseNumber() 
     {
         Token tok = lexer.peek();
@@ -262,7 +468,7 @@ public class Parser {
         }
         return null;
     }
-    
+
     private IdentifierNode parseIdentifier() {
         Token tok = lexer.peek();
         if ( Identifier.isValidIdentifier( tok.value ) ) 
@@ -272,7 +478,7 @@ public class Parser {
         }
         return null;
     }
-    
+
     private CommentNode parseComment() 
     {
         final Token tok = lexer.peek();
@@ -297,13 +503,13 @@ public class Parser {
         }
         return null;
     }
-    
+
     private boolean parseEOL() {
-        
+
         if ( lexer.eof() ) {
             return true;
         }
-                
+
         if ( lexer.peek( TokenType.EOL ) ) 
         {
             do {

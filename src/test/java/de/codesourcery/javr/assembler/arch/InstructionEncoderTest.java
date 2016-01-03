@@ -69,6 +69,13 @@ public class InstructionEncoderTest
     } 
     
     @Test
+    public void testFreeFormMapping() {
+        enc = new InstructionEncoder("10s0 ss0d dddd 1sss");
+        Assert.assertEquals(2,  enc.getArgumentCount() );
+        final int value = enc.encode( 0b1010 , 0b111001 );
+        assertBinary( 0b1010_1100_1010_1001 , value );
+    }
+    @Test
     public void testADD() 
     {
         enc = new InstructionEncoder("000011sdddddssss");

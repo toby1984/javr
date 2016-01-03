@@ -17,9 +17,10 @@ package de.codesourcery.javr.assembler.ast;
 
 import org.apache.commons.lang3.StringUtils;
 
+import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.TextRegion;
 
-public class NumberLiteralNode extends ASTNode 
+public class NumberLiteralNode extends ASTNode implements IValueNode
 {
     public static enum LiteralType {
         DECIMAL,
@@ -48,10 +49,16 @@ public class NumberLiteralNode extends ASTNode
         }
     }
     
-    public int getValue() 
+    @Override
+    public void resolveValue(ICompilationContext context) 
+    {
+    }
+    
+    @Override
+    public Integer getValue() 
     {
         return value;
-    }
+    }    
     
     public LiteralType getType() {
         return type;

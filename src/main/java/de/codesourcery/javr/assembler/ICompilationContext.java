@@ -16,36 +16,30 @@
 package de.codesourcery.javr.assembler;
 
 import de.codesourcery.javr.assembler.Parser.CompilationMessage;
+import de.codesourcery.javr.assembler.ast.SegmentNode.Segment;
 
 public interface ICompilationContext 
 {
     public static enum Phase 
     {
+        VALIDATE1,
         GATHER_SYMBOLS,
         RESOLVE_SYMBOLS,
+        VALIDATE2,
         GENERATE_CODE;
-        
-        public void onEnter(ICompilationContext ctx) {
-            
-        }
-        
-        public void onExit(ICompilationContext ctx) {
-            
-        }        
-    }
-    
-    public static enum Segment 
-    {
-        CODE,
-        INITIALIZED_DATA,
-        UNINITIALIZED_DATA
     }
     
     public SymbolTable getSymbolTable();
     
     public int currentOffset();
     
+    public Address currentAddress();
+    
     public Segment currentSegment();
+    
+    public Phase currentPhase();
+    
+    public boolean isInPhase(Phase p);    
     
     public void setSegment(Segment s);
     
@@ -59,9 +53,9 @@ public interface ICompilationContext
     
     public void allocateWord();
     
-    public void message(CompilationMessage msg);
+    public void allocateBytes(int numberOfBytes);    
     
-    public Phase phase();
+    public void message(CompilationMessage msg);
     
     public IArchitecture getArchitecture();
 }

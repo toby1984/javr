@@ -29,5 +29,6 @@ public enum TokenType
     SEMICOLON,
     DOT,
     COMMA,
-    QUOTE;
+    SINGLE_QUOTE,
+    DOUBLE_QUOTE;
 }
