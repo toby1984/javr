@@ -57,7 +57,7 @@ public class GatherSymbols implements Phase
                 }
             }
 
-            private void defineSymbol(ASTNode node,final Symbol<?> symbol) 
+            private void defineSymbol(ASTNode node,final Symbol<?,?> symbol) 
             {
                 try {
                     context.getSymbolTable().defineSymbol( symbol );

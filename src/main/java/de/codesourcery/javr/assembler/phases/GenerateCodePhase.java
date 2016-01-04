@@ -100,5 +100,4 @@ public class GenerateCodePhase implements Phase
             ctx.dontGoDeeper();
         }
     }    
-
 }

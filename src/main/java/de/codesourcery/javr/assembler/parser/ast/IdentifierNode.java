@@ -19,19 +19,16 @@ import java.util.Optional;
 
 import org.apache.commons.lang3.Validate;
 
-import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.TextRegion;
-import de.codesourcery.javr.assembler.symbols.LabelSymbol;
 import de.codesourcery.javr.assembler.symbols.Symbol;
-import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 
 public class IdentifierNode extends ASTNode implements IValueNode {
 
     public final Identifier value;
 
-    private Address resolvedValue;
+    private Object resolvedValue;
     
     public IdentifierNode(Identifier id,TextRegion region) {
         super(region);
@@ -43,21 +40,17 @@ public class IdentifierNode extends ASTNode implements IValueNode {
     public String getAsString() {
         return value.value;
     }
+    
+    public boolean resolveValue(ICompilationContext context) 
+    {
+        final Optional<Symbol<?, ?>> symbol = context.getSymbolTable().maybeGet( value );
+        final Object value = symbol.isPresent() ? symbol.get().getValue() : null;
+        this.resolvedValue = value;
+        return value != null;
+    }
 
     @Override
-    public void resolveValue(ICompilationContext context) 
-    {
-        final Optional<Symbol<?>> symbol = context.getSymbolTable().maybeGet( this.value );
-        if ( symbol.isPresent() && symbol.get().hasType( Type.LABEL ) ) 
-        {
-            final LabelSymbol label = (LabelSymbol) symbol.get();
-            resolvedValue = label.getAddress();
-        } else {
-            resolvedValue = null;
-        }
-    }    
-    @Override
-    public Address getValue()
+    public Object getValue()
     {
         return resolvedValue;
     }

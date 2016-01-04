@@ -1,9 +1,6 @@
 package de.codesourcery.javr.assembler.phases;
 
-import org.apache.commons.lang3.Validate;
-
 import de.codesourcery.javr.assembler.ICompilationContext;
-import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
@@ -11,20 +8,18 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode.IASTVisitor;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
+import de.codesourcery.javr.assembler.parser.ast.EquLabelNode;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
-import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
+import de.codesourcery.javr.assembler.symbols.EquSymbol;
 import de.codesourcery.javr.assembler.symbols.LabelSymbol;
 
 public class PrepareGenerateCode extends GenerateCodePhase
 {
-    private final IArchitecture architecture;
     
-    public PrepareGenerateCode(IArchitecture architecture) 
+    public PrepareGenerateCode() 
     {
         super(true);
-        Validate.notNull(architecture, "architecture must not be NULL");
-        this.architecture = architecture;
     }
     
     @Override
@@ -51,7 +46,7 @@ public class PrepareGenerateCode extends GenerateCodePhase
                 {
                     final Identifier identifier = ((LabelNode) node).identifier;
                     LabelSymbol s = (LabelSymbol) context.getSymbolTable().get( identifier );
-                    s.setAddress( context.currentAddress() );
+                    s.setValue( context.currentAddress() );
                 }
                 visitNode( context , node , fakeCtx );
             }
@@ -65,6 +60,12 @@ public class PrepareGenerateCode extends GenerateCodePhase
             @Override
             public void visit(ASTNode node, IIterationContext ctx) 
             {
+               if ( node instanceof IValueNode ) 
+               {
+                   if ( ! ((IValueNode) node).resolveValue( context ) ) {
+                       context.error( "Failed to resolve value for ", node );
+                   }
+               }
                if ( node instanceof DirectiveNode ) 
                {
                    final Directive directive = ((DirectiveNode) node).directive;
@@ -72,10 +73,12 @@ public class PrepareGenerateCode extends GenerateCodePhase
                    {
                        case EQU:
                            // first child is EquLabelNode
-                           for ( int i = 1 ; i < node.childCount() ; i++ ) 
-                           {
-                               checkResolved( node.child(i) );
-                           }
+                           final EquLabelNode labelNode = (EquLabelNode) node.firstChild();
+                           final EquSymbol symbol = (EquSymbol) context.getSymbolTable().get( labelNode.name );
+                           
+                           checkResolved( node.child(1) );
+                           final Object v = ((IValueNode) node.child(1) ).getValue();
+                           symbol.setValue( v );
                            break;
                        case INIT_BYTES:
                        case INIT_WORDS:
@@ -126,10 +129,13 @@ public class PrepareGenerateCode extends GenerateCodePhase
             private Number getValue(ASTNode node) 
             {
                 Object value = ((IValueNode) node).getValue();
-                if ( value instanceof Number) 
+                if ( value == null ) {
+                    context.error( "Failed to resolve value for ", node );
+                } 
+                else if ( value instanceof Number) 
                 {
                     return ((Number) value).intValue();
-                } 
+                }  
                 context.error("Expected a number but got "+value, node );                    
                 return null;
             }

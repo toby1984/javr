@@ -19,11 +19,12 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.parser.Identifier;
 
-public abstract class Symbol<T> 
+public abstract class Symbol<T,VALUETYPE> 
 {
     private final Identifier name;
     private final T node;
     private Type type;
+    private VALUETYPE value;
     
     public static enum Type 
     {
@@ -41,19 +42,28 @@ public abstract class Symbol<T>
         this.type = type;
     }
     
-    public Type getType() {
+    public final Type getType() {
         return type;
     }
     
-    public boolean hasType(Type t) {
+    public final boolean hasType(Type t) {
         return t.equals( this.type );
     }
     
-    public Identifier name() {
+    public final Identifier name() {
         return name;
     }
     
-    public T getNode() {
+    public final T getNode() {
         return node;
+    }
+    
+    public final VALUETYPE getValue() {
+        return value;
+    }
+    
+    public final void setValue(VALUETYPE value) {
+        Validate.notNull(value, "value must not be NULL");
+        this.value = value;
     }
 }

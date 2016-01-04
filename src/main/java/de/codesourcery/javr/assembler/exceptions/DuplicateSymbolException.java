@@ -21,10 +21,10 @@ import de.codesourcery.javr.assembler.symbols.Symbol;
 
 public class DuplicateSymbolException extends RuntimeException 
 {
-    private final Symbol<?> newSymbol;
-    private final Symbol<?> existingSymbol;
+    private final Symbol<?,?> newSymbol;
+    private final Symbol<?,?> existingSymbol;
 
-    public DuplicateSymbolException(Symbol<?> newSymbol,Symbol<?> existingSymbol) 
+    public DuplicateSymbolException(Symbol<?,?> newSymbol,Symbol<?,?> existingSymbol) 
     {
         super("Duplicate symbol "+newSymbol+" clashes with "+existingSymbol);
         Validate.notNull(newSymbol, "newSymbol must not be NULL");
@@ -33,11 +33,11 @@ public class DuplicateSymbolException extends RuntimeException
         this.existingSymbol = existingSymbol;
     }
 
-    public Symbol<?> getNewSymbol() {
+    public Symbol<?,?> getNewSymbol() {
         return newSymbol;
     }
     
-    public Symbol<?> getExistingSymbol() {
+    public Symbol<?,?> getExistingSymbol() {
         return existingSymbol;
     }
 }

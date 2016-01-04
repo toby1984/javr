@@ -1,6 +1,5 @@
 package de.codesourcery.javr.assembler.parser.ast;
 
-import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 
 public class CharacterLiteralNode extends ASTNode implements IValueNode {
@@ -18,10 +17,6 @@ public class CharacterLiteralNode extends ASTNode implements IValueNode {
         return Integer.valueOf( value );
     }
 
-    @Override
-    public void resolveValue(ICompilationContext context) {
-    }
-    
     @Override
     protected CharacterLiteralNode createCopy() 
     {

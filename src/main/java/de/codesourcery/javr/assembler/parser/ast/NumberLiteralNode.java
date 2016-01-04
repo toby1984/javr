@@ -18,7 +18,6 @@ package de.codesourcery.javr.assembler.parser.ast;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
-import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 
 public class NumberLiteralNode extends ASTNode implements IValueNode
@@ -61,11 +60,6 @@ public class NumberLiteralNode extends ASTNode implements IValueNode
     protected NumberLiteralNode createCopy() 
     {
         return new NumberLiteralNode( this.value , this.type , getTextRegion().createCopy() );
-    }
-    
-    @Override
-    public void resolveValue(ICompilationContext context) 
-    {
     }
     
     @Override

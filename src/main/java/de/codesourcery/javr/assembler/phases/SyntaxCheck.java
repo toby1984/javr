@@ -9,7 +9,6 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode.IASTVisitor;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
-import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 
 public class SyntaxCheck implements Phase 
@@ -35,7 +34,7 @@ public class SyntaxCheck implements Phase
                {
                    final Directive directive = ((DirectiveNode) node).directive;
                    int operandCount = node.childCount();
-                   if ( directive == Directive.EQU ) {
+                   if ( directive == Directive.EQU ) { // .equ is special since the first child node is the label, not an operand
                        operandCount = operandCount > 0 ? operandCount-1 : operandCount;
                    } 
                    if ( ! directive.isValidOperandCount( node.childCount() ) ) {
@@ -49,21 +48,11 @@ public class SyntaxCheck implements Phase
                        case ESEG: context.setSegment( Segment.EEPROM ); break;
                        case INIT_BYTES:
                        case INIT_WORDS:
-                           for ( ASTNode child : node.children ) 
-                           {
-                               Object value = ((IValueNode) child).getValue();
-                           }
-                           break;
                        case RESERVE:
-                           switch( context.currentSegment() ) 
+                           if( context.currentSegment() != Segment.SRAM && context.currentSegment() != Segment.EEPROM ) 
                            {
-                               case EEPROM:
-                               case SRAM:
-                                   break;
-                               default:
-                                   context.message( CompilationMessage.error("Cannot reserve bytes in "+context.currentSegment()+" segment, only SRAM and EEPROM are supported",node ) );
+                               context.message( CompilationMessage.error("Cannot reserve bytes in "+context.currentSegment()+" segment, only SRAM and EEPROM are supported",node ) );
                            }
-                           ctx.dontGoDeeper();                            
                            break;
                        default:
                            throw new RuntimeException("Internal error, unhandled directive "+directive);

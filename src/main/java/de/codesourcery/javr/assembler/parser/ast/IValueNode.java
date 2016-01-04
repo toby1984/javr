@@ -4,7 +4,9 @@ import de.codesourcery.javr.assembler.ICompilationContext;
 
 public interface IValueNode 
 {
-    public void resolveValue(ICompilationContext context);
+    public default boolean resolveValue(ICompilationContext context) {
+        return true;
+    }
     
     public Object getValue();
 }

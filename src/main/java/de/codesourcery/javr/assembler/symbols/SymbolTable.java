@@ -29,7 +29,7 @@ public class SymbolTable
 {
     private SymbolTable parent;
     
-    private final Map<Identifier,Symbol<?>> symbols = new HashMap<>();
+    private final Map<Identifier,Symbol<?,?>> symbols = new HashMap<>();
     
     public SymbolTable() {
     }
@@ -39,23 +39,23 @@ public class SymbolTable
         this.parent = parent;
     }
     
-    public Symbol<?> get(Identifier name) 
+    public Symbol<?,?> get(Identifier name) 
     {
-        final Symbol<?> result = internalGet(name);
+        final Symbol<?,?> result = internalGet(name);
         if ( result != null ) {
             return result;
         }
         throw new UnknownSymbolException( name );
     }
     
-    public Optional<Symbol<?>> maybeGet(Identifier name) 
+    public Optional<Symbol<?,?>> maybeGet(Identifier name) 
     {
         return Optional.ofNullable( internalGet( name ) );
     }    
     
-    public Symbol<?> internalGet(Identifier name) 
+    public Symbol<?,?> internalGet(Identifier name) 
     {
-        final Symbol<?> result = symbols.get( name );
+        final Symbol<?,?> result = symbols.get( name );
         if ( result == null && parent != null ) {
             return parent.get( name );
         }
@@ -65,7 +65,7 @@ public class SymbolTable
     public void declareSymbol(Identifier name) 
     {
         Validate.notNull(name, "name must not be NULL");
-        Symbol<?> existing = internalGet(name);
+        Symbol<?,?> existing = internalGet(name);
         if ( existing == null ) {
             this.symbols.put( name , null );
         }
@@ -77,10 +77,10 @@ public class SymbolTable
         return symbols.get(name) != null;
     }
     
-    public void defineSymbol(Symbol<?> symbol) 
+    public void defineSymbol(Symbol<?,?> symbol) 
     {
         Validate.notNull(symbol, "symbol must not be NULL");
-        Symbol<?> existing = internalGet( symbol.name() );
+        Symbol<?,?> existing = internalGet( symbol.name() );
         if ( existing != null ) {
             throw new DuplicateSymbolException( symbol , existing );
         }

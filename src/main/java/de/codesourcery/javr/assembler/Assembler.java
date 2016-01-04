@@ -26,8 +26,11 @@ import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.phases.GatherSymbols;
+import de.codesourcery.javr.assembler.phases.GenerateCodePhase;
 import de.codesourcery.javr.assembler.phases.ParseSource;
 import de.codesourcery.javr.assembler.phases.Phase;
+import de.codesourcery.javr.assembler.phases.PrepareGenerateCode;
+import de.codesourcery.javr.assembler.phases.SyntaxCheck;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.ui.IConfig;
 import de.codesourcery.javr.ui.IConfigProvider;
@@ -253,11 +256,16 @@ public class Assembler
         
         final List<Phase> phases = new ArrayList<>();
         phases.add( new ParseSource(config) );
+        phases.add( new SyntaxCheck() );
         phases.add( new GatherSymbols() );
+        phases.add( new PrepareGenerateCode() );
+        phases.add( new GenerateCodePhase() );
         
         for ( Phase p : phases )
         {
-            logDebug("Assembler phase: "+p);
+            if ( debug ) {
+                LOG.info("Assembler phase: "+p);
+            }
             
             try {
                 p.run( compilationContext );
@@ -274,13 +282,6 @@ public class Assembler
             if ( p.stopOnErrors() && unit.getAST().hasErrors() ) {
                 return;
             }
-        }
-    }
-    
-    private void logDebug(String msg) 
-    {
-        if ( debug ) {
-            System.out.println(msg);
         }
     }
     
