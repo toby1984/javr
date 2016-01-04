@@ -1,13 +1,13 @@
 package de.codesourcery.javr.assembler.symbols;
 
 import de.codesourcery.javr.assembler.parser.Identifier;
-import de.codesourcery.javr.assembler.parser.ast.EquNode;
+import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 
-public class EquSymbol extends Symbol<EquNode> 
+public class EquSymbol extends Symbol<DirectiveNode> 
 {
     private Object value;
     
-    public EquSymbol(Identifier name,EquNode node) 
+    public EquSymbol(Identifier name,DirectiveNode node) 
     {
         super(name, Type.EQU, node);
     }

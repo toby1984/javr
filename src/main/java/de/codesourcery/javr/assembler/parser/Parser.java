@@ -24,26 +24,22 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.Instruction;
 import de.codesourcery.javr.assembler.Register;
-import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.CharacterLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.CommentNode;
+import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
+import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.EquLabelNode;
-import de.codesourcery.javr.assembler.parser.ast.EquNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
-import de.codesourcery.javr.assembler.parser.ast.InitMemNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
 import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
-import de.codesourcery.javr.assembler.parser.ast.ReserveMemNode;
-import de.codesourcery.javr.assembler.parser.ast.SegmentNode;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
 import de.codesourcery.javr.assembler.parser.ast.StringLiteral;
-import de.codesourcery.javr.assembler.parser.ast.InitMemNode.ElementSize;
 
 public class Parser 
 {
@@ -221,27 +217,24 @@ public class Parser
                 final ASTNode expr = parseExpression();
                 if ( expr != null ) 
                 {
-                    final ReserveMemNode result = new ReserveMemNode();
+                    final DirectiveNode result = new DirectiveNode( Directive.RESERVE );
                     result.add( expr );
                     return result;
                 }
                 break;
-            case "cseg": return new SegmentNode(Segment.FLASH, tok2.region() );
+            case "dseg": return new DirectiveNode(Directive.DSEG , tok2.region() );
+            case "eseg": return new DirectiveNode(Directive.ESEG , tok2.region() );
+            case "cseg": return new DirectiveNode(Directive.CSEG , tok2.region() );
             case "db":
             case "dw":
-                final List<ASTNode> values = parseExpressionList();
-                if ( ! values.isEmpty() )
-                {
-                    final ElementSize size = value.toLowerCase().equals("db") ? ElementSize.BYTE : ElementSize.WORD;
-                    final InitMemNode result = new InitMemNode( size );
-                    result.add( values );
-                    return result;
+                final DirectiveNode result =  new DirectiveNode( value.toLowerCase().equals("db") ? Directive.INIT_BYTES : Directive.INIT_WORDS ); 
+                final List<ASTNode> values = parseExpressionList();                
+                if ( values.isEmpty() ) {
+                    throw new ParseException( "Missing expression" , lexer.peek() );
                 }
-                break;            
-            case "dseg": 
-                return new SegmentNode(Segment.SRAM, tok2.region() );
-            case "eseg": 
-                return new SegmentNode(Segment.EEPROM, tok2.region() );
+                result.add( values );
+                return result;
+
             case "equ":
                 if ( lexer.peek(TokenType.TEXT ) && Identifier.isValidIdentifier( lexer.peek().value ) ) 
                 {
@@ -252,10 +245,10 @@ public class Parser
                         lexer.next();
                         final ASTNode expr2 = parseExpression();
                         if ( expr2 != null ) {
-                            final EquNode result = new EquNode();
-                            result.add( new EquLabelNode( name , tok.region() ) );
-                            result.add( expr2 );
-                            return result;
+                            final DirectiveNode result2 = new DirectiveNode(Directive.EQU);
+                            result2.add( new EquLabelNode( name , tok.region() ) );
+                            result2.add( expr2 );
+                            return result2;
                         }
                         throw new ParseException("Expected an expression",lexer.peek());
                     } 

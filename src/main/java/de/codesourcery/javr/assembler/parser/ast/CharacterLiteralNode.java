@@ -21,4 +21,10 @@ public class CharacterLiteralNode extends ASTNode implements IValueNode {
     @Override
     public void resolveValue(ICompilationContext context) {
     }
+    
+    @Override
+    protected CharacterLiteralNode createCopy() 
+    {
+        return new CharacterLiteralNode( this.value , getTextRegion().createCopy() );
+    }      
 }

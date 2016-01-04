@@ -19,9 +19,10 @@ import org.apache.commons.lang3.Validate;
 
 public class Instruction {
 
-    private String name;
+    private final String name;
     
-    public Instruction(String name) {
+    public Instruction(String name) 
+    {
         Validate.notBlank(name, "name must not be NULL or blank");
         this.name = name.toLowerCase();
     }
@@ -31,6 +32,10 @@ public class Instruction {
             return this.name.equals( ((Instruction) obj).name );
         }
         return false;
+    }
+    
+    public Instruction createCopy() {
+        return this;
     }
     
     public String getMnemonic() {

@@ -19,22 +19,27 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang3.Validate;
+import org.apache.log4j.Logger;
 
-import de.codesourcery.javr.assembler.ICompilationContext.Phase;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.AST;
+import de.codesourcery.javr.assembler.parser.ast.ASTNode;
+import de.codesourcery.javr.assembler.phases.GatherSymbols;
+import de.codesourcery.javr.assembler.phases.ParseSource;
+import de.codesourcery.javr.assembler.phases.Phase;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.ui.IConfig;
+import de.codesourcery.javr.ui.IConfigProvider;
 
 public class Assembler 
 {
+    private static final Logger LOG = Logger.getLogger(Assembler.class);
+    
     private IConfig config;
     private CompilationContext compilationContext;
     
     private boolean debug;
-    
-    private final List<Phase> phases = new ArrayList<>();
     
     private final class CompilationContext implements ICompilationContext 
     {
@@ -47,12 +52,14 @@ public class Assembler
         
         private byte[] codeSegment = new byte[0];
         private byte[] initDataSegment = new byte[0];
+        
+        private final CompilationUnit compilationUnit;
         private final AST ast;
-        private Phase phase;
         
         public CompilationContext(CompilationUnit unit) 
         {
             Validate.notNull(unit, "unit must not be NULL");
+            this.compilationUnit = unit;
             this.ast = unit.getAST();
             this.symbolTable = unit.getSymbolTable();
         }
@@ -158,15 +165,15 @@ public class Assembler
             writeByte( value ); // little endian
             writeByte( value >> 8 );
         }
+        
+        @Override
+        public void error(String message, ASTNode node) {
+            message( CompilationMessage.error(message,node ) );
+        }
 
         @Override
         public void message(CompilationMessage msg) {
             ast.addMessage( msg );
-        }
-
-        public void setPhase(Phase phase) 
-        {
-            this.phase = phase;
         }
 
         @Override
@@ -204,53 +211,70 @@ public class Assembler
         }
 
         @Override
-        public boolean isInPhase(Phase p) {
-            return p.equals( this.phase );
+        public CompilationUnit getCompilationUnit() {
+            return compilationUnit;
         }
 
         @Override
-        public Phase currentPhase() {
-            return phase;
+        public int getBytesRemainingInCurrentSegment() 
+        {
+            final IArchitecture architecture = config.getArchitecture();
+            final int available;
+            switch( currentSegment() ) 
+            {
+             case EEPROM:
+                 available = architecture.getEEPromSize();
+                 break;
+             case FLASH:
+                 available = architecture.getFlashMemorySize();
+                 break;
+             case SRAM:
+                 available = architecture.getSRAMMemorySize();
+                 break;
+             default:
+                 throw new RuntimeException("Unreachable code reached");
+            }
+            final int remainingBytes = available - currentAddress().getByteAddress();
+            if ( remainingBytes < 0 ) {
+                LOG.warn("getBytesRemainingInCurrentSegment(): Segment overrun ("+currentSegment()+")");
+                return 0;
+            }
+            return remainingBytes;
         }
     }
     
-    public Assembler() 
-    {
-        phases.add( Phase.VALIDATE1 );
-        phases.add( Phase.GATHER_SYMBOLS );
-        phases.add( Phase.RESOLVE_SYMBOLS );
-        phases.add( Phase.VALIDATE2 );
-        phases.add( Phase.GENERATE_CODE );
-    }
-    
-    public void assemble(CompilationUnit unit,IConfig config) 
+    public void assemble(CompilationUnit unit,IConfigProvider config) 
     {
         Validate.notNull(unit, "unit must not be NULL");
-        Validate.notNull(config, "config must not be NULL");
-        
-        final AST ast = unit.getAST();
-        Validate.notNull(ast, "ast must not be NULL");
+        Validate.notNull(config, "provider must not be NULL");
         
         this.compilationContext = new CompilationContext( unit );
-        this.config = config;
+        this.config = config.getConfig();
         
-        if ( ast.hasErrors() ) 
-        {
-            return;
-        }
+        final List<Phase> phases = new ArrayList<>();
+        phases.add( new ParseSource(config) );
+        phases.add( new GatherSymbols() );
         
         for ( Phase p : phases )
         {
-            logDebug("Assembler phase: "+compilationContext.currentPhase());
+            logDebug("Assembler phase: "+p);
             
-            this.compilationContext.setPhase( p );
+            try {
+                p.run( compilationContext );
+            } 
+            catch (Exception e) 
+            {
+                LOG.error("assemble(): ",e);
+                if ( e instanceof RuntimeException) {
+                    throw (RuntimeException) e;
+                }
+                throw new RuntimeException(e);
+            }
             
-            ast.compile( compilationContext );
-            
-            if ( ast.hasErrors() ) {
+            if ( p.stopOnErrors() && unit.getAST().hasErrors() ) {
                 return;
             }
-        } 
+        }
     }
     
     private void logDebug(String msg) 

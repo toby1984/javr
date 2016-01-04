@@ -15,4 +15,9 @@ public class StringLiteral extends ASTNode
         Validate.notNull(value, "value must not be NULL");
         this.value = value;
     }
+
+    @Override
+    protected StringLiteral createCopy() {
+        return new StringLiteral(value,getTextRegion().createCopy());
+    }
 }

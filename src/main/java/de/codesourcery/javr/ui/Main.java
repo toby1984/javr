@@ -16,17 +16,25 @@
 package de.codesourcery.javr.ui;
 
 import java.awt.Dimension;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Paths;
 
 import javax.swing.JDesktopPane;
 import javax.swing.JFrame;
 import javax.swing.JInternalFrame;
 import javax.swing.SwingUtilities;
 
+import de.codesourcery.javr.assembler.Binary;
+import de.codesourcery.javr.assembler.ResourceFactory;
+import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.Parser;
 import de.codesourcery.javr.assembler.parser.Scanner;
+import de.codesourcery.javr.assembler.util.FileResource;
+import de.codesourcery.javr.assembler.util.Resource;
 
 public class Main 
 {
@@ -64,6 +72,38 @@ public class Main
             @Override
             public String getEditorIndentString() {
                 return "  ";
+            }
+
+            @Override
+            public ResourceFactory getResourceFactory() 
+            {
+                String path = Paths.get(".").toAbsolutePath().normalize().toString();
+                while ( path.length() > File.pathSeparator.length() && path.endsWith( File.pathSeparator ) ) {
+                    path = path.substring(0 , path.length()-1 );
+                }
+                final String pwd = path;
+                final File pwdFile = new File( path );
+                return new ResourceFactory() 
+                {
+                    @Override
+                    public Resource resolveResource(Resource parent, String child) throws IOException {
+                        return new FileResource( new File(pwdFile,child) ,  Resource.ENCODING_UTF );
+                    }
+                    
+                    @Override
+                    public Resource getResource(Binary binary, Segment segment) throws IOException 
+                    {
+                        final String suffix;
+                        switch( segment ) 
+                        {
+                            case EEPROM: suffix = ".eeprom"; break;
+                            case FLASH:  suffix = ".flash"; break;
+                            case SRAM:   suffix = ".sram"; break;
+                            default: throw new RuntimeException("Unhandled segment type: "+segment);
+                        }
+                        return new FileResource( new File( pwd + File.separatorChar + binary.getIdentifier()+ suffix )  , Resource.ENCODING_UTF );
+                    }
+                };
             }
         };
         configProvider = new IConfigProvider() {

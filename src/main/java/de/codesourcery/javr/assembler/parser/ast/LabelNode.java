@@ -17,18 +17,12 @@ package de.codesourcery.javr.assembler.parser.ast;
 
 import org.apache.commons.lang3.Validate;
 
-import de.codesourcery.javr.assembler.ICompilationContext;
-import de.codesourcery.javr.assembler.Segment;
-import de.codesourcery.javr.assembler.ICompilationContext.Phase;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.TextRegion;
-import de.codesourcery.javr.assembler.symbols.LabelSymbol;
 
 public class LabelNode extends ASTNode 
 {
     public final Identifier identifier;
-    public Segment segment;
-    public int address=-1;
     
     public LabelNode(Identifier id,TextRegion region) {
         super(region);
@@ -37,34 +31,10 @@ public class LabelNode extends ASTNode
     }
     
     @Override
-    public void compile(ICompilationContext ctx) 
+    protected LabelNode createCopy() 
     {
-        if ( ctx.isInPhase( Phase.GATHER_SYMBOLS ) ) 
-        {
-            ctx.getSymbolTable().defineSymbol( new LabelSymbol( this ) );
-        } 
-        else if ( ctx.isInPhase( Phase.RESOLVE_SYMBOLS ) ) 
-        {
-            final LabelSymbol symbol = (LabelSymbol) ctx.getSymbolTable().get( this.identifier );
-            symbol.setAddress( ctx.currentAddress() );
-        }
-    }
-    
-    public void setSegment(Segment segment) {
-        this.segment = segment;
-    }
-    
-    public Segment getSegment() {
-        return segment;
-    }
-    
-    public void setAddress(int address) {
-        this.address = address;
-    }
-    
-    public int getAddress() {
-        return address;
-    }
+        return new LabelNode( this.identifier , getTextRegion().createCopy() );
+    }    
     
     @Override
     public String getAsString() {

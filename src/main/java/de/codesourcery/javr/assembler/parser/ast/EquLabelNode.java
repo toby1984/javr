@@ -14,4 +14,10 @@ public class EquLabelNode extends ASTNode {
         Validate.notNull(name, "name must not be NULL");
         this.name = name;
     }    
+    
+    @Override
+    protected EquLabelNode createCopy() 
+    {
+        return new EquLabelNode( this.name , getTextRegion().createCopy() );
+    }       
 }

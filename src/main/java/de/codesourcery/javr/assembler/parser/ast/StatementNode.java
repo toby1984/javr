@@ -30,6 +30,11 @@ public class StatementNode extends ASTNode {
         return null;
     }
     
+    @Override
+    protected StatementNode createCopy() {
+        return new StatementNode();
+    }    
+    
     private static boolean continueLabelSearch(StatementNode node) 
     {
         return node.hasNoChildren() || ( node.childCount() == 1 && node.child(0) instanceof CommentNode); 

@@ -17,30 +17,20 @@ package de.codesourcery.javr.assembler;
 
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
+import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 public interface ICompilationContext 
 {
-    public static enum Phase 
-    {
-        VALIDATE1,
-        GATHER_SYMBOLS,
-        RESOLVE_SYMBOLS,
-        VALIDATE2,
-        GENERATE_CODE;
-    }
-    
     public SymbolTable getSymbolTable();
+    
+    public CompilationUnit getCompilationUnit();
     
     public int currentOffset();
     
     public Address currentAddress();
     
     public Segment currentSegment();
-    
-    public Phase currentPhase();
-    
-    public boolean isInPhase(Phase p);    
     
     public void setSegment(Segment s);
     
@@ -56,7 +46,11 @@ public interface ICompilationContext
     
     public void allocateBytes(int numberOfBytes);    
     
+    public void error(String message,ASTNode node);
+    
     public void message(CompilationMessage msg);
     
     public IArchitecture getArchitecture();
+    
+    public int getBytesRemainingInCurrentSegment();
 }

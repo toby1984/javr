@@ -17,12 +17,8 @@ package de.codesourcery.javr.assembler.parser.ast;
 
 import org.apache.commons.lang3.Validate;
 
-import de.codesourcery.javr.assembler.ICompilationContext;
-import de.codesourcery.javr.assembler.ICompilationContext.Phase;
-import de.codesourcery.javr.assembler.parser.TextRegion;
-import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.Instruction;
-import de.codesourcery.javr.assembler.Segment;
+import de.codesourcery.javr.assembler.parser.TextRegion;
 
 public class InstructionNode extends ASTNode 
 {
@@ -36,26 +32,8 @@ public class InstructionNode extends ASTNode
     }
     
     @Override
-    public void compile(ICompilationContext ctx) 
-    {
-        if ( ctx.isInPhase( Phase.VALIDATE1 ) ) 
-        {
-            if ( ctx.currentSegment() != Segment.FLASH ) {
-                ctx.message( CompilationMessage.error("Instructions need to be placed in CODE segment",this) );
-            }
-        } 
-        else if ( ctx.isInPhase( Phase.VALIDATE2 ) ) 
-        {
-            ctx.getArchitecture().validate( this , ctx );
-        } 
-        else if ( ctx.isInPhase( Phase.GATHER_SYMBOLS ) ) 
-        {
-            ctx.allocateBytes( ctx.getArchitecture().getInstructionLengthInBytes( this , ctx , true ) );
-        } 
-        else if ( ctx.isInPhase( Phase.GENERATE_CODE) ) 
-        {
-            ctx.getArchitecture().compile(this, ctx );
-        }        
+    protected ASTNode createCopy() {
+        return new InstructionNode( this.instruction.createCopy() , getTextRegion().createCopy() );
     }
     
     public ASTNode src() {

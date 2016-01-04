@@ -36,6 +36,12 @@ public interface IArchitecture {
      */
     public int getSRAMMemorySize();
     
+    /**
+     * 
+     * @return size of EEPROM in bytes
+     */
+    public int getEEPromSize();    
+    
     // --
     
     public boolean isValidInstruction(String s);

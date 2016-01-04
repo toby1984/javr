@@ -48,5 +48,10 @@ public class AST extends ASTNode
     
     public boolean hasInfo() {
         return messages.stream().anyMatch( msg -> msg.severity == Severity.INFO );
+    }
+
+    @Override
+    protected AST createCopy() {
+        return new AST();
     }    
 }

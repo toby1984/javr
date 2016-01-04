@@ -36,6 +36,21 @@ public abstract class ASTNode
     public ASTNode() {
     }
     
+    public final ASTNode createCopy(boolean deep) 
+    {
+        final ASTNode result = createCopy();
+        if ( deep ) 
+        {
+            for ( ASTNode child : children ) 
+            {
+                result.add( child.createCopy( true ) );
+            }
+        }
+        return result;
+    }
+    
+    protected abstract ASTNode createCopy();
+    
     public ASTNode(TextRegion region) 
     {
         Validate.notNull(region, "region must not be NULL");
@@ -145,6 +160,10 @@ public abstract class ASTNode
         for ( ASTNode child : children ) {
             add( child );
         }
+    }
+    
+    public ASTNode firstChild() {
+        return children.get(0);
     }
     
     public ASTNode child(int index) {

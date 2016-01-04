@@ -21,11 +21,8 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.ICompilationContext;
-import de.codesourcery.javr.assembler.ICompilationContext.Phase;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.TextRegion;
-import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
-import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.symbols.LabelSymbol;
 import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.symbols.Symbol.Type;
@@ -40,19 +37,6 @@ public class IdentifierNode extends ASTNode implements IValueNode {
         super(region);
         Validate.notNull(id, "id must not be NULL");
         this.value = id;
-    }
-    
-    @Override
-    public void compile(ICompilationContext ctx) 
-    {
-        if ( ctx.isInPhase( Phase.RESOLVE_SYMBOLS ) ) 
-        {
-            if ( ! ctx.getSymbolTable().isDefined( value ) ) 
-            {
-                ctx.message( new CompilationMessage( Severity.ERROR , "Unknown symbol: '"+value.value+"'" , this ) );
-            } 
-            resolveValue( ctx );
-        } 
     }
     
     @Override
@@ -77,4 +61,10 @@ public class IdentifierNode extends ASTNode implements IValueNode {
     {
         return resolvedValue;
     }
+    
+    @Override
+    protected IdentifierNode createCopy() 
+    {
+        return new IdentifierNode(this.value , getTextRegion().createCopy() );
+    }     
 }

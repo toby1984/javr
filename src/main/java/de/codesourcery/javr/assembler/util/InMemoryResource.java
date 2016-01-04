@@ -8,6 +8,8 @@ import org.apache.commons.lang3.Validate;
 
 public class InMemoryResource implements Resource 
 {
+    private final String encoding;
+    
     private byte[] data = new byte[1024];
     private String contentHash;
     private int len = 0;
@@ -17,9 +19,11 @@ public class InMemoryResource implements Resource
     
     private final String name;
     
-    public InMemoryResource(String name) 
+    public InMemoryResource(String name,String encoding) 
     {
         Validate.notBlank(name, "name must not be NULL or blank");
+        Validate.notBlank(encoding, "encoding must not be NULL or blank");
+        this.encoding = encoding;
         this.name = name;
         updateContentHash();
     }
@@ -132,5 +136,10 @@ public class InMemoryResource implements Resource
     @Override
     public String toString() {
         return "InMemoryResource[ "+name+" , len="+size()+", hash="+contentHash+", readers: "+openReaders+", writers: "+openWriters+" ]";
+    }
+    
+    @Override
+    public String getEncoding() {
+        return encoding;
     }
 }

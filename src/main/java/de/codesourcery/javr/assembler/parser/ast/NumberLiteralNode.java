@@ -16,6 +16,7 @@
 package de.codesourcery.javr.assembler.parser.ast;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.parser.TextRegion;
@@ -28,8 +29,15 @@ public class NumberLiteralNode extends ASTNode implements IValueNode
         BINARY;
     }
     
-    private LiteralType type;
-    private int value;
+    private final LiteralType type;
+    private final int value;
+    
+    private NumberLiteralNode(int value,LiteralType type,TextRegion region) {
+        super(region);
+        Validate.notNull(type, "type must not be NULL");
+        this.type = type;
+        this.value = value;
+    }
     
     public NumberLiteralNode(String value, TextRegion region) 
     {
@@ -47,6 +55,12 @@ public class NumberLiteralNode extends ASTNode implements IValueNode
         } else {
             throw new IllegalArgumentException("Not a valid number literal: '"+value+"'");
         }
+    }
+
+    @Override
+    protected NumberLiteralNode createCopy() 
+    {
+        return new NumberLiteralNode( this.value , this.type , getTextRegion().createCopy() );
     }
     
     @Override

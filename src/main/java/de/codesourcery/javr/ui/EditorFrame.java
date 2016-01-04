@@ -89,6 +89,7 @@ import de.codesourcery.javr.assembler.parser.ast.LabelNode;
 import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
+import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
 
 public class EditorFrame extends JInternalFrame implements IViewComponent {
@@ -114,7 +115,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
     protected final Style STYLE_MNEMONIC;
     protected final Style STYLE_COMMENT;
 
-    private CompilationUnit compilationUnit = new CompilationUnit( new StringResource("dummy","" ) );
+    private CompilationUnit compilationUnit = new CompilationUnit( new StringResource( "dummy","" ) );
     
     private LineMap lineMap;
 
@@ -507,8 +508,10 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         String text = editor.getText();
         text = text == null ? "" : text;
         
-        try ( OutputStream out = compilationUnit.getResource().createOutputStream() ) {
-            out.write( text.getBytes() );
+        final Resource resource = compilationUnit.getResource();
+        try ( OutputStream out = resource.createOutputStream() ) 
+        {
+            out.write( text.getBytes( resource.getEncoding() ) );
         }
     }
 
@@ -551,7 +554,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         // assemble
         final Assembler asm = new Assembler();
         try {
-            asm.assemble( compilationUnit , configProvider.getConfig() );
+            asm.assemble( compilationUnit , configProvider );
         } 
         catch(Exception e) 
         {

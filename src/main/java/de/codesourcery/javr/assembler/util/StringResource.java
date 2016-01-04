@@ -6,11 +6,13 @@ import java.io.OutputStream;
 
 public class StringResource implements Resource {
 
+    private final String encoding = "UTF8";
+    
     private final InMemoryResource res;
     
     public StringResource(String name,String value) 
     {
-        res = new InMemoryResource(name);
+        res = new InMemoryResource(name,encoding);
         
         try ( OutputStream out = res.createOutputStream(); ) 
         {
@@ -43,5 +45,10 @@ public class StringResource implements Resource {
     @Override
     public String contentHash() {
         return res.contentHash();
+    }
+    
+    @Override
+    public String getEncoding() {
+        return encoding;
     }
 }

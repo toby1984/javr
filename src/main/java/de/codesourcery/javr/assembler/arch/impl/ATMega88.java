@@ -22,10 +22,6 @@ import de.codesourcery.javr.assembler.Register;
 import de.codesourcery.javr.assembler.arch.AbstractAchitecture;
 import de.codesourcery.javr.assembler.arch.Architecture;
 import de.codesourcery.javr.assembler.arch.InstructionEncoder;
-import de.codesourcery.javr.assembler.arch.AbstractAchitecture.ArgumentType;
-import de.codesourcery.javr.assembler.arch.AbstractAchitecture.EncodingEntry;
-import de.codesourcery.javr.assembler.arch.AbstractAchitecture.InstructionEncoding;
-import de.codesourcery.javr.assembler.arch.AbstractAchitecture.InstructionSelector;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
@@ -466,6 +462,11 @@ public class ATMega88 extends AbstractAchitecture
 
     @Override
     public int getSRAMMemorySize() {
+        return 1024;
+    }
+
+    @Override
+    public int getEEPromSize() {
         return 512;
     }
 }

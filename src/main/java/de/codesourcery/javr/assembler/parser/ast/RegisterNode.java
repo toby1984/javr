@@ -34,4 +34,10 @@ public class RegisterNode extends ASTNode {
     public String getAsString() {
         return register.toString();
     }
+    
+    @Override
+    protected RegisterNode createCopy() 
+    {
+        return new RegisterNode( this.register , getTextRegion().createCopy() );
+    }    
 }

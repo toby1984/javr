@@ -38,6 +38,11 @@ public class TextRegion {
         return 31 * result + start;
     }
     
+    public TextRegion createCopy() 
+    {
+        return new TextRegion(this.start,this.len);
+    }
+    
     public TextRegion incLength() {
         this.len += 1;
         return this;

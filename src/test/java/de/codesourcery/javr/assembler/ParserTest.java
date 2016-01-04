@@ -27,16 +27,14 @@ import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.CharacterLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.CommentNode;
+import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
+import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.EquLabelNode;
-import de.codesourcery.javr.assembler.parser.ast.EquNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
-import de.codesourcery.javr.assembler.parser.ast.InitMemNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
 import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
-import de.codesourcery.javr.assembler.parser.ast.ReserveMemNode;
-import de.codesourcery.javr.assembler.parser.ast.SegmentNode;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
 import de.codesourcery.javr.assembler.parser.ast.StringLiteral;
 
@@ -386,7 +384,7 @@ public class ParserTest
         Assert.assertNotNull(stmt);
         Assert.assertEquals( 1 , stmt.childCount() );
         
-        final ReserveMemNode node = (ReserveMemNode) stmt.child(0);
+        final DirectiveNode node = (DirectiveNode) stmt.child(0);
         Assert.assertNotNull(node);
         Assert.assertEquals( 1 , node.childCount() );
         
@@ -407,10 +405,10 @@ public class ParserTest
         Assert.assertNotNull(stmt);
         Assert.assertEquals( 1 , stmt.childCount() );
         
-        final InitMemNode node = (InitMemNode) stmt.child(0);
+        final DirectiveNode node = (DirectiveNode) stmt.child(0);
         Assert.assertNotNull(node);
         Assert.assertEquals( 2 , node.childCount() );
-        Assert.assertEquals( InitMemNode.ElementSize.BYTE , node.elementSize );
+        Assert.assertEquals( Directive.INIT_BYTES , node.directive );
         
         final NumberLiteralNode num = (NumberLiteralNode) node.child( 0 );
         Assert.assertEquals( 1 , num.getValue().intValue()  );
@@ -433,10 +431,10 @@ public class ParserTest
         Assert.assertNotNull(stmt);
         Assert.assertEquals( 1 , stmt.childCount() );
         
-        final InitMemNode node = (InitMemNode) stmt.child(0);
+        final DirectiveNode node = (DirectiveNode) stmt.child(0);
         Assert.assertNotNull(node);
         Assert.assertEquals( 2 , node.childCount() );
-        Assert.assertEquals( InitMemNode.ElementSize.WORD , node.elementSize );
+        Assert.assertEquals( Directive.INIT_WORDS , node.directive );
         
         final NumberLiteralNode num = (NumberLiteralNode) node.child( 0 );
         Assert.assertEquals( 1 , num.getValue().intValue()  );
@@ -459,7 +457,8 @@ public class ParserTest
         Assert.assertNotNull(stmt);
         Assert.assertEquals( 1 , stmt.childCount() );
         
-        final EquNode node = (EquNode) stmt.child(0);
+        final DirectiveNode node = (DirectiveNode) stmt.child(0);
+        Assert.assertEquals(Directive.EQU , node.directive );
         Assert.assertNotNull(node);
         Assert.assertEquals( 2 , node.childCount() );
 
@@ -504,9 +503,9 @@ public class ParserTest
         Assert.assertNotNull(stmt);
         Assert.assertEquals( 1 , stmt.childCount() );
         
-        final SegmentNode insn = (SegmentNode) stmt.child(0);
+        final DirectiveNode insn = (DirectiveNode) stmt.child(0);
         Assert.assertNotNull(insn);
-        Assert.assertEquals( Segment.FLASH , insn.segment );
+        Assert.assertEquals( Directive.CSEG , insn.directive );
     }    
     
     @Test
@@ -521,9 +520,9 @@ public class ParserTest
         Assert.assertNotNull(stmt);
         Assert.assertEquals( 1 , stmt.childCount() );
         
-        final SegmentNode insn = (SegmentNode) stmt.child(0);
+        final DirectiveNode insn = (DirectiveNode) stmt.child(0);
         Assert.assertNotNull(insn);
-        Assert.assertEquals( Segment.SRAM , insn.segment );
+        Assert.assertEquals( Directive.DSEG , insn.directive );
     }     
     
     @Test
@@ -622,9 +621,9 @@ public class ParserTest
         Assert.assertNotNull(stmt);
         Assert.assertEquals( 1 , stmt.childCount() );
         
-        final SegmentNode insn = (SegmentNode) stmt.child(0);
+        final DirectiveNode insn = (DirectiveNode) stmt.child(0);
         Assert.assertNotNull(insn);
-        Assert.assertEquals( Segment.EEPROM , insn.segment );
+        Assert.assertEquals( Directive.ESEG , insn.directive );
     }    
     
     @Test

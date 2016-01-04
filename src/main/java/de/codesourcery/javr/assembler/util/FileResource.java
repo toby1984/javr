@@ -14,15 +14,18 @@ public class FileResource implements Resource
 {
     private final File file;
     private String contentHash;
+    private final String encoding;
     
-    public FileResource(String s) throws IOException {
-        this( new File(s) );
+    public FileResource(String s,String encoding) throws IOException {
+        this( new File(s) , encoding );
     }
     
-    public FileResource(File file) throws IOException 
+    public FileResource(File file,String encoding) throws IOException 
     {
         Validate.notNull(file, "file must not be NULL");
+        Validate.notBlank(encoding,"encoding must not be NULL or blank");
         this.file = file;
+        this.encoding = encoding;
         updateContentHash();
     }
     
@@ -49,7 +52,8 @@ public class FileResource implements Resource
     }
 
     @Override
-    public OutputStream createOutputStream() throws IOException {
+    public OutputStream createOutputStream() throws IOException 
+    {
         return new FileOutputStream(file) 
         {
             @Override
@@ -74,5 +78,10 @@ public class FileResource implements Resource
     @Override
     public String contentHash() {
         return contentHash;
+    }
+
+    @Override
+    public String getEncoding() {
+        return encoding;
     }
 }

@@ -31,4 +31,10 @@ public class CommentNode extends ASTNode {
     public String getAsString() {
         return "; "+value;
     }
+    
+    @Override
+    protected CommentNode createCopy() 
+    {
+        return new CommentNode( this.value , getTextRegion().createCopy() );
+    }    
 }
