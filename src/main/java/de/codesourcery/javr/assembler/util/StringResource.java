@@ -1,0 +1,47 @@
+package de.codesourcery.javr.assembler.util;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+public class StringResource implements Resource {
+
+    private final InMemoryResource res;
+    
+    public StringResource(String name,String value) 
+    {
+        res = new InMemoryResource(name);
+        
+        try ( OutputStream out = res.createOutputStream(); ) 
+        {
+            out.write( value.getBytes() ); 
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    
+    @Override
+    public InputStream createInputStream() throws IOException {
+        return res.createInputStream();
+    }
+
+    @Override
+    public OutputStream createOutputStream() throws IOException {
+        return res.createOutputStream();
+    }
+
+    @Override
+    public int size() {
+        return res.size();
+    }
+
+    @Override
+    public boolean exists() {
+        return true;
+    }
+
+    @Override
+    public String contentHash() {
+        return res.contentHash();
+    }
+}

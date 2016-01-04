@@ -21,9 +21,10 @@ import java.util.List;
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext.Phase;
-import de.codesourcery.javr.assembler.Parser.CompilationMessage;
-import de.codesourcery.javr.assembler.ast.AST;
-import de.codesourcery.javr.assembler.ast.SegmentNode.Segment;
+import de.codesourcery.javr.assembler.arch.IArchitecture;
+import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
+import de.codesourcery.javr.assembler.parser.ast.AST;
+import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.ui.IConfig;
 
 public class Assembler 
@@ -38,7 +39,7 @@ public class Assembler
     private final class CompilationContext implements ICompilationContext 
     {
         private Segment segment = Segment.FLASH;
-        private final SymbolTable symbolTable = new SymbolTable();
+        private final SymbolTable symbolTable;
         
         private int codeOffset = 0;
         private int initDataOffset = 0;
@@ -49,8 +50,11 @@ public class Assembler
         private final AST ast;
         private Phase phase;
         
-        public CompilationContext(AST ast) {
-            this.ast = ast;
+        public CompilationContext(CompilationUnit unit) 
+        {
+            Validate.notNull(unit, "unit must not be NULL");
+            this.ast = unit.getAST();
+            this.symbolTable = unit.getSymbolTable();
         }
         
         @Override
@@ -219,9 +223,15 @@ public class Assembler
         phases.add( Phase.GENERATE_CODE );
     }
     
-    public void assemble(AST ast,IConfig config) 
+    public void assemble(CompilationUnit unit,IConfig config) 
     {
-        this.compilationContext = new CompilationContext( ast );
+        Validate.notNull(unit, "unit must not be NULL");
+        Validate.notNull(config, "config must not be NULL");
+        
+        final AST ast = unit.getAST();
+        Validate.notNull(ast, "ast must not be NULL");
+        
+        this.compilationContext = new CompilationContext( unit );
         this.config = config;
         
         if ( ast.hasErrors() ) 
@@ -248,11 +258,6 @@ public class Assembler
         if ( debug ) {
             System.out.println(msg);
         }
-    }
-    
-    public SymbolTable getSymbolTable() 
-    {
-        return compilationContext.getSymbolTable();
     }
     
     public void setDebug(boolean debug) {

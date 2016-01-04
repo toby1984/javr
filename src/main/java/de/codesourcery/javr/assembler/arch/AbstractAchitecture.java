@@ -20,33 +20,28 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.Address;
-import de.codesourcery.javr.assembler.Architecture;
-import de.codesourcery.javr.assembler.IArchitecture;
 import de.codesourcery.javr.assembler.ICompilationContext;
-import de.codesourcery.javr.assembler.Instruction;
-import de.codesourcery.javr.assembler.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.Register;
-import de.codesourcery.javr.assembler.arch.AbstractAchitecture.ArgumentType;
+import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.InstructionEncoder.Transform;
-import de.codesourcery.javr.assembler.ast.ASTNode;
-import de.codesourcery.javr.assembler.ast.IValueNode;
-import de.codesourcery.javr.assembler.ast.InstructionNode;
-import de.codesourcery.javr.assembler.ast.RegisterNode;
-import de.codesourcery.javr.assembler.ast.SegmentNode.Segment;
+import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
+import de.codesourcery.javr.assembler.parser.ast.ASTNode;
+import de.codesourcery.javr.assembler.parser.ast.IValueNode;
+import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
+import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 
 public abstract class AbstractAchitecture implements IArchitecture 
 {
-    private static final Logger LOG = LogManager.getLogger( AbstractAchitecture.class );
-    
+    @SuppressWarnings("unused")
+    private static final Logger LOG = Logger.getLogger(AbstractAchitecture.class);
+
     private static final long VALUE_UNAVAILABLE= 0xdeadabcdbeefdeadL;
     
     private static final InstructionSelector DEFAULT_INSN_SELECTOR = new InstructionSelector() {
@@ -100,14 +95,14 @@ public abstract class AbstractAchitecture implements IArchitecture
         return value;
     };    
     
-    protected interface InstructionSelector 
+    public interface InstructionSelector 
     {
         public InstructionEncoding pick(InstructionNode node,List<InstructionEncoding> candidates);
         
         public int getMaxInstructionLengthInBytes(InstructionNode node,List<InstructionEncoding> candidates,boolean estimate);
     }
     
-    protected static final class EncodingEntry 
+    public static final class EncodingEntry 
     {
         public final InstructionSelector selector;
         public final List<InstructionEncoding> encodings = new ArrayList<>();
@@ -243,7 +238,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         return ins;
     }     
     
-    protected static enum ArgumentType 
+    public static enum ArgumentType 
     {
         SINGLE_REGISTER,
         COMPOUND_REGISTERS_R24_TO_R30,
@@ -275,7 +270,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         NONE
     }
     
-    protected static final class InstructionEncoding 
+    public static final class InstructionEncoding 
     {
         public final String mnemonic;
         private final InstructionEncoder encoder;

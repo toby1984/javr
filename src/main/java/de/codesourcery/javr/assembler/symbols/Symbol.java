@@ -13,23 +13,47 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package de.codesourcery.javr.assembler.exceptions;
+package de.codesourcery.javr.assembler.symbols;
 
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.parser.Identifier;
 
-public class UnknownSymbolException extends RuntimeException 
+public abstract class Symbol<T> 
 {
     private final Identifier name;
-
-    public UnknownSymbolException(Identifier name) {
-        super("Unknown symbol: '"+name+"'");
-        Validate.notNull(name, "name must not be NULL");
-        this.name = name;
+    private final T node;
+    private Type type;
+    
+    public static enum Type 
+    {
+        LABEL,
+        EQU
     }
-
-    public Identifier getName() {
+    
+    public Symbol(Identifier name,Type type,T node) 
+    {
+        Validate.notNull(name, "name must not be NULL");
+        Validate.notNull(node, "node must not be NULL");
+        Validate.notNull(type, "type must not be NULL");
+        this.name = name;
+        this.node = node;
+        this.type = type;
+    }
+    
+    public Type getType() {
+        return type;
+    }
+    
+    public boolean hasType(Type t) {
+        return t.equals( this.type );
+    }
+    
+    public Identifier name() {
         return name;
+    }
+    
+    public T getNode() {
+        return node;
     }
 }

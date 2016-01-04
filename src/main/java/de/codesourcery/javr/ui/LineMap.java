@@ -20,12 +20,12 @@ import java.util.List;
 
 import org.apache.commons.lang3.Validate;
 
-import de.codesourcery.javr.assembler.Lexer;
-import de.codesourcery.javr.assembler.Location;
-import de.codesourcery.javr.assembler.Scanner;
-import de.codesourcery.javr.assembler.TextRegion;
-import de.codesourcery.javr.assembler.Token;
-import de.codesourcery.javr.assembler.TokenType;
+import de.codesourcery.javr.assembler.parser.Lexer;
+import de.codesourcery.javr.assembler.parser.Location;
+import de.codesourcery.javr.assembler.parser.Scanner;
+import de.codesourcery.javr.assembler.parser.TextRegion;
+import de.codesourcery.javr.assembler.parser.Token;
+import de.codesourcery.javr.assembler.parser.TokenType;
 
 public class LineMap 
 {

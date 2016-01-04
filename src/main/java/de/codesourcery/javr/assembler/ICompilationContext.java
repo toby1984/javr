@@ -15,8 +15,9 @@
  */
 package de.codesourcery.javr.assembler;
 
-import de.codesourcery.javr.assembler.Parser.CompilationMessage;
-import de.codesourcery.javr.assembler.ast.SegmentNode.Segment;
+import de.codesourcery.javr.assembler.arch.IArchitecture;
+import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
+import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 public interface ICompilationContext 
 {

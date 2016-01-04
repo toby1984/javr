@@ -18,23 +18,27 @@ package de.codesourcery.javr.assembler;
 import org.junit.Assert;
 import org.junit.Test;
 
-import de.codesourcery.javr.assembler.arch.ATMega88;
-import de.codesourcery.javr.assembler.ast.AST;
-import de.codesourcery.javr.assembler.ast.CharacterLiteralNode;
-import de.codesourcery.javr.assembler.ast.CommentNode;
-import de.codesourcery.javr.assembler.ast.EquLabelNode;
-import de.codesourcery.javr.assembler.ast.EquNode;
-import de.codesourcery.javr.assembler.ast.IdentifierNode;
-import de.codesourcery.javr.assembler.ast.InitMemNode;
-import de.codesourcery.javr.assembler.ast.InstructionNode;
-import de.codesourcery.javr.assembler.ast.LabelNode;
-import de.codesourcery.javr.assembler.ast.NumberLiteralNode;
-import de.codesourcery.javr.assembler.ast.RegisterNode;
-import de.codesourcery.javr.assembler.ast.ReserveMemNode;
-import de.codesourcery.javr.assembler.ast.SegmentNode;
-import de.codesourcery.javr.assembler.ast.SegmentNode.Segment;
-import de.codesourcery.javr.assembler.ast.StatementNode;
-import de.codesourcery.javr.assembler.ast.StringLiteral;
+import de.codesourcery.javr.assembler.arch.IArchitecture;
+import de.codesourcery.javr.assembler.arch.impl.ATMega88;
+import de.codesourcery.javr.assembler.parser.Identifier;
+import de.codesourcery.javr.assembler.parser.Lexer;
+import de.codesourcery.javr.assembler.parser.Parser;
+import de.codesourcery.javr.assembler.parser.Scanner;
+import de.codesourcery.javr.assembler.parser.ast.AST;
+import de.codesourcery.javr.assembler.parser.ast.CharacterLiteralNode;
+import de.codesourcery.javr.assembler.parser.ast.CommentNode;
+import de.codesourcery.javr.assembler.parser.ast.EquLabelNode;
+import de.codesourcery.javr.assembler.parser.ast.EquNode;
+import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
+import de.codesourcery.javr.assembler.parser.ast.InitMemNode;
+import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
+import de.codesourcery.javr.assembler.parser.ast.LabelNode;
+import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
+import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
+import de.codesourcery.javr.assembler.parser.ast.ReserveMemNode;
+import de.codesourcery.javr.assembler.parser.ast.SegmentNode;
+import de.codesourcery.javr.assembler.parser.ast.StatementNode;
+import de.codesourcery.javr.assembler.parser.ast.StringLiteral;
 
 public class ParserTest 
 {

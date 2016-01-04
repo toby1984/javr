@@ -13,23 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package de.codesourcery.javr.assembler.exceptions;
+package de.codesourcery.javr.assembler.parser.ast;
 
-import org.apache.commons.lang3.Validate;
+import de.codesourcery.javr.assembler.parser.TextRegion;
 
-import de.codesourcery.javr.assembler.parser.Identifier;
+public class CommentNode extends ASTNode {
 
-public class UnknownSymbolException extends RuntimeException 
-{
-    private final Identifier name;
-
-    public UnknownSymbolException(Identifier name) {
-        super("Unknown symbol: '"+name+"'");
-        Validate.notNull(name, "name must not be NULL");
-        this.name = name;
+    public final String value;
+    
+    public CommentNode(String string, TextRegion region) 
+    {
+        super(region);
+        this.value = string;
     }
-
-    public Identifier getName() {
-        return name;
+    
+    @Override
+    public String getAsString() {
+        return "; "+value;
     }
 }

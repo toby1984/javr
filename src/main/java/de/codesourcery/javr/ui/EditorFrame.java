@@ -24,6 +24,8 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -64,30 +66,35 @@ import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreePath;
 
 import org.apache.commons.lang3.Validate;
+import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.Assembler;
-import de.codesourcery.javr.assembler.Lexer;
-import de.codesourcery.javr.assembler.Location;
-import de.codesourcery.javr.assembler.Parser;
-import de.codesourcery.javr.assembler.Parser.CompilationMessage;
-import de.codesourcery.javr.assembler.Parser.Severity;
-import de.codesourcery.javr.assembler.Scanner;
-import de.codesourcery.javr.assembler.TextRegion;
-import de.codesourcery.javr.assembler.ast.AST;
-import de.codesourcery.javr.assembler.ast.ASTNode;
-import de.codesourcery.javr.assembler.ast.ASTNode.IASTVisitor;
-import de.codesourcery.javr.assembler.ast.ASTNode.IIterationContext;
-import de.codesourcery.javr.assembler.ast.CommentNode;
-import de.codesourcery.javr.assembler.ast.IdentifierNode;
-import de.codesourcery.javr.assembler.ast.InstructionNode;
-import de.codesourcery.javr.assembler.ast.LabelNode;
-import de.codesourcery.javr.assembler.ast.NumberLiteralNode;
-import de.codesourcery.javr.assembler.ast.RegisterNode;
-import de.codesourcery.javr.assembler.ast.StatementNode;
+import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
+import de.codesourcery.javr.assembler.parser.Lexer;
+import de.codesourcery.javr.assembler.parser.Location;
+import de.codesourcery.javr.assembler.parser.Parser;
+import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
+import de.codesourcery.javr.assembler.parser.Parser.Severity;
+import de.codesourcery.javr.assembler.parser.Scanner;
+import de.codesourcery.javr.assembler.parser.TextRegion;
+import de.codesourcery.javr.assembler.parser.ast.AST;
+import de.codesourcery.javr.assembler.parser.ast.ASTNode;
+import de.codesourcery.javr.assembler.parser.ast.ASTNode.IASTVisitor;
+import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
+import de.codesourcery.javr.assembler.parser.ast.CommentNode;
+import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
+import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
+import de.codesourcery.javr.assembler.parser.ast.LabelNode;
+import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
+import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
+import de.codesourcery.javr.assembler.parser.ast.StatementNode;
+import de.codesourcery.javr.assembler.util.StringResource;
 
 public class EditorFrame extends JInternalFrame implements IViewComponent {
 
+    private static final Logger LOG = Logger.getLogger(EditorFrame.class);
+    
     public static final Duration RECOMPILATION_DELAY = Duration.ofMillis( 150 );
     
     private final JTextPane editor = new JTextPane();
@@ -107,6 +114,8 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
     protected final Style STYLE_MNEMONIC;
     protected final Style STYLE_COMMENT;
 
+    private CompilationUnit compilationUnit = new CompilationUnit( new StringResource("dummy","" ) );
+    
     private LineMap lineMap;
 
     protected class IndentFilter extends DocumentFilter 
@@ -492,16 +501,36 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
 
         return result;
     }
+    
+    private void save() throws IOException 
+    {
+        String text = editor.getText();
+        text = text == null ? "" : text;
+        
+        try ( OutputStream out = compilationUnit.getResource().createOutputStream() ) {
+            out.write( text.getBytes() );
+        }
+    }
 
     private void compile() 
     {
+        messageModel.clear();
+        
+        try {
+            save();
+        } 
+        catch(IOException e) 
+        {
+            LOG.error("compile(): Failed to save changes",e);
+            messageModel.add( CompilationMessage.error( "Failed to save changes") );
+            return;
+        }
+        
         Parser p = configProvider.getConfig().createParser();
         String text = editor.getText();
         text = text == null ? "" : text;
-
+        
         this.lineMap = new LineMap(text,configProvider);        
-
-        messageModel.clear();
         
         // parse
         final AST ast;
@@ -522,7 +551,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         // assemble
         final Assembler asm = new Assembler();
         try {
-            asm.assemble( ast , configProvider.getConfig() );
+            asm.assemble( compilationUnit , configProvider.getConfig() );
         } 
         catch(Exception e) 
         {

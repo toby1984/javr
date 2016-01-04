@@ -13,23 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package de.codesourcery.javr.assembler.exceptions;
+package de.codesourcery.javr.assembler.parser;
 
-import org.apache.commons.lang3.Validate;
-
-import de.codesourcery.javr.assembler.parser.Identifier;
-
-public class UnknownSymbolException extends RuntimeException 
+public enum TokenType 
 {
-    private final Identifier name;
-
-    public UnknownSymbolException(Identifier name) {
-        super("Unknown symbol: '"+name+"'");
-        Validate.notNull(name, "name must not be NULL");
-        this.name = name;
-    }
-
-    public Identifier getName() {
-        return name;
-    }
+// multiple characters   
+    WHITESPACE,
+    EOL, 
+    TEXT,
+    DIGITS,
+    OPERATOR,
+// single character     
+    HASH,
+    EOF, 
+    COLON,
+    SEMICOLON,
+    DOT,
+    COMMA,
+    SINGLE_QUOTE,
+    DOUBLE_QUOTE;
 }

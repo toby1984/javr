@@ -25,6 +25,11 @@ import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
 
+import de.codesourcery.javr.assembler.parser.Lexer;
+import de.codesourcery.javr.assembler.parser.Scanner;
+import de.codesourcery.javr.assembler.parser.Token;
+import de.codesourcery.javr.assembler.parser.TokenType;
+
 public class LexerTest {
     
     private Lexer lexer;

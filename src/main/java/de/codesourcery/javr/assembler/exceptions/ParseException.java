@@ -15,7 +15,7 @@
  */
 package de.codesourcery.javr.assembler.exceptions;
 
-import de.codesourcery.javr.assembler.Token;
+import de.codesourcery.javr.assembler.parser.Token;
 
 public class ParseException extends RuntimeException {
 

@@ -19,6 +19,7 @@ import static org.junit.Assert.*;
 import org.junit.Test;
 
 import de.codesourcery.javr.assembler.exceptions.ParseException;
+import de.codesourcery.javr.assembler.parser.Scanner;
 
 public class ScannerTest
 {

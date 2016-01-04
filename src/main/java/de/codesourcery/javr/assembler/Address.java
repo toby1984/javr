@@ -3,8 +3,6 @@ package de.codesourcery.javr.assembler;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
-import de.codesourcery.javr.assembler.ast.SegmentNode.Segment;
-
 public final class Address {
 
     private final Segment segment;
