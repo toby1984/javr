@@ -370,7 +370,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         final InstructionEncoding encoding = variants.getEncoding( node );
         if ( argCount != encoding.getArgumentCount() ) 
         {
-            context.message( CompilationMessage.error( encoding.mnemonic+" expects "+encoding.getArgumentCount()+" arguments but got "+argCount,node ) );
+            context.message( CompilationMessage.error( encoding.mnemonic.toUpperCase()+" expects "+encoding.getArgumentCount()+" arguments but got "+argCount,node ) );
             return false;
         }  
         

@@ -64,6 +64,12 @@ public final class Token {
         return t.equals( this.type );
     }
     
+    public boolean isOperator(String op) 
+    {
+        Validate.notBlank(op, "op must not be NULL or blank");
+        return hasType( TokenType.OPERATOR ) && value.equals( op );
+    }
+    
     public boolean hasType(TokenType t1,TokenType... t2) 
     {
         if ( t1.equals( this.type ) ) {

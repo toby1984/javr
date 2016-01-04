@@ -99,6 +99,10 @@ public class LineMap
         }
     }    
     
+    public int getLineCount() {
+        return lines.size();
+    }
+    
     private void add(LineInfo l) 
     {
         System.out.println("LINEINFO: "+l);

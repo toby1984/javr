@@ -22,7 +22,7 @@ import org.apache.commons.lang3.Validate;
 
 public class Lexer 
 {
-    public static final boolean DEBUG = true;
+    public static final boolean DEBUG = false;
     
     private final Scanner scanner;
     
@@ -96,24 +96,35 @@ outer:
                 scanner.pushBack();
                 break;
             }
+           
+            if ( c == '-' ) 
+            {
+                parseBuffer(offset);
+                addToken( TokenType.OPERATOR , c , scanner.offset()-1 ); 
+                break outer;
+            }
             
-            if ( Operator.isValidOperator( buffer.toString()+c ) ) {
+            if ( OperatorType.mayBeOperator( buffer.toString() + c ) ) 
+            {
                 buffer.append( c );
                 continue;
             }
-            else if ( Operator.isValidOperator( buffer.toString() ) ) 
+            else if ( OperatorType.getExactMatch( buffer.toString() ) != null ) 
             {
                 addToken( TokenType.OPERATOR , buffer.toString() , offset );
                 buffer.setLength(0);
                 scanner.pushBack();
                 break;
-            } else if ( Operator.isValidOperatorOrOperatorPrefix( c ) ) {
+            } else if ( OperatorType.mayBeOperator( c ) ) {
                 scanner.pushBack();
                 break;
             }
             
             switch( c ) 
             {
+                case '(':  parseBuffer(offset) ; addToken( TokenType.PARENS_OPEN, c , scanner.offset()-1 ); break outer;
+                case ')':  parseBuffer(offset) ; addToken( TokenType.PARENS_CLOSE, c , scanner.offset()-1 ); break outer;
+                case '=':  parseBuffer(offset) ; addToken( TokenType.EQUALS, c , scanner.offset()-1 ); break outer;
                 case ';':  parseBuffer(offset) ; addToken( TokenType.SEMICOLON, c , scanner.offset()-1 ); break outer;
                 case '\'': parseBuffer(offset) ; addToken( TokenType.SINGLE_QUOTE , c , scanner.offset()-1 );    break outer;
                 case '"':  parseBuffer(offset) ; addToken( TokenType.DOUBLE_QUOTE , c , scanner.offset()-1 );    break outer;
@@ -152,9 +163,14 @@ outer:
         final String value = buffer.toString();
         buffer.setLength( 0 );
         
-        if ( Operator.isValidOperator( value ) ) 
+        if ( OperatorType.getExactMatch( value ) != null ) 
         {
             addToken(TokenType.OPERATOR , value , startOffset );
+            return;
+        }
+        
+        if ( "=".equals( value ) ) {
+            addToken( TokenType.EQUALS, "=" , scanner.offset()-1 );
             return;
         }
         

@@ -21,7 +21,7 @@ import org.apache.commons.lang3.StringUtils;
 
 public final class Identifier {
 
-    private static final Pattern ID_PATTERN = Pattern.compile("^[a-zA-Z]+[_a-zA-Z0-9]*$");
+    private static final Pattern ID_PATTERN = Pattern.compile("^[_]*[a-zA-Z]+[_a-zA-Z0-9]*$");
     
     public final String value;
     
@@ -31,6 +31,10 @@ public final class Identifier {
             throw new IllegalArgumentException("Not a valid identifier: '"+value+"'");
         }
         this.value = value;
+    }
+    
+    public String getValue() {
+        return value;
     }
     
     @Override

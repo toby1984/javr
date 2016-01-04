@@ -16,11 +16,14 @@
 package de.codesourcery.javr.assembler.symbols;
 
 import org.apache.commons.lang3.Validate;
+import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.parser.Identifier;
 
 public abstract class Symbol<T,VALUETYPE> 
 {
+    private static final Logger LOG = Logger.getLogger(Symbol.class);
+    
     private final Identifier name;
     private final T node;
     private Type type;
@@ -62,8 +65,10 @@ public abstract class Symbol<T,VALUETYPE>
         return value;
     }
     
-    public final void setValue(VALUETYPE value) {
-        Validate.notNull(value, "value must not be NULL");
+    public final void setValue(VALUETYPE value) 
+    {
+        LOG.debug("setValue( "+name+") = "+value);
+        Validate.notNull(value, "value for symbol '"+name+"' must not be NULL");
         this.value = value;
     }
 }

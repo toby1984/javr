@@ -51,4 +51,9 @@ public class StringResource implements Resource {
     public String getEncoding() {
         return encoding;
     }
+
+    @Override
+    public void delete() throws IOException {
+        res.delete();
+    }
 }

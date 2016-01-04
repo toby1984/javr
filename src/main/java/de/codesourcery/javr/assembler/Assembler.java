@@ -15,9 +15,14 @@
  */
 package de.codesourcery.javr.assembler;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
@@ -32,6 +37,7 @@ import de.codesourcery.javr.assembler.phases.Phase;
 import de.codesourcery.javr.assembler.phases.PrepareGenerateCode;
 import de.codesourcery.javr.assembler.phases.SyntaxCheck;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
+import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.ui.IConfig;
 import de.codesourcery.javr.ui.IConfigProvider;
 
@@ -41,8 +47,6 @@ public class Assembler
     
     private IConfig config;
     private CompilationContext compilationContext;
-    
-    private boolean debug;
     
     private final class CompilationContext implements ICompilationContext 
     {
@@ -65,6 +69,64 @@ public class Assembler
             this.compilationUnit = unit;
             this.ast = unit.getAST();
             this.symbolTable = unit.getSymbolTable();
+        }
+        
+        public void save(Binary b , ResourceFactory rf) throws IOException 
+        {
+            for ( Segment seg : Segment.values() ) 
+            {
+                final Resource resource = rf.getResource( seg );
+                if ( writeSegment( resource , seg ) != 0 ) {
+                    b.setResource( seg , resource );
+                }
+            }
+        }
+        
+        private int writeSegment(Resource r,Segment segment) throws IOException 
+        {
+            final int len;
+            final byte[] data;
+            switch( segment ) 
+            {
+                case EEPROM:
+                    data = new byte[ uninitDataOffset ];
+                    len = uninitDataOffset;
+                    break;
+                case FLASH:
+                    len = codeOffset;
+                    data = codeSegment;
+                    break;
+                case SRAM:
+                    len = initDataOffset;
+                    data = initDataSegment;
+                    break;
+                default:
+                    throw new RuntimeException("Unhandled switch/case: "+segment);
+            }
+            if ( len > 0 ) {
+                writeResource( r , data , len );
+            } else {
+                r.delete();
+            }
+            return len;
+        }
+        
+        private void writeResource(Resource flash,byte[] data,int len) throws IOException 
+        {
+            try ( OutputStream out = flash.createOutputStream() ; InputStream in = new ByteArrayInputStream( data , 0 , len ) ) 
+            {
+                IOUtils.copy( in , out );
+            }        
+        }
+        
+        public void beforePhase() 
+        {
+            segment = Segment.FLASH;
+            codeOffset = 0;
+            initDataOffset = 0;
+            uninitDataOffset = 0;
+            codeSegment = new byte[0];
+            initDataSegment = new byte[0];
         }
         
         @Override
@@ -108,7 +170,6 @@ public class Assembler
         @Override
         public void writeAsBytes(int value, int numberOfBytes) 
         {
-            // // little endian
             switch( numberOfBytes ) 
             {
                 case 1:
@@ -118,12 +179,12 @@ public class Assembler
                     writeWord( value );
                     break;
                 case 3:
-                    writeByte( value );
                     writeWord( value >> 8);
+                    writeByte( value );
                     break;
                 case 4:
-                    writeWord( value );
                     writeWord( value >> 16);
+                    writeWord( value );
                     break;
                 default:
                     throw new RuntimeException("Invalid byte count: "+numberOfBytes);
@@ -165,8 +226,8 @@ public class Assembler
         
         @Override
         public void writeWord(int value) {
-            writeByte( value ); // little endian
             writeByte( value >> 8 );
+            writeByte( value );
         }
         
         @Override
@@ -246,9 +307,10 @@ public class Assembler
         }
     }
     
-    public void assemble(CompilationUnit unit,IConfigProvider config) 
+    public Binary assemble(CompilationUnit unit,ResourceFactory rf, IConfigProvider config) throws IOException 
     {
         Validate.notNull(unit, "unit must not be NULL");
+        Validate.notNull(rf, "rf must not be NULL");
         Validate.notNull(config, "provider must not be NULL");
         
         this.compilationContext = new CompilationContext( unit );
@@ -261,10 +323,14 @@ public class Assembler
         phases.add( new PrepareGenerateCode() );
         phases.add( new GenerateCodePhase() );
         
+        LOG.info("assemble(): Now compiling "+unit);
+        
         for ( Phase p : phases )
         {
-            if ( debug ) {
-                LOG.info("Assembler phase: "+p);
+            compilationContext.beforePhase();
+            
+            if ( LOG.isDebugEnabled() ) {
+                LOG.debug("Assembler phase: "+p);
             }
             
             try {
@@ -280,12 +346,13 @@ public class Assembler
             }
             
             if ( p.stopOnErrors() && unit.getAST().hasErrors() ) {
-                return;
+                return null;
             }
         }
-    }
-    
-    public void setDebug(boolean debug) {
-        this.debug = debug;
+        
+        // write output
+        final Binary b = new Binary();
+        compilationContext.save( b , rf );
+        return b;
     }
 }

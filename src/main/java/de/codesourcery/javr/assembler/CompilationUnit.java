@@ -14,7 +14,7 @@ public class CompilationUnit
     private final Resource resource;
     private String contentHash;
     
-    private AST ast;
+    private AST ast = new AST();
     private List<CompilationUnit> dependencies = new ArrayList<>();
     private final SymbolTable symbolTable = new SymbolTable();
 
@@ -48,6 +48,7 @@ public class CompilationUnit
     }
     
     public void setAst(AST ast) {
+        Validate.notNull(ast, "AST must not be NULL");
         this.ast = ast;
     }
     

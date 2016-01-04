@@ -47,6 +47,21 @@ public class PrepareGenerateCode extends GenerateCodePhase
                     final Identifier identifier = ((LabelNode) node).identifier;
                     LabelSymbol s = (LabelSymbol) context.getSymbolTable().get( identifier );
                     s.setValue( context.currentAddress() );
+                } 
+                else if ( node instanceof DirectiveNode) 
+                {
+                    DirectiveNode dn = (DirectiveNode) node;
+                    if ( dn.is(Directive.EQU ) ) 
+                    {
+                        ((IValueNode) node.child(1)).resolveValue(context);
+                        Object value = ((IValueNode) node.child(1)).getValue();
+                        if ( value == null ) {
+                            context.error( "Failed to resolve value for ", node.child(1) );
+                        } else {
+                            final EquLabelNode label = (EquLabelNode) node.child(0);
+                            ((EquSymbol) context.getSymbolTable().get( label.name )).setValue( value );
+                        }
+                    }
                 }
                 visitNode( context , node , fakeCtx );
             }
@@ -78,6 +93,9 @@ public class PrepareGenerateCode extends GenerateCodePhase
                            
                            checkResolved( node.child(1) );
                            final Object v = ((IValueNode) node.child(1) ).getValue();
+                           if ( v == null ) {
+                               System.out.println("UNRESOLVED: "+node.child(1));
+                           }
                            symbol.setValue( v );
                            break;
                        case INIT_BYTES:

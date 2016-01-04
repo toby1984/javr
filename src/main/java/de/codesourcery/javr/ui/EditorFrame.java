@@ -24,10 +24,13 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.text.DecimalFormat;
 import java.time.Duration;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -83,12 +86,16 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode.IASTVisitor;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
 import de.codesourcery.javr.assembler.parser.ast.CommentNode;
+import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
 import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
+import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
+import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
+import de.codesourcery.javr.assembler.util.FileResourceFactory;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
 
@@ -295,11 +302,11 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         {
             switch(columnIndex) {
                 case 0:
-                    return "region";
+                    return "Location";
                 case 1:
-                    return "severity";
+                    return "Severity";
                 case 2:
-                    return "message";
+                    return "Message";
                 default:
                     throw new RuntimeException("Invalid column: "+columnIndex);
             }
@@ -369,6 +376,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
             this.ast = ast;
 
             final TreeModelEvent ev = new TreeModelEvent(this, new TreePath(this.ast) );
+            System.out.println("Tree has "+ast.childCount()+" statements");
             listeners.forEach( l -> l.treeStructureChanged( ev  ) );
         }
 
@@ -536,9 +544,12 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         this.lineMap = new LineMap(text,configProvider);        
         
         // parse
+        long parseTime = 0;
         final AST ast;
         try {
+           final long start = System.currentTimeMillis();
             ast = p.parse( new Lexer( new Scanner( text ) ) );
+            parseTime = System.currentTimeMillis() - start;
             astTreeModel.setAST( ast );
         } 
         catch(Exception e) 
@@ -552,9 +563,12 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         doSyntaxHighlighting();
         
         // assemble
+        long assembleTime = 0;
         final Assembler asm = new Assembler();
         try {
-            asm.assemble( compilationUnit , configProvider );
+            final long start = System.currentTimeMillis();
+            asm.assemble( compilationUnit , FileResourceFactory.createInstance( new File("/home/tobi/atmel/asm") , "dummy" ) , configProvider );
+            assembleTime = System.currentTimeMillis() -start;
         } 
         catch(Exception e) 
         {
@@ -564,8 +578,17 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         if ( ast.hasErrors() ) 
         {
             messageModel.addAll( ast.getMessages() );
-        } else {
-            messageModel.add( new CompilationMessage(Severity.INFO, "Compilation successful on "+ZonedDateTime.now() ) );
+        } 
+        else 
+        {
+            final long ms = parseTime+assembleTime;
+            float seconds = ms/1000f;
+            final DecimalFormat DF = new DecimalFormat("#######0.0#");
+            float linesPerSeconds = lineMap.getLineCount()/seconds;
+            final String time = "Time: "+ ms +" ms , "+DF.format( linesPerSeconds )+" lines/s , parse: "+parseTime+" ms, assemble: "+assembleTime+" ms";
+            messageModel.add( new CompilationMessage(Severity.INFO, time) );
+            DateTimeFormatter df = DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss");
+            messageModel.add( new CompilationMessage(Severity.INFO, "Compilation successful ("+ms+" millis) on "+df.format( ZonedDateTime.now() ) ) );
         }          
     }
     
@@ -653,6 +676,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         });
 
         final JTree tree = new JTree( astTreeModel );
+        
         tree.setCellRenderer( new DefaultTreeCellRenderer() 
         {
             @Override
@@ -664,7 +688,14 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
                     final ASTNode node = (ASTNode) value;
                     String text=node.getClass().getSimpleName();
 
-                    if ( node instanceof IdentifierNode) {
+                    if ( node instanceof DirectiveNode) {
+                        text = "."+((DirectiveNode) node).directive.literal;
+                    } 
+                    else  if ( node instanceof PreprocessorNode) {
+                        text = "#"+((PreprocessorNode) node).type.literal;
+                    } else if ( node instanceof OperatorNode) {
+                        text = "Operator: "+((OperatorNode) node).type.getSymbol();
+                    } else  if ( node instanceof IdentifierNode) {
                         text = "identifier: "+((IdentifierNode) node).value.value;
                     }
                     else if ( node instanceof StatementNode) {
@@ -708,9 +739,14 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
             }
         });
         tree.setRootVisible( true );
-
-        tree.setPreferredSize( new Dimension(200,300 ) );
-        frame.getContentPane().add( new JScrollPane( tree ) );
+        tree.setVisibleRowCount( 5 );
+        
+        final JPanel panel = new JPanel();
+        panel.setLayout( new BorderLayout() );
+        final JScrollPane pane = new JScrollPane();
+        pane.getViewport().add( tree );
+        panel.add( pane , BorderLayout.CENTER );
+        frame.getContentPane().add( panel );
 
         return frame;
     }

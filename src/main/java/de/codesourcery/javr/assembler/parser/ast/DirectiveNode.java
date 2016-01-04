@@ -12,6 +12,7 @@ public class DirectiveNode extends ASTNode
     {
         CSEG("cseg",0,0),
         DSEG("dseg",0,0),
+        DEVICE("device",1,1),
         ESEG("eseg",0,0),
         RESERVE("byte",1,1),
         INIT_BYTES("db",1,Integer.MAX_VALUE),
@@ -24,7 +25,7 @@ public class DirectiveNode extends ASTNode
         
         private Directive(String literal,int minOperandCount,int maxOperandCount) 
         {
-            this.literal = literal;
+            this.literal = literal.toLowerCase();
             this.minOperandCount = minOperandCount;
             this.maxOperandCount = maxOperandCount;
         }

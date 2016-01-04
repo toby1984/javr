@@ -54,6 +54,9 @@ public class SyntaxCheck implements Phase
                                context.message( CompilationMessage.error("Cannot reserve bytes in "+context.currentSegment()+" segment, only SRAM and EEPROM are supported",node ) );
                            }
                            break;
+                       case EQU: // currently ignored
+                       case DEVICE: // currently ignored
+                           break;
                        default:
                            throw new RuntimeException("Internal error, unhandled directive "+directive);
                    }

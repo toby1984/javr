@@ -15,6 +15,8 @@
  */
 package de.codesourcery.javr.assembler.parser.ast;
 
+import java.util.regex.Pattern;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
@@ -22,7 +24,10 @@ import de.codesourcery.javr.assembler.parser.TextRegion;
 
 public class NumberLiteralNode extends ASTNode implements IValueNode
 {
-    public static enum LiteralType {
+    private static final Pattern HEX_PATTERN = Pattern.compile("^[0-9A-Fa-f]+$");
+    
+    public static enum LiteralType 
+    {
         DECIMAL,
         HEXADECIMAL,
         BINARY;
@@ -65,7 +70,7 @@ public class NumberLiteralNode extends ASTNode implements IValueNode
     @Override
     public Integer getValue() 
     {
-        return value;
+        return Integer.valueOf( value );
     }    
     
     public LiteralType getType() {
@@ -95,12 +100,7 @@ public class NumberLiteralNode extends ASTNode implements IValueNode
     {
         if ( StringUtils.isNotBlank( s ) && s.startsWith("0x") && s.length() >= 3 ) 
         {
-            for ( int i = 2 , len= s.length() ; i < len ; i++ ) {
-                if ( ! Character.isDigit( s.charAt( i ) ) ) {
-                    return false;
-                }
-            }
-            return true;
+            return HEX_PATTERN.matcher( s.substring(2) ).matches();
         }
         return false;
     }    
@@ -109,7 +109,7 @@ public class NumberLiteralNode extends ASTNode implements IValueNode
     {
         if ( StringUtils.isNotBlank( s ) && s.startsWith("%") && s.length() >= 2 ) 
         {
-            for ( int i = 2 , len= s.length() ; i < len ; i++ ) 
+            for ( int i = 1 , len= s.length() ; i < len ; i++ ) 
             {
                 final char c = s.charAt(i);
                 if ( c != '0' && c != '1' ) 

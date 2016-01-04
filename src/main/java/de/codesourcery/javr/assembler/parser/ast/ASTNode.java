@@ -43,7 +43,7 @@ public abstract class ASTNode
         {
             for ( ASTNode child : children ) 
             {
-                result.add( child.createCopy( true ) );
+                result.addChild( child.createCopy( true ) );
             }
         }
         return result;
@@ -93,7 +93,7 @@ public abstract class ASTNode
         public void dontGoDeeper();
     }
     
-    protected final class IterationContext implements IIterationContext {
+    protected class IterationContext implements IIterationContext {
 
         public boolean stop;
         public boolean dontGoDeeper;
@@ -143,22 +143,56 @@ public abstract class ASTNode
         }
     }    
     
+    public void visitDepthFirst(IASTVisitor n) 
+    {
+        visitDepthFirst( n , new IterationContext() 
+        {
+            public void dontGoDeeper() {
+                throw new UnsupportedOperationException("dontGoDeeper() doesn't make sense with depth-first traversal");
+            }
+        } );
+    }
+    
+    private void visitDepthFirst(IASTVisitor n,IterationContext ctx)  
+    {
+        for ( ASTNode child : children ) 
+        {
+            child.visitDepthFirst( n , ctx );
+            if ( ctx.stop ) 
+            {
+                return;
+            }
+        }
+        
+        n.visit( this , ctx );
+        if ( ctx.stop ) {
+            return;
+        }
+    }      
+    
     public TextRegion getTextRegion() {
         return region;
     }
     
-    public void add(ASTNode child) 
+    public void insertChild(int index,ASTNode child) 
+    {
+        Validate.notNull(child, "child must not be NULL");
+        this.children.add( index , child );
+        child.setParent( this );
+    }
+    
+    public void addChild(ASTNode child) 
     {
         Validate.notNull(child, "child must not be NULL");
         this.children.add( child );
         child.setParent( this );
     }
     
-    public void add(Collection<ASTNode> children) 
+    public void addChildren(Collection<ASTNode> children) 
     {
         Validate.notNull(children, "child must not be NULL");
         for ( ASTNode child : children ) {
-            add( child );
+            addChild( child );
         }
     }
     

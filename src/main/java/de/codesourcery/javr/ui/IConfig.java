@@ -30,6 +30,4 @@ public interface IConfig
     public Parser createParser();
     
     public String getEditorIndentString();
-    
-    public ResourceFactory getResourceFactory();
 }

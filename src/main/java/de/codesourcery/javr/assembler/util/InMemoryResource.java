@@ -142,4 +142,17 @@ public class InMemoryResource implements Resource
     public String getEncoding() {
         return encoding;
     }
+
+    @Override
+    public void delete() throws IOException 
+    {
+        if ( openReaders > 0 ) {
+            throw new IOException("readers are still open");
+        }
+        if ( openWriters > 0 ) {
+            throw new IOException("writers are still open");
+        }         
+        data = new byte[0];
+        len = 0;
+    }
 }

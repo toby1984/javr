@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.Validate;
 
@@ -26,6 +27,7 @@ import de.codesourcery.javr.assembler.Instruction;
 import de.codesourcery.javr.assembler.Register;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
+import de.codesourcery.javr.assembler.parser.ExpressionToken.ExpressionTokenType;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.CharacterLiteralNode;
@@ -33,10 +35,14 @@ import de.codesourcery.javr.assembler.parser.ast.CommentNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.EquLabelNode;
+import de.codesourcery.javr.assembler.parser.ast.FunctionCallNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
 import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
+import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
+import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
+import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode.Preprocessor;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
 import de.codesourcery.javr.assembler.parser.ast.StringLiteral;
@@ -135,7 +141,7 @@ public class Parser
         while ( ! lexer.eof() ) 
         {
             try {
-                ast.add( parseStatement() );
+                ast.addChild( parseStatement() );
             } 
             catch(Exception e) 
             {
@@ -151,35 +157,84 @@ public class Parser
     {
         final StatementNode result = new StatementNode();
 
-        // parse label
-        final LabelNode label = parseLabel();
-        if ( label != null ) {
-            result.add( label );
-        }
-
-        // parse .XXXX directive
-        final ASTNode directive = parseDirective();
-        if ( directive != null ) {
-            result.add( directive );
+        final ASTNode preproc = parsePreprocessor();
+        if ( preproc != null ) 
+        {
+            result.addChild(preproc);
         } 
         else 
         {
-            // parse instruction
-            final InstructionNode insn = parseInstruction();
-            if ( insn!= null ) {
-                result.add( insn );
-            }       
+            // parse label
+            final LabelNode label = parseLabel();
+            if ( label != null ) {
+                result.addChild( label );
+            }
+
+            // parse .XXXX directive
+            final ASTNode directive = parseDirective();
+            if ( directive != null ) {
+                result.addChild( directive );
+            } 
+            else 
+            {
+                // parse instruction
+                final InstructionNode insn = parseInstruction();
+                if ( insn!= null ) {
+                    result.addChild( insn );
+                }       
+            }
         }
 
         // parse comment
         final CommentNode comment = parseComment();
         if ( comment != null ) {
-            result.add( comment );
+            result.addChild( comment );
         }           
 
         // parse EOF/EOL
         if ( ! parseEOL() ) {
             throw new ParseException("Expected EOF/EOL but got "+lexer.peek(),currentOffset());
+        }
+        return result;
+    }
+
+    private ASTNode parsePreprocessor() 
+    {
+        final int offset = lexer.peek().offset;
+        if ( lexer.peek(TokenType.HASH ) ) 
+        {
+            lexer.next();
+            if ( lexer.peek(TokenType.TEXT ) ) 
+            {
+                final Token tok2 = lexer.next();
+                final String keyword = tok2.value;
+                final PreprocessorNode.Preprocessor proc = Preprocessor.parse( keyword );
+                if ( proc == null ) {
+                    throw new ParseException("Unknown preprocessor instruction ",tok2);
+                }
+                final List<String> args = parseText();
+                final TextRegion r = new TextRegion( offset , lexer.peek().offset - offset );
+                return new PreprocessorNode( proc , args , r );
+            }
+            throw new ParseException("Expected a keyword",lexer.peek());
+        }
+        return null;
+    }
+    
+    private List<String> parseText() 
+    {
+        final List<String> result = new ArrayList<>();
+        while ( ! lexer.peek().hasType( TokenType.SEMICOLON, TokenType.EOF, TokenType.EOL) ) 
+        {
+            if ( lexer.peek( TokenType.SINGLE_QUOTE ) ) {
+                final CharacterLiteralNode n = parseCharLiteral();
+                result.add("'"+n.value+"'");
+            } else if ( lexer.peek( TokenType.DOUBLE_QUOTE ) ) {
+                final StringLiteral n = parseStringLiteral();
+                result.add("\""+n.value+"\"");
+            } else {
+                result.add( lexer.next().value );
+            }
         }
         return result;
     }
@@ -213,12 +268,22 @@ public class Parser
         final String value = tok2.value;
         switch( value.toLowerCase() ) 
         {
+            case "device":
+                final int start = lexer.peek().offset;
+                final List<String> values2 = parseText();
+                if ( values2.isEmpty() ) {
+                    throw new ParseException("Missing value", lexer.peek() );
+                }
+                final String device= values2.stream().collect(Collectors.joining());
+                final ASTNode dResult = new DirectiveNode(Directive.DEVICE , tok2.region() );
+                dResult.addChild( new StringLiteral( device , new TextRegion(start, lexer.peek().offset - start ) ) ); 
+                return dResult;
             case "byte":
                 final ASTNode expr = parseExpression();
                 if ( expr != null ) 
                 {
                     final DirectiveNode result = new DirectiveNode( Directive.RESERVE );
-                    result.add( expr );
+                    result.addChild( expr );
                     return result;
                 }
                 break;
@@ -232,7 +297,7 @@ public class Parser
                 if ( values.isEmpty() ) {
                     throw new ParseException( "Missing expression" , lexer.peek() );
                 }
-                result.add( values );
+                result.addChildren( values );
                 return result;
 
             case "equ":
@@ -240,14 +305,14 @@ public class Parser
                 {
                     final Token tok = lexer.next();
                     final Identifier name = new Identifier( tok.value );
-                    if ( lexer.peek( TokenType.OPERATOR ) && lexer.peek().value.equals("=") ) 
+                    if ( lexer.peek( TokenType.EQUALS ) ) 
                     {
                         lexer.next();
                         final ASTNode expr2 = parseExpression();
                         if ( expr2 != null ) {
                             final DirectiveNode result2 = new DirectiveNode(Directive.EQU);
-                            result2.add( new EquLabelNode( name , tok.region() ) );
-                            result2.add( expr2 );
+                            result2.addChild( new EquLabelNode( name , tok.region() ) );
+                            result2.addChild( expr2 );
                             return result2;
                         }
                         throw new ParseException("Expected an expression",lexer.peek());
@@ -306,7 +371,7 @@ public class Parser
             lexer.next();
             final Instruction instruction = new Instruction( tok.value );
             final InstructionNode result = new InstructionNode(instruction, tok.region());
-            result.add( parseOperands() );
+            result.addChildren( parseOperands() );
             return result;
         }
         return null;
@@ -433,7 +498,7 @@ public class Parser
             final Register reg = new Register( name , postIncrement && displacement == null , preDecrement );
             final RegisterNode result = new RegisterNode( reg , region );
             if ( displacement != null ) {
-                result.add( displacement );
+                result.addChild( displacement );
             }
             return result;
         }
@@ -444,6 +509,55 @@ public class Parser
     }
     
     private ASTNode parseExpression() 
+    {
+        final ShuntingYard yard = new ShuntingYard();
+        while ( ! lexer.eof() ) 
+        {
+            final Token tok = lexer.peek();
+            if ( tok.hasType(TokenType.PARENS_OPEN ) ) {
+                yard.pushOperator( new ExpressionToken(ExpressionTokenType.PARENS_OPEN , lexer.next() ) );
+            } 
+            else if ( tok.hasType(TokenType.PARENS_CLOSE ) ) {
+                yard.pushOperator( new ExpressionToken(ExpressionTokenType.PARENS_CLOSE , lexer.next() ) );
+            }
+            else if ( tok.hasType(TokenType.OPERATOR) ) 
+            {
+                lexer.next();
+                final OperatorType type;
+                if ( tok.value.equals("-" ) ) {
+                    type = OperatorType.BINARY_MINUS;
+                } else {
+                    type = OperatorType.getExactMatch( tok.value );
+                }
+                OperatorNode op = new OperatorNode( type , tok.region() );
+                
+                yard.pushOperator( new ExpressionToken(ExpressionTokenType.OPERATOR , op ) );
+            }
+            else if ( yard.isFunctionOnStack() && tok.hasType(TokenType.COMMA ) ) {
+                yard.pushOperator( new ExpressionToken(ExpressionTokenType.ARGUMENT_DELIMITER, lexer.next() ) );
+            } else {
+                final ASTNode node = parseAtom();
+                if ( node != null ) 
+                {
+                    if ( node instanceof IdentifierNode && lexer.peek(TokenType.PARENS_OPEN ) ) 
+                    {
+                        final Identifier id = ((IdentifierNode) node).value;
+                        yard.pushOperator( new ExpressionToken(ExpressionTokenType.FUNCTION , new FunctionCallNode( id , node.getTextRegion() ) ) );
+                    } else {
+                        yard.pushValue( node );
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+        if ( yard.isEmpty() ) {
+            return null;
+        }
+        return yard.getResult( lexer.peek().region() );
+    }
+    
+    private ASTNode parseAtom() 
     {
         // character literal
         ASTNode result = parseCharLiteral();
@@ -464,7 +578,7 @@ public class Parser
         }
 
         // identifier
-        return parseIdentifier(); 
+        return parseIdentifier();         
     }
     
     private boolean isCompoundRegister(String name) {
@@ -543,28 +657,60 @@ public class Parser
     private CommentNode parseComment() 
     {
         final Token tok = lexer.peek();
-        if ( tok.hasType( TokenType.SEMICOLON ) ) 
+        if ( tok.hasType( TokenType.SEMICOLON ) || tok.isOperator("/" ) ) 
         {
-            lexer.setIgnoreWhitespace( false );
             final StringBuilder buffer = new StringBuilder();
+            
+            boolean isMultiLineComment = false;
+            if ( tok.isOperator("/" ) ) 
+            {
+                lexer.next();
+                final Token tok2 = lexer.peek();
+                if ( tok2.isOperator("/") ) { // single-line comment
+                    buffer.append( tok.value );
+                } 
+                else if ( tok2.isOperator("*") ) { // multi-line comment
+                    buffer.append( tok.value );
+                    buffer.append( lexer.next().value );
+                    isMultiLineComment = true;
+                }
+                else 
+                {
+                    throw new ParseException( "C-style comment needs //" , tok);
+                }
+            }
+            lexer.setIgnoreWhitespace( false );
             try 
             {
                 final TextRegion region = lexer.peek().region();
-                while ( ! lexer.eof() && ! lexer.peek( TokenType.EOL ) ) 
+                while ( ! lexer.eof() ) 
                 {
+                    if ( lexer.peek(TokenType.EOL ) ) 
+                    {
+                        if ( ! isMultiLineComment ) {
+                            break;
+                        }
+                    }
                     final Token tok2 = lexer.next();
                     region.merge( tok2.region() );
                     buffer.append( tok2.value );
+                    if ( isMultiLineComment && tok2.isOperator("*") && lexer.peek().isOperator("/" ) ) 
+                    {
+                        buffer.append( lexer.peek().value );                        
+                        region.merge( lexer.next().region() );
+                        break;
+                    }                    
                 }
                 return new CommentNode( buffer.toString(), region );
-            } finally 
+            } 
+            finally 
             {
                 lexer.setIgnoreWhitespace( true );
             }
         }
         return null;
     }
-
+    
     private boolean parseEOL() {
 
         if ( lexer.eof() ) {

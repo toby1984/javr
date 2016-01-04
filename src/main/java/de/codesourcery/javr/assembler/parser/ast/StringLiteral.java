@@ -4,7 +4,7 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.parser.TextRegion;
 
-public class StringLiteral extends ASTNode 
+public class StringLiteral extends ASTNode implements IValueNode
 {
     public final String value;
 
@@ -19,5 +19,10 @@ public class StringLiteral extends ASTNode
     @Override
     protected StringLiteral createCopy() {
         return new StringLiteral(value,getTextRegion().createCopy());
+    }
+
+    @Override
+    public String getValue() {
+        return value;
     }
 }

@@ -24,6 +24,10 @@ public class FileResource implements Resource
     {
         Validate.notNull(file, "file must not be NULL");
         Validate.notBlank(encoding,"encoding must not be NULL or blank");
+        
+        if ( file.exists() && ! file.isFile() ) {
+            throw new IllegalArgumentException("Not a file: "+file.getAbsolutePath());
+        }
         this.file = file;
         this.encoding = encoding;
         updateContentHash();
@@ -35,6 +39,7 @@ public class FileResource implements Resource
         if ( ! file.exists() ) 
         {
             this.contentHash = digest.finish();
+            return;
         }
         final byte[] buffer = new byte[1024];
         try ( InputStream in = new FileInputStream(file ) ) {
@@ -83,5 +88,16 @@ public class FileResource implements Resource
     @Override
     public String getEncoding() {
         return encoding;
+    }
+
+    @Override
+    public void delete() throws IOException 
+    {
+        if ( exists() ) 
+        {
+            if ( ! file.delete() ) {
+                throw new IOException("Failed to delete "+file.getAbsolutePath());
+            }
+        }
     }
 }

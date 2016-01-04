@@ -19,4 +19,6 @@ public interface Resource
     public String contentHash();
     
     public String getEncoding();
+    
+    public void delete() throws IOException;
 }

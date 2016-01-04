@@ -73,38 +73,6 @@ public class Main
             public String getEditorIndentString() {
                 return "  ";
             }
-
-            @Override
-            public ResourceFactory getResourceFactory() 
-            {
-                String path = Paths.get(".").toAbsolutePath().normalize().toString();
-                while ( path.length() > File.pathSeparator.length() && path.endsWith( File.pathSeparator ) ) {
-                    path = path.substring(0 , path.length()-1 );
-                }
-                final String pwd = path;
-                final File pwdFile = new File( path );
-                return new ResourceFactory() 
-                {
-                    @Override
-                    public Resource resolveResource(Resource parent, String child) throws IOException {
-                        return new FileResource( new File(pwdFile,child) ,  Resource.ENCODING_UTF );
-                    }
-                    
-                    @Override
-                    public Resource getResource(Binary binary, Segment segment) throws IOException 
-                    {
-                        final String suffix;
-                        switch( segment ) 
-                        {
-                            case EEPROM: suffix = ".eeprom"; break;
-                            case FLASH:  suffix = ".flash"; break;
-                            case SRAM:   suffix = ".sram"; break;
-                            default: throw new RuntimeException("Unhandled segment type: "+segment);
-                        }
-                        return new FileResource( new File( pwd + File.separatorChar + binary.getIdentifier()+ suffix )  , Resource.ENCODING_UTF );
-                    }
-                };
-            }
         };
         configProvider = new IConfigProvider() {
             

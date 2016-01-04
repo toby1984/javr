@@ -53,7 +53,16 @@ public class LexerTest {
         assertEquals(2,tokens.size());
         assertEquals( token(TokenType.TEXT,"Z",0) , tokens.get(0) );
         assertEquals( token(TokenType.OPERATOR,"+",1) , tokens.get(1) );
-    }     
+    }  
+    
+    @Test
+    public void testLexOperators3() 
+    {
+        final List<Token> tokens = lexAll("Z-");
+        assertEquals(2,tokens.size());
+        assertEquals( token(TokenType.TEXT,"Z",0) , tokens.get(0) );
+        assertEquals( token(TokenType.OPERATOR,"-",1) , tokens.get(1) );
+    }    
     
     @Test
     public void testLexUnixEOL() 
@@ -116,9 +125,24 @@ public class LexerTest {
         assertEquals( token(TokenType.OPERATOR,"-" , 1) , tokens.get(1) );        
         assertEquals( token(TokenType.OPERATOR,"*" , 2) , tokens.get(2) );        
         assertEquals( token(TokenType.OPERATOR,"/" , 3) , tokens.get(3) );        
-        assertEquals( token(TokenType.OPERATOR,"=" , 4) , tokens.get(4) );        
+        assertEquals( token(TokenType.EQUALS,"=" , 4) , tokens.get(4) );        
         assertEOF();
     }  
+    
+    @Test
+    public void testLexFunction() 
+    {
+        final List<Token> tokens = lexAll("HIGH(1,2)");
+        assertEquals(6,tokens.size());
+        final Iterator<Token> it = tokens.iterator();
+        assertEquals( token(TokenType.TEXT,"HIGH" , 0) , it.next() );
+        assertEquals( token(TokenType.PARENS_OPEN,"(" , 4) , it.next() );
+        assertEquals( token(TokenType.DIGITS,"1" , 5) , it.next() );
+        assertEquals( token(TokenType.COMMA,"," , 6) , it.next() );
+        assertEquals( token(TokenType.DIGITS,"2" , 7) , it.next() );
+        assertEquals( token(TokenType.PARENS_CLOSE,")" , 8) , it.next() );
+        assertEOF();
+    }    
     
     @Test
     public void testLexText() 
