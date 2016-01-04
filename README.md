@@ -26,7 +26,5 @@ java -jar target/javr.jar
 - Write object file(s) to disk
 - Add parse error recovery
 - Testing...
-- Add support for string and character literals
 - Add support for #xxx directives
-- Add expression support
 - Add #include directive 
