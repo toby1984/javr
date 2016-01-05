@@ -30,6 +30,7 @@ import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Register;
 import de.codesourcery.javr.assembler.Segment;
+import de.codesourcery.javr.assembler.arch.AbstractAchitecture.InstructionEncoding;
 import de.codesourcery.javr.assembler.arch.InstructionEncoder.Transform;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
@@ -144,7 +145,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         }
     }
     
-    private final Map<String,EncodingEntry> instructions = new HashMap<>();
+    protected final Map<String,EncodingEntry> instructions = new HashMap<>();
     
     protected InstructionEncoding insn(String mnemonic,String pattern) 
     {
@@ -253,7 +254,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         Z_REGISTER_DISPLACEMENT,
         // addresses
         FLASH_MEM_ADDRESS, // device-dependent, covers whole address range
-        SRAM_MEM_ADDRESS, // device-dependent, covers whole address range
+        SIXTEEN_BIT_SRAM_MEM_ADDRESS, // device-dependent, covers whole address range
         SEVEN_BIT_SRAM_MEM_ADDRESS,
         DATASPACE_16_BIT_ADDESS,
         // constant values
@@ -270,12 +271,92 @@ public abstract class AbstractAchitecture implements IArchitecture
         NONE
     }
     
+    protected interface DisassemblySelector 
+    {
+        public InstructionEncoding pick(List<InstructionEncoding> candidates,int value);
+    }
+    
+    protected static final class SameOperandsDisassemblySelector implements DisassemblySelector 
+    {
+        private final InstructionEncoding sameOperands;
+        private final InstructionEncoding differentOperands;
+        
+        public SameOperandsDisassemblySelector(InstructionEncoding sameOperands,InstructionEncoding differentOperands) 
+        {
+            Validate.notNull(sameOperands, "sameOperands must not be NULL");
+            Validate.notNull(differentOperands, "differentOperands must not be NULL");
+            this.sameOperands = sameOperands;
+            this.differentOperands = differentOperands;
+            if ( ! ( sameOperands.getArgumentCount() == 2 && differentOperands.getArgumentCount() == 1 ) &&
+                 ! ( sameOperands.getArgumentCount() == 1 && differentOperands.getArgumentCount() == 2 ) ) 
+            {
+                throw new IllegalArgumentException("Unsupported argument counts: "+sameOperands.getArgumentCount()+" <-> "+differentOperands.getArgumentCount());
+            }
+        }
+        
+        @Override
+        public InstructionEncoding pick(List<InstructionEncoding> candidates,int value) 
+        {
+            if ( candidates.size() == 1 ) {
+                return candidates.get(0);
+            }
+            if ( candidates.size() != 2 ) {
+                throw new IllegalArgumentException("Unsupported candidate count");
+            }
+            final InstructionEncoding enc1 = candidates.get(0);
+            final InstructionEncoding enc2 = candidates.get(1);
+            if ( (enc1 == sameOperands && enc2 == differentOperands) || (enc1 == differentOperands && enc2 == sameOperands ) ) 
+            {
+                final List<Integer> result1 = sameOperands.encoder.decode( value );
+                final List<Integer> result2 = differentOperands.encoder.decode( value );
+                if ( result1.equals( result2 ) ) {
+                    return sameOperands;
+                }
+                // first check failed, 
+                // missing src operand is returned as NULL value from decode(), 
+                // copy value from dst operand and re-try comparison
+                // this is to handle equivalent operations like ADD r0,r0 <=> ROL r0
+                if ( result1.get(1) == null ) {
+                    result1.set(1,result1.get(0) );
+                }
+                if ( result2.get(1) == null ) {
+                    result2.set(1,result2.get(0) );
+                }   
+                if ( result1.equals( result2 ) ) {
+                    return sameOperands;
+                }                
+                return differentOperands;
+            } 
+            throw new IllegalArgumentException("Unsupported candidates");
+        }
+    }
+    
+    protected static final DisassemblySelector DEFAULT_DISASM_SELECTOR = (candidates,value) -> 
+    {
+        switch(candidates.size() ) {
+            case 0:
+                throw new IllegalArgumentException("No candidates?");
+            case 1:
+                return candidates.get(0);
+            case 2:
+                if ( candidates.get(0).isAliasOf( candidates.get(1)) &&
+                     candidates.get(1).isAliasOf( candidates.get(0)) ) 
+                {
+                    return candidates.get(0);
+                }
+            default:
+                throw new IllegalArgumentException("More than one candidate: "+candidates);
+        }
+    };
+    
     public static final class InstructionEncoding 
     {
         public final String mnemonic;
-        private final InstructionEncoder encoder;
+        public final InstructionEncoder encoder;
         public final ArgumentType srcType;
         public final ArgumentType dstType;
+        public DisassemblySelector disasmSelector = DEFAULT_DISASM_SELECTOR;
+        public InstructionEncoding aliasOf;
         
         public InstructionEncoding(String mnemonic,InstructionEncoder enc,ArgumentType dstType,ArgumentType srcType) 
         {
@@ -291,6 +372,24 @@ public abstract class AbstractAchitecture implements IArchitecture
             this.srcType = srcType;
             this.dstType = dstType;
         }     
+        
+        public void disassemblySelector(DisassemblySelector sel) 
+        {
+            Validate.notNull(sel, "sel must not be NULL");
+            this.disasmSelector = sel;
+        }
+        
+        public void aliasOf(InstructionEncoding other) 
+        {
+            Validate.notNull(other, "encoding must not be NULL");
+            if ( other == this ) {
+                throw new IllegalArgumentException("same instance doesn't make sense");
+            }
+            if ( this.aliasOf != null ) {
+                throw new IllegalStateException("Alias already assigned");
+            }
+            this.aliasOf = other;
+        }
         
         @Override
         public String toString() {
@@ -318,6 +417,11 @@ public abstract class AbstractAchitecture implements IArchitecture
         public int encode(int dstValue,int srcValue) 
         {
             return encoder.encode( dstValue , srcValue );
+        }
+
+        public boolean isAliasOf(InstructionEncoding enc) 
+        {
+            return this.aliasOf != null && this.aliasOf == enc;
         }
     }
     
@@ -449,7 +553,7 @@ public abstract class AbstractAchitecture implements IArchitecture
             default:
                 throw new RuntimeException( "Unreachable code reached");
         }
-        System.err.println( node.instruction.getMnemonic().toUpperCase()+" "+dstValue+" , "+srcValue+" [ "+node+" ]"+
+        System.out.println( node.instruction.getMnemonic().toUpperCase()+" "+dstValue+" , "+srcValue+" [ "+node+" ]"+
                             " compiled => "+prettyPrint(hex,2)+" ( "+prettyPrint(bin,4)+" )");
         System.out.println( "ENCODING: "+encoding);
     }
@@ -543,7 +647,7 @@ public abstract class AbstractAchitecture implements IArchitecture
             case SIX_BIT_IO_REGISTER_CONSTANT:
             case DATASPACE_16_BIT_ADDESS: // TODO: Validate range according to spec
             case SEVEN_BIT_SRAM_MEM_ADDRESS:                
-            case SRAM_MEM_ADDRESS:                
+            case SIXTEEN_BIT_SRAM_MEM_ADDRESS:                
             case FLASH_MEM_ADDRESS:                
                 if ( ! (node instanceof IValueNode)) {
                     return fail("Operand must evaluate to a constant (expected: " +type+", was: "+node.getClass().getName()+")",node,context);
@@ -638,7 +742,7 @@ public abstract class AbstractAchitecture implements IArchitecture
                 }
                 break;
             case SEVEN_BIT_SRAM_MEM_ADDRESS:
-            case SRAM_MEM_ADDRESS: 
+            case SIXTEEN_BIT_SRAM_MEM_ADDRESS: 
                 if ( result < 0 || result > getSRAMMemorySize() ) {
                     return fail("Address "+result+" is out-of-range, target architecture only has "+getFlashMemorySize()+" bytes of SRAM memory",node,context);
                 }
@@ -678,5 +782,63 @@ public abstract class AbstractAchitecture implements IArchitecture
         }
         return result;
     }
-    
+
+    @Override
+    public String disassemble(byte[] data,int len) 
+    {
+        final PrefixTree tree = new PrefixTree();
+        for ( EncodingEntry entry : this.instructions.values() ) 
+        {
+            for ( InstructionEncoding i : entry.encodings ) {
+                tree.add( i );
+            }
+        }
+        
+//        System.out.println( tree );
+        
+        final StringBuilder buffer = new StringBuilder();
+        
+        int ptr = 0;
+        while ( ptr < len ) 
+        {
+            final int remaining = len - ptr;
+            int value=0;
+            for ( int i = 0 ; i < remaining ; i++ ) 
+            {
+                value <<= 8;
+                value |= data[ptr+i] & 0xff;
+            }
+            // decoding assumes that data
+            // starts with the MSB
+            value <<= (4-remaining)*8;
+            
+            System.out.println("Trying to match "+Integer.toBinaryString( value ) );
+            final List<InstructionEncoding> matches = tree.getMatch( value );
+            if ( matches.isEmpty() )
+            {
+                buffer.append(".db ");
+                for ( int i = 0 ; i < remaining ; i++ ) {
+                    buffer.append( Integer.toHexString( data[ptr+i] & 0xff ) );
+                    if ((i+1) < remaining) {
+                        buffer.append(" , ");
+                    }
+                }
+                buffer.append("\n");
+                ptr += remaining;
+            } 
+            else 
+            {
+                matches.sort( (a,b) -> {
+                    return Integer.compare( b.encoder.getOpcodeBitCount() , a.encoder.getOpcodeBitCount() );
+                });
+                final int longestMatch = matches.get(0).encoder.getOpcodeBitCount();
+                matches.removeIf( m -> m.encoder.getOpcodeBitCount() < longestMatch );
+                final InstructionEncoding result = matches.get(0).disasmSelector.pick( matches , value );
+                // TODO: Decode & print arguments
+                buffer.append( result.mnemonic.toUpperCase() ).append(" ");
+                ptr += result.getInstructionLengthInBytes();
+            }
+        }
+        return buffer.toString();
+    }
 }

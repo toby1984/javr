@@ -43,11 +43,16 @@ public final class Address {
         return "0x"+StringUtils.leftPad( Integer.toHexString( byteOffset ) , 4 , '0' )+" ("+segment+")";
     }
     
-    public static Address byteAddress(Segment s,int byteOffset) {
+    public static Address byteAddress(Segment s,int byteOffset) 
+    {
         return new Address(s,byteOffset);
     }
     
-    public static Address wordAddress(Segment s,int wordOffset) {
-        return new Address(s,wordOffset*2);
+    public static Address wordAddress(Segment s,int byteOffset) 
+    {
+        if ( (byteOffset&1) != 0 ) {
+            throw new IllegalArgumentException("Word-address must be even, was: "+byteOffset);
+        }
+        return new Address(s,byteOffset);
     }
 }

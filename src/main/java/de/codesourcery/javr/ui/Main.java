@@ -16,25 +16,17 @@
 package de.codesourcery.javr.ui;
 
 import java.awt.Dimension;
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Paths;
 
 import javax.swing.JDesktopPane;
 import javax.swing.JFrame;
 import javax.swing.JInternalFrame;
 import javax.swing.SwingUtilities;
 
-import de.codesourcery.javr.assembler.Binary;
-import de.codesourcery.javr.assembler.ResourceFactory;
-import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.Parser;
 import de.codesourcery.javr.assembler.parser.Scanner;
-import de.codesourcery.javr.assembler.util.FileResource;
-import de.codesourcery.javr.assembler.util.Resource;
 
 public class Main 
 {

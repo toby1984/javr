@@ -140,7 +140,7 @@ public enum OperatorType
             return evaluate( ((ExpressionNode) node).child(0) , symbolTable );
         }
         if ( node instanceof IdentifierNode) {
-            return symbolTable.get( ((IdentifierNode) node).value ).getValue();
+            return symbolTable.get( ((IdentifierNode) node).name ).getValue();
         }
         if ( node instanceof StringLiteral) {
             return ((StringLiteral) node).value;

@@ -27,7 +27,7 @@ public class FunctionCallNode extends ASTNode implements IValueNode {
     @Override
     public boolean resolveValue(ICompilationContext context) 
     {
-        this.value = OperatorType.evaluate( this , context.getSymbolTable() );
+        this.value = OperatorType.evaluate( this , context.globalSymbolTable() );
         return value != null;
     }    
 

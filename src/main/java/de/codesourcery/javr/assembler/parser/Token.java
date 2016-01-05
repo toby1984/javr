@@ -40,6 +40,10 @@ public final class Token {
         this.type = type;
     }
     
+    public int endOffset() {
+        return offset+value.length();
+    }
+    
     public boolean equals(Object o) 
     {
         if ( o instanceof Token) 

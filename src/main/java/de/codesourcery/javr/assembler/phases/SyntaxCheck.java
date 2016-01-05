@@ -16,7 +16,7 @@ public class SyntaxCheck implements Phase
     @Override
     public void run(ICompilationContext context) throws Exception
     {
-        final AST ast = context.getCompilationUnit().getAST();
+        final AST ast = context.currentCompilationUnit().getAST();
         
         final IASTVisitor visitor = new IASTVisitor() 
         {
@@ -37,15 +37,15 @@ public class SyntaxCheck implements Phase
                    if ( directive == Directive.EQU ) { // .equ is special since the first child node is the label, not an operand
                        operandCount = operandCount > 0 ? operandCount-1 : operandCount;
                    } 
-                   if ( ! directive.isValidOperandCount( node.childCount() ) ) {
-                       context.error("Invalid operand count (expected at least "+directive.minOperandCount+" and at most "+directive.maxOperandCount, node );
+                   if ( ! directive.isValidOperandCount( operandCount ) ) {
+                       context.error( directive.name().toUpperCase()+" directive has invalid operand count "+node.childCount()+" , (expected at least "+directive.minOperandCount+" and at most "+directive.maxOperandCount, node );
                    }
                    
                    switch( directive ) 
                    {
                        case CSEG: context.setSegment( Segment.FLASH ); break;
                        case DSEG: context.setSegment( Segment.SRAM ) ; break;
-                       case ESEG: context.setSegment( Segment.EEPROM ); break;
+                       case ESEG: context.setSegment( Segment.EEPROM ); break;                       
                        case INIT_BYTES:
                        case INIT_WORDS:
                        case RESERVE:

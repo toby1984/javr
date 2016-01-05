@@ -35,9 +35,13 @@ public class InstructionEncoder
     private static final char DST_PATTERN = 'd';
     
     private final String pattern;
+    private final String trimmedPattern;
     private final int binaryPattern;
     private final Encoding srcEncoding;
     private final Encoding dstEncoding;
+    
+    // number of '0' or '1' characters in pattern
+    private final int opcodeBitCount;
     
     private Transform srcTransform = IDENTITY;
     private Transform dstTransform = IDENTITY;
@@ -45,6 +49,10 @@ public class InstructionEncoder
     public interface Transform 
     {
         public int transform(int value);
+    }
+    
+    public String getPattern() {
+        return pattern;
     }
     
     public InstructionEncoder srcTransform(Transform t) 
@@ -63,8 +71,43 @@ public class InstructionEncoder
         return this;
     }    
     
+    public String getTrimmedPattern() {
+        return trimmedPattern;
+    }
+    
     public int getInstructionLengthInBytes() {
         return pattern.length()/8;
+    }
+    
+    /**
+     * 
+     * @return the total number of '0' or '1' characters in the pattern 
+     */
+    public int getOpcodeBitCount() {
+        return opcodeBitCount;
+    }
+    
+    public boolean matches(int value) 
+    {
+        int mask = 0b10000000_00000000_00000000_00000000;
+        for ( int i = 0,len=trimmedPattern.length() ; i < len ; i++ ) 
+        {
+            final boolean bitSet = (value&mask) != 0;
+            final char c = trimmedPattern.charAt(i);
+            if ( c == '0' ) {
+                if ( bitSet ) {
+                    return false;
+                }
+            } 
+            else if ( c == '1' ) 
+            {
+                if ( ! bitSet ) {
+                    return false;
+                }
+            } // else { /* the pattern contains a data bit at this position, both 0 and 1 are valid */ }
+            mask >>>= 1;
+        }
+        return true;
     }
     
     public InstructionEncoder(String pat) 
@@ -79,6 +122,8 @@ public class InstructionEncoder
         {
             throw new IllegalArgumentException("Unsupported pattern length: "+pattern);
         }
+        
+        this.trimmedPattern = pattern;
         
         // hack to map pattern that only contain one unique non-digit character
         // to use DST_PATTERN instead (simplifies copy'n'paste from Atmel spec)
@@ -110,13 +155,17 @@ public class InstructionEncoder
         int dstBitCount=0;
         int binaryPattern =0;
         int mask = 1;
+        int opcodeBitCount = 0;
         for ( int i = pattern.length()-1 ; i >= 0 ; i-- ) 
         {
             final char c = pattern.charAt(i);
             if (c == '0') 
             {
-            } else if (c == '1') 
+                opcodeBitCount++;
+            } 
+            else if (c == '1') 
             {
+                opcodeBitCount++;
                 binaryPattern |= mask;
             } 
             else if ( hasMoreThanOneArgument && c == SRC_PATTERN) 
@@ -136,6 +185,7 @@ public class InstructionEncoder
             throw new IllegalArgumentException("One-argument patterns must only use '"+DST_PATTERN+"'");
         }
         
+        this.opcodeBitCount = opcodeBitCount;
         this.binaryPattern = binaryPattern;
         this.pattern = pattern;
         
@@ -156,7 +206,7 @@ public class InstructionEncoder
         }
     }
     
-    private static Encoding toEncoding(int[] bitMapping) 
+    private Encoding toEncoding(int[] bitMapping) 
     {
         final List<BitRange> ranges = toBitRanges( bitMapping );
         if ( ranges.isEmpty() ) {
@@ -222,8 +272,8 @@ public class InstructionEncoder
         } 
         else 
         {
-            final BitRange last = result.get( result.size()-1 );
-            if ( last.shiftOffset+last.length != bitMapping.length ) 
+            final int coveredLength = result.stream().mapToInt( s -> s.length ).sum();
+            if ( coveredLength < bitMapping.length )
             {
                 final int len = bitMapping.length - currentStart;
                 final int mask = ( (1<<len)-1 ) << maskShift;
@@ -257,9 +307,27 @@ public class InstructionEncoder
         return binaryPattern | dstEncoding.encode( dstTransform.transform( dstArgument ) ) | srcEncoding.encode( srcTransform.transform( srcArgument ) );
     }    
     
+    public List<Integer> decode(int value) 
+    {
+        final List<Integer> result = new ArrayList<>();
+        if ( dstEncoding != NOP ) {
+            result.add( dstEncoding.decode( value ) );
+        } else {
+            result.add( null );
+        }
+        if ( srcEncoding != NOP ) {
+            result.add( srcEncoding.decode( value ) );
+        } else {
+            result.add( null );
+        }        
+        return result;
+    }
+    
     protected interface Encoding 
     {
         public int encode(int value);
+        
+        public int decode(int value);
         
         public int getBitCount();
         
@@ -281,6 +349,11 @@ public class InstructionEncoder
         @Override
         public String getDescription() {
             return "NOP";
+        }
+
+        @Override
+        public int decode(int value) {
+            throw new UnsupportedOperationException();
         }
     }
     
@@ -315,7 +388,7 @@ public class InstructionEncoder
         protected abstract int doEncode(int value);
     }
     
-    protected static final class IdentityEncoding extends AbstractEncoding 
+    protected final class IdentityEncoding extends AbstractEncoding 
     {
         public IdentityEncoding(int bitCount) {
             super(bitCount);
@@ -330,9 +403,16 @@ public class InstructionEncoder
         public String getDescription() {
             return "Identity( "+getBitCount()+" bits)";
         }        
+        
+        public int decode(int value) 
+        {
+            final int shiftedValue = value >> (4-getInstructionLengthInBytes())*8;
+            final int mask = (1<<getBitCount() )-1;
+            return shiftedValue & mask;
+        }
     }
     
-    protected static final class ShiftedEncoding extends AbstractEncoding {
+    protected final class ShiftedEncoding extends AbstractEncoding {
 
         private final int bitsToShift;
         
@@ -353,9 +433,17 @@ public class InstructionEncoder
         public String getDescription() {
             return "Shifted( "+getBitCount()+" bits, shifted by "+bitsToShift+")";
         }          
+        
+        public int decode(int value) 
+        {
+            final int shiftedValue = value >>> (4-getInstructionLengthInBytes())*8;
+            int mask = (1<<getBitCount() )-1;
+            mask <<= bitsToShift;
+            return (shiftedValue & mask) >> bitsToShift;
+        }        
     }
     
-    protected static final class FreeFormEncoding extends AbstractEncoding {
+    protected final class FreeFormEncoding extends AbstractEncoding {
 
         private final int[] bitMapping;
         
@@ -380,6 +468,19 @@ public class InstructionEncoder
             }
             return result;
         }
+        
+        public int decode(int value) 
+        {
+            final int shiftedValue = value >> (4-getInstructionLengthInBytes())*8;
+            int result = 0;
+            for ( int i = 0 ; i < bitMapping.length ; i++ ) 
+            {
+                if ( ( shiftedValue & 1 << bitMapping[i] ) != 0 ) {
+                    result |= 1<<i;
+                }
+            }
+            return result;
+        }         
         
         @Override
         public String getDescription() {
@@ -424,10 +525,13 @@ public class InstructionEncoder
         }
     }
     
-    // encoding where the lower n-1 bits are left-shifted by a fixed amount
-    // and the MSB is at some random (other) position
+    // encoding where the value is split at some arbitrary bit position
+    // and both halves of the value go to different bit offsets in the
+    // destination
+    //
+    // e.g. 0010ddd10101011ddd1
     
-    protected static final class ShiftedSingleSplitEncoding extends AbstractEncoding {
+    protected final class ShiftedSingleSplitEncoding extends AbstractEncoding {
 
         private final int lowerBitsShift;
         private final int upperBitsShift;
@@ -457,6 +561,15 @@ public class InstructionEncoder
         {
             return "ShiftedSplit( "+getBitCount()+" bits total, lower_shift="+lowerBitsShift+", lower_mask="+toBinary( lowerBitMask)+
                     " , upper_shift="+upperBitsShift+",upper_mask="+toBinary( upperBitMask );
+        }
+
+        @Override
+        public int decode(int value) 
+        {
+            final int shiftedValue = value >>> (4-getInstructionLengthInBytes())*8;
+            final int hiValue = (shiftedValue & (upperBitMask << upperBitsShift)) >>> upperBitsShift;
+            final int loValue = (shiftedValue & (lowerBitMask << lowerBitsShift)) >>> lowerBitsShift;
+            return hiValue | loValue;
         }         
     }
     

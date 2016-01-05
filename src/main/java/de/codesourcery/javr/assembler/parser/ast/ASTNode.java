@@ -22,23 +22,46 @@ import java.util.List;
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
-import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.Parser.Severity;
+import de.codesourcery.javr.assembler.parser.TextRegion;
 
 public abstract class ASTNode 
 {
     public final List<ASTNode> children=new ArrayList<>();
     
+    private boolean skip;
     private TextRegion region;
     private ASTNode parent;
     
     public ASTNode() {
     }
     
+    /**
+     * Marks this subtree as to be skipped because of conditional compilation.
+     */
+    public final void markAsSkip() 
+    {
+        this.skip = true;
+        for ( ASTNode child : children ) 
+        {
+            child.markAsSkip();
+        }
+    }
+    
+    /**
+     * Check whether conditional compilation marked this subtree as to be skipped
+     * @return
+     */
+    public boolean isSkip() {
+        return skip;
+    }
+    
     public final ASTNode createCopy(boolean deep) 
     {
         final ASTNode result = createCopy();
+        result.skip = this.skip;
+        
         if ( deep ) 
         {
             for ( ASTNode child : children ) 
@@ -188,7 +211,7 @@ public abstract class ASTNode
         child.setParent( this );
     }
     
-    public void addChildren(Collection<ASTNode> children) 
+    public void addChildren(Collection<? extends ASTNode> children) 
     {
         Validate.notNull(children, "child must not be NULL");
         for ( ASTNode child : children ) {

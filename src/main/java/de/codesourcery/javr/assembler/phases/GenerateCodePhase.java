@@ -1,7 +1,6 @@
 package de.codesourcery.javr.assembler.phases;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
-import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
@@ -12,7 +11,7 @@ import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 
-public class GenerateCodePhase implements Phase 
+public class GenerateCodePhase extends AbstractPhase 
 {
     private final boolean onlyAllocation;
     
@@ -27,7 +26,7 @@ public class GenerateCodePhase implements Phase
     @Override
     public void run(ICompilationContext context) throws Exception {
 
-        final AST ast = context.getCompilationUnit().getAST();
+        final AST ast = context.currentCompilationUnit().getAST();
         
         final IASTVisitor visitor = new IASTVisitor() 
         {
@@ -40,8 +39,12 @@ public class GenerateCodePhase implements Phase
         ast.visitBreadthFirst( visitor );        
     }
     
-    protected final void visitNode(ICompilationContext context, ASTNode node,IIterationContext ctx) 
+    protected boolean visitNode(ICompilationContext context, ASTNode node,IIterationContext ctx) 
     {
+        if ( ! super.visitNode( context , node , ctx ) ) {
+            return false;
+        }
+        
         if ( node instanceof InstructionNode ) 
         {
             if ( onlyAllocation ) 
@@ -58,9 +61,6 @@ public class GenerateCodePhase implements Phase
             final Directive directive = ((DirectiveNode) node).directive;
             switch( directive ) 
             {
-                case CSEG: context.setSegment( Segment.FLASH ); break;
-                case DSEG: context.setSegment( Segment.SRAM ) ; break;
-                case ESEG: context.setSegment( Segment.EEPROM ); break;                
                 case INIT_BYTES:
                 case INIT_WORDS:
                     for ( ASTNode child : node.children ) 
@@ -99,5 +99,6 @@ public class GenerateCodePhase implements Phase
             }
             ctx.dontGoDeeper();
         }
+        return true;
     }    
 }

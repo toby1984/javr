@@ -18,31 +18,49 @@ package de.codesourcery.javr.assembler.symbols;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
+import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.parser.Identifier;
+import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 
-public abstract class Symbol<T,VALUETYPE> 
+public final class Symbol 
 {
     private static final Logger LOG = Logger.getLogger(Symbol.class);
     
     private final Identifier name;
-    private final T node;
+    private final ASTNode node;
+    private final CompilationUnit compilationUnit;
     private Type type;
-    private VALUETYPE value;
+    private Object value;
     
     public static enum Type 
     {
         LABEL,
-        EQU
+        EQU,
+        MACRO,
+        UNDEFINED
     }
     
-    public Symbol(Identifier name,Type type,T node) 
+    public Symbol(Identifier name,Type type,CompilationUnit compilationUnit, ASTNode node) 
     {
+        Validate.notNull(compilationUnit, "com must not be NULL");
         Validate.notNull(name, "name must not be NULL");
-        Validate.notNull(node, "node must not be NULL");
         Validate.notNull(type, "type must not be NULL");
+        if ( type != Type.UNDEFINED && type != Type.MACRO ) {
+            Validate.notNull(node, "node must not be NULL");
+        }
+        this.compilationUnit = compilationUnit;
         this.name = name;
         this.node = node;
         this.type = type;
+    }
+    
+    @Override
+    public String toString() {
+        return name.getValue()+" [ "+type+" ] , value= "+value;
+    }
+    
+    public CompilationUnit getCompilationUnit() {
+        return compilationUnit;
     }
     
     public final Type getType() {
@@ -57,18 +75,32 @@ public abstract class Symbol<T,VALUETYPE>
         return name;
     }
     
-    public final T getNode() {
+    public final ASTNode getNode() {
         return node;
     }
     
-    public final VALUETYPE getValue() {
+    public final Object getValue() {
         return value;
     }
     
-    public final void setValue(VALUETYPE value) 
+    public final void setValue(Object value,Type type) 
+    {
+        LOG.debug("setValue( "+name+" ) = "+value);
+        Validate.notNull(value, "value for symbol '"+name+"' must not be NULL");
+        if ( ! hasType(Type.UNDEFINED ) ) {
+            throw new IllegalStateException("Refusing to set value on symbol that already has a type "+this);
+        }        
+        this.type = type;
+        this.value = value;
+    }    
+    
+    public final void setValue(Object value) 
     {
         LOG.debug("setValue( "+name+") = "+value);
         Validate.notNull(value, "value for symbol '"+name+"' must not be NULL");
+        if ( hasType(Type.UNDEFINED ) ) {
+            throw new IllegalStateException("Setting a value on a UNDEFINED symbol requires a type, use setValue(Object,Type) instead.");
+        }
         this.value = value;
     }
 }

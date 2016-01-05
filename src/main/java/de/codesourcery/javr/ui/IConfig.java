@@ -15,7 +15,6 @@
  */
 package de.codesourcery.javr.ui;
 
-import de.codesourcery.javr.assembler.ResourceFactory;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.Parser;

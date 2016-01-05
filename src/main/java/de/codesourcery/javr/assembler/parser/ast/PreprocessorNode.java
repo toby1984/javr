@@ -18,6 +18,9 @@ public class PreprocessorNode extends ASTNode {
         IF_NDEFINE("ifndef"),
         PRAGMA("pragma"),
         ENDIF("endif"),
+        ERROR("error"),
+        WARNING("warning"),
+        MESSAGE("message"),
         DEFINE("define");
         
         public final String literal;
@@ -38,6 +41,10 @@ public class PreprocessorNode extends ASTNode {
         }        
     }
     
+    public PreprocessorNode(Preprocessor p , TextRegion r) {
+        this(p, new ArrayList<String>() , r );
+    }
+    
     public PreprocessorNode(Preprocessor p ,List<String> arguments,TextRegion r) {
         super(r);
         Validate.notNull(p, "type must not be NULL");
@@ -52,4 +59,8 @@ public class PreprocessorNode extends ASTNode {
         return new PreprocessorNode( this.type , this.arguments , getTextRegion().createCopy() );
     }
 
+    @Override
+    public String toString() {
+        return this.type+" ("+this.arguments+")";
+    }
 }

@@ -15,8 +15,10 @@
  */
 package de.codesourcery.javr.assembler.arch;
 
+import java.util.List;
+
 import org.apache.commons.lang3.StringUtils;
-import org.junit.Assert;
+import static org.junit.Assert.*;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -60,10 +62,101 @@ public class InstructionEncoderTest
     }    
     
     @Test
+    public void testEncodeDecode1() {
+        
+        enc = new InstructionEncoder("101010101010dddd");
+        int value = enc.encode( 0b1111 , 0 );
+        assertBinary( 0b1010101010101111 , value );
+        value <<= (enc.getInstructionLengthInBytes()*8);
+        final List<Integer> decoded = enc.decode( value );
+        assertEquals(2,decoded.size());
+        assertEquals( 0b1111 , decoded.get(0).intValue() );
+        assertNull(decoded.get(1) );
+    }
+    
+    @Test
+    public void testEncodeDecode2() {
+        
+        enc = new InstructionEncoder("1010101010dddd00");
+        int value = enc.encode( 0b1111 , 0 );
+        assertBinary( 0b1010101010111100 , value );
+        value <<= (enc.getInstructionLengthInBytes()*8);
+        final List<Integer> decoded = enc.decode( value );
+        assertEquals(2,decoded.size());
+        assertEquals( 0b1111 , decoded.get(0).intValue() );
+        assertNull(decoded.get(1) );
+    }    
+    
+    @Test
+    public void testEncodeDecode3() {
+        
+        enc = new InstructionEncoder("1010101010ddddss");
+        int value = enc.encode( 0b1111 , 0b01 );
+        assertBinary( 0b1010101010111101 , value );
+        value <<= (enc.getInstructionLengthInBytes()*8);
+        final List<Integer> decoded = enc.decode( value );
+        assertEquals(2,decoded.size());
+        assertEquals( 0b1111 , decoded.get(0).intValue() );
+        assertEquals( 0b01 , decoded.get(1).intValue() );
+    }     
+    
+    @Test
+    public void testEncodeDecode4() {
+        
+        enc = new InstructionEncoder("101010101d101ddd");
+        int value = enc.encode( 0b1111 , 0 );
+        assertBinary( 0b1010101011101111 , value );
+        value <<= (enc.getInstructionLengthInBytes()*8);
+        final List<Integer> decoded = enc.decode( value );
+        assertEquals(2,decoded.size());
+        assertEquals( 0b1111 , decoded.get(0).intValue() );
+        assertNull(decoded.get(1) );
+    }    
+    
+    @Test
+    public void testEncodeDecode5() {
+        
+        enc = new InstructionEncoder("0101010dd001dd10");
+        int value = enc.encode( 0b1111 , 0 );
+        assertBinary( 0b0101010110011110 , value );
+        value <<= (enc.getInstructionLengthInBytes()*8);
+        final List<Integer> decoded = enc.decode( value );
+        assertEquals(2,decoded.size());
+        assertEquals( 0b1111 , decoded.get(0).intValue() );
+        assertNull(decoded.get(1) );
+    }       
+    
+    @Test
+    public void testEncodeDecode6() {
+        
+        enc = new InstructionEncoder("00ss010dd001dd1s");
+        int value = enc.encode( 0b1111 , 0b111 );
+        assertBinary( 0b0011010110011111 , value );
+        value <<= (enc.getInstructionLengthInBytes()*8);
+        final List<Integer> decoded = enc.decode( value );
+        assertEquals(2,decoded.size());
+        assertEquals( 0b1111 , decoded.get(0).intValue() );
+        assertEquals( 0b111 , decoded.get(1).intValue() );
+    }     
+    
+    @Test
+    public void testEncodeDecode8() {
+        
+        enc = new InstructionEncoder("01d101d101d101d1");
+        int value = enc.encode( 0b1111 , 0 );
+        assertBinary( 0b0111011101110111 , value );
+        value <<= (enc.getInstructionLengthInBytes()*8);
+        final List<Integer> decoded = enc.decode( value );
+        assertEquals(2,decoded.size());
+        assertEquals( 0b1111 , decoded.get(0).intValue() );
+        assertNull( decoded.get(1) );
+    } 
+    
+    @Test
     public void testPatternWithRandomArbitraryCharacterWorks() 
     {
         enc = new InstructionEncoder("1100_0100_kkkk_0000");
-        Assert.assertEquals(1,  enc.getArgumentCount() );
+        assertEquals(1,  enc.getArgumentCount() );
         final int value = enc.encode( 0b1111 , 0 );
         assertBinary( 0b1100_0100_1111_0000 , value );
     } 
@@ -71,7 +164,7 @@ public class InstructionEncoderTest
     @Test
     public void testFreeFormMapping() {
         enc = new InstructionEncoder("10s0 ss0d dddd 1sss");
-        Assert.assertEquals(2,  enc.getArgumentCount() );
+        assertEquals(2,  enc.getArgumentCount() );
         final int value = enc.encode( 0b1010 , 0b111001 );
         assertBinary( 0b1010_1100_1010_1001 , value );
     }
@@ -79,7 +172,7 @@ public class InstructionEncoderTest
     public void testADD() 
     {
         enc = new InstructionEncoder("000011sdddddssss");
-        Assert.assertEquals(2,  enc.getArgumentCount() );
+        assertEquals(2,  enc.getArgumentCount() );
         final int value = enc.encode( 1 , 2 );
         assertBinary( 0b0000_1100_0001_0010 , value );
     }     
@@ -90,7 +183,7 @@ public class InstructionEncoderTest
         enc = new InstructionEncoder("1100_0100_1010_0000");
         final int value = enc.encode( -1 , -1 );
         assertBinary( 0b1100_0100_1010_0000 , value );
-        Assert.assertEquals(0, enc.getArgumentCount() );
+        assertEquals(0, enc.getArgumentCount() );
     }     
     
     @Test
@@ -116,7 +209,7 @@ public class InstructionEncoderTest
         enc = new InstructionEncoder("1100_d100_0ddd_1010");
         final int value = enc.encode( 15 , -1 );
         assertBinary( 0b1100_1100_0111_1010 , value );
-        Assert.assertEquals(1, enc.getArgumentCount() );
+        assertEquals(1, enc.getArgumentCount() );
     }     
     
     @Test
@@ -125,7 +218,7 @@ public class InstructionEncoderTest
         enc = new InstructionEncoder("1001 011K K0dd KKKK");
         final int value = enc.encode( 0b01 , 0b111010);
         assertBinary( 0b1001_0111_1001_1010 , value );
-        Assert.assertEquals(2, enc.getArgumentCount() );
+        assertEquals(2, enc.getArgumentCount() );
     }     
     
     @Test
@@ -135,7 +228,7 @@ public class InstructionEncoderTest
         final int value = enc.encode( 15 , 7);
                      // 1100_010d_ddd0_1010
         assertBinary( 0b1100_0101_1110_1111 , value );
-        Assert.assertEquals( 2 , enc.getArgumentCount() );
+        assertEquals( 2 , enc.getArgumentCount() );
     }     
     
     // helpers
@@ -143,7 +236,7 @@ public class InstructionEncoderTest
     {
         final String exp = "0b"+StringUtils.leftPad( Integer.toBinaryString( expected ) , 16 , '0' ); 
         final String act = "0b"+StringUtils.leftPad( Integer.toBinaryString( actual ) , 16 , '0' ); 
-        Assert.assertEquals( "Expected \n"+exp+" but got \n"+act, expected , actual );
+        assertEquals( "Expected \n"+exp+" but got \n"+act, expected , actual );
     }
     
 }

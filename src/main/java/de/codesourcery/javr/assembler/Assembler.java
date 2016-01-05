@@ -28,7 +28,6 @@ import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
-import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.phases.GatherSymbols;
 import de.codesourcery.javr.assembler.phases.GenerateCodePhase;
@@ -47,11 +46,11 @@ public class Assembler
     
     private IConfig config;
     private CompilationContext compilationContext;
+    private SymbolTable globalSymbolTable = new SymbolTable( SymbolTable.GLOBAL );
     
     private final class CompilationContext implements ICompilationContext 
     {
         private Segment segment = Segment.FLASH;
-        private final SymbolTable symbolTable;
         
         private int codeOffset = 0;
         private int initDataOffset = 0;
@@ -61,14 +60,12 @@ public class Assembler
         private byte[] initDataSegment = new byte[0];
         
         private final CompilationUnit compilationUnit;
-        private final AST ast;
         
         public CompilationContext(CompilationUnit unit) 
         {
             Validate.notNull(unit, "unit must not be NULL");
             this.compilationUnit = unit;
-            this.ast = unit.getAST();
-            this.symbolTable = unit.getSymbolTable();
+            unit.setSymbolTable( new SymbolTable( compilationUnit.getResource().toString() , globalSymbolTable) );
         }
         
         public void save(Binary b , ResourceFactory rf) throws IOException 
@@ -130,8 +127,13 @@ public class Assembler
         }
         
         @Override
-        public SymbolTable getSymbolTable() {
-            return symbolTable;
+        public SymbolTable currentSymbolTable() {
+            return compilationUnit.getSymbolTable();
+        }
+        
+        @Override
+        public SymbolTable globalSymbolTable() {
+            return globalSymbolTable;
         }
         
         @Override
@@ -237,7 +239,7 @@ public class Assembler
 
         @Override
         public void message(CompilationMessage msg) {
-            ast.addMessage( msg );
+            currentCompilationUnit().getAST().addMessage( msg );
         }
 
         @Override
@@ -275,7 +277,7 @@ public class Assembler
         }
 
         @Override
-        public CompilationUnit getCompilationUnit() {
+        public CompilationUnit currentCompilationUnit() {
             return compilationUnit;
         }
 
@@ -307,12 +309,13 @@ public class Assembler
         }
     }
     
-    public Binary assemble(CompilationUnit unit,ResourceFactory rf, IConfigProvider config) throws IOException 
+    public Binary compile(CompilationUnit unit,ResourceFactory rf, IConfigProvider config) throws IOException 
     {
         Validate.notNull(unit, "unit must not be NULL");
         Validate.notNull(rf, "rf must not be NULL");
         Validate.notNull(config, "provider must not be NULL");
         
+        this.globalSymbolTable = new SymbolTable(SymbolTable.GLOBAL);
         this.compilationContext = new CompilationContext( unit );
         this.config = config.getConfig();
         
@@ -329,12 +332,17 @@ public class Assembler
         {
             compilationContext.beforePhase();
             
-            if ( LOG.isDebugEnabled() ) {
-                LOG.debug("Assembler phase: "+p);
-            }
+            LOG.debug("Assembler phase: "+p);
             
-            try {
+            try 
+            {
+                p.beforeRun( compilationContext );
+                
                 p.run( compilationContext );
+                
+                if ( ! unit.getAST().hasErrors() ) {
+                    p.afterSuccessfulRun( compilationContext );
+                } 
             } 
             catch (Exception e) 
             {
@@ -345,7 +353,9 @@ public class Assembler
                 throw new RuntimeException(e);
             }
             
-            if ( p.stopOnErrors() && unit.getAST().hasErrors() ) {
+            if ( p.stopOnErrors() && unit.getAST().hasErrors() ) 
+            {
+                System.err.println("Stopping with errors");
                 return null;
             }
         }
@@ -354,5 +364,10 @@ public class Assembler
         final Binary b = new Binary();
         compilationContext.save( b , rf );
         return b;
+    }
+    
+    public SymbolTable getGlobalSymbolTable() 
+    {
+        return globalSymbolTable;
     }
 }

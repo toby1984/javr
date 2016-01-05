@@ -31,10 +31,13 @@ import java.text.DecimalFormat;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -42,6 +45,7 @@ import javax.swing.JInternalFrame;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.JToolBar;
 import javax.swing.JTree;
@@ -52,6 +56,7 @@ import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.event.TreeModelEvent;
 import javax.swing.event.TreeModelListener;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableModel;
 import javax.swing.text.AbstractDocument;
 import javax.swing.text.AttributeSet;
@@ -74,12 +79,9 @@ import org.apache.log4j.Logger;
 import de.codesourcery.javr.assembler.Assembler;
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
-import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.Location;
-import de.codesourcery.javr.assembler.parser.Parser;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.Parser.Severity;
-import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
@@ -95,6 +97,8 @@ import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
 import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
+import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.FileResourceFactory;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
@@ -108,10 +112,13 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
     private final JTextPane editor = new JTextPane();
     private final IConfigProvider configProvider;
 
+    private final ASTTreeModel astTreeModel = new ASTTreeModel();
     private JFrame astWindow = null;
-
-    private final MyTreeModel astTreeModel = new MyTreeModel();
-    private final MessageModel messageModel = new MessageModel();
+    
+    private JFrame symbolWindow = null;
+    
+    private final SymbolTableModel symbolModel = new SymbolTableModel();
+    private final MessageTableModel messageModel = new MessageTableModel();
     
     private final RecompilationThread recompilationThread = new RecompilationThread();
 
@@ -125,6 +132,76 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
     private CompilationUnit compilationUnit = new CompilationUnit( new StringResource( "dummy","" ) );
     
     private LineMap lineMap;
+    
+    protected static final class FilteredList<T> extends AbstractList<T> {
+
+        private final List<T> unfiltered = new ArrayList<T>();
+        private final List<T> filtered = new ArrayList<T>();
+
+        private Function<T,Boolean> filterFunc = x -> true;
+        
+        public void setFilterFunc(Function<T,Boolean> filterFunc ) 
+        {
+            Validate.notNull(filterFunc, "filterFunc must not be NULL");
+            this.filterFunc = filterFunc;
+            doFilter();
+        }
+        
+        private void doFilter() 
+        {
+            filtered.clear();
+            for ( T elem : unfiltered ) 
+            {
+                if ( filterFunc.apply( elem ) == Boolean.TRUE ) {
+                    filtered.add( elem );
+                }
+            }
+        }
+        
+        @Override
+        public boolean addAll(Collection<? extends T> c) 
+        {
+            boolean result = false;
+            for ( T elem : c ) {
+                result |= add(elem);
+            }
+            return result;
+        }
+        
+        @Override
+        public boolean add(T e) 
+        {
+            Validate.notNull(e, "e must not be NULL");
+            unfiltered.add( e );
+            if ( filterFunc.apply( e ) == Boolean.TRUE ) {
+                filtered.add(e);
+                return true;
+            }
+            return false;
+        }
+        
+        @Override
+        public void clear() {
+            filtered.clear();
+            unfiltered.clear();
+        }
+        
+        @Override
+        public Iterator<T> iterator() {
+            return filtered.iterator();
+        }
+        
+        @Override
+        public T get(int index) 
+        {
+            return filtered.get(index);
+        }
+
+        @Override
+        public int size() {
+            return filtered.size();
+        }
+    }
 
     protected class IndentFilter extends DocumentFilter 
     {
@@ -250,7 +327,130 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         }
     }
 
-    private final class MessageModel implements TableModel {
+    private final class SymbolTableModel implements TableModel {
+
+        private final FilteredList<Symbol> symbols = new FilteredList<>();
+
+        private final List<TableModelListener> listeners = new ArrayList<>();
+
+        private String filterString = null;
+        
+        public void setSymbolTable(SymbolTable table)
+        {
+            Validate.notNull(table,"table must not be NULL");
+            this.symbols.clear();
+            final List<Symbol> allSymbolsSorted = table.getAllSymbolsSorted();
+            System.out.println("Setting "+allSymbolsSorted.size()+" symbols on "+this);            
+            this.symbols.addAll( allSymbolsSorted );
+            tableChanged();
+        }        
+        
+        public void clear() 
+        {
+            System.out.println("Symbols CLEARED on "+this);
+            symbols.clear();
+            setFilterString( this.filterString );
+        }
+        
+        private void tableChanged() {
+            final TableModelEvent ev = new TableModelEvent( this );
+            listeners.forEach( l -> l.tableChanged( ev ) );
+        }
+        
+        public void setFilterString(String s) 
+        {
+            this.filterString = s == null ? null : s.toLowerCase();
+            final Function<Symbol,Boolean> func;
+            if ( filterString == null ) 
+            {
+                func = symbol -> true;
+            } else {
+                func = symbol -> filterString == null ? Boolean.TRUE : Boolean.valueOf( symbol.name().value.toLowerCase().contains( filterString ) );
+            }
+            symbols.setFilterFunc( func );        
+            tableChanged();
+        }
+
+        @Override
+        public int getRowCount() {
+            return symbols.size();
+        }
+
+        @Override
+        public int getColumnCount() {
+            return 3;
+        }
+
+        private void assertValidColumn(int columnIndex) {
+            if ( columnIndex < 0 || columnIndex > 3 ) {
+                throw new RuntimeException("Invalid column: "+columnIndex);
+            }
+        }
+        @Override
+        public String getColumnName(int columnIndex) 
+        {
+            switch(columnIndex) {
+                case 0:
+                    return "Name";
+                case 1:
+                    return "Type";
+                case 2:
+                    return "Value";
+                default:
+                    throw new RuntimeException("Invalid column: "+columnIndex);
+            }
+        }
+
+        @Override
+        public Class<?> getColumnClass(int columnIndex) 
+        {
+            assertValidColumn(columnIndex);
+            return String.class;
+        }
+
+        @Override
+        public boolean isCellEditable(int rowIndex, int columnIndex) {
+            return false;
+        }
+
+        @Override
+        public Object getValueAt(int rowIndex, int columnIndex) 
+        {
+            final Symbol symbol = symbols.get(rowIndex);
+            switch( columnIndex ) {
+                case 0:
+                    return symbol.name().value;
+                case 1:
+                    return symbol.getType().toString();
+                case 2:
+                    final Object value = symbol.getValue(); 
+                    return value == null ? "<no value>" : value.toString();
+                default:
+                    throw new RuntimeException("Invalid column: "+columnIndex);                 
+            }
+        }
+
+        @Override
+        public void setValueAt(Object aValue, int rowIndex, int columnIndex) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void addTableModelListener(TableModelListener l) {
+            listeners.add(l);
+        }
+
+        @Override
+        public void removeTableModelListener(TableModelListener l) {
+            listeners.remove(l);
+        }
+
+        public Symbol getRow(int row) {
+            return symbols.get( row );
+        }
+    }
+    
+    private final class MessageTableModel implements TableModel {
 
         private final List<CompilationMessage> errors = new ArrayList<>();
 
@@ -365,7 +565,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         }
     }
 
-    private final class MyTreeModel implements TreeModel 
+    private final class ASTTreeModel implements TreeModel 
     {
         private final List<TreeModelListener> listeners = new ArrayList<>();
 
@@ -448,6 +648,31 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
 
         // error messages table
         final JTable errorTable = new JTable( messageModel );
+        
+        errorTable.setDefaultRenderer( String.class , new DefaultTableCellRenderer() 
+        {
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) 
+            {
+                final Component result = super.getTableCellRendererComponent(errorTable, value, isSelected, hasFocus, row, column);
+                if ( column == 1 ) {
+                    final CompilationMessage msg = messageModel.getRow( row );
+                    switch ( msg.severity ) 
+                    {
+                        case ERROR:
+                            result.setBackground( Color.RED );
+                            break;
+                        case WARNING:
+                            result.setBackground( Color.YELLOW );
+                            break;
+                        default:
+                            result.setBackground( Color.WHITE );
+                    }
+                } else {
+                    result.setBackground( Color.WHITE );
+                }
+                return result;
+            }
+        } );
         errorTable.addMouseListener( new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) 
@@ -507,6 +732,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
 
         result.add( button("Compile" , ev -> this.compile() ) );
         result.add( button("AST" , ev -> this.toggleASTWindow() ) );
+        result.add( button("Symbols" , ev -> this.toggleSymbolTableWindow() ) );
 
         return result;
     }
@@ -526,70 +752,54 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
     private void compile() 
     {
         messageModel.clear();
+        symbolModel.clear();
         
+        String text = editor.getText();
+        text = text == null ? "" : text;
+        
+        this.lineMap = new LineMap( text ,configProvider);            
+        
+        // save changes
         try {
             save();
         } 
         catch(IOException e) 
         {
             LOG.error("compile(): Failed to save changes",e);
-            messageModel.add( CompilationMessage.error( "Failed to save changes") );
+            messageModel.add( CompilationMessage.error( "Failed to save changes: "+e.getMessage()) );
             return;
         }
-        
-        Parser p = configProvider.getConfig().createParser();
-        String text = editor.getText();
-        text = text == null ? "" : text;
-        
-        this.lineMap = new LineMap(text,configProvider);        
-        
-        // parse
-        long parseTime = 0;
-        final AST ast;
-        try {
-           final long start = System.currentTimeMillis();
-            ast = p.parse( new Lexer( new Scanner( text ) ) );
-            parseTime = System.currentTimeMillis() - start;
-            astTreeModel.setAST( ast );
-        } 
-        catch(Exception e) 
-        {
-            e.printStackTrace();
-            astTreeModel.setAST( new AST() );
-            messageModel.add( toCompilationMessage( e ) );
-            return;
-        }
-
-        doSyntaxHighlighting();
         
         // assemble
         long assembleTime = 0;
         final Assembler asm = new Assembler();
         try {
             final long start = System.currentTimeMillis();
-            asm.assemble( compilationUnit , FileResourceFactory.createInstance( new File("/home/tobi/atmel/asm") , "dummy" ) , configProvider );
+            asm.compile( compilationUnit , FileResourceFactory.createInstance( new File("/home/tobi/atmel/asm") , "dummy" ) , configProvider );
             assembleTime = System.currentTimeMillis() -start;
         } 
         catch(Exception e) 
         {
             e.printStackTrace();
-            ast.addMessage( toCompilationMessage( e ) );
+            compilationUnit.getAST().addMessage( toCompilationMessage( e ) );
         }
-        if ( ast.hasErrors() ) 
-        {
-            messageModel.addAll( ast.getMessages() );
-        } 
-        else 
-        {
-            final long ms = parseTime+assembleTime;
-            float seconds = ms/1000f;
-            final DecimalFormat DF = new DecimalFormat("#######0.0#");
-            float linesPerSeconds = lineMap.getLineCount()/seconds;
-            final String time = "Time: "+ ms +" ms , "+DF.format( linesPerSeconds )+" lines/s , parse: "+parseTime+" ms, assemble: "+assembleTime+" ms";
-            messageModel.add( new CompilationMessage(Severity.INFO, time) );
-            DateTimeFormatter df = DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss");
-            messageModel.add( new CompilationMessage(Severity.INFO, "Compilation successful ("+ms+" millis) on "+df.format( ZonedDateTime.now() ) ) );
-        }          
+        
+        symbolModel.setSymbolTable( asm.getGlobalSymbolTable() );        
+        messageModel.addAll( compilationUnit.getAST().getMessages() );        
+        astTreeModel.setAST( compilationUnit.getAST() );
+        
+        doSyntaxHighlighting();
+        
+        final float seconds = assembleTime/1000f;
+        final DecimalFormat DF = new DecimalFormat("#######0.0#");
+        final float linesPerSeconds = lineMap.getLineCount()/seconds;
+        final String time = "Time: "+ assembleTime +" ms , "+DF.format( linesPerSeconds )+" lines/s";
+        
+        messageModel.add( new CompilationMessage(Severity.INFO, time) );
+        
+        final String success = compilationUnit.getAST().hasErrors() ? "failed" : "successful"; 
+        final DateTimeFormatter df = DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss");
+        messageModel.add( new CompilationMessage(Severity.INFO, "Compilation "+success+" ("+assembleTime+" millis) on "+df.format( ZonedDateTime.now() ) ) );
     }
     
     private static CompilationMessage toCompilationMessage(Exception e)
@@ -662,6 +872,20 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         astWindow.setVisible( true );
     }
 
+    private void toggleSymbolTableWindow() 
+    {
+        if ( symbolWindow != null ) {
+            symbolWindow.dispose();
+            symbolWindow=null;
+            return;
+        }
+        symbolWindow = createSymbolWindow();
+
+        symbolWindow.pack();
+        symbolWindow.setLocationRelativeTo( this );
+        symbolWindow.setVisible( true );
+    }
+    
     private JFrame createASTWindow() 
     {
         final JFrame frame = new JFrame("AST");
@@ -696,7 +920,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
                     } else if ( node instanceof OperatorNode) {
                         text = "Operator: "+((OperatorNode) node).type.getSymbol();
                     } else  if ( node instanceof IdentifierNode) {
-                        text = "identifier: "+((IdentifierNode) node).value.value;
+                        text = "identifier: "+((IdentifierNode) node).name.value;
                     }
                     else if ( node instanceof StatementNode) {
                         text = "statement";
@@ -733,7 +957,11 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
                         text = "reg: "+((RegisterNode) node).register.toString();
                     }
 
-                    setText( text );
+                    if ( node.isSkip() ) {
+                        setText( text+" [ SKIPPED ]" );
+                    } else {
+                        setText( text );
+                    }
                 }
                 return result;
             }
@@ -750,6 +978,49 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
 
         return frame;
     }
+    
+    private JFrame createSymbolWindow() 
+    {
+        final JFrame frame = new JFrame("Symbols");
+
+        frame.addWindowListener( new WindowAdapter() {
+
+            @Override
+            public void windowClosing(WindowEvent e) {
+                frame.dispose();
+                symbolWindow = null;
+            }
+        });
+
+        final JTextField filterField = new JTextField();
+        filterField.addActionListener( ev -> 
+        {
+            symbolModel.setFilterString( filterField.getText() );
+        });
+        filterField.getDocument().addDocumentListener( new DocumentListener() {
+
+            @Override
+            public void insertUpdate(DocumentEvent e) { symbolModel.setFilterString( filterField.getText() ); }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) { symbolModel.setFilterString( filterField.getText() ); }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) { symbolModel.setFilterString( filterField.getText() ); }
+        });
+        
+        final JTable table= new JTable( symbolModel );
+        
+        final JPanel panel = new JPanel();
+        panel.setLayout( new BorderLayout() );
+        final JScrollPane pane = new JScrollPane();
+        pane.getViewport().add( table );
+        panel.add( filterField , BorderLayout.NORTH );
+        panel.add( pane , BorderLayout.CENTER );
+        
+        frame.getContentPane().add( panel );
+        return frame;
+    }    
 
     private static Style createStyle(String name,Color col,Style parent,StyleContext ctx) {
 

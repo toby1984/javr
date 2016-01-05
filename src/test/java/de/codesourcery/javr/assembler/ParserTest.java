@@ -15,7 +15,8 @@
  */
 package de.codesourcery.javr.assembler;
 
-import org.junit.Assert;
+import static org.junit.Assert.*;
+
 import org.junit.Test;
 
 import de.codesourcery.javr.assembler.arch.IArchitecture;
@@ -32,6 +33,7 @@ import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.EquLabelNode;
 import de.codesourcery.javr.assembler.parser.ast.FunctionCallNode;
+import de.codesourcery.javr.assembler.parser.ast.FunctionDefinitionNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
@@ -53,860 +55,933 @@ public class ParserTest
     public void testEmptyFile() 
     {
         AST ast = parse("");
-        Assert.assertNotNull(ast);
-        Assert.assertFalse( ast.hasChildren() );
-        Assert.assertEquals( 0 ,  ast.childCount() );        
+        assertNotNull(ast);
+        assertFalse( ast.hasChildren() );
+        assertEquals( 0 ,  ast.childCount() );        
     }
 
     @Test
     public void testParseBlankLine() 
     {
         AST ast = parse("\n");
-        Assert.assertNotNull(ast);
-        Assert.assertFalse( ast.hasChildren() );
-        Assert.assertEquals( 0 ,  ast.childCount() );
+        assertNotNull(ast);
+        assertFalse( ast.hasChildren() );
+        assertEquals( 0 ,  ast.childCount() );
     } 
     
     @Test
     public void testParseIfDef() 
     {
         AST ast = parse("#ifdef test");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() );
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() );
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final PreprocessorNode ins = (PreprocessorNode) stmt.child(0);
-        Assert.assertNotNull(ins);
-        Assert.assertEquals( Preprocessor.IF_DEFINE , ins.type );
-        Assert.assertEquals( 1 , ins.arguments.size() );
-        Assert.assertEquals( "test" , ins.arguments.get(0) );
+        assertNotNull(ins);
+        assertEquals( Preprocessor.IF_DEFINE , ins.type );
+        assertEquals( 0 , ins.arguments.size() );
+        assertEquals( 1 , ins.childCount() );
+        assertEquals( new Identifier("test") , ((IdentifierNode) ins.firstChild()).name );
     }
     
     @Test
     public void testParseDefine1() 
     {
         AST ast = parse("#define test");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() );
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() );
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final PreprocessorNode ins = (PreprocessorNode) stmt.child(0);
-        Assert.assertNotNull(ins);
-        Assert.assertEquals( Preprocessor.DEFINE , ins.type );
-        Assert.assertEquals( 1 , ins.arguments.size() );
-        Assert.assertEquals( "test" , ins.arguments.get(0) );
+        assertNotNull(ins);
+        assertEquals( Preprocessor.DEFINE , ins.type );        
+        assertEquals( 1 , ins.childCount() );
+        
+        final FunctionDefinitionNode in = (FunctionDefinitionNode) ins.child(0);
+        assertEquals( 0 , in.getArgumentCount() );
+        assertEquals( new Identifier("test") , in.name );
     }
+    
+    @Test
+    public void testParseErrorMessage() 
+    {
+        AST ast = parse("#error test");
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() );
+        
+        final StatementNode stmt = (StatementNode) ast.child(0);
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
+        
+        final PreprocessorNode ins = (PreprocessorNode) stmt.child(0);
+        assertEquals( Preprocessor.ERROR , ins.type );
+        assertNotNull(ins);
+        assertEquals( 0 , ins.childCount() );
+        
+        assertEquals( 1 , ins.arguments.size() );
+        assertEquals( "test" , ins.arguments.get(0));
+    }    
+    
+    @Test
+    public void testParseWarningMessage() 
+    {
+        AST ast = parse("#warning test");
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() );
+        
+        final StatementNode stmt = (StatementNode) ast.child(0);
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
+        
+        final PreprocessorNode ins = (PreprocessorNode) stmt.child(0);
+        assertNotNull(ins);
+        assertEquals( Preprocessor.WARNING , ins.type );
+        assertEquals( 0 , ins.childCount() );
+        
+        assertEquals( 1 , ins.arguments.size() );
+        assertEquals( "test" , ins.arguments.get(0));
+    }    
+    
+    @Test
+    public void testParseInfoMessage() 
+    {
+        AST ast = parse("#message test");
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() );
+        
+        final StatementNode stmt = (StatementNode) ast.child(0);
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
+        
+        final PreprocessorNode ins = (PreprocessorNode) stmt.child(0);
+        assertNotNull(ins);
+        assertEquals( Preprocessor.MESSAGE , ins.type );
+        assertEquals( 0 , ins.childCount() );
+        
+        assertEquals( 1 , ins.arguments.size() );
+        assertEquals( "test" , ins.arguments.get(0));
+    }     
     
     @Test
     public void testParseDefine2() 
     {
         AST ast = parse("#define test test2");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() );
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() );
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final PreprocessorNode ins = (PreprocessorNode) stmt.child(0);
-        Assert.assertNotNull(ins);
-        Assert.assertEquals( Preprocessor.DEFINE , ins.type );
-        Assert.assertEquals( 2 , ins.arguments.size() );
-        Assert.assertEquals( "test" , ins.arguments.get(0) );
-        Assert.assertEquals( "test2" , ins.arguments.get(1) );
+        assertNotNull(ins);
+        assertEquals( Preprocessor.DEFINE , ins.type );
+        assertEquals( 0 , ins.arguments.size() );
+        
+        final FunctionDefinitionNode funcDef = (FunctionDefinitionNode) ins.child(0);
+        assertNotNull(funcDef);
+        assertEquals( new Identifier("test") , funcDef.name );
+        assertEquals( 0 , funcDef.getArgumentCount() );
+        
+        final IdentifierNode in = (IdentifierNode) funcDef.child(1);
+        assertEquals( new Identifier("test2") , in.name );
     }    
     
     @Test
     public void testParseEndIf() 
     {
         AST ast = parse("#endif");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() );
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() );
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final PreprocessorNode ins = (PreprocessorNode) stmt.child(0);
-        Assert.assertNotNull(ins);
-        Assert.assertEquals( Preprocessor.ENDIF , ins.type );
-        Assert.assertEquals( 0 , ins.arguments.size() );
+        assertNotNull(ins);
+        assertEquals( Preprocessor.ENDIF , ins.type );
+        assertEquals( 0 , ins.arguments.size() );
     }    
     
     @Test
     public void testParsePragma() 
     {
         AST ast = parse("#pragma a b c");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() );
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() );
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final PreprocessorNode ins = (PreprocessorNode) stmt.child(0);
-        Assert.assertNotNull(ins);
-        Assert.assertEquals( Preprocessor.PRAGMA , ins.type );
-        Assert.assertEquals( 3 , ins.arguments.size() );
-        Assert.assertEquals( "a" , ins.arguments.get(0) );
-        Assert.assertEquals( "b" , ins.arguments.get(1) );
-        Assert.assertEquals( "c" , ins.arguments.get(2) );
+        assertNotNull(ins);
+        assertEquals( Preprocessor.PRAGMA , ins.type );
+        assertEquals( 3 , ins.arguments.size() );
+        assertEquals( "a" , ins.arguments.get(0) );
+        assertEquals( "b" , ins.arguments.get(1) );
+        assertEquals( "c" , ins.arguments.get(2) );
     }    
     
     @Test
     public void testParseASMCommentLine() 
     {
         AST ast = parse("; test comment");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() );
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() );
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final CommentNode comment = (CommentNode) stmt.child(0);
-        Assert.assertNotNull(comment);
-        Assert.assertEquals("; test comment" , comment.value );
+        assertNotNull(comment);
+        assertEquals("; test comment" , comment.value );
     }
     
     @Test
     public void testParseCStyleCommentLine() 
     {
         AST ast = parse("// test comment");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() );
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() );
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final CommentNode comment = (CommentNode) stmt.child(0);
-        Assert.assertNotNull(comment);
-        Assert.assertEquals("// test comment" , comment.value );
+        assertNotNull(comment);
+        assertEquals("// test comment" , comment.value );
     }     
     
     @Test
     public void testParseCStyleMultiLineComment1() 
     {
         AST ast = parse("/* test * comment */");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() );
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() );
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final CommentNode comment = (CommentNode) stmt.child(0);
-        Assert.assertNotNull(comment);
-        Assert.assertEquals("/* test * comment */" , comment.value );
+        assertNotNull(comment);
+        assertEquals("/* test * comment */" , comment.value );
     }     
     
     @Test
     public void testParseCStyleMultiLineComment2() 
     {
         AST ast = parse("/* test \ncomment */");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() );
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() );
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final CommentNode comment = (CommentNode) stmt.child(0);
-        Assert.assertNotNull(comment);
-        Assert.assertEquals("/* test \ncomment */" , comment.value );
+        assertNotNull(comment);
+        assertEquals("/* test \ncomment */" , comment.value );
     }     
     
     @Test
     public void testParseLabelLine() 
     {
         AST ast = parse("label:");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() );
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() );
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final LabelNode label = (LabelNode) stmt.child(0);
-        Assert.assertNotNull(label);
-        Assert.assertEquals( new Identifier("label") , label.identifier );
+        assertNotNull(label);
+        assertEquals( new Identifier("label") , label.identifier );
     }    
     
     @Test
     public void testParseLabelLineWithComment() 
     {
         AST ast = parse("label: ; test comment");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 2 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 2 , stmt.childCount() );
         
         final LabelNode label = (LabelNode) stmt.child(0);
-        Assert.assertNotNull(label);
-        Assert.assertEquals( new Identifier("label") , label.identifier );
+        assertNotNull(label);
+        assertEquals( new Identifier("label") , label.identifier );
         
         final CommentNode comment = (CommentNode) stmt.child(1);
-        Assert.assertNotNull(comment);
-        Assert.assertEquals("; test comment" , comment.value );        
+        assertNotNull(comment);
+        assertEquals("; test comment" , comment.value );        
     }     
     
     @Test
     public void testParseInstructionLineWithNoOperands() 
     {
         AST ast = parse("add");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final InstructionNode insn = (InstructionNode) stmt.child(0);
-        Assert.assertEquals( 0 , insn.childCount() );
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( "add" , insn.instruction.getMnemonic());
+        assertEquals( 0 , insn.childCount() );
+        assertNotNull(insn);
+        assertEquals( "add" , insn.instruction.getMnemonic());
     }    
     
     @Test
     public void testParseInstructionWithOneDecimalNumberOperand() 
     {
         AST ast = parse("add 123");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final InstructionNode insn = (InstructionNode) stmt.child(0);
-        Assert.assertEquals( 1 , insn.childCount() );        
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( "add" , insn.instruction.getMnemonic());
+        assertEquals( 1 , insn.childCount() );        
+        assertNotNull(insn);
+        assertEquals( "add" , insn.instruction.getMnemonic());
         
         final NumberLiteralNode num = (NumberLiteralNode) insn.child( 0 );
-        Assert.assertEquals( 123 , num.getValue().intValue() );
-        Assert.assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num.getType() );
+        assertEquals( 123 , num.getValue().intValue() );
+        assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num.getType() );
     }    
     
     @Test
     public void testParseInstructionWithTwoDecimalNumberOperands() 
     {
         AST ast = parse("add 123 , 456");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final InstructionNode insn = (InstructionNode) stmt.child(0);
-        Assert.assertEquals( 2 , insn.childCount() );        
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( "add" , insn.instruction.getMnemonic());
+        assertEquals( 2 , insn.childCount() );        
+        assertNotNull(insn);
+        assertEquals( "add" , insn.instruction.getMnemonic());
         
         final NumberLiteralNode num1 = (NumberLiteralNode) insn.child( 0 );
-        Assert.assertEquals( 123 , num1.getValue().intValue() );
-        Assert.assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num1.getType() );
+        assertEquals( 123 , num1.getValue().intValue() );
+        assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num1.getType() );
         
         final NumberLiteralNode num2 = (NumberLiteralNode) insn.child( 1 );
-        Assert.assertEquals( 456 , num2.getValue().intValue()  );
-        Assert.assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num2.getType() );        
+        assertEquals( 456 , num2.getValue().intValue()  );
+        assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num2.getType() );        
     }     
     
     @Test
     public void testParseInstructionWithTwoRegisterOperands() 
     {
         AST ast = parse("add r0,r1");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final InstructionNode insn = (InstructionNode) stmt.child(0);
-        Assert.assertEquals( 2 , insn.childCount() );        
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( "add" , insn.instruction.getMnemonic());
+        assertEquals( 2 , insn.childCount() );        
+        assertNotNull(insn);
+        assertEquals( "add" , insn.instruction.getMnemonic());
         
         final RegisterNode num1 = (RegisterNode) insn.child( 0 );
-        Assert.assertFalse( num1.register.isCompoundRegister() );
-        Assert.assertEquals( 0 , num1.register.getRegisterNumber() );
+        assertFalse( num1.register.isCompoundRegister() );
+        assertEquals( 0 , num1.register.getRegisterNumber() );
         
         final RegisterNode num2 = (RegisterNode) insn.child( 1 );
-        Assert.assertFalse( num2.register.isCompoundRegister() );
-        Assert.assertEquals( 1 , num2.register.getRegisterNumber() );      
+        assertFalse( num2.register.isCompoundRegister() );
+        assertEquals( 1 , num2.register.getRegisterNumber() );      
     }     
     
     @Test
     public void testParseInstructionWithPostIncrement() 
     {
         AST ast = parse("add r0,Z+");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final InstructionNode insn = (InstructionNode) stmt.child(0);
-        Assert.assertEquals( 2 , insn.childCount() );        
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( "add" , insn.instruction.getMnemonic());
+        assertEquals( 2 , insn.childCount() );        
+        assertNotNull(insn);
+        assertEquals( "add" , insn.instruction.getMnemonic());
         
         final RegisterNode num1 = (RegisterNode) insn.child( 0 );
-        Assert.assertFalse( num1.register.isCompoundRegister() );
-        Assert.assertEquals( 0 , num1.register.getRegisterNumber() );
+        assertFalse( num1.register.isCompoundRegister() );
+        assertEquals( 0 , num1.register.getRegisterNumber() );
         
         final RegisterNode num2 = (RegisterNode) insn.child( 1 );
-        Assert.assertTrue( num2.register.isCompoundRegister() );
-        Assert.assertTrue( num2.register.isPostIncrement() );
-        Assert.assertFalse( num2.register.isPreDecrement() );
-        Assert.assertEquals( Register.REG_Z , num2.register.getRegisterNumber() );      
+        assertTrue( num2.register.isCompoundRegister() );
+        assertTrue( num2.register.isPostIncrement() );
+        assertFalse( num2.register.isPreDecrement() );
+        assertEquals( Register.REG_Z , num2.register.getRegisterNumber() );      
     }    
     
     @Test
     public void testParseInstructionWithPreDecrement() 
     {
         AST ast = parse("add r0,-X");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final InstructionNode insn = (InstructionNode) stmt.child(0);
-        Assert.assertEquals( 2 , insn.childCount() );        
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( "add" , insn.instruction.getMnemonic());
+        assertEquals( 2 , insn.childCount() );        
+        assertNotNull(insn);
+        assertEquals( "add" , insn.instruction.getMnemonic());
         
         final RegisterNode num1 = (RegisterNode) insn.child( 0 );
-        Assert.assertFalse( num1.register.isCompoundRegister() );
-        Assert.assertEquals( 0 , num1.register.getRegisterNumber() );
+        assertFalse( num1.register.isCompoundRegister() );
+        assertEquals( 0 , num1.register.getRegisterNumber() );
         
         final RegisterNode num2 = (RegisterNode) insn.child( 1 );
-        Assert.assertTrue( num2.register.isCompoundRegister() );
-        Assert.assertFalse( num2.register.isPostIncrement() );
-        Assert.assertTrue( num2.register.isPreDecrement() );
-        Assert.assertEquals( Register.REG_X , num2.register.getRegisterNumber() );      
+        assertTrue( num2.register.isCompoundRegister() );
+        assertFalse( num2.register.isPostIncrement() );
+        assertTrue( num2.register.isPreDecrement() );
+        assertEquals( Register.REG_X , num2.register.getRegisterNumber() );      
     }      
     
     @Test
     public void testParseInstructionWithExpression() 
     {
         AST ast = parse("add r0,1+2");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final InstructionNode insn = (InstructionNode) stmt.child(0);
-        Assert.assertEquals( 2 , insn.childCount() );        
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( "add" , insn.instruction.getMnemonic());
+        assertEquals( 2 , insn.childCount() );        
+        assertNotNull(insn);
+        assertEquals( "add" , insn.instruction.getMnemonic());
         
         final RegisterNode num1 = (RegisterNode) insn.child( 0 );
-        Assert.assertFalse( num1.register.isCompoundRegister() );
-        Assert.assertEquals( 0 , num1.register.getRegisterNumber() );
+        assertFalse( num1.register.isCompoundRegister() );
+        assertEquals( 0 , num1.register.getRegisterNumber() );
         
         final OperatorNode num2 = (OperatorNode) insn.child( 1 );
-        Assert.assertEquals( OperatorType.PLUS , num2.type );
-        Assert.assertEquals( 2 , num2.childCount() );
-        Assert.assertEquals( 1 , ((NumberLiteralNode) num2.child(0)).getValue().intValue() );
-        Assert.assertEquals( 2 , ((NumberLiteralNode) num2.child(1)).getValue().intValue() );
+        assertEquals( OperatorType.PLUS , num2.type );
+        assertEquals( 2 , num2.childCount() );
+        assertEquals( 1 , ((NumberLiteralNode) num2.child(0)).getValue().intValue() );
+        assertEquals( 2 , ((NumberLiteralNode) num2.child(1)).getValue().intValue() );
     }  
 
     @Test
     public void testParseInstructionWithFunction() 
     {
         AST ast = parse("add r0,HIGH( 1,2 )");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final InstructionNode insn = (InstructionNode) stmt.child(0);
-        Assert.assertEquals( 2 , insn.childCount() );        
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( "add" , insn.instruction.getMnemonic());
+        assertEquals( 2 , insn.childCount() );        
+        assertNotNull(insn);
+        assertEquals( "add" , insn.instruction.getMnemonic());
         
         final RegisterNode num1 = (RegisterNode) insn.child( 0 );
-        Assert.assertFalse( num1.register.isCompoundRegister() );
-        Assert.assertEquals( 0 , num1.register.getRegisterNumber() );
+        assertFalse( num1.register.isCompoundRegister() );
+        assertEquals( 0 , num1.register.getRegisterNumber() );
         
         final FunctionCallNode num2 = (FunctionCallNode) insn.child( 1 );
-        Assert.assertEquals( new Identifier("HIGH") , num2.functionName );
-        Assert.assertEquals( 2 , num2.childCount() );
-        Assert.assertEquals( 1 , ((NumberLiteralNode) num2.child(0)).getValue().intValue() );
-        Assert.assertEquals( 2 , ((NumberLiteralNode) num2.child(1)).getValue().intValue() );
+        assertEquals( new Identifier("HIGH") , num2.functionName );
+        assertEquals( 2 , num2.childCount() );
+        assertEquals( 1 , ((NumberLiteralNode) num2.child(0)).getValue().intValue() );
+        assertEquals( 2 , ((NumberLiteralNode) num2.child(1)).getValue().intValue() );
     }    
     
     @Test
     public void testParseInstructionWithCompoundRegister() 
     {
         AST ast = parse("add r0,r4:r3");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final InstructionNode insn = (InstructionNode) stmt.child(0);
-        Assert.assertEquals( 2 , insn.childCount() );        
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( "add" , insn.instruction.getMnemonic());
+        assertEquals( 2 , insn.childCount() );        
+        assertNotNull(insn);
+        assertEquals( "add" , insn.instruction.getMnemonic());
         
         final RegisterNode num1 = (RegisterNode) insn.child( 0 );
-        Assert.assertFalse( num1.register.isCompoundRegister() );
-        Assert.assertEquals( 0 , num1.register.getRegisterNumber() );
+        assertFalse( num1.register.isCompoundRegister() );
+        assertEquals( 0 , num1.register.getRegisterNumber() );
         
         final RegisterNode num2 = (RegisterNode) insn.child( 1 );
-        Assert.assertTrue( num2.register.isCompoundRegister() );
-        Assert.assertFalse( num2.register.isPostIncrement() );
-        Assert.assertFalse( num2.register.isPreDecrement() );
-        Assert.assertEquals( 3 , num2.register.getRegisterNumber() );      
+        assertTrue( num2.register.isCompoundRegister() );
+        assertFalse( num2.register.isPostIncrement() );
+        assertFalse( num2.register.isPreDecrement() );
+        assertEquals( 3 , num2.register.getRegisterNumber() );      
     }     
     
     @Test
     public void testParseInstructionWithCompoundRegisterAndDisplacement() 
     {
         AST ast = parse("ADD r0,Y+42");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final InstructionNode insn = (InstructionNode) stmt.child(0);
-        Assert.assertEquals( 2 , insn.childCount() );        
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( "add" , insn.instruction.getMnemonic());
+        assertEquals( 2 , insn.childCount() );        
+        assertNotNull(insn);
+        assertEquals( "add" , insn.instruction.getMnemonic());
         
         final RegisterNode num1 = (RegisterNode) insn.child( 0 );
-        Assert.assertFalse( num1.register.isCompoundRegister() );
-        Assert.assertEquals( 0 , num1.register.getRegisterNumber() );
+        assertFalse( num1.register.isCompoundRegister() );
+        assertEquals( 0 , num1.register.getRegisterNumber() );
         
         final RegisterNode num2 = (RegisterNode) insn.child( 1 );
-        Assert.assertTrue( num2.register.isCompoundRegister() );
-        Assert.assertFalse( num2.register.isPostIncrement() );
-        Assert.assertFalse( num2.register.isPreDecrement() );
-        Assert.assertEquals( Register.REG_Y , num2.register.getRegisterNumber() );
+        assertTrue( num2.register.isCompoundRegister() );
+        assertFalse( num2.register.isPostIncrement() );
+        assertFalse( num2.register.isPreDecrement() );
+        assertEquals( Register.REG_Y , num2.register.getRegisterNumber() );
         
-        Assert.assertEquals( 1 , num2.childCount() );
-        Assert.assertTrue( num2.child(0) instanceof NumberLiteralNode);
+        assertEquals( 1 , num2.childCount() );
+        assertTrue( num2.child(0) instanceof NumberLiteralNode);
         NumberLiteralNode num3 = (NumberLiteralNode) num2.child(0);
-        Assert.assertEquals( 42 , num3.getValue().intValue()  );
+        assertEquals( 42 , num3.getValue().intValue()  );
     }       
     
     @Test
     public void testParseInstructionWithRegisterAndIdentifierOperands() 
     {
         AST ast = parse("add r0,counter");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final InstructionNode insn = (InstructionNode) stmt.child(0);
-        Assert.assertEquals( 2 , insn.childCount() );        
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( "add" , insn.instruction.getMnemonic());
+        assertEquals( 2 , insn.childCount() );        
+        assertNotNull(insn);
+        assertEquals( "add" , insn.instruction.getMnemonic());
         
         final RegisterNode num1 = (RegisterNode) insn.child( 0 );
-        Assert.assertFalse( num1.register.isCompoundRegister() );
-        Assert.assertEquals( 0 , num1.register.getRegisterNumber() );
+        assertFalse( num1.register.isCompoundRegister() );
+        assertEquals( 0 , num1.register.getRegisterNumber() );
         
         final IdentifierNode num2 = (IdentifierNode) insn.child( 1 );
-        Assert.assertEquals( new Identifier( "counter" ) , num2.value);        
+        assertEquals( new Identifier( "counter" ) , num2.name);        
     }     
     
     @Test
     public void testParseInstructionWithOneHexadecimalNumberOperand() 
     {
         AST ast = parse("add 0x123");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final InstructionNode insn = (InstructionNode) stmt.child(0);
-        Assert.assertEquals( 1 , insn.childCount() );        
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( "add" , insn.instruction.getMnemonic());
+        assertEquals( 1 , insn.childCount() );        
+        assertNotNull(insn);
+        assertEquals( "add" , insn.instruction.getMnemonic());
         
         final NumberLiteralNode num = (NumberLiteralNode) insn.child( 0 );
-        Assert.assertEquals( 0x123 , num.getValue().intValue()  );
-        Assert.assertEquals( NumberLiteralNode.LiteralType.HEXADECIMAL , num.getType() );
+        assertEquals( 0x123 , num.getValue().intValue()  );
+        assertEquals( NumberLiteralNode.LiteralType.HEXADECIMAL , num.getType() );
     }    
     
     @Test
     public void testParseReserveBytes() 
     {
         AST ast = parse(".byte 10");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final DirectiveNode node = (DirectiveNode) stmt.child(0);
-        Assert.assertNotNull(node);
-        Assert.assertEquals( 1 , node.childCount() );
+        assertNotNull(node);
+        assertEquals( 1 , node.childCount() );
         
         final NumberLiteralNode num = (NumberLiteralNode) node.child( 0 );
-        Assert.assertEquals( 10 , num.getValue().intValue()  );
-        Assert.assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num.getType() );
+        assertEquals( 10 , num.getValue().intValue()  );
+        assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num.getType() );
     }
     
     @Test
     public void testParseDevice() 
     {
         AST ast = parse(".device ATMega88");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final DirectiveNode node = (DirectiveNode) stmt.child(0);
-        Assert.assertEquals( Directive.DEVICE , node.directive );
-        Assert.assertNotNull(node);
-        Assert.assertEquals( 1 , node.childCount() );
+        assertEquals( Directive.DEVICE , node.directive );
+        assertNotNull(node);
+        assertEquals( 1 , node.childCount() );
         
         final StringLiteral num = (StringLiteral) node.child( 0 );
-        Assert.assertEquals( "ATMega88" , num.value );
+        assertEquals( "ATMega88" , num.value );
     }    
     
     @Test
     public void testParseInitBytes() 
     {
         AST ast = parse(".db 1,2");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final DirectiveNode node = (DirectiveNode) stmt.child(0);
-        Assert.assertNotNull(node);
-        Assert.assertEquals( 2 , node.childCount() );
-        Assert.assertEquals( Directive.INIT_BYTES , node.directive );
+        assertNotNull(node);
+        assertEquals( 2 , node.childCount() );
+        assertEquals( Directive.INIT_BYTES , node.directive );
         
         final NumberLiteralNode num = (NumberLiteralNode) node.child( 0 );
-        Assert.assertEquals( 1 , num.getValue().intValue()  );
-        Assert.assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num.getType() );
+        assertEquals( 1 , num.getValue().intValue()  );
+        assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num.getType() );
         
         final NumberLiteralNode num2 = (NumberLiteralNode) node.child( 1 );
-        Assert.assertEquals( 2 , num2.getValue().intValue()  );
-        Assert.assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num2.getType() );        
+        assertEquals( 2 , num2.getValue().intValue()  );
+        assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num2.getType() );        
     }  
     
     @Test
     public void testParseInitWords() 
     {
         AST ast = parse(".dw 1,2");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final DirectiveNode node = (DirectiveNode) stmt.child(0);
-        Assert.assertNotNull(node);
-        Assert.assertEquals( 2 , node.childCount() );
-        Assert.assertEquals( Directive.INIT_WORDS , node.directive );
+        assertNotNull(node);
+        assertEquals( 2 , node.childCount() );
+        assertEquals( Directive.INIT_WORDS , node.directive );
         
         final NumberLiteralNode num = (NumberLiteralNode) node.child( 0 );
-        Assert.assertEquals( 1 , num.getValue().intValue()  );
-        Assert.assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num.getType() );
+        assertEquals( 1 , num.getValue().intValue()  );
+        assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num.getType() );
         
         final NumberLiteralNode num2 = (NumberLiteralNode) node.child( 1 );
-        Assert.assertEquals( 2 , num2.getValue().intValue()  );
-        Assert.assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num2.getType() );        
+        assertEquals( 2 , num2.getValue().intValue()  );
+        assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num2.getType() );        
     }      
     
     @Test
     public void testParseEQU() 
     {
         AST ast = parse(".equ A = 1");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final DirectiveNode node = (DirectiveNode) stmt.child(0);
-        Assert.assertEquals(Directive.EQU , node.directive );
-        Assert.assertNotNull(node);
-        Assert.assertEquals( 2 , node.childCount() );
+        assertEquals(Directive.EQU , node.directive );
+        assertNotNull(node);
+        assertEquals( 2 , node.childCount() );
 
         final EquLabelNode label = (EquLabelNode) node.child(0);
         final NumberLiteralNode num2 = (NumberLiteralNode) node.child(1);
         
-        Assert.assertEquals( new Identifier("A") , label.name );
-        Assert.assertEquals( 1 , num2.getValue().intValue() );
+        assertEquals( new Identifier("A") , label.name );
+        assertEquals( 1 , num2.getValue().intValue() );
     }     
     
     @Test
     public void testParseEQUWithHexValue() 
     {
         AST ast = parse(".equ _SIGNATURE_000   = 0x1e");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final DirectiveNode node = (DirectiveNode) stmt.child(0);
-        Assert.assertEquals(Directive.EQU , node.directive );
-        Assert.assertNotNull(node);
-        Assert.assertEquals( 2 , node.childCount() );
+        assertEquals(Directive.EQU , node.directive );
+        assertNotNull(node);
+        assertEquals( 2 , node.childCount() );
 
         final EquLabelNode label = (EquLabelNode) node.child(0);
         final NumberLiteralNode num2 = (NumberLiteralNode) node.child(1);
-        Assert.assertEquals( LiteralType.HEXADECIMAL , num2.getType() );
-        Assert.assertEquals( new Identifier("_SIGNATURE_000") , label.name );
-        Assert.assertEquals( 0x1e , num2.getValue().intValue() );
+        assertEquals( LiteralType.HEXADECIMAL , num2.getType() );
+        assertEquals( new Identifier("_SIGNATURE_000") , label.name );
+        assertEquals( 0x1e , num2.getValue().intValue() );
     }       
     
     @Test
     public void testParseInstructionWithOneBinaryNumberOperand() 
     {
         AST ast = parse("add %1011");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final InstructionNode insn = (InstructionNode) stmt.child(0);
-        Assert.assertEquals( 1 , insn.childCount() );        
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( "add" , insn.instruction.getMnemonic());
+        assertEquals( 1 , insn.childCount() );        
+        assertNotNull(insn);
+        assertEquals( "add" , insn.instruction.getMnemonic());
         
         final NumberLiteralNode num = (NumberLiteralNode) insn.child( 0 );
-        Assert.assertEquals( 0b1011 , num.getValue().intValue()  );
-        Assert.assertEquals( NumberLiteralNode.LiteralType.BINARY , num.getType() );
+        assertEquals( 0b1011 , num.getValue().intValue()  );
+        assertEquals( NumberLiteralNode.LiteralType.BINARY , num.getType() );
     }     
     
     @Test
     public void testParseCSEG() 
     {
         AST ast = parse(".cseg");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final DirectiveNode insn = (DirectiveNode) stmt.child(0);
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( Directive.CSEG , insn.directive );
+        assertNotNull(insn);
+        assertEquals( Directive.CSEG , insn.directive );
     }    
     
     @Test
     public void testParseDSEG() 
     {
         AST ast = parse(".dseg");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final DirectiveNode insn = (DirectiveNode) stmt.child(0);
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( Directive.DSEG , insn.directive );
+        assertNotNull(insn);
+        assertEquals( Directive.DSEG , insn.directive );
     }     
     
     @Test
     public void testParseStringLiteral1() 
     {
         AST ast = parse("lsl \"abc def 123 .,;.\"");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final InstructionNode insn = (InstructionNode) stmt.child(0);
-        Assert.assertEquals( 1 , insn.childCount() );        
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( "lsl" , insn.instruction.getMnemonic());
+        assertEquals( 1 , insn.childCount() );        
+        assertNotNull(insn);
+        assertEquals( "lsl" , insn.instruction.getMnemonic());
         
         final StringLiteral num = (StringLiteral) insn.child( 0 );
-        Assert.assertEquals( "abc def 123 .,;." , num.value);
+        assertEquals( "abc def 123 .,;." , num.value);
     }   
     
     @Test
     public void testParseStringLiteralOnlyWhitespace() 
     {
         AST ast = parse("lsl \" \"");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final InstructionNode insn = (InstructionNode) stmt.child(0);
-        Assert.assertEquals( 1 , insn.childCount() );        
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( "lsl" , insn.instruction.getMnemonic());
+        assertEquals( 1 , insn.childCount() );        
+        assertNotNull(insn);
+        assertEquals( "lsl" , insn.instruction.getMnemonic());
         
         final StringLiteral num = (StringLiteral) insn.child( 0 );
-        Assert.assertEquals( " " , num.value);
+        assertEquals( " " , num.value);
     }      
     
     @Test
     public void testParseCharLiteral() 
     {
         AST ast = parse("lsl 'x'");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final InstructionNode insn = (InstructionNode) stmt.child(0);
-        Assert.assertEquals( 1 , insn.childCount() );        
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( "lsl" , insn.instruction.getMnemonic());
+        assertEquals( 1 , insn.childCount() );        
+        assertNotNull(insn);
+        assertEquals( "lsl" , insn.instruction.getMnemonic());
         
         final CharacterLiteralNode num = (CharacterLiteralNode) insn.child( 0 );
-        Assert.assertEquals( "Got : >"+num.value+"<" , 'x' , num.value);
+        assertEquals( "Got : >"+num.value+"<" , 'x' , num.value);
     }     
     
     @Test
     public void testParseCharLiteralWhitespace() 
     {
         AST ast = parse("lsl ' '");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final InstructionNode insn = (InstructionNode) stmt.child(0);
-        Assert.assertEquals( 1 , insn.childCount() );        
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( "lsl" , insn.instruction.getMnemonic());
+        assertEquals( 1 , insn.childCount() );        
+        assertNotNull(insn);
+        assertEquals( "lsl" , insn.instruction.getMnemonic());
         
         final CharacterLiteralNode num = (CharacterLiteralNode) insn.child( 0 );
-        Assert.assertEquals( "Got : >"+num.value+"<" , ' ' , num.value);
+        assertEquals( "Got : >"+num.value+"<" , ' ' , num.value);
     }     
     
     @Test
     public void testParseESEG() 
     {
         AST ast = parse(".eseg");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 1 ,  ast.childCount() ); 
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
         
         final StatementNode stmt = (StatementNode) ast.child(0);
-        Assert.assertNotNull(stmt);
-        Assert.assertEquals( 1 , stmt.childCount() );
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
         
         final DirectiveNode insn = (DirectiveNode) stmt.child(0);
-        Assert.assertNotNull(insn);
-        Assert.assertEquals( Directive.ESEG , insn.directive );
+        assertNotNull(insn);
+        assertEquals( Directive.ESEG , insn.directive );
     }    
     
     @Test
     public void testParseCommentLines() 
     {
         AST ast = parse("; test comment1\n; test comment2");
-        Assert.assertNotNull(ast);
-        Assert.assertTrue( ast.hasChildren() );
-        Assert.assertEquals( 2 , ast.childCount() );
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 2 , ast.childCount() );
         
         {
             final StatementNode stmt = (StatementNode) ast.child(0);
-            Assert.assertNotNull(stmt);
-            Assert.assertEquals( 1 , stmt.childCount() );
+            assertNotNull(stmt);
+            assertEquals( 1 , stmt.childCount() );
             
             final CommentNode comment = (CommentNode) stmt.child(0);
-            Assert.assertNotNull(comment);
-            Assert.assertEquals("; test comment1" , comment.value );
+            assertNotNull(comment);
+            assertEquals("; test comment1" , comment.value );
         }
         
         {
             final StatementNode stmt = (StatementNode) ast.child(1);
-            Assert.assertNotNull(stmt);
-            Assert.assertEquals( 1 , stmt.childCount() );
+            assertNotNull(stmt);
+            assertEquals( 1 , stmt.childCount() );
             
             final CommentNode comment = (CommentNode) stmt.child(0);
-            Assert.assertNotNull(comment);
-            Assert.assertEquals("; test comment2" , comment.value );            
+            assertNotNull(comment);
+            assertEquals("; test comment2" , comment.value );            
         }
         
     }     
@@ -917,9 +992,9 @@ public class ParserTest
     public void testParseBlankLines() 
     {
         AST ast = parse("\n\n\n");
-        Assert.assertNotNull(ast);
-        Assert.assertFalse( ast.hasChildren() );
-        Assert.assertEquals( 0 ,  ast.childCount() );
+        assertNotNull(ast);
+        assertFalse( ast.hasChildren() );
+        assertEquals( 0 ,  ast.childCount() );
     }      
     
     // helper functions

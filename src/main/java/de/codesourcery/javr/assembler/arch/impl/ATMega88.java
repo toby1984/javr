@@ -18,43 +18,58 @@ package de.codesourcery.javr.assembler.arch.impl;
 import java.util.List;
 
 import de.codesourcery.javr.assembler.Address;
+import de.codesourcery.javr.assembler.CompilationUnit;
+import de.codesourcery.javr.assembler.ICompilationContext;
+import de.codesourcery.javr.assembler.Instruction;
 import de.codesourcery.javr.assembler.Register;
+import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.AbstractAchitecture;
 import de.codesourcery.javr.assembler.arch.Architecture;
+import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.arch.InstructionEncoder;
+import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
+import de.codesourcery.javr.assembler.parser.TextRegion;
+import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
+import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
+import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 public class ATMega88 extends AbstractAchitecture 
 {
     public ATMega88() 
     {
-        insn("adc",   "0001 11rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER ); 
-        insn("add",   "0000 11rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER );  
+        final InstructionEncoding adc = insn("adc",   "0001 11rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER ); 
+        final InstructionEncoding add = insn("add",   "0000 11rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER );  
         insn("adiw",  "1001 0110 KKdd KKKK" , ArgumentType.COMPOUND_REGISTERS_R24_TO_R30 , ArgumentType.SIX_BIT_CONSTANT );
-        insn("and",   "0010 00rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER );
-        insn("andi",  "0111 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT );
+        final InstructionEncoding and = insn("and",   "0010 00rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER );
+        final InstructionEncoding andi = insn("andi",  "0111 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT );
         insn("asr",   "1001 010d dddd 0101" , ArgumentType.SINGLE_REGISTER );
         insn("bclr",  "1001 0100 1ddd 1000" , ArgumentType.THREE_BIT_CONSTANT );
         insn("bld",   "1111 100d dddd 0sss" , ArgumentType.SINGLE_REGISTER , ArgumentType.THREE_BIT_CONSTANT );
-        insn("brbc",  "1111 01ss ssss sddd" , ArgumentType.THREE_BIT_CONSTANT , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
         insn("brbs",  "1111 00ss ssss sddd" , ArgumentType.THREE_BIT_CONSTANT , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        insn("brcc",  "1111 01kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        insn("brcs",  "1111 00kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
+        final InstructionEncoding brcc = insn("brcc",  "1111 01kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
+        final InstructionEncoding brcs = insn("brcs",  "1111 00kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
         insn("break", "1001 0101 1001 1000" );
         insn("breq",  "1111 00kk kkkk k001" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        insn("brge",  "1111 00kk kkkk k001" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        insn("brhc",  "1111 01kk kkkk k100" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
+        insn("brbc",  "1111 01ss ssss sddd" , ArgumentType.THREE_BIT_CONSTANT , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
+        insn("brge",  "1111 01kk kkkk k100" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
+        insn("brhc",  "1111 01kk kkkk k101" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
         insn("brhs",  "1111 00kk kkkk k101" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
         insn("brid",  "1111 01kk kkkk k111" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
         insn("brie",  "1111 00kk kkkk k111" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        insn("brlo",  "1111 00kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
+        final InstructionEncoding brlo = insn("brlo",  "1111 00kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
+        brlo.aliasOf( brcs );
+        brcs.aliasOf( brlo );
+        
         insn("brlt",  "1111 00kk kkkk k100" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
         insn("brmi",  "1111 00kk kkkk k010" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
         insn("brne",  "1111 01kk kkkk k001" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
         insn("brpl",  "1111 01kk kkkk k010" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        insn("brsh",  "1111 01kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
+        final InstructionEncoding brsh = insn("brsh",  "1111 01kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
+        brsh.aliasOf( brcc );
+        brcc.aliasOf( brsh);
         insn("brtc",  "1111 01kk kkkk k110" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
         insn("brts",  "1111 00kk kkkk k110" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
         insn("brvc",  "1111 01kk kkkk k011" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
@@ -65,15 +80,17 @@ public class ATMega88 extends AbstractAchitecture
         insn("call",  "1001 010k kkkk 111k kkkk kkkk kkkk kkkk" , ArgumentType.FLASH_MEM_ADDRESS );
         
         insn("cbi",   "1001 1000 dddd dsss" , ArgumentType.FIVE_BIT_IO_REGISTER_CONSTANT , ArgumentType.THREE_BIT_CONSTANT );
-        insn("cbr",   "0111 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT ).srcTransform( value -> 
+        final InstructionEncoding cbr = insn("cbr",   "0111 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT ).srcTransform( value -> 
         {
           return ~value &0xff; // CBR is implemented as AND with inverted src value     
-        });      
+        });   
+        andi.aliasOf( cbr );
+        cbr.aliasOf( andi );
         insn("clc",    "1001 0100 1000 1000" );
         insn("clh",    "1001 0100 1101 1000" );
         insn("cli",    "1001 0100 1111 1000" );
         insn("cln",    "1001 0100 1010 1000" );
-        insn("clr",    "0010 01dd dddd dddd" , ArgumentType.SINGLE_REGISTER );
+        final InstructionEncoding clr = insn("clr",    "0010 01dd dddd dddd" , ArgumentType.SINGLE_REGISTER );
         insn("cls",    "1001 0100 1100 1000" );
         insn("clt",    "1001 0100 1110 1000" );
         insn("clv",    "1001 0100 1011 1000" );
@@ -116,7 +133,12 @@ public class ATMega88 extends AbstractAchitecture
         };
         add( new EncodingEntry( elpmSelector , elpmNoArgs , elpmZWithPostIncrement , elpmOnlyZ ) );
         
-        insn("eor",    "0010 01rd dddd rrrr" , ArgumentType.SINGLE_REGISTER, ArgumentType.SINGLE_REGISTER);
+        final InstructionEncoding eor = insn("eor",    "0010 01rd dddd rrrr" , ArgumentType.SINGLE_REGISTER, ArgumentType.SINGLE_REGISTER);
+        
+        final DisassemblySelector eorOrClr = new SameOperandsDisassemblySelector(clr,eor);
+        eor.disassemblySelector( eorOrClr );
+        clr.disassemblySelector( eorOrClr );
+        
         insn("fmul",   "0000 0011 0ddd 1rrr" , ArgumentType.R16_TO_R23, ArgumentType.R16_TO_R23);
         insn("fmuls",  "0000 0011 1ddd 0rrr" , ArgumentType.R16_TO_R23, ArgumentType.R16_TO_R23);
         insn("fmulsu", "0000 0011 1ddd 1rrr" , ArgumentType.R16_TO_R23, ArgumentType.R16_TO_R23);
@@ -210,7 +232,7 @@ public class ATMega88 extends AbstractAchitecture
         
         // LDS
         final InstructionEncoding ldsShort = new InstructionEncoding( "lds" , new InstructionEncoder( "1010 0kkk dddd kkkk" ) , ArgumentType.R16_TO_R31, ArgumentType.SEVEN_BIT_SRAM_MEM_ADDRESS);
-        final InstructionEncoding ldsLong  = new InstructionEncoding( "lds" , new InstructionEncoder( "1001 000d dddd 0000 kkkk kkkk kkkk kkkk" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.SRAM_MEM_ADDRESS);
+        final InstructionEncoding ldsLong  = new InstructionEncoding( "lds" , new InstructionEncoder( "1001 000d dddd 0000 kkkk kkkk kkkk kkkk" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.SIXTEEN_BIT_SRAM_MEM_ADDRESS);
         
         final InstructionSelector ldsSelector = new InstructionSelector() {
 
@@ -272,7 +294,12 @@ public class ATMega88 extends AbstractAchitecture
         add( new EncodingEntry( lpmSelector , lpmNoArgs , lpmZWithPostIncrement , lpmOnlyZ ) );        
         
         
-        insn("lsl",   "0000 11dd dddd dddd" , ArgumentType.SINGLE_REGISTER );
+        final InstructionEncoding lsl = insn("lsl",   "0000 11dd dddd dddd" , ArgumentType.SINGLE_REGISTER );
+        
+        final DisassemblySelector addOrLsl = new SameOperandsDisassemblySelector(lsl,add);
+        add.disassemblySelector( addOrLsl );
+        lsl.disassemblySelector( addOrLsl );
+        
         insn("lsr",   "1001 010d dddd 0110" , ArgumentType.SINGLE_REGISTER );
         insn("mov",   "0010 11rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER );
         insn("movw",  "0000 0001 dddd rrrr" , ArgumentType.COMPOUND_REGISTER , ArgumentType.COMPOUND_REGISTER);
@@ -282,7 +309,7 @@ public class ATMega88 extends AbstractAchitecture
         insn("neg",   "1001 010d dddd 0001" , ArgumentType.SINGLE_REGISTER);
         insn("nop",   "0000 0000 0000 0000");
         insn("or",    "0010 10rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER);
-        insn("ori",   "0110 ssss dddd ssss" , ArgumentType.SINGLE_REGISTER , ArgumentType.EIGHT_BIT_CONSTANT);
+        final InstructionEncoding ori = insn("ori",   "0110 ssss dddd ssss" , ArgumentType.SINGLE_REGISTER , ArgumentType.EIGHT_BIT_CONSTANT);
         insn("out",   "1011 1ssd dddd ssss" , ArgumentType.SINGLE_REGISTER , ArgumentType.SIX_BIT_IO_REGISTER_CONSTANT);
         insn("pop",   "1001 000d dddd 1111" , ArgumentType.SINGLE_REGISTER);
         insn("push",  "1001 001d dddd 1111" , ArgumentType.SINGLE_REGISTER );
@@ -290,7 +317,12 @@ public class ATMega88 extends AbstractAchitecture
         insn("ret",   "1001 0101 0000 1000");
         insn("reti",  "1001 0101 0001 1000");
         insn("rjmp",  "1100 kkkk kkkk kkkk" , ArgumentType.TWELVE_BIT_SIGNED_JUMP_OFFSET );
-        insn("rol",   "0001 11dd dddd dddd" , ArgumentType.SINGLE_REGISTER );
+        final InstructionEncoding rol = insn("rol",   "0001 11dd dddd dddd" , ArgumentType.SINGLE_REGISTER );
+        
+        final DisassemblySelector adcOrRol = new SameOperandsDisassemblySelector(rol,adc);
+        adc.disassemblySelector( adcOrRol );
+        rol.disassemblySelector( adcOrRol );
+        
         insn("ror",   "1001 010d dddd 0111" , ArgumentType.SINGLE_REGISTER );
         insn("sbc",   "0000 10rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER );
         insn("sbci",  "0100 KKKK dddd KKKK" , ArgumentType.SINGLE_REGISTER , ArgumentType.EIGHT_BIT_CONSTANT );
@@ -298,7 +330,9 @@ public class ATMega88 extends AbstractAchitecture
         insn("sbic",  "1001 1001 dddd dsss" , ArgumentType.FIVE_BIT_IO_REGISTER_CONSTANT, ArgumentType.THREE_BIT_CONSTANT );
         insn("sbis",  "1001 1011 dddd dsss" , ArgumentType.FIVE_BIT_IO_REGISTER_CONSTANT, ArgumentType.THREE_BIT_CONSTANT );
         insn("sbiw",  "1001 0111 KKdd KKKK" , ArgumentType.COMPOUND_REGISTERS_R24_TO_R30, ArgumentType.SIX_BIT_CONSTANT );
-        insn("sbr",   "0110 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT );
+        final InstructionEncoding sbr = insn("sbr",   "0110 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT );
+        sbr.aliasOf( ori );
+        ori.aliasOf( sbr );
         insn("sbrc",  "1111 110d dddd 0sss" , ArgumentType.SINGLE_REGISTER , ArgumentType.THREE_BIT_CONSTANT );
         insn("sbrs",  "1111 111d dddd 0sss" , ArgumentType.SINGLE_REGISTER , ArgumentType.THREE_BIT_CONSTANT );
         insn("sec",   "1001 0100 0000 1000");
@@ -446,7 +480,12 @@ public class ATMega88 extends AbstractAchitecture
         insn("sub",  "0001 10rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER );
         insn("subi", "0101 KKKK dddd KKKK" , ArgumentType.SINGLE_REGISTER , ArgumentType.EIGHT_BIT_CONSTANT );
         insn("swap", "1001 010d dddd 0010" , ArgumentType.SINGLE_REGISTER );
-        insn("tst",  "0010 00dd dddd dddd" , ArgumentType.SINGLE_REGISTER );
+        InstructionEncoding tst = insn("tst",  "0010 00dd dddd dddd" , ArgumentType.SINGLE_REGISTER );
+        
+        final SameOperandsDisassemblySelector tstOrAnd = new SameOperandsDisassemblySelector(tst,and);
+        tst.disassemblySelector( tstOrAnd );
+        and.disassemblySelector( tstOrAnd );
+        
         insn("wdr",  "1001 0101 1010 1000");
         insn("xch",  "1001 001r rrrr 0100" , ArgumentType.SINGLE_REGISTER );
     }
@@ -469,4 +508,142 @@ public class ATMega88 extends AbstractAchitecture
     public int getEEPromSize() {
         return 512;
     }
+    
+    public static void main(String[] args) 
+    {
+        final ATMega88 arch = new ATMega88();
+        
+        FakeContext ctx = new FakeContext(arch);
+        
+        for ( EncodingEntry entry : arch.instructions.values() ) 
+        {
+            for ( InstructionEncoding enc : entry.encodings ) 
+            {
+                final InstructionNode in = new InstructionNode( new Instruction( enc.mnemonic) , new TextRegion(1,1) );
+                in.addChild( new NumberLiteralNode( "1" , new TextRegion(1,1) ) );
+                in.addChild( new NumberLiteralNode( "2" , new TextRegion(1,1) ) );
+                ctx.reset();
+                arch.compile( in , ctx  );
+                arch.disassemble( ctx.buffer , ctx.ptr );
+            }
+        }
+    }
+    
+    protected static final class FakeContext implements ICompilationContext {
+        
+        private final IArchitecture arch;
+        
+        public final byte[] buffer = new byte[1024];
+        public int ptr = 0;
+        
+        public FakeContext(IArchitecture arch) {
+            this.arch = arch;
+        }
+        
+        public void reset() {
+            ptr = 0;
+        }
+
+        @Override
+        public void writeWord(int value) {
+            writeByte( value >> 8 );
+            writeByte( value );
+        }
+        
+        @Override
+        public void writeByte(int value) {
+            buffer[ptr++] = (byte) (value & 0xff);
+        }
+        
+        @Override
+        public void writeAsBytes(int value, int numberOfBytes) {
+            switch( numberOfBytes ) {
+                case 1:
+                    writeByte(value);
+                    break;
+                case 2:
+                    writeWord(value);
+                    break;
+                case 3:
+                    writeByte(value >> 16 );
+                    writeByte(value >> 8 );
+                    writeByte(value );
+                    break;
+                case 4:
+                    writeWord(value >> 16 );
+                    writeWord(value );
+                    break;                    
+            }
+        }
+        
+        @Override
+        public void setSegment(Segment s) {
+            throw new UnsupportedOperationException();
+        }
+        
+        @Override
+        public void message(CompilationMessage msg) {
+            System.err.println( msg );
+        }
+        
+        @Override
+        public SymbolTable globalSymbolTable() {
+            throw new UnsupportedOperationException();
+        }
+        
+        @Override
+        public int getBytesRemainingInCurrentSegment() {
+            throw new UnsupportedOperationException();
+        }
+        
+        @Override
+        public IArchitecture getArchitecture() {
+            return arch;
+        }
+        
+        @Override
+        public void error(String message, ASTNode node) {
+            System.err.println( message );            
+        }
+        
+        @Override
+        public SymbolTable currentSymbolTable() {
+            throw new UnsupportedOperationException();
+        }
+        
+        @Override
+        public Segment currentSegment() {
+            return Segment.FLASH;
+        }
+        
+        @Override
+        public int currentOffset() {
+            return 0;
+        }
+        
+        @Override
+        public CompilationUnit currentCompilationUnit() {
+            throw new UnsupportedOperationException();
+        }
+        
+        @Override
+        public Address currentAddress() {
+            return Address.wordAddress(Segment.FLASH, currentOffset() );
+        }
+        
+        @Override
+        public void allocateWord() {
+            throw new UnsupportedOperationException();            
+        }
+        
+        @Override
+        public void allocateBytes(int numberOfBytes) {
+            throw new UnsupportedOperationException();            
+        }
+        
+        @Override
+        public void allocateByte() {
+            throw new UnsupportedOperationException();            
+        }
+    };
 }

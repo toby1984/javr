@@ -22,6 +22,7 @@ public class ExpressionNode extends ASTNode implements IValueNode {
         boolean result = ((IValueNode) child(0)).resolveValue( context );
         if ( result ) {
             value = ((IValueNode) child(0)).getValue();
+            return true;
         }
         return false;
     }

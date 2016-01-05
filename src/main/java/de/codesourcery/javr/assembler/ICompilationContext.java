@@ -22,9 +22,11 @@ import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 public interface ICompilationContext 
 {
-    public SymbolTable getSymbolTable();
+    public SymbolTable globalSymbolTable();
     
-    public CompilationUnit getCompilationUnit();
+    public SymbolTable currentSymbolTable();
+    
+    public CompilationUnit currentCompilationUnit();
     
     public int currentOffset();
     

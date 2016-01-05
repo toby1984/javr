@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang3.Validate;
+import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
@@ -11,17 +12,26 @@ import de.codesourcery.javr.assembler.util.Resource;
 
 public class CompilationUnit 
 {
+    private static final Logger LOG = Logger.getLogger(CompilationUnit.class);
+    
     private final Resource resource;
     private String contentHash;
     
     private AST ast = new AST();
     private List<CompilationUnit> dependencies = new ArrayList<>();
-    private final SymbolTable symbolTable = new SymbolTable();
+    private SymbolTable symbolTable;
 
     public CompilationUnit(Resource resource) 
     {
         Validate.notNull(resource, "resource must not be NULL");
         this.resource = resource;
+        symbolTable = new SymbolTable( resource.toString() );
+    }
+    
+    public void setSymbolTable(SymbolTable symbolTable) 
+    {
+        Validate.notNull(symbolTable, "symbolTable must not be NULL");
+        this.symbolTable = symbolTable;
     }
     
     public boolean isDirty() 

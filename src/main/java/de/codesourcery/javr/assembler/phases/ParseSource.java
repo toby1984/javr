@@ -28,7 +28,7 @@ public class ParseSource implements Phase {
     @Override
     public void run(ICompilationContext context) throws IOException 
     {
-        final Resource resource = context.getCompilationUnit().getResource();
+        final Resource resource = context.currentCompilationUnit().getResource();
         
         final String input;
         try ( ByteArrayOutputStream out = new ByteArrayOutputStream() ; InputStream in = resource.createInputStream() ) 
@@ -42,7 +42,7 @@ public class ParseSource implements Phase {
         final Lexer lexer = config.createLexer( scanner );
         final Parser parser = config.createParser();
 
-        context.getCompilationUnit().setAst( parser.parse( lexer ) );
+        context.currentCompilationUnit().setAst( parser.parse( lexer ) );
     }
 
 }

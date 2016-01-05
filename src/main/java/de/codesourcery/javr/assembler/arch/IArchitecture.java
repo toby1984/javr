@@ -63,4 +63,6 @@ public interface IArchitecture {
     public int getInstructionLengthInBytes(InstructionNode node,ICompilationContext context,boolean estimate);    
     
     public void compile(InstructionNode node,ICompilationContext context);
+    
+    public String disassemble(byte[] data,int len);
 }

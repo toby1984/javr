@@ -19,17 +19,25 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang3.Validate;
+import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.Parser.Severity;
 
 public class AST extends ASTNode 
 {
+    private static final Logger LOG = Logger.getLogger(AST.class);
+    
     private final List<CompilationMessage> messages = new ArrayList<>();
     
     public void addMessage(CompilationMessage msg) 
     {
         Validate.notNull(msg, "msg must not be NULL");
+        
+        if ( LOG.isTraceEnabled() ) 
+        { 
+            LOG.trace("addMessage() "+msg.message , new Exception() );
+        }
         this.messages.add(msg);
     }
     

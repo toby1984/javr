@@ -40,12 +40,18 @@ public class OperatorNode extends ASTNode implements IValueNode
     @Override
     public boolean resolveValue(ICompilationContext context) 
     {
-        this.value = OperatorType.evaluate( this , context.getSymbolTable() );
+        this.value = OperatorType.evaluate( this , context.currentSymbolTable() );
         return value != null;
     }
 
     @Override
     public Object getValue() {
         return value;
+    }
+    
+    @Override
+    public String toString() 
+    {
+        return "Operator: "+this.type.getSymbol()+"( "+children+")";
     }
 }

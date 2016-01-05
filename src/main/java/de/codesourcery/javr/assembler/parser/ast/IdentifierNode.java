@@ -26,24 +26,24 @@ import de.codesourcery.javr.assembler.symbols.Symbol;
 
 public class IdentifierNode extends ASTNode implements IValueNode {
 
-    public final Identifier value;
+    public final Identifier name;
 
     private Object resolvedValue;
     
     public IdentifierNode(Identifier id,TextRegion region) {
         super(region);
         Validate.notNull(id, "id must not be NULL");
-        this.value = id;
+        this.name = id;
     }
     
     @Override
     public String getAsString() {
-        return value.value;
+        return name.value;
     }
     
     public boolean resolveValue(ICompilationContext context) 
     {
-        final Optional<Symbol<?, ?>> symbol = context.getSymbolTable().maybeGet( value );
+        final Optional<Symbol> symbol = context.currentSymbolTable().maybeGet( name );
         final Object value = symbol.isPresent() ? symbol.get().getValue() : null;
         this.resolvedValue = value;
         return value != null;
@@ -58,6 +58,11 @@ public class IdentifierNode extends ASTNode implements IValueNode {
     @Override
     protected IdentifierNode createCopy() 
     {
-        return new IdentifierNode(this.value , getTextRegion().createCopy() );
+        return new IdentifierNode(this.name , getTextRegion().createCopy() );
     }     
+    
+    @Override
+    public String toString() {
+        return "Identifier[ "+name+" ] = "+resolvedValue;
+    }
 }
