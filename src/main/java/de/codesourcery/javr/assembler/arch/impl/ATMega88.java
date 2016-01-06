@@ -155,17 +155,17 @@ public class ATMega88 extends AbstractAchitecture
         insn("lat",    "1001 001r rrrr 0111" , ArgumentType.SINGLE_REGISTER );
         
         // LD Rd,-(X|Y|Z)+
-        final InstructionEncoding ldOnlyX = new InstructionEncoding( "ld" , new InstructionEncoder( "1001 000d dddd 1100" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER );
-        final InstructionEncoding ldOnlyY = new InstructionEncoding( "ld" , new InstructionEncoder( "1000 000d dddd 1000" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER );
-        final InstructionEncoding ldOnlyZ = new InstructionEncoding( "ld" , new InstructionEncoder( "1000 000d dddd 0000" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER );
+        final InstructionEncoding ldOnlyX = new InstructionEncoding( "ld" , new InstructionEncoder( "1001 000d dddd 1100" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER ).disasmImplicitSource("X");
+        final InstructionEncoding ldOnlyY = new InstructionEncoding( "ld" , new InstructionEncoder( "1000 000d dddd 1000" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER ).disasmImplicitSource("Y");
+        final InstructionEncoding ldOnlyZ = new InstructionEncoding( "ld" , new InstructionEncoder( "1000 000d dddd 0000" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER ).disasmImplicitSource("Z");
         
-        final InstructionEncoding ldXWithPostIncrement = new InstructionEncoding( "ld" , new InstructionEncoder(  "1001 000d dddd 1101" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER);
-        final InstructionEncoding ldYWithPostIncrement = new InstructionEncoding( "ld" , new InstructionEncoder(  "1001 000d dddd 1001" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER);
-        final InstructionEncoding ldZWithPostIncrement = new InstructionEncoding( "ld" , new InstructionEncoder(  "1001 000d dddd 0001" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER);
+        final InstructionEncoding ldXWithPostIncrement = new InstructionEncoding( "ld" , new InstructionEncoder(  "1001 000d dddd 1101" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER).disasmImplicitSource("X+");
+        final InstructionEncoding ldYWithPostIncrement = new InstructionEncoding( "ld" , new InstructionEncoder(  "1001 000d dddd 1001" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER).disasmImplicitSource("Y+");
+        final InstructionEncoding ldZWithPostIncrement = new InstructionEncoding( "ld" , new InstructionEncoder(  "1001 000d dddd 0001" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER).disasmImplicitSource("Z+");
         
-        final InstructionEncoding ldXWithPreDecrement = new InstructionEncoding( "ld" , new InstructionEncoder( "1001 000d dddd 1110" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER);
-        final InstructionEncoding ldYWithPreDecrement = new InstructionEncoding( "ld" , new InstructionEncoder( "1001 000d dddd 1010" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER);
-        final InstructionEncoding ldZYWithPreDecrement = new InstructionEncoding( "ld" , new InstructionEncoder( "1001 000d dddd 0010" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER);
+        final InstructionEncoding ldXWithPreDecrement = new InstructionEncoding( "ld" , new InstructionEncoder( "1001 000d dddd 1110" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER) .disasmImplicitSource("-X");
+        final InstructionEncoding ldYWithPreDecrement = new InstructionEncoding( "ld" , new InstructionEncoder( "1001 000d dddd 1010" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER) .disasmImplicitSource("-Y");
+        final InstructionEncoding ldZYWithPreDecrement = new InstructionEncoding( "ld" , new InstructionEncoder( "1001 000d dddd 0010" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER).disasmImplicitSource("-Z");
         
         final InstructionSelector ldSelector = new InstructionSelector() {
 
@@ -450,15 +450,17 @@ public class ATMega88 extends AbstractAchitecture
         add( new EncodingEntry( stSelector , candidates ) );        
         
         // STS
-        final InstructionEncoding stsShort = new InstructionEncoding( "sts" , new InstructionEncoder( "1010 1kkk dddd kkkk" ) , ArgumentType.R16_TO_R31, ArgumentType.SEVEN_BIT_SRAM_MEM_ADDRESS);
-        final InstructionEncoding stsLong  = new InstructionEncoding( "sts" , new InstructionEncoder( "1001 001d dddd 0000 kkkk kkkk kkkk kkkk" ) , ArgumentType.R16_TO_R31 , ArgumentType.DATASPACE_16_BIT_ADDESS);
+        // short: 1010 1kkk dddd kkkk
+        // long:  1001 001d dddd 0000 kkkk kkkk kkkk kkkk
+        final InstructionEncoding stsShort = new InstructionEncoding( "sts" , new InstructionEncoder( "1010 1ddd ssss dddd" ) , ArgumentType.SEVEN_BIT_SRAM_MEM_ADDRESS , ArgumentType.R16_TO_R31);
+        final InstructionEncoding stsLong  = new InstructionEncoding( "sts" , new InstructionEncoder( "1001 001s ssss 0000 dddd dddd dddd dddd" ) , ArgumentType.DATASPACE_16_BIT_ADDESS, ArgumentType.SINGLE_REGISTER );
         
         final InstructionSelector stsSelector = new InstructionSelector() {
 
             @Override
             public InstructionEncoding pick(InstructionNode node, List<InstructionEncoding> candidates)
             {
-                final Object value = ((IValueNode) node.src() ).getValue();
+                final Object value = ((IValueNode) node.dst() ).getValue();
                 final int adr;
                 if ( value instanceof Address) 
                 {
@@ -468,13 +470,25 @@ public class ATMega88 extends AbstractAchitecture
                 } else {
                     throw new RuntimeException("Internal error, don't know how to turn "+value+" into a number");
                 }
-                return adr <= 127 ? stsShort : stsLong;
+                // STS short opcode requires operand <= 127 and only supports R16...R31
+                if ( adr <= 127 ) 
+                {
+                    final ASTNode srcNode = node.src();
+                    final Register src = ((RegisterNode) srcNode ).register;
+                    if ( src.isCompoundRegister() ) {
+                        throw new RuntimeException("STS src register must be a single register");
+                    }
+                    if ( src.getRegisterNumber() >= 16 ) { // short opcode only supports R16..R31
+                        return stsShort;
+                    }
+                }
+                return stsLong;
             }
 
             @Override
             public int getMaxInstructionLengthInBytes(InstructionNode node, List<InstructionEncoding> candidates, boolean estimate) 
             {
-                final Object value = ((IValueNode) node.src() ).getValue();
+                final Object value = ((IValueNode) node.dst() ).getValue();
                 if ( value == null ) {
                     return ldsLong.getInstructionLengthInBytes();
                 }

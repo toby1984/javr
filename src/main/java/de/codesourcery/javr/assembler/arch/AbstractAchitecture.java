@@ -90,7 +90,8 @@ public abstract class AbstractAchitecture implements IArchitecture
             case 26: value = 1; break;
             case 28: value = 2; break;
             case 30: value = 3; break;
-            default: throw new RuntimeException("Illegal register r"+x+", expected r24/r26/r28/r30");
+            default: 
+                throw new RuntimeException("Illegal register r"+x+", expected r24/r26/r28/r30");
         }
         return value;
     };    
@@ -357,6 +358,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         public DisassemblySelector disasmSelector = DEFAULT_DISASM_SELECTOR;
         public InstructionEncoding aliasOf;
         public String disasmImplicitDestination;
+        public String disasmImplicitSource;
         
         public InstructionEncoding(String mnemonic,InstructionEncoder enc,ArgumentType dstType,ArgumentType srcType) 
         {
@@ -373,10 +375,23 @@ public abstract class AbstractAchitecture implements IArchitecture
             this.dstType = dstType;
         }     
         
+        public boolean hasImplicitSourceArgument() {
+            return disasmImplicitSource != null;
+        }        
+        
+        public boolean hasImplicitDestinationArgument() {
+            return disasmImplicitDestination != null;
+        }            
+        
         public InstructionEncoding disasmImplicitDestination(String disasmImplicitDestination) {
             this.disasmImplicitDestination = disasmImplicitDestination;
             return this;
         }
+        
+        public InstructionEncoding disasmImplicitSource(String disasmImplicitSource) {
+            this.disasmImplicitSource = disasmImplicitSource;
+            return this;
+        }        
         
         public void disassemblySelector(DisassemblySelector sel) 
         {
@@ -405,6 +420,15 @@ public abstract class AbstractAchitecture implements IArchitecture
             return encoder.getInstructionLengthInBytes();
         }
         
+        /**
+         * Returns the number of arguments (values) that are encoded IN THE OPCODE.
+         * 
+         * <p>Note that some opcodes automatically imply a certain src/dst argument ,
+         * implied arguments are not accounted for by this method.</p>
+         * <p>Use {@link #hasImplicitSourceArgument()} and {@link hasImplicitDestinationArgument()} to check whether this is the case.</p>
+         * 
+         * @return
+         */
         public int getArgumentCount() {
             return encoder.getArgumentCount();
         }
@@ -496,32 +520,46 @@ public abstract class AbstractAchitecture implements IArchitecture
     @Override
     public void compile(InstructionNode node, ICompilationContext context) 
     {
-        ASTNode child1 = null;
-        ASTNode child2 = null;
+        ASTNode dstArgument = null;
+        ASTNode srcArgument = null;
         switch( node.childCount() ) 
         {
             case 0: 
                 break;
-            case 2: child2 = node.child(1);
+            case 2: srcArgument = node.child(1);
             //      $$FALL-THROUGH$$
-            case 1: child1 = node.child(0); 
+            case 1: dstArgument = node.child(0); 
                 break;
             default:
         }
-        final int argCount = ( child1 != null ? 1 : 0 ) + (child2 != null ? 1 : 0 );
+        final int argCount = ( dstArgument != null ? 1 : 0 ) + (srcArgument != null ? 1 : 0 );
         
         final EncodingEntry variants = instructions.get( node.instruction.getMnemonic().toLowerCase() );
         if ( variants == null ) {
             throw new RuntimeException("Unknown instruction: "+node.instruction.getMnemonic()); 
         }        
         final InstructionEncoding encoding = variants.getEncoding( node );
-        if ( argCount != encoding.getArgumentCount() ) 
+        int expectedArgumentCount = encoding.getArgumentCount();
+        if ( encoding.hasImplicitSourceArgument() ) 
+        {
+            expectedArgumentCount++;
+        }
+        if ( encoding.hasImplicitDestinationArgument() ) 
+        {
+            expectedArgumentCount++;
+            // destination is implied so the first child of the InstructionNode is actually the source, not the destination 
+            final ASTNode tmp = dstArgument;
+            dstArgument = srcArgument;
+            srcArgument = tmp;
+        }        
+        
+        if ( argCount != expectedArgumentCount ) 
         {
             throw new RuntimeException( encoding.mnemonic+" expects "+encoding.getArgumentCount()+" arguments but got "+argCount);
         }
         
-        final long dstValue = getDstValue( child1 , encoding.dstType , context , true );
-        final long srcValue = getSrcValue( child2 , encoding.srcType , context , true );
+        final long dstValue = getDstValue( dstArgument , encoding.dstType , context , true );
+        final long srcValue = getSrcValue( srcArgument , encoding.srcType , context , true );
 
         if ( dstValue != VALUE_UNAVAILABLE && srcValue != VALUE_UNAVAILABLE ) 
         {
@@ -534,8 +572,9 @@ public abstract class AbstractAchitecture implements IArchitecture
                 case 4:
                     context.writeWord( instruction >> 16 );
                     context.writeWord( instruction );
+                    break;
                 default:
-                    throw new RuntimeException("Unsupported length: "+encoding.getInstructionLengthInBytes());
+                    throw new RuntimeException("Unsupported instruction word length: "+encoding.getInstructionLengthInBytes()+" bytes");
             }
         }
     }
@@ -635,9 +674,6 @@ public abstract class AbstractAchitecture implements IArchitecture
                 }
                 if ( type == ArgumentType.COMPOUND_REGISTERS_R24_TO_R30 ) 
                 {
-                    if ( val != 24 && val != Register.REG_X && val != Register.REG_Y && val != Register.REG_Z ) 
-                    {
-                    }
                     switch( val ) 
                     {
                         case 24:
@@ -970,11 +1006,24 @@ public abstract class AbstractAchitecture implements IArchitecture
         if ( result.getArgumentCount() == 1 ) 
         {
             buffer.append(" ");
+            
+            if ( result.disasmImplicitSource != null && result.disasmImplicitDestination != null ) {
+                throw new IllegalStateException("Command may only have implicit src or destination but not both");
+            } 
+            
             if ( result.disasmImplicitDestination != null ) 
             {
                 buffer.append( result.disasmImplicitDestination ).append(",");
+                buffer.append( prettyPrint( operands.get(0) , result.dstType ) );
+            } 
+            else if ( result.disasmImplicitSource != null ) 
+            {
+                buffer.append( prettyPrint( operands.get(0) , result.dstType ) ).append(",");
+                buffer.append( result.disasmImplicitSource );
+            } 
+            else {
+                buffer.append( prettyPrint( operands.get(0) , result.dstType ) );
             }
-            buffer.append( prettyPrint( operands.get(0) , result.dstType ) );
         } 
         else if ( result.getArgumentCount() == 2 ) 
         {

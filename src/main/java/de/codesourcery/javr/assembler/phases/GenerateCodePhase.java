@@ -1,5 +1,7 @@
 package de.codesourcery.javr.assembler.phases;
 
+import org.apache.log4j.Logger;
+
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.AST;
@@ -13,6 +15,8 @@ import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 
 public class GenerateCodePhase extends AbstractPhase 
 {
+    private static final Logger LOG = Logger.getLogger(GenerateCodePhase.class);
+    
     private final boolean onlyAllocation;
     
     public GenerateCodePhase() {
@@ -44,16 +48,21 @@ public class GenerateCodePhase extends AbstractPhase
         if ( ! super.visitNode( context , node , ctx ) ) {
             return false;
         }
-        
+
         if ( node instanceof InstructionNode ) 
         {
-            if ( onlyAllocation ) 
-            {
-                final int bytes = context.getArchitecture().getInstructionLengthInBytes( (InstructionNode) node , context , true );
-                context.allocateBytes( bytes );
-            } else {
-                context.getArchitecture().compile( (InstructionNode) node , context );
-            }
+            try {            
+                if ( onlyAllocation ) 
+                {
+                    final int bytes = context.getArchitecture().getInstructionLengthInBytes( (InstructionNode) node , context , true );
+                    context.allocateBytes( bytes );
+                } else {
+                    context.getArchitecture().compile( (InstructionNode) node , context );
+                }
+            } catch(Exception e) {
+                LOG.debug("visitNode(): "+e.getMessage(),e);
+                context.error( e.getMessage() , node );
+            }            
             ctx.dontGoDeeper();
         } 
         else if ( node instanceof DirectiveNode ) 
