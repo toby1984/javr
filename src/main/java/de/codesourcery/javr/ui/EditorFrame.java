@@ -21,14 +21,18 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.event.ActionListener;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.text.DecimalFormat;
 import java.time.Duration;
 import java.time.ZonedDateTime;
@@ -44,6 +48,8 @@ import java.util.function.Function;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JInternalFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
@@ -76,6 +82,7 @@ import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreePath;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
@@ -117,6 +124,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
 
     private final ASTTreeModel astTreeModel = new ASTTreeModel();
     private JFrame astWindow = null;
+    private JFrame searchWindow = null;
     
     private JFrame symbolWindow = null;
     
@@ -135,6 +143,60 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
     private CompilationUnit compilationUnit = new CompilationUnit( new StringResource( "dummy","" ) );
     
     private LineMap lineMap;
+    
+    private final SearchHelper searchHelper=new SearchHelper();
+    
+    protected class SearchHelper {
+        
+        private int currentPosition;
+        private String term;
+        
+        public boolean search() 
+        {
+            String text = editor.getText();
+            if ( ! canSearch() ) 
+            {
+                return false;
+            }            
+            if ( currentPosition >= text.length()) {
+                System.out.println("At end of text, starting from 0");
+                currentPosition = 0;
+            }
+            System.out.println("Starting to search @ "+currentPosition);
+            final int nextMatch = text.substring( currentPosition , text.length() ).toLowerCase().indexOf( term.toLowerCase() );
+            if ( nextMatch != -1 ) 
+            {
+                final int cursorPos = currentPosition+nextMatch;
+                editor.setCaretPosition( cursorPos );
+                editor.select( cursorPos , cursorPos+term.length() );
+                editor.requestFocus();
+                currentPosition = cursorPos+1;
+                System.out.println("Found match at "+cursorPos);
+                return true;
+            }
+            System.out.println("No more matches");
+            return false;
+        }
+        
+        public void startFromBeginning() {
+            System.out.println("Start from beginning");
+            currentPosition = 0;
+        }
+        
+        public boolean canSearch() 
+        {
+            final String text = editor.getText();
+            return term != null && term.length() > 0 && text != null && text.length() != 0;
+        }
+        
+        public void setTerm(String term) {
+            this.term = term;
+        }
+        
+        public String getTerm() {
+            return term;
+        }
+    }
     
     protected static final class FilteredList<T> extends AbstractList<T> {
 
@@ -639,6 +701,31 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
 
         this.configProvider = provider;
         
+        editor.addKeyListener( new KeyAdapter() {
+            
+            @Override
+            public void keyTyped(KeyEvent e) 
+            {
+                System.out.println("Typed: "+e.getKeyChar()+" , modifiers: "+e.getModifiersEx()+" , "+KeyEvent.CTRL_DOWN_MASK);
+                if ( ( e.getModifiersEx() & KeyEvent.CTRL_DOWN_MASK ) != 0 ) 
+                {
+                    final byte[] bytes = Character.toString( e.getKeyChar() ).getBytes();
+                    System.out.println("Bytes: "+bytes.length+" , "+Integer.toHexString( bytes[0] ) );
+                    if ( e.getKeyChar() == 6 ) 
+                    {
+                        toggleSearchWindow();
+                    } 
+                    else if ( e.getKeyChar() == 0x0b && searchHelper.canSearch() ) 
+                    {
+                        searchHelper.search();
+                    } else if ( e.getKeyChar() == 0x07 ) 
+                    {
+                        gotoLine();
+                    }                    
+                }
+            }
+        });
+        
         editor.setFont(new Font("monospaced", Font.PLAIN, 12));
         editor.setPreferredSize( new Dimension(200,300 ) );
         
@@ -876,6 +963,20 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         astWindow.setLocationRelativeTo( this );
         astWindow.setVisible( true );
     }
+    
+    private void toggleSearchWindow() 
+    {
+        if ( searchWindow != null ) {
+            searchWindow.dispose();
+            searchWindow=null;
+            return;
+        }
+        searchWindow = createSearchWindow();
+
+        searchWindow.pack();
+        searchWindow.setLocationRelativeTo( this );
+        searchWindow.setVisible( true );
+    }    
 
     private void toggleSymbolTableWindow() 
     {
@@ -984,6 +1085,73 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         return frame;
     }
     
+    private JFrame createSearchWindow() 
+    {
+        final JFrame frame = new JFrame("Search");
+
+        frame.addWindowListener( new WindowAdapter() {
+
+            @Override
+            public void windowClosing(WindowEvent e) {
+                frame.dispose();
+                searchWindow = null;
+            }
+        });
+        
+        final JLabel label = new JLabel();
+        label.setText("Enter text to search.");
+
+        final JTextField filterField = new JTextField();
+        if ( searchHelper.getTerm() != null ) {
+            filterField.setText( searchHelper.getTerm() );
+        }
+        filterField.getDocument().addDocumentListener( new DocumentListener() {
+
+            @Override
+            public void insertUpdate(DocumentEvent e) { resetLabel(); }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) { resetLabel(); }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) { resetLabel(); }
+
+            private void resetLabel() 
+            {
+                label.setText( "Hit enter to start searching");
+                searchHelper.startFromBeginning();
+            }
+        });
+        
+        filterField.addActionListener( ev -> 
+        {
+            searchHelper.setTerm( filterField.getText() );
+            boolean foundMatch  = false;
+            if ( searchHelper.canSearch() ) 
+            {
+                foundMatch = searchHelper.search(); 
+                if ( ! foundMatch )
+                {
+                    searchHelper.startFromBeginning();
+                    foundMatch = searchHelper.search();
+                }
+            }
+            if ( foundMatch ) {
+                label.setText("Hit enter to continue searching");
+            } else {
+                label.setText("No (more) matches.");
+            }            
+        });
+        
+        final JPanel panel = new JPanel();
+        panel.setLayout( new BorderLayout() );
+        panel.add( filterField , BorderLayout.NORTH );
+        panel.add( label , BorderLayout.CENTER );
+        frame.getContentPane().add( panel );
+        frame.setPreferredSize( new Dimension(200,50 ) );
+        return frame;
+    }      
+    
     private JFrame createSymbolWindow() 
     {
         final JFrame frame = new JFrame("Symbols");
@@ -996,8 +1164,9 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
                 symbolWindow = null;
             }
         });
-
+        
         final JTextField filterField = new JTextField();
+        
         filterField.addActionListener( ev -> 
         {
             symbolModel.setFilterString( filterField.getText() );
@@ -1026,6 +1195,24 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         frame.getContentPane().add( panel );
         return frame;
     }    
+    
+    private void gotoLine() {
+        
+        final String lineNo = JOptionPane.showInputDialog(null, "Enter line number", "Go to line", JOptionPane.QUESTION_MESSAGE );
+        try {
+            if ( StringUtils.isNotBlank( lineNo ) ) {
+                int no = Integer.parseInt( lineNo );
+                final int position = lineMap.getPositionOfLine( no );
+                if ( position != -1 ) {
+                    editor.setCaretPosition( position );
+                    editor.requestFocus();
+                }
+            }
+        } 
+        catch(Exception e) {
+            
+        }
+    }
 
     private static Style createStyle(String name,Color col,Style parent,StyleContext ctx) {
 
@@ -1042,6 +1229,18 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         {
             final byte[] data = IOUtils.toByteArray( in );
             editor.setText( new String(data, unit.getResource().getEncoding() ) );
+            editor.setCaretPosition( 0 );
+        }
+    }
+
+    public void save(File file) throws FileNotFoundException 
+    {
+        try ( PrintWriter w = new PrintWriter(file ) ) 
+        {
+            if ( editor.getText() != null )  {
+                w.write( editor.getText() );
+            }
+            messageModel.add( new CompilationMessage(Severity.INFO , "Source saved to "+file.getAbsolutePath() ) );
         }
     }    
 }

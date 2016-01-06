@@ -100,4 +100,9 @@ public class FileResource implements Resource
             }
         }
     }
+    
+    @Override
+    public String toString() {
+        return "file://"+file.getAbsolutePath();
+    }
 }

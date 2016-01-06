@@ -732,7 +732,7 @@ public abstract class AbstractAchitecture implements IArchitecture
                 throw new RuntimeException("Internal error,unhandled switch/case: "+type);
         }
         
-        final int result;
+        int result;
         if ( node instanceof IValueNode ) 
         {
             final Object value = ((IValueNode) node).getValue();
@@ -741,33 +741,7 @@ public abstract class AbstractAchitecture implements IArchitecture
             } 
             else if ( value instanceof Address) 
             {
-                final Address actual = (Address) value;
-                if ( ! actual.hasSegment( Segment.FLASH ) ) {
-                    return fail("Expected at address in the code segment",node,context);
-                }
-                final Address current = context.currentAddress();   
-                if ( ! current.hasSegment( Segment.FLASH ) ) {
-                    throw new RuntimeException("Expected the ICompilationContext to be in FLASH");
-                }                
-                final int delta = actual.getWordAddress() - current.getWordAddress();
-                switch( type ) 
-                {
-                    case TWELVE_BIT_SIGNED_JUMP_OFFSET:
-                        if ( validateAddressRanges && ( delta < 2041 || delta > 2048 ) ) {
-                            return fail("Jump distance out of 12-bit range (was: "+delta+")",node,context);
-                        }
-                        result = delta;
-                        break;
-                    case SEVEN_BIT_SIGNED_BRANCH_OFFSET:
-                        if ( validateAddressRanges && ( delta < -64 || delta > 63 ) ) 
-                        {
-                            return fail("Jump distance out of 7-bit range (was: "+delta+")",node,context);
-                        }                        
-                        result = delta;
-                        break;
-                    default:
-                        result = ((Address) value).getByteAddress();
-                }
+                result = ((Address) value).getByteAddress();
             } else {
                 return fail("Operand needs to evaluate to a number",node,context);
             }
@@ -782,10 +756,43 @@ public abstract class AbstractAchitecture implements IArchitecture
             throw new RuntimeException("Internal error, don't know how to get value from "+node);
         }
         
+        if ( type == ArgumentType.FLASH_MEM_ADDRESS ) 
+        {
+            result = result >>> 1; // byte address -> word address
+        }
+        if ( type == ArgumentType.TWELVE_BIT_SIGNED_JUMP_OFFSET || type == ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET ) 
+        {
+            final Address actual = Address.byteAddress( context.currentSegment() , result );
+            if ( ! actual.hasSegment( Segment.FLASH ) ) {
+                return fail("Expected at address in the code segment",node,context);
+            }
+            final Address current = context.currentAddress();   
+            if ( ! current.hasSegment( Segment.FLASH ) ) {
+                throw new RuntimeException("Expected the ICompilationContext to be in FLASH");
+            }                
+            final int delta = actual.getWordAddress() - current.getWordAddress();
+            switch( type ) 
+            {
+                case TWELVE_BIT_SIGNED_JUMP_OFFSET:
+                    if ( validateAddressRanges && ( delta < 2041 || delta > 2048 ) ) {
+                        return fail("Jump distance out of 12-bit range (was: "+delta+")",node,context);
+                    }
+                    result = delta;
+                    break;
+                case SEVEN_BIT_SIGNED_BRANCH_OFFSET:
+                    if ( validateAddressRanges && ( delta < -64 || delta > 63 ) ) 
+                    {
+                        return fail("Jump distance out of 7-bit range (was: "+delta+")",node,context);
+                    }                        
+                    result = delta;
+                    break;
+            }        
+        }
+        
         switch ( type ) 
         {
             case FLASH_MEM_ADDRESS:
-                if ( result < 0 || result > getFlashMemorySize() ) {
+                if ( result < 0 || result > getFlashMemorySize()/2 ) {
                     return fail("Address "+result+" is out-of-range, target architecture only has "+getFlashMemorySize()+" bytes of flash memory",node,context);
                 }
                 break;
@@ -1113,12 +1120,12 @@ public abstract class AbstractAchitecture implements IArchitecture
     
     private String printConstant(int value,boolean signed,int bitCount) 
     {
-//        if ( signed ) {
-//            value = signExtend(value,bitCount);
-//        }
-//        if ( bitCount <= 3 || signed) { // <= 3 bit => print decimal
-//            return Integer.toString( value ); 
-//        }
+        if ( signed ) {
+            value = signExtend(value,bitCount);
+        }
+        if ( bitCount <= 3 || signed) { // <= 3 bit => print decimal
+            return Integer.toString( value ); 
+        }
         String result = Integer.toHexString( value );
         if ( (result.length()&1) == 1 ) {
             result = "0"+result;

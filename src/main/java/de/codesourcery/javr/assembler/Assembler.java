@@ -28,6 +28,7 @@ import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
+import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.phases.GatherSymbols;
 import de.codesourcery.javr.assembler.phases.GenerateCodePhase;
@@ -73,7 +74,9 @@ public class Assembler
             for ( Segment seg : Segment.values() ) 
             {
                 final Resource resource = rf.getResource( seg );
-                if ( writeSegment( resource , seg ) != 0 ) {
+                if ( writeSegment( resource , seg ) != 0 ) 
+                {
+                    message( new CompilationMessage(Severity.INFO,"Wrote "+resource) );
                     b.setResource( seg , resource );
                 }
             }

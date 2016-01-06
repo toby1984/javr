@@ -99,7 +99,7 @@ public class ATMega88 extends AbstractAchitecture
         insn("clv",    "1001 0100 1011 1000" );
         insn("clz",    "1001 0100 1001 1000" );
         insn("com",    "1001 010d dddd 0000" , ArgumentType.SINGLE_REGISTER);
-        insn("c",      "0001 01rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER);
+        insn("cp",      "0001 01rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER);
         insn("cpc",    "0000 01rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER);
         insn("cpi",    "0011 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT);
         insn("cpse",   "0001 00rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER);
@@ -316,7 +316,9 @@ public class ATMega88 extends AbstractAchitecture
         insn("nop",   "0000 0000 0000 0000");
         insn("or",    "0010 10rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER);
         final InstructionEncoding ori = insn("ori",   "0110 ssss dddd ssss" , ArgumentType.SINGLE_REGISTER , ArgumentType.EIGHT_BIT_CONSTANT);
-        insn("out",   "1011 1ssd dddd ssss" , ArgumentType.SINGLE_REGISTER , ArgumentType.SIX_BIT_IO_REGISTER_CONSTANT);
+        
+        //             1011 1AAr rrrr AAAA
+        insn("out",   "1011 1dds ssss dddd" , ArgumentType.SIX_BIT_IO_REGISTER_CONSTANT, ArgumentType.SINGLE_REGISTER );
         insn("pop",   "1001 000d dddd 1111" , ArgumentType.SINGLE_REGISTER);
         insn("push",  "1001 001d dddd 1111" , ArgumentType.SINGLE_REGISTER );
         insn("rcall", "1101 kkkk kkkk kkkk" , ArgumentType.TWELVE_BIT_SIGNED_JUMP_OFFSET );

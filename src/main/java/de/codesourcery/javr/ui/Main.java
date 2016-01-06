@@ -38,6 +38,8 @@ import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.Parser;
 import de.codesourcery.javr.assembler.parser.Scanner;
+import de.codesourcery.javr.assembler.util.FileResource;
+import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
 
 public class Main 
@@ -45,7 +47,8 @@ public class Main
     private IConfig config; 
     private IConfigProvider configProvider;
     private EditorFrame editorFrame;
-    private File lastFile = new File("/home/tobi/atmel/bootloader/BootLoader88.raw");
+    private File lastDisassembledFile = new File("/home/tobi/atmel/bootloader/BootLoader88.raw");
+    private File lastSourceFile = new File("/home/tobi/mars_workspace/javr/test.asm");
     
     public static void main(String[] args) 
     {
@@ -115,7 +118,23 @@ public class Main
         
         final JMenu menu = new JMenu("File");
         result.add( menu );
-        addItem( menu , "Disassemble" , () -> openFile( parent , file -> disassemble(file) ) );  
+        addItem( menu , "Disassemble" , () -> doWithFile( parent , true , lastDisassembledFile, file -> 
+        {
+            disassemble(file);
+            lastDisassembledFile = file;
+        }));
+        
+        addItem( menu , "Save source" , () -> doWithFile( parent , false , lastSourceFile, file -> 
+        {
+            editorFrame.save(file); 
+            lastSourceFile = file;
+        }));  
+        addItem( menu , "Load source" , () -> doWithFile( parent , true , lastSourceFile, file -> 
+        {
+            final CompilationUnit unit = new CompilationUnit( new FileResource(file , Resource.ENCODING_UTF ) );
+            editorFrame.setCompilationUnit( unit );
+            lastSourceFile = file;
+        })); 
         return result;
     }
     
@@ -149,13 +168,13 @@ public class Main
         public void run() throws Exception;
     }    
     
-    private void openFile(JFrame parent,ThrowingConsumer<File> handler) throws Exception 
+    private void doWithFile(JFrame parent,boolean openDialog,File file , ThrowingConsumer<File> handler) throws Exception 
     {
         final JFileChooser chooser = new JFileChooser();
-        if ( lastFile != null ) {
-            chooser.setSelectedFile( lastFile );
+        if ( file != null ) {
+            chooser.setSelectedFile( file );
         }
-        final int result = chooser.showOpenDialog( parent );
+        final int result = openDialog ? chooser.showOpenDialog( parent ) : chooser.showSaveDialog( parent );
         if ( result == JFileChooser.APPROVE_OPTION ) 
         {
             handler.apply( chooser.getSelectedFile() );

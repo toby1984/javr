@@ -16,6 +16,7 @@
 package de.codesourcery.javr.ui;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 import org.apache.commons.lang3.Validate;
@@ -89,7 +90,7 @@ public class LineMap
                 final Token eol = lexer.next();
                 fileEndsWithEOL = lexer.eof();
                 add( new LineInfo( line , offset , eol.offset ) );
-                offset = eol.offset;
+                offset = eol.offset+1;
                 line++;
               }
             }
@@ -97,6 +98,7 @@ public class LineMap
                 add( new LineInfo( line , offset , scanner.offset() ) );
             }
         }
+        lines.sort( (a,b) -> Integer.compare( a.line , b.line ) );
     }    
     
     public int getLineCount() {
@@ -119,5 +121,17 @@ public class LineMap
             result = lines.get(i).getLocation( r );
         }
         return result;
+    }
+
+    public int getPositionOfLine(int lineNo) 
+    {
+        if ( lineNo < 1 ) {
+            throw new IllegalArgumentException("line number must be >= 1 ");
+        }
+        lineNo--;
+        if ( lineNo < lines.size() ) {
+            return lines.get(lineNo).startOffset;
+        }
+        return -1;
     }    
 }
