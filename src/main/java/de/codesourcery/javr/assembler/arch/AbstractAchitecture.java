@@ -81,21 +81,6 @@ public abstract class AbstractAchitecture implements IArchitecture
         return x-16;
     };    
     
-    private static final Transform TRANSFORM_COMPOUND_REGISTERS_R24_TO_R30 =  x -> 
-    {
-        int value;
-        switch( x ) 
-        {
-            case 24: value = 0; break;
-            case 26: value = 1; break;
-            case 28: value = 2; break;
-            case 30: value = 3; break;
-            default: 
-                throw new RuntimeException("Illegal register r"+x+", expected r24/r26/r28/r30");
-        }
-        return value;
-    };    
-    
     public interface InstructionSelector 
     {
         public InstructionEncoding pick(InstructionNode node,List<InstructionEncoding> candidates);
@@ -222,8 +207,6 @@ public abstract class AbstractAchitecture implements IArchitecture
         else if ( dstType == ArgumentType.R16_TO_R31 ) 
         {
             ins.encoder.dstTransform(TRANSFORM_R16_TO_R31);
-        } else if ( dstType == ArgumentType.COMPOUND_REGISTERS_R24_TO_R30 ) {
-            ins.encoder.dstTransform(TRANSFORM_COMPOUND_REGISTERS_R24_TO_R30);
         }
         
         if ( srcType == ArgumentType.R16_TO_R23 ) 
@@ -233,8 +216,6 @@ public abstract class AbstractAchitecture implements IArchitecture
         else if ( srcType == ArgumentType.R16_TO_R31 ) 
         {
             ins.encoder.srcTransform(TRANSFORM_R16_TO_R31);
-        }  else if ( srcType == ArgumentType.COMPOUND_REGISTERS_R24_TO_R30 ) {
-            ins.encoder.srcTransform(TRANSFORM_COMPOUND_REGISTERS_R24_TO_R30);
         }       
         return ins;
     }     
@@ -955,7 +936,6 @@ public abstract class AbstractAchitecture implements IArchitecture
                         buffer.append(" , ");
                     }
                 }
-                buffer.append("\n");
                 ptr += skip;
             } 
             else 
