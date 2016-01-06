@@ -379,8 +379,11 @@ public class InstructionEncoder
         @Override
         public final int encode(int value) 
         {
-            if ( ( value & mask ) != 0 ) {
-                throw new RuntimeException("Value out of "+bitCount+"-bit range, expected 0.."+((1<<(bitCount))-1)+" but got "+value);
+            if ( ( value & mask ) != 0 ) 
+            {
+                if ( (value & 0x80000000) == 0 ) { // don't fail on signed numbers 
+                    throw new RuntimeException("Value "+value+" is out of "+bitCount+"-bit range, expected 0.."+((1<<(bitCount))-1));
+                }
             }
             return doEncode(value);
         }

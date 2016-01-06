@@ -756,25 +756,26 @@ public abstract class AbstractAchitecture implements IArchitecture
             throw new RuntimeException("Internal error, don't know how to get value from "+node);
         }
         
-        if ( type == ArgumentType.FLASH_MEM_ADDRESS ) 
+        if ( type == ArgumentType.FLASH_MEM_ADDRESS ||  type == ArgumentType.TWELVE_BIT_SIGNED_JUMP_OFFSET || type == ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET ) 
         {
             result = result >>> 1; // byte address -> word address
         }
         if ( type == ArgumentType.TWELVE_BIT_SIGNED_JUMP_OFFSET || type == ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET ) 
         {
-            final Address actual = Address.byteAddress( context.currentSegment() , result );
+            if ( ! context.currentSegment().equals( Segment.FLASH ) ) 
+            {
+                throw new RuntimeException("Expected the ICompilationContext to be in FLASH");
+            }              
+            final Address actual = Address.byteAddress( Segment.FLASH , context.currentOffset() + result*2 );
             if ( ! actual.hasSegment( Segment.FLASH ) ) {
                 return fail("Expected at address in the code segment",node,context);
             }
             final Address current = context.currentAddress();   
-            if ( ! current.hasSegment( Segment.FLASH ) ) {
-                throw new RuntimeException("Expected the ICompilationContext to be in FLASH");
-            }                
             final int delta = actual.getWordAddress() - current.getWordAddress();
             switch( type ) 
             {
                 case TWELVE_BIT_SIGNED_JUMP_OFFSET:
-                    if ( validateAddressRanges && ( delta < 2041 || delta > 2048 ) ) {
+                    if ( validateAddressRanges && ( delta < -2048 || delta > 2047 ) ) {
                         return fail("Jump distance out of 12-bit range (was: "+delta+")",node,context);
                     }
                     result = delta;
@@ -1044,23 +1045,45 @@ public abstract class AbstractAchitecture implements IArchitecture
             case SIX_BIT_IO_REGISTER_CONSTANT:
             case THREE_BIT_CONSTANT:
             case TWELVE_BIT_SIGNED_JUMP_OFFSET:
-                boolean signed=false;
                 int bitCount=0;
-                switch(type) {
-                    case DATASPACE_16_BIT_ADDESS: signed=false ; bitCount = 16 ;break;
-                    case EIGHT_BIT_CONSTANT:      signed=false ; bitCount =  8 ;break;
-                    case FIVE_BIT_IO_REGISTER_CONSTANT:  signed=false ; bitCount = 5 ;break;
-                    case FOUR_BIT_CONSTANT:  signed=false ; bitCount = 4 ;break;
-                    case SEVEN_BIT_SIGNED_BRANCH_OFFSET:  signed=true ; bitCount = 7 ;break;
-                    case SEVEN_BIT_SRAM_MEM_ADDRESS:  signed=false ; bitCount = 7 ;break;
-                    case SIXTEEN_BIT_SRAM_MEM_ADDRESS:  signed=false ; bitCount = 16 ;break;
+                switch(type) 
+                {
+                    case DATASPACE_16_BIT_ADDESS: 
+                        bitCount = 16 ;
+                        break;
+                    case EIGHT_BIT_CONSTANT:      
+                        bitCount =  8 ;
+                        break;
+                    case FIVE_BIT_IO_REGISTER_CONSTANT:  
+                        bitCount = 5 ;
+                        break;
+                    case FOUR_BIT_CONSTANT:  
+                        bitCount = 4 ;
+                        break;
+                    case SEVEN_BIT_SIGNED_BRANCH_OFFSET:  
+                        bitCount = 7 ;
+                        return printConstant(2*signExtend(value,bitCount) , bitCount);  // signExtend(value,bitCount);
+                    case SEVEN_BIT_SRAM_MEM_ADDRESS:  
+                        bitCount = 7 ;
+                        break;
+                    case SIXTEEN_BIT_SRAM_MEM_ADDRESS:  
+                        bitCount = 16 ;
+                        return printConstant(value,bitCount);                        
                     case FLASH_MEM_ADDRESS: 
-                    case SIX_BIT_CONSTANT:  signed=false ; bitCount = 6 ;break;
-                    case SIX_BIT_IO_REGISTER_CONSTANT:  signed=false ; bitCount = 6 ;break;
-                    case THREE_BIT_CONSTANT:  signed=false ; bitCount = 3 ;break;
-                    case TWELVE_BIT_SIGNED_JUMP_OFFSET:  signed=true; bitCount = 12 ;break;
+                    case SIX_BIT_CONSTANT:  
+                        bitCount = 6 ;
+                        break;
+                    case SIX_BIT_IO_REGISTER_CONSTANT:  
+                        bitCount = 6 ;
+                        break;
+                    case THREE_BIT_CONSTANT:  
+                        bitCount = 3 ;
+                        break;
+                    case TWELVE_BIT_SIGNED_JUMP_OFFSET:  
+                        bitCount = 12 ;
+                        return printConstant(2*signExtend(value,bitCount) , bitCount);
                 }
-                return printConstant(value,signed,bitCount);
+                return printConstant(value,bitCount);
             default:
                 //$$FALL-THROUGH;
         }
@@ -1118,12 +1141,9 @@ public abstract class AbstractAchitecture implements IArchitecture
         throw new RuntimeException("Unhandled type: "+type);
     }
     
-    private String printConstant(int value,boolean signed,int bitCount) 
+    private String printConstant(int value,int bitCount) 
     {
-        if ( signed ) {
-            value = signExtend(value,bitCount);
-        }
-        if ( bitCount <= 3 || signed) { // <= 3 bit => print decimal
+        if ( value < 0 ) { 
             return Integer.toString( value ); 
         }
         String result = Integer.toHexString( value );
@@ -1136,9 +1156,9 @@ public abstract class AbstractAchitecture implements IArchitecture
     private static int signExtend(int value,int bitCount) 
     {
         // 100
-        final int mask = 1<<(bitCount-1);
-        final boolean isNegative = (value&mask) != 0;
-        if ( isNegative ) {
+        final int msb = 1<<(bitCount-1);
+        final boolean msbSet = (value&msb) != 0;
+        if ( msbSet ) {
             final int signMask = ~((1<<bitCount)-1);
             return value | signMask;
         }

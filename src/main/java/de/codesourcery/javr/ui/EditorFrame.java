@@ -27,6 +27,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -116,21 +117,21 @@ import de.codesourcery.javr.assembler.util.StringResource;
 public class EditorFrame extends JInternalFrame implements IViewComponent {
 
     private static final Logger LOG = Logger.getLogger(EditorFrame.class);
-    
+
     public static final Duration RECOMPILATION_DELAY = Duration.ofMillis( 150 );
-    
+
     private final JTextPane editor = new JTextPane();
     private final IConfigProvider configProvider;
 
     private final ASTTreeModel astTreeModel = new ASTTreeModel();
     private JFrame astWindow = null;
     private JFrame searchWindow = null;
-    
+
     private JFrame symbolWindow = null;
-    
+
     private final SymbolTableModel symbolModel = new SymbolTableModel();
     private final MessageTableModel messageModel = new MessageTableModel();
-    
+
     private final RecompilationThread recompilationThread = new RecompilationThread();
 
     protected final Style STYLE_TOPLEVEL;
@@ -141,16 +142,16 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
     protected final Style STYLE_COMMENT;
 
     private CompilationUnit compilationUnit = new CompilationUnit( new StringResource( "dummy","" ) );
-    
+
     private LineMap lineMap;
-    
+
     private final SearchHelper searchHelper=new SearchHelper();
-    
+
     protected class SearchHelper {
-        
+
         private int currentPosition;
         private String term;
-        
+
         public boolean search() 
         {
             String text = editor.getText();
@@ -177,41 +178,41 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
             System.out.println("No more matches");
             return false;
         }
-        
+
         public void startFromBeginning() {
             System.out.println("Start from beginning");
             currentPosition = 0;
         }
-        
+
         public boolean canSearch() 
         {
             final String text = editor.getText();
             return term != null && term.length() > 0 && text != null && text.length() != 0;
         }
-        
+
         public void setTerm(String term) {
             this.term = term;
         }
-        
+
         public String getTerm() {
             return term;
         }
     }
-    
+
     protected static final class FilteredList<T> extends AbstractList<T> {
 
         private final List<T> unfiltered = new ArrayList<T>();
         private final List<T> filtered = new ArrayList<T>();
 
         private Function<T,Boolean> filterFunc = x -> true;
-        
+
         public void setFilterFunc(Function<T,Boolean> filterFunc ) 
         {
             Validate.notNull(filterFunc, "filterFunc must not be NULL");
             this.filterFunc = filterFunc;
             doFilter();
         }
-        
+
         private void doFilter() 
         {
             filtered.clear();
@@ -222,7 +223,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
                 }
             }
         }
-        
+
         @Override
         public boolean addAll(Collection<? extends T> c) 
         {
@@ -232,7 +233,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
             }
             return result;
         }
-        
+
         @Override
         public boolean add(T e) 
         {
@@ -244,18 +245,18 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
             }
             return false;
         }
-        
+
         @Override
         public void clear() {
             filtered.clear();
             unfiltered.clear();
         }
-        
+
         @Override
         public Iterator<T> iterator() {
             return filtered.iterator();
         }
-        
+
         @Override
         public T get(int index) 
         {
@@ -271,7 +272,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
     protected class IndentFilter extends DocumentFilter 
     {
         private static final String NEWLINE = "\n";
-        
+
         public void insertString(FilterBypass fb, int offs, String str, AttributeSet a) throws BadLocationException
         {
             if ( isNewline( str ) ) 
@@ -280,11 +281,11 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
             }
             super.insertString(fb, offs, replaceTabs(str) , a);
         }
-        
+
         private boolean isNewline(String s) {
             return NEWLINE.equals( s );
         }
-        
+
         private String replaceTabs(String in) {
             return in.replace("\t" ,  configProvider.getConfig().getEditorIndentString() );
         }
@@ -322,18 +323,18 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
     }
 
     protected final class RecompilationThread extends Thread {
-        
+
         private long lastChange = -1;
-        
+
         private final AtomicBoolean terminate = new AtomicBoolean(false);
-        
+
         private final Object SLEEP_LOCK = new Object();
-        
+
         {
             setDaemon(true);
             setName("recompilation");
         }
-        
+
         public void run() 
         {
             while ( ! terminate.get() ) 
@@ -381,7 +382,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
                 }
             }
         }
-        
+
         public void documentChanged() 
         {
             synchronized ( SLEEP_LOCK ) 
@@ -399,7 +400,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         private final List<TableModelListener> listeners = new ArrayList<>();
 
         private String filterString = null;
-        
+
         public void setSymbolTable(SymbolTable table)
         {
             Validate.notNull(table,"table must not be NULL");
@@ -409,19 +410,19 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
             this.symbols.addAll( allSymbolsSorted );
             tableChanged();
         }        
-        
+
         public void clear() 
         {
             System.out.println("Symbols CLEARED on "+this);
             symbols.clear();
             setFilterString( this.filterString );
         }
-        
+
         private void tableChanged() {
             final TableModelEvent ev = new TableModelEvent( this );
             listeners.forEach( l -> l.tableChanged( ev ) );
         }
-        
+
         public void setFilterString(String s) 
         {
             this.filterString = s == null ? null : s.toLowerCase();
@@ -514,7 +515,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
             return symbols.get( row );
         }
     }
-    
+
     private final class MessageTableModel implements TableModel {
 
         private final List<CompilationMessage> errors = new ArrayList<>();
@@ -529,7 +530,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
             final TableModelEvent ev = new TableModelEvent( this , idx ,idx );
             listeners.forEach( l -> l.tableChanged( ev ) );
         }
-        
+
         public void addAll(Collection<CompilationMessage> msg) 
         {
             Validate.notNull(msg,"msg must not be NULL");
@@ -700,9 +701,9 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         Validate.notNull(provider, "provider must not be NULL");
 
         this.configProvider = provider;
-        
+
         editor.addKeyListener( new KeyAdapter() {
-            
+
             @Override
             public void keyTyped(KeyEvent e) 
             {
@@ -725,10 +726,10 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
                 }
             }
         });
-        
+
         editor.setFont(new Font("monospaced", Font.PLAIN, 12));
         editor.setPreferredSize( new Dimension(200,300 ) );
-        
+
         final JPanel panel = new JPanel();
         panel.setLayout( new BorderLayout() );
 
@@ -740,7 +741,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
 
         // error messages table
         final JTable errorTable = new JTable( messageModel );
-        
+
         errorTable.setDefaultRenderer( String.class , new DefaultTableCellRenderer() 
         {
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) 
@@ -792,9 +793,6 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         // setup styles
         final StyleContext ctx = new StyleContext();
 
-        final DefaultStyledDocument doc = new DefaultStyledDocument(ctx);
-        editor.setStyledDocument( doc );
-
         final Style topLevelStyle = ctx.addStyle( "topLevelStyle" , null);
         STYLE_TOPLEVEL = topLevelStyle;
 
@@ -803,19 +801,29 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         STYLE_REGISTER = createStyle( "registerStyle" , Color.MAGENTA, topLevelStyle , ctx );
         STYLE_MNEMONIC = createStyle( "mnemonicStyle" , Color.BLACK , topLevelStyle , ctx );
         STYLE_COMMENT  = createStyle( "commentStyle" , Color.GRAY , topLevelStyle , ctx );     
-        
+
         // setup recompilation
         recompilationThread.start();
+
+        editor.setDocument( createDocument() );
+    }
+    
+    private Document createDocument() 
+    {
+        final Document doc = editor.getEditorKit().createDefaultDocument();
         
-        editor.getStyledDocument().addDocumentListener( new DocumentListener() 
+        // setup styles
+
+        doc.addDocumentListener( new DocumentListener() 
         {
             @Override public void insertUpdate(DocumentEvent e) {  recompilationThread.documentChanged(); }
             @Override public void removeUpdate(DocumentEvent e) {  recompilationThread.documentChanged(); }
             @Override public void changedUpdate(DocumentEvent e) { recompilationThread.documentChanged(); }
         });
-        
+
         // setup auto-indent
-        ((AbstractDocument) editor.getStyledDocument()).setDocumentFilter( new IndentFilter() );
+//        ((AbstractDocument) doc).setDocumentFilter( new IndentFilter() );
+        return doc;
     }
 
     private JToolBar createToolbar() 
@@ -828,12 +836,12 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
 
         return result;
     }
-    
+
     private void save() throws IOException 
     {
         String text = editor.getText();
         text = text == null ? "" : text;
-        
+
         final Resource resource = compilationUnit.getResource();
         try ( OutputStream out = resource.createOutputStream() ) 
         {
@@ -845,12 +853,12 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
     {
         messageModel.clear();
         symbolModel.clear();
-        
+
         String text = editor.getText();
         text = text == null ? "" : text;
-        
+
         this.lineMap = new LineMap( text ,configProvider);            
-        
+
         // save changes
         try {
             save();
@@ -861,7 +869,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
             messageModel.add( CompilationMessage.error( "Failed to save changes: "+e.getMessage()) );
             return;
         }
-        
+
         // assemble
         long assembleTime = 0;
         final Assembler asm = new Assembler();
@@ -875,25 +883,25 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
             e.printStackTrace();
             compilationUnit.getAST().addMessage( toCompilationMessage( e ) );
         }
-        
+
         symbolModel.setSymbolTable( asm.getGlobalSymbolTable() );        
         messageModel.addAll( compilationUnit.getAST().getMessages() );        
         astTreeModel.setAST( compilationUnit.getAST() );
-        
+
         doSyntaxHighlighting();
-        
+
         final float seconds = assembleTime/1000f;
         final DecimalFormat DF = new DecimalFormat("#######0.0#");
         final float linesPerSeconds = lineMap.getLineCount()/seconds;
         final String time = "Time: "+ assembleTime +" ms , "+DF.format( linesPerSeconds )+" lines/s";
-        
+
         messageModel.add( new CompilationMessage(Severity.INFO, time) );
-        
+
         final String success = compilationUnit.getAST().hasErrors() ? "failed" : "successful"; 
         final DateTimeFormatter df = DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss");
         messageModel.add( new CompilationMessage(Severity.INFO, "Compilation "+success+" ("+assembleTime+" millis) on "+df.format( ZonedDateTime.now() ) ) );
     }
-    
+
     private static CompilationMessage toCompilationMessage(Exception e)
     {
         if ( e instanceof ParseException ) {
@@ -934,7 +942,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
                     {
                         style = STYLE_NUMBER;
                     }                      
-                    
+
                     if ( style != null ) {
                         doc.setCharacterAttributes( region.start(), region.length() , style , true );
                     }
@@ -963,7 +971,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         astWindow.setLocationRelativeTo( this );
         astWindow.setVisible( true );
     }
-    
+
     private void toggleSearchWindow() 
     {
         if ( searchWindow != null ) {
@@ -991,7 +999,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         symbolWindow.setLocationRelativeTo( this );
         symbolWindow.setVisible( true );
     }
-    
+
     private JFrame createASTWindow() 
     {
         final JFrame frame = new JFrame("AST");
@@ -1006,7 +1014,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         });
 
         final JTree tree = new JTree( astTreeModel );
-        
+
         tree.setCellRenderer( new DefaultTreeCellRenderer() 
         {
             @Override
@@ -1074,7 +1082,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         });
         tree.setRootVisible( true );
         tree.setVisibleRowCount( 5 );
-        
+
         final JPanel panel = new JPanel();
         panel.setLayout( new BorderLayout() );
         final JScrollPane pane = new JScrollPane();
@@ -1084,7 +1092,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
 
         return frame;
     }
-    
+
     private JFrame createSearchWindow() 
     {
         final JFrame frame = new JFrame("Search");
@@ -1097,7 +1105,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
                 searchWindow = null;
             }
         });
-        
+
         final JLabel label = new JLabel();
         label.setText("Enter text to search.");
 
@@ -1122,7 +1130,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
                 searchHelper.startFromBeginning();
             }
         });
-        
+
         filterField.addActionListener( ev -> 
         {
             searchHelper.setTerm( filterField.getText() );
@@ -1142,7 +1150,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
                 label.setText("No (more) matches.");
             }            
         });
-        
+
         final JPanel panel = new JPanel();
         panel.setLayout( new BorderLayout() );
         panel.add( filterField , BorderLayout.NORTH );
@@ -1151,7 +1159,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         frame.setPreferredSize( new Dimension(200,50 ) );
         return frame;
     }      
-    
+
     private JFrame createSymbolWindow() 
     {
         final JFrame frame = new JFrame("Symbols");
@@ -1164,9 +1172,9 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
                 symbolWindow = null;
             }
         });
-        
+
         final JTextField filterField = new JTextField();
-        
+
         filterField.addActionListener( ev -> 
         {
             symbolModel.setFilterString( filterField.getText() );
@@ -1182,40 +1190,43 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
             @Override
             public void changedUpdate(DocumentEvent e) { symbolModel.setFilterString( filterField.getText() ); }
         });
-        
+
         final JTable table= new JTable( symbolModel );
-        
+
         final JPanel panel = new JPanel();
         panel.setLayout( new BorderLayout() );
         final JScrollPane pane = new JScrollPane();
         pane.getViewport().add( table );
         panel.add( filterField , BorderLayout.NORTH );
         panel.add( pane , BorderLayout.CENTER );
-        
+
         frame.getContentPane().add( panel );
         return frame;
     }    
-    
+
     private void gotoLine() {
-        
+
         final String lineNo = JOptionPane.showInputDialog(null, "Enter line number", "Go to line", JOptionPane.QUESTION_MESSAGE );
-        try {
-            if ( StringUtils.isNotBlank( lineNo ) ) {
-                int no = Integer.parseInt( lineNo );
-                final int position = lineMap.getPositionOfLine( no );
+        if ( StringUtils.isNotBlank( lineNo ) ) 
+        {
+            int no = -1;
+            try {
+                no = Integer.parseInt( lineNo );                    
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            if ( no > 0 ) {
+                int position = lineMap.getPositionOfLine( no );                
                 if ( position != -1 ) {
                     editor.setCaretPosition( position );
                     editor.requestFocus();
-                }
+                }                
             }
-        } 
-        catch(Exception e) {
-            
         }
     }
 
-    private static Style createStyle(String name,Color col,Style parent,StyleContext ctx) {
-
+    private static Style createStyle(String name,Color col,Style parent,StyleContext ctx) 
+    {
         final Style style = ctx.addStyle( name , parent );
         style.addAttribute(StyleConstants.Foreground, col );
         return style;
@@ -1225,12 +1236,17 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
     {
         Validate.notNull(unit, "unit must not be NULL");
         this.compilationUnit = unit;
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
         try ( InputStream in = unit.getResource().createInputStream() ) 
         {
-            final byte[] data = IOUtils.toByteArray( in );
-            editor.setText( new String(data, unit.getResource().getEncoding() ) );
-            editor.setCaretPosition( 0 );
+            IOUtils.copy( in , out );
         }
+        final byte[] data = out.toByteArray();
+        String source = new String(data, unit.getResource().getEncoding() );
+        System.out.println("\n=========================\n"+source+"\n===================");
+        editor.setDocument( createDocument() );
+        editor.setText( source );
+        editor.setCaretPosition( 0 );
     }
 
     public void save(File file) throws FileNotFoundException 

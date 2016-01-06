@@ -47,8 +47,8 @@ public class Main
     private IConfig config; 
     private IConfigProvider configProvider;
     private EditorFrame editorFrame;
-    private File lastDisassembledFile = new File("/home/tobi/atmel/bootloader/BootLoader88.raw");
-    private File lastSourceFile = new File("/home/tobi/mars_workspace/javr/test.asm");
+    private File lastDisassembledFile = new File("/home/tobi/atmel/bootloader/BootLoader88.raw_stripped");
+    private File lastSourceFile = new File("/home/tobi/atmel/asm/BootLoader88_original2.asm");
     
     public static void main(String[] args) 
     {
@@ -199,6 +199,7 @@ public class Main
     {
         editorFrame = new EditorFrame( configProvider );
         editorFrame.setResizable(true);
+        editorFrame.setMaximizable(true);
         editorFrame.pack();
         editorFrame.setVisible( true );
         pane.add( editorFrame );
