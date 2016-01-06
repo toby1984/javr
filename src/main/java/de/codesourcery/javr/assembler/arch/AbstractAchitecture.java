@@ -30,7 +30,6 @@ import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Register;
 import de.codesourcery.javr.assembler.Segment;
-import de.codesourcery.javr.assembler.arch.AbstractAchitecture.InstructionEncoding;
 import de.codesourcery.javr.assembler.arch.InstructionEncoder.Transform;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
@@ -357,6 +356,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         public final ArgumentType dstType;
         public DisassemblySelector disasmSelector = DEFAULT_DISASM_SELECTOR;
         public InstructionEncoding aliasOf;
+        public String disasmImplicitDestination;
         
         public InstructionEncoding(String mnemonic,InstructionEncoder enc,ArgumentType dstType,ArgumentType srcType) 
         {
@@ -372,6 +372,11 @@ public abstract class AbstractAchitecture implements IArchitecture
             this.srcType = srcType;
             this.dstType = dstType;
         }     
+        
+        public InstructionEncoding disasmImplicitDestination(String disasmImplicitDestination) {
+            this.disasmImplicitDestination = disasmImplicitDestination;
+            return this;
+        }
         
         public void disassemblySelector(DisassemblySelector sel) 
         {
@@ -856,7 +861,7 @@ public abstract class AbstractAchitecture implements IArchitecture
     } 
 
     @Override
-    public String disassemble(byte[] data,int len,boolean printAddresses,int startAddress) 
+    public String disassemble(byte[] data,int len,boolean printAddresses,int startAddress,boolean printBytes) 
     {
         // use prefix tree to narrow-down the
         // number of potential matches
@@ -910,7 +915,7 @@ public abstract class AbstractAchitecture implements IArchitecture
                 final int skip = remaining >= 2 ? 2 : remaining;
                 for ( int i = 0 ; i < skip ; i++ ) {
                     buffer.append( "0x"+Integer.toHexString( data[ptr+i] & 0xff ) );
-                    if ((i+1) < remaining) {
+                    if ((i+1) < skip ) {
                         buffer.append(" , ");
                     }
                 }
@@ -929,11 +934,32 @@ public abstract class AbstractAchitecture implements IArchitecture
                 if ( printAddresses ) {
                     buffer.append( StringUtils.leftPad( Integer.toHexString( startAddress+ptr ) , 4 , '0' ) ).append(":    ");
                 }
-                print(result, buffer, value);
+                
+                if ( printBytes ) 
+                {
+                    final StringBuilder tmp = new StringBuilder();
+                    print(result, tmp , value);
+                    buffer.append( StringUtils.rightPad( tmp.toString() , 15 , " " ) ).append("; ").append( toHex( data , ptr , result.getInstructionLengthInBytes() ) );
+                } else {
+                    print(result, buffer, value);                    
+                }
                 ptr += result.getInstructionLengthInBytes();
             }
         }
         return buffer.toString();
+    }
+    
+    private String toHex(byte[] data,int offset,int len) 
+    {
+        final StringBuilder result = new StringBuilder();
+        for ( int i = 0 ; i <len ; i++ ) 
+        {
+            if ( result.length() > 0 ) {
+                result.append(" ");
+            }
+            result.append( StringUtils.leftPad( Integer.toHexString( data[offset+i] & 0xff ) , 2 , '0' ) );
+        }
+        return result.toString();
     }
 
     private void print(final InstructionEncoding result, final StringBuilder buffer, int value) 
@@ -943,11 +969,22 @@ public abstract class AbstractAchitecture implements IArchitecture
         buffer.append( result.mnemonic.toUpperCase() );
         if ( result.getArgumentCount() == 1 ) 
         {
-            buffer.append(" ").append( prettyPrint( operands.get(0) , result.dstType ) );
+            buffer.append(" ");
+            if ( result.disasmImplicitDestination != null ) 
+            {
+                buffer.append( result.disasmImplicitDestination ).append(",");
+            }
+            buffer.append( prettyPrint( operands.get(0) , result.dstType ) );
         } 
         else if ( result.getArgumentCount() == 2 ) 
         {
-            buffer.append(" ").append( prettyPrint( operands.get(0) , result.dstType ) );
+            buffer.append(" ");
+            if ( result.disasmImplicitDestination != null ) 
+            {
+                buffer.append( result.disasmImplicitDestination );
+            } else {
+                buffer.append( prettyPrint( operands.get(0) , result.dstType ) );
+            }
             buffer.append(",").append( prettyPrint( operands.get(1) , result.srcType ) );
         }
     }

@@ -19,6 +19,7 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -637,6 +638,8 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         Validate.notNull(provider, "provider must not be NULL");
 
         this.configProvider = provider;
+        
+        editor.setFont(new Font("monospaced", Font.PLAIN, 12));
         editor.setPreferredSize( new Dimension(200,300 ) );
         
         final JPanel panel = new JPanel();

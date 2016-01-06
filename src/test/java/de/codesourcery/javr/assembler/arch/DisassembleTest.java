@@ -28,16 +28,28 @@ public class DisassembleTest extends TestCase {
 
     private final ATMega88 arch = new ATMega88();
     
-    public void testCompile() {
+    public void testDisassemble2() {
         
         final byte[] bytes = new byte[] { (byte) 0xff, (byte) 0xff , (byte) 0x8f, (byte) 0xef , (byte) 0x8d ,(byte) 0xbf  , (byte) 0xc8 ,(byte) 0xed };
         
-        final FakeContext ctx = new FakeContext(arch);
-        final String output = arch.disassemble( bytes , bytes.length , false , 0 );
+        final String output = arch.disassemble( bytes , bytes.length , false , 0 , false );
         System.out.println( ">>>>>> "+output );
     }
     
-    public void testDisasm()
+    /*
+1c2c:    ST R24         ; 8d 93
+1c2e:    ST R24         ; 8c 93
+
+    */
+    public void testDisassembleST() {
+        
+        final byte[] bytes = new byte[] { (byte) 0x8d, (byte) 0x93 , (byte) 0x8c, (byte) 0x93};
+        
+        final String output = arch.disassemble( bytes , bytes.length , false , 0 , false );
+        System.out.println( ">>>>>> "+output );
+    }
+    
+    public void testDisassembl3()
     {
         FakeContext ctx = new FakeContext(arch);
         
@@ -66,7 +78,7 @@ public class DisassembleTest extends TestCase {
                 } catch(Exception e) {
                     continue;
                 }
-                final String output = arch.disassemble( ctx.buffer , ctx.ptr , false , 0 );
+                final String output = arch.disassemble( ctx.buffer , ctx.ptr , false , 0 , false );
                 final String actual = printer.prettyPrint( parse( output ) );
                 if ( ! actual.equalsIgnoreCase( expected ) )
                 {

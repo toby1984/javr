@@ -123,7 +123,7 @@ public class Main
     {
         final byte[] data = FileUtils.readFileToByteArray( file );
         System.out.println("Disassembling "+data.length+" bytes");
-        String disassembly = config.getArchitecture().disassemble( data , data.length , false , 0 );
+        String disassembly = config.getArchitecture().disassemble( data , data.length , false , 0 , true );
         disassembly = "; disassembled "+data.length+" bytes from "+file.getAbsolutePath()+"\n"+disassembly;
         
         final StringResource res = new StringResource(file.getAbsolutePath(), disassembly );

@@ -385,20 +385,20 @@ public class ATMega88 extends AbstractAchitecture
         add( new EncodingEntry( spmSelector , spmNoArgs , spmZWithPostIncrement) );
         
         // ST
-        final InstructionEncoding stOnlyX = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 1100" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER );
-        final InstructionEncoding stOnlyY = new InstructionEncoding( "st" , new InstructionEncoder( "1000 001r rrrr 1000" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER );
-        final InstructionEncoding stOnlyZ = new InstructionEncoding( "st" , new InstructionEncoder( "1000 001r rrrr 0000" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER );
+        final InstructionEncoding stOnlyX = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 1100" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER ).disasmImplicitDestination("X");
+        final InstructionEncoding stOnlyY = new InstructionEncoding( "st" , new InstructionEncoder( "1000 001r rrrr 1000" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER ).disasmImplicitDestination("Y");
+        final InstructionEncoding stOnlyZ = new InstructionEncoding( "st" , new InstructionEncoder( "1000 001r rrrr 0000" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER ).disasmImplicitDestination("Z");
                                   
-        final InstructionEncoding stXWithPostIncrement = new InstructionEncoding( "st" , new InstructionEncoder(  "1001 001r rrrr 1101" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER);
-        final InstructionEncoding stYWithPostIncrement = new InstructionEncoding( "st" , new InstructionEncoder(  "1001 001r rrrr 1001" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER);
-        final InstructionEncoding stZWithPostIncrement = new InstructionEncoding( "st" , new InstructionEncoder(  "1001 001r rrrr 0001" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER);
+        final InstructionEncoding stXWithPostIncrement = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 1101" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER).disasmImplicitDestination("X+");
+        final InstructionEncoding stXWithPreDecrement = new InstructionEncoding( "st" , new InstructionEncoder(  "1001 001r rrrr 1110" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER).disasmImplicitDestination("-X");
         
+        final InstructionEncoding stYWithPostIncrement = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 1001" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER).disasmImplicitDestination("Y+");
+        final InstructionEncoding stYWithPreDecrement = new InstructionEncoding( "st" , new InstructionEncoder(  "1001 001r rrrr 1010" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER).disasmImplicitDestination("-Y");
         final InstructionEncoding stYWithDisplacement = new InstructionEncoding( "st" , new InstructionEncoder(  "10d0 dd1s ssss 1ddd" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER_DISPLACEMENT);
+        
+        final InstructionEncoding stZWithPostIncrement = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 0001" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER).disasmImplicitDestination("Z+");
+        final InstructionEncoding stZYWithPreDecrement = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 0010" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER).disasmImplicitDestination("-Z");
         final InstructionEncoding stZWithDisplacement = new InstructionEncoding( "st" , new InstructionEncoder(  "10d0 dd1s ssss 0ddd" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER_DISPLACEMENT);
-                                  
-        final InstructionEncoding stXWithPreDecrement = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 1110" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER);
-        final InstructionEncoding stYWithPreDecrement = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 1010" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER);
-        final InstructionEncoding stZYWithPreDecrement = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 0010" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER);
                                  
         final InstructionEncoding[] candidates = new InstructionEncoding[]{ stOnlyX, stOnlyY, 
                 stOnlyZ, stXWithPostIncrement, stYWithPostIncrement, stZWithPostIncrement, 
@@ -532,7 +532,7 @@ public class ATMega88 extends AbstractAchitecture
                 in.addChild( new NumberLiteralNode( "2" , new TextRegion(1,1) ) );
                 ctx.reset();
                 arch.compile( in , ctx  );
-                arch.disassemble( ctx.buffer , ctx.ptr , true , 0 );
+                arch.disassemble( ctx.buffer , ctx.ptr , true , 0 , false );
             }
         }
     }
