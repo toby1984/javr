@@ -170,30 +170,6 @@ public class Assembler
         }
         
         @Override
-        public void writeAsBytes(int value, int numberOfBytes) 
-        {
-            switch( numberOfBytes ) 
-            {
-                case 1:
-                    writeByte(value);
-                    break;
-                case 2:
-                    writeWord( value );
-                    break;
-                case 3:
-                    writeWord( value >> 8);
-                    writeByte( value );
-                    break;
-                case 4:
-                    writeWord( value >> 16);
-                    writeWord( value );
-                    break;
-                default:
-                    throw new RuntimeException("Invalid byte count: "+numberOfBytes);
-            }
-        }        
-        
-        @Override
         public void writeByte(int value) 
         {
             switch( segment ) 
@@ -228,8 +204,9 @@ public class Assembler
         
         @Override
         public void writeWord(int value) {
-            writeByte( value >> 8 );
+            // AVR is little endian
             writeByte( value );
+            writeByte( value >> 8 );
         }
         
         @Override

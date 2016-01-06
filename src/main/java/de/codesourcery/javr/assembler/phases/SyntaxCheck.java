@@ -48,6 +48,7 @@ public class SyntaxCheck implements Phase
                        case ESEG: context.setSegment( Segment.EEPROM ); break;                       
                        case INIT_BYTES:
                        case INIT_WORDS:
+                           break;
                        case RESERVE:
                            if( context.currentSegment() != Segment.SRAM && context.currentSegment() != Segment.EEPROM ) 
                            {

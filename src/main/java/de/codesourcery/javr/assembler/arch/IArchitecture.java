@@ -64,5 +64,5 @@ public interface IArchitecture {
     
     public void compile(InstructionNode node,ICompilationContext context);
     
-    public String disassemble(byte[] data,int len);
+    public String disassemble(byte[] data,int len,boolean printAddresses,int startAddress);
 }

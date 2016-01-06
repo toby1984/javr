@@ -40,8 +40,6 @@ public interface ICompilationContext
     
     public void writeWord(int value);
     
-    public void writeAsBytes(int value,int numberOfBytes);    
-    
     public void allocateByte();
     
     public void allocateWord();

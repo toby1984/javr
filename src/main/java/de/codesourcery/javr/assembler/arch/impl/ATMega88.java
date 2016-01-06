@@ -48,7 +48,10 @@ public class ATMega88 extends AbstractAchitecture
         insn("asr",   "1001 010d dddd 0101" , ArgumentType.SINGLE_REGISTER );
         insn("bclr",  "1001 0100 1ddd 1000" , ArgumentType.THREE_BIT_CONSTANT );
         insn("bld",   "1111 100d dddd 0sss" , ArgumentType.SINGLE_REGISTER , ArgumentType.THREE_BIT_CONSTANT );
+        
         insn("brbs",  "1111 00ss ssss sddd" , ArgumentType.THREE_BIT_CONSTANT , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
+        insn("brhs",  "1111 00kk kkkk k101" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
+        
         final InstructionEncoding brcc = insn("brcc",  "1111 01kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
         final InstructionEncoding brcs = insn("brcs",  "1111 00kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
         insn("break", "1001 0101 1001 1000" );
@@ -56,9 +59,9 @@ public class ATMega88 extends AbstractAchitecture
         insn("brbc",  "1111 01ss ssss sddd" , ArgumentType.THREE_BIT_CONSTANT , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
         insn("brge",  "1111 01kk kkkk k100" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
         insn("brhc",  "1111 01kk kkkk k101" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        insn("brhs",  "1111 00kk kkkk k101" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
         insn("brid",  "1111 01kk kkkk k111" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
         insn("brie",  "1111 00kk kkkk k111" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
+        
         final InstructionEncoding brlo = insn("brlo",  "1111 00kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
         brlo.aliasOf( brcs );
         brcs.aliasOf( brlo );
@@ -302,7 +305,10 @@ public class ATMega88 extends AbstractAchitecture
         
         insn("lsr",   "1001 010d dddd 0110" , ArgumentType.SINGLE_REGISTER );
         insn("mov",   "0010 11rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER );
-        insn("movw",  "0000 0001 dddd rrrr" , ArgumentType.COMPOUND_REGISTER , ArgumentType.COMPOUND_REGISTER);
+        
+        
+        // MOVW 28,30  0000 0001 1101 1110
+        insn("movw",  "0000 0001 dddd rrrr" , ArgumentType.COMPOUND_REGISTER_FOUR_BITS , ArgumentType.COMPOUND_REGISTER_FOUR_BITS);
         insn("mul",   "1001 11rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER);
         insn("muls",  "0000 0010 dddd rrrr" , ArgumentType.R16_TO_R31, ArgumentType.R16_TO_R31);
         insn("mulsu", "0000 0011 0ddd 0rrr" , ArgumentType.R16_TO_R23, ArgumentType.R16_TO_R23);
@@ -329,7 +335,9 @@ public class ATMega88 extends AbstractAchitecture
         insn("sbi",   "1001 1010 dddd dsss" , ArgumentType.FIVE_BIT_IO_REGISTER_CONSTANT, ArgumentType.THREE_BIT_CONSTANT );
         insn("sbic",  "1001 1001 dddd dsss" , ArgumentType.FIVE_BIT_IO_REGISTER_CONSTANT, ArgumentType.THREE_BIT_CONSTANT );
         insn("sbis",  "1001 1011 dddd dsss" , ArgumentType.FIVE_BIT_IO_REGISTER_CONSTANT, ArgumentType.THREE_BIT_CONSTANT );
+        
         insn("sbiw",  "1001 0111 KKdd KKKK" , ArgumentType.COMPOUND_REGISTERS_R24_TO_R30, ArgumentType.SIX_BIT_CONSTANT );
+        
         final InstructionEncoding sbr = insn("sbr",   "0110 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT );
         sbr.aliasOf( ori );
         ori.aliasOf( sbr );
@@ -429,7 +437,7 @@ public class ATMega88 extends AbstractAchitecture
                         }
                         return reg.register.isPostIncrement() ? stZWithPostIncrement : stOnlyZ;                         
                     default:
-                        throw new RuntimeException("Unsupported register: "+reg.register);
+                        throw new RuntimeException("Unsupported destination register: "+reg.register+" for instruction "+node.instruction.getMnemonic().toUpperCase());
                 }
             }
 
@@ -524,7 +532,7 @@ public class ATMega88 extends AbstractAchitecture
                 in.addChild( new NumberLiteralNode( "2" , new TextRegion(1,1) ) );
                 ctx.reset();
                 arch.compile( in , ctx  );
-                arch.disassemble( ctx.buffer , ctx.ptr );
+                arch.disassemble( ctx.buffer , ctx.ptr , true , 0 );
             }
         }
     }
@@ -546,34 +554,13 @@ public class ATMega88 extends AbstractAchitecture
 
         @Override
         public void writeWord(int value) {
-            writeByte( value >> 8 );
             writeByte( value );
+            writeByte( value >> 8 );
         }
         
         @Override
         public void writeByte(int value) {
             buffer[ptr++] = (byte) (value & 0xff);
-        }
-        
-        @Override
-        public void writeAsBytes(int value, int numberOfBytes) {
-            switch( numberOfBytes ) {
-                case 1:
-                    writeByte(value);
-                    break;
-                case 2:
-                    writeWord(value);
-                    break;
-                case 3:
-                    writeByte(value >> 16 );
-                    writeByte(value >> 8 );
-                    writeByte(value );
-                    break;
-                case 4:
-                    writeWord(value >> 16 );
-                    writeWord(value );
-                    break;                    
-            }
         }
         
         @Override

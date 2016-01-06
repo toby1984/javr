@@ -16,30 +16,45 @@
 package de.codesourcery.javr.ui;
 
 import java.awt.Dimension;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintWriter;
 
 import javax.swing.JDesktopPane;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
-import javax.swing.JInternalFrame;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 
+import org.apache.commons.io.FileUtils;
+
+import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.Parser;
 import de.codesourcery.javr.assembler.parser.Scanner;
+import de.codesourcery.javr.assembler.util.StringResource;
 
 public class Main 
 {
-    private final IConfigProvider configProvider;
+    private IConfig config; 
+    private IConfigProvider configProvider;
+    private EditorFrame editorFrame;
+    private File lastFile = new File("/home/tobi/atmel/bootloader/BootLoader88.raw");
     
     public static void main(String[] args) 
     {
         SwingUtilities.invokeLater( () -> new Main().run() );
     }
     
-    public Main() 
+    private void init() 
     {
-        final IConfig config = new IConfig() {
+        config = new IConfig() {
             
             private final IArchitecture arch = new ATMega88();
             
@@ -72,15 +87,18 @@ public class Main
             public IConfig getConfig() {
                 return config;
             }
-        };
+        };        
     }
     
     public void run() 
     {
+        init();
+        
         final JDesktopPane pane = new JDesktopPane();
         setup( pane );
         
         final JFrame frame = new JFrame();
+        frame.setJMenuBar( createMenu(frame) );
         frame.setDefaultCloseOperation( JFrame.EXIT_ON_CLOSE );
         
         frame.setPreferredSize( new Dimension(640,480));
@@ -90,10 +108,77 @@ public class Main
         frame.setLocationRelativeTo( null );
         frame.setVisible( true );
     }
+    
+    private JMenuBar createMenu(JFrame parent) 
+    {
+        final JMenuBar result = new JMenuBar();
+        
+        final JMenu menu = new JMenu("File");
+        result.add( menu );
+        addItem( menu , "Disassemble" , () -> openFile( parent , file -> disassemble(file) ) );  
+        return result;
+    }
+    
+    private void disassemble(File file) throws IOException 
+    {
+        final byte[] data = FileUtils.readFileToByteArray( file );
+        System.out.println("Disassembling "+data.length+" bytes");
+        String disassembly = config.getArchitecture().disassemble( data , data.length , false , 0 );
+        disassembly = "; disassembled "+data.length+" bytes from "+file.getAbsolutePath()+"\n"+disassembly;
+        
+        final StringResource res = new StringResource(file.getAbsolutePath(), disassembly );
+        final CompilationUnit unit = new CompilationUnit(res);
+        editorFrame.setCompilationUnit( unit );        
+    }
+    
+    protected static void fail(Exception e) 
+    {
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        final PrintWriter writer = new PrintWriter( out );
+        e.printStackTrace( writer );
+        
+        final String body = "Error: "+e.getMessage()+"\n\n"+new String( out.toByteArray() );
+        JOptionPane.showMessageDialog(null, body , "Error", JOptionPane.ERROR_MESSAGE);
+    }
+    
+    protected interface ThrowingConsumer<T> {
+        public void apply(T obj) throws Exception;
+    }
+    
+    protected interface ThrowingRunnable {
+        public void run() throws Exception;
+    }    
+    
+    private void openFile(JFrame parent,ThrowingConsumer<File> handler) throws Exception 
+    {
+        final JFileChooser chooser = new JFileChooser();
+        if ( lastFile != null ) {
+            chooser.setSelectedFile( lastFile );
+        }
+        final int result = chooser.showOpenDialog( parent );
+        if ( result == JFileChooser.APPROVE_OPTION ) 
+        {
+            handler.apply( chooser.getSelectedFile() );
+        }
+    }
+    
+    private void addItem(JMenu menu,String label,ThrowingRunnable eventHandler) 
+    {
+        final JMenuItem item = new JMenuItem( label );
+        item.addActionListener( ev -> 
+        {
+            try {
+                eventHandler.run();
+            } catch (Exception e) {
+                fail(e);
+            } 
+        });
+        menu.add( item );
+    }
 
     private void setup(JDesktopPane pane) 
     {
-        final JInternalFrame editorFrame = new EditorFrame( configProvider );
+        editorFrame = new EditorFrame( configProvider );
         editorFrame.setResizable(true);
         editorFrame.pack();
         editorFrame.setVisible( true );

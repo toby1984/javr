@@ -243,7 +243,7 @@ public abstract class AbstractAchitecture implements IArchitecture
     {
         SINGLE_REGISTER,
         COMPOUND_REGISTERS_R24_TO_R30,
-        COMPOUND_REGISTER,
+        COMPOUND_REGISTER_FOUR_BITS,
         R0_TO_R15,
         R16_TO_R31,
         R16_TO_R23,
@@ -522,7 +522,16 @@ public abstract class AbstractAchitecture implements IArchitecture
         {
             final int instruction = encoding.encode( (int) dstValue , (int) srcValue );
             debugAssembly(node, encoding, (int) dstValue, (int) srcValue, instruction); // TODO: Remove debug code
-            context.writeAsBytes( instruction , encoding.getInstructionLengthInBytes() );
+            switch( encoding.getInstructionLengthInBytes() ) {
+                case 2:
+                    context.writeWord( instruction );
+                    break;
+                case 4:
+                    context.writeWord( instruction >> 16 );
+                    context.writeWord( instruction );
+                default:
+                    throw new RuntimeException("Unsupported length: "+encoding.getInstructionLengthInBytes());
+            }
         }
     }
 
@@ -607,24 +616,41 @@ public abstract class AbstractAchitecture implements IArchitecture
             case Z_REGISTER:
             case Y_REGISTER_DISPLACEMENT:
             case Z_REGISTER_DISPLACEMENT:
-            case COMPOUND_REGISTER:
+            case COMPOUND_REGISTER_FOUR_BITS:
             case COMPOUND_REGISTERS_R24_TO_R30:
                 if ( ! (node instanceof RegisterNode) || ! ((RegisterNode) node).register.isCompoundRegister() ) 
                 {
                     return fail( "Operand needs to be a compound register expression",node,context );
                 }
                 final int val = ((RegisterNode) node).register.getRegisterNumber();
+                if ( type == ArgumentType.COMPOUND_REGISTER_FOUR_BITS ) 
+                {
+                    // REG e {0,2,4,...30} encoded as 4 bit value 
+                    return val >>> 1;
+                }
                 if ( type == ArgumentType.COMPOUND_REGISTERS_R24_TO_R30 ) 
                 {
                     if ( val != 24 && val != Register.REG_X && val != Register.REG_Y && val != Register.REG_Z ) 
                     {
-                        return fail("Operand needs to be a compound register expression with X/Y/Z (r25:r24/r27:r26/r29:r28/r31:r30)",node,context);
+                    }
+                    switch( val ) 
+                    {
+                        case 24:
+                            return 0;
+                        case Register.REG_X:
+                            return 1;
+                        case Register.REG_Y:
+                            return 2;
+                        case Register.REG_Z:
+                            return 3;
+                        default:
+                            return fail("Operand needs to be a compound register expression with X/Y/Z (r25:r24/r27:r26/r29:r28/r31:r30)",node,context);
                     }
                 } 
                 if ( type == ArgumentType.X_REGISTER && val != Register.REG_X ) {
                     return fail("Operand needs to be Z register",node,context);
                 } 
-                if ( ( type == ArgumentType.Y_REGISTER || type == ArgumentType.Z_REGISTER_DISPLACEMENT ) && val != Register.REG_Y ) {
+                if ( ( type == ArgumentType.Y_REGISTER || type == ArgumentType.Y_REGISTER_DISPLACEMENT ) && val != Register.REG_Y ) {
                     return fail("Operand needs to be Y register",node,context);
                 } 
                 if ( ( type == ArgumentType.Z_REGISTER || type == ArgumentType.Z_REGISTER_DISPLACEMENT ) && val != Register.REG_Z ) {
@@ -744,7 +770,7 @@ public abstract class AbstractAchitecture implements IArchitecture
             case SEVEN_BIT_SRAM_MEM_ADDRESS:
             case SIXTEEN_BIT_SRAM_MEM_ADDRESS: 
                 if ( result < 0 || result > getSRAMMemorySize() ) {
-                    return fail("Address "+result+" is out-of-range, target architecture only has "+getFlashMemorySize()+" bytes of SRAM memory",node,context);
+                    return fail("Address "+result+" is out-of-range, target architecture only has "+getSRAMMemorySize()+" bytes of SRAM memory",node,context);
                 }
                 break;
         }
@@ -782,10 +808,65 @@ public abstract class AbstractAchitecture implements IArchitecture
         }
         return result;
     }
+    
+    private static String insertEvery(String input,int distance,String s) 
+    {
+        final StringBuilder builder = new StringBuilder();
+        for ( int i = 0 ; i < input.length() ; i++ ) {
+            if ( i > 0 && (i%distance) == 0 ) {
+                builder.append( s );
+            }
+            builder.append( input.charAt(i) );
+        }
+        return builder.toString();
+    }
+    
+    private static int reverseBytes(int value,int byteCount) 
+    {
+        final int result;
+        switch(byteCount) 
+        {
+            case 1: result=value; break;
+            case 2: result=reverse2Bytes(value); break;
+            case 3: result=reverse3Bytes(value); break;
+            case 4: result=reverse4Bytes(value); break;
+            default:
+                throw new RuntimeException("Illegal byte count: "+byteCount);
+        }
+        
+        String in = StringUtils.leftPad( Integer.toBinaryString( value ) , 8*byteCount , '0' );
+        String out = StringUtils.leftPad( Integer.toBinaryString( result ) , 8*byteCount , '0' );
+        System.out.println("REVERSED: \n"+insertEvery(in,8,"_")+"\n"+insertEvery(out,8,"_"));
+        return result;
+    }    
+    
+    private static int reverse4Bytes(int value) 
+    {
+        return (value & 0xff000000) >>> 8 | (value & 0x00ff0000) << 8 | (value & 0x0000ff00) >>> 8 | (value & 0xff) << 8;
+    }
+    
+    private static int reverse3Bytes(int value) 
+    {
+        return (value & 0xff000000) >>> 8 | (value & 0x00ff0000) <<8  | (value & 0x0000ff00);
+    }    
+    
+    private static int reverse2Bytes(int value) 
+    {
+        return (value & 0xff000000) >>> 8  | (value & 0x00ff0000) << 8;
+    } 
 
     @Override
-    public String disassemble(byte[] data,int len) 
+    public String disassemble(byte[] data,int len,boolean printAddresses,int startAddress) 
     {
+        // use prefix tree to narrow-down the
+        // number of potential matches
+        
+        // note that the tree requires the input 
+        // data to be in big-endian order, otherwise
+        // if wouldn't work (and the instructions
+        // in little-endian order have only very short
+        // fixed prefixes so the tree approach would basically
+        // be a waste
         final PrefixTree tree = new PrefixTree();
         for ( EncodingEntry entry : this.instructions.values() ) 
         {
@@ -794,37 +875,47 @@ public abstract class AbstractAchitecture implements IArchitecture
             }
         }
         
-//        System.out.println( tree );
-        
         final StringBuilder buffer = new StringBuilder();
         
         int ptr = 0;
         while ( ptr < len ) 
         {
             final int remaining = len - ptr;
+            final int bytesToProcess = remaining >= 4 ? 4 : remaining;
             int value=0;
-            for ( int i = 0 ; i < remaining ; i++ ) 
+            for ( int i = 0 ; i < bytesToProcess ; i++ ) 
             {
                 value <<= 8;
                 value |= data[ptr+i] & 0xff;
             }
             // decoding assumes that data
             // starts with the MSB
-            value <<= (4-remaining)*8;
+            value <<= (4-bytesToProcess)*8;
             
-            System.out.println("Trying to match "+Integer.toBinaryString( value ) );
+            // convert to big endian so that the prefix tree works properly 
+            value = reverseBytes( value , bytesToProcess );
+            
+            System.out.println("0x"+Integer.toHexString( ptr+startAddress)+": Trying to match "+bytesToProcess+" bytes : "+Integer.toBinaryString( value ) );
             final List<InstructionEncoding> matches = tree.getMatch( value );
+            if ( buffer.length() > 0 ) 
+            {
+                buffer.append("\n");
+            }
+            
+//            buffer.append("; 0x").append( StringUtils.leftPad( Integer.toHexString( startAddress+ptr ) , 4 , '0' ) ).append(":    ");            
+            
             if ( matches.isEmpty() )
             {
                 buffer.append(".db ");
-                for ( int i = 0 ; i < remaining ; i++ ) {
-                    buffer.append( Integer.toHexString( data[ptr+i] & 0xff ) );
+                final int skip = remaining >= 2 ? 2 : remaining;
+                for ( int i = 0 ; i < skip ; i++ ) {
+                    buffer.append( "0x"+Integer.toHexString( data[ptr+i] & 0xff ) );
                     if ((i+1) < remaining) {
                         buffer.append(" , ");
                     }
                 }
                 buffer.append("\n");
-                ptr += remaining;
+                ptr += skip;
             } 
             else 
             {
@@ -833,12 +924,151 @@ public abstract class AbstractAchitecture implements IArchitecture
                 });
                 final int longestMatch = matches.get(0).encoder.getOpcodeBitCount();
                 matches.removeIf( m -> m.encoder.getOpcodeBitCount() < longestMatch );
+                
                 final InstructionEncoding result = matches.get(0).disasmSelector.pick( matches , value );
-                // TODO: Decode & print arguments
-                buffer.append( result.mnemonic.toUpperCase() ).append(" ");
+                if ( printAddresses ) {
+                    buffer.append( StringUtils.leftPad( Integer.toHexString( startAddress+ptr ) , 4 , '0' ) ).append(":    ");
+                }
+                print(result, buffer, value);
                 ptr += result.getInstructionLengthInBytes();
             }
         }
         return buffer.toString();
+    }
+
+    private void print(final InstructionEncoding result, final StringBuilder buffer, int value) 
+    {
+        final List<Integer> operands = result.encoder.decode( value );
+        System.out.println("DECODED: "+result.mnemonic+" "+operands);
+        buffer.append( result.mnemonic.toUpperCase() );
+        if ( result.getArgumentCount() == 1 ) 
+        {
+            buffer.append(" ").append( prettyPrint( operands.get(0) , result.dstType ) );
+        } 
+        else if ( result.getArgumentCount() == 2 ) 
+        {
+            buffer.append(" ").append( prettyPrint( operands.get(0) , result.dstType ) );
+            buffer.append(",").append( prettyPrint( operands.get(1) , result.srcType ) );
+        }
+    }
+    
+    private String prettyPrint(Integer value, ArgumentType type) 
+    {
+        if ( type == ArgumentType.NONE ) {
+            return "";
+        }
+        switch( type ) 
+        {
+            case DATASPACE_16_BIT_ADDESS:
+            case EIGHT_BIT_CONSTANT:
+            case FIVE_BIT_IO_REGISTER_CONSTANT:
+            case FOUR_BIT_CONSTANT:
+            case SEVEN_BIT_SIGNED_BRANCH_OFFSET:
+            case SEVEN_BIT_SRAM_MEM_ADDRESS:
+            case SIXTEEN_BIT_SRAM_MEM_ADDRESS:
+            case FLASH_MEM_ADDRESS:
+            case SIX_BIT_CONSTANT:
+            case SIX_BIT_IO_REGISTER_CONSTANT:
+            case THREE_BIT_CONSTANT:
+            case TWELVE_BIT_SIGNED_JUMP_OFFSET:
+                boolean signed=false;
+                int bitCount=0;
+                switch(type) {
+                    case DATASPACE_16_BIT_ADDESS: signed=false ; bitCount = 16 ;break;
+                    case EIGHT_BIT_CONSTANT:      signed=false ; bitCount =  8 ;break;
+                    case FIVE_BIT_IO_REGISTER_CONSTANT:  signed=false ; bitCount = 5 ;break;
+                    case FOUR_BIT_CONSTANT:  signed=false ; bitCount = 4 ;break;
+                    case SEVEN_BIT_SIGNED_BRANCH_OFFSET:  signed=true ; bitCount = 7 ;break;
+                    case SEVEN_BIT_SRAM_MEM_ADDRESS:  signed=false ; bitCount = 7 ;break;
+                    case SIXTEEN_BIT_SRAM_MEM_ADDRESS:  signed=false ; bitCount = 16 ;break;
+                    case FLASH_MEM_ADDRESS: 
+                    case SIX_BIT_CONSTANT:  signed=false ; bitCount = 6 ;break;
+                    case SIX_BIT_IO_REGISTER_CONSTANT:  signed=false ; bitCount = 6 ;break;
+                    case THREE_BIT_CONSTANT:  signed=false ; bitCount = 3 ;break;
+                    case TWELVE_BIT_SIGNED_JUMP_OFFSET:  signed=true; bitCount = 12 ;break;
+                }
+                return printConstant(value,signed,bitCount);
+            default:
+                //$$FALL-THROUGH;
+        }
+        
+        switch(type) 
+        {
+            case COMPOUND_REGISTER_FOUR_BITS: // X/Y/Z (r27:r26/r29:r28/r31:r30
+            case COMPOUND_REGISTERS_R24_TO_R30:
+                if ( type == ArgumentType.COMPOUND_REGISTERS_R24_TO_R30 ) 
+                {
+                    switch( value ) 
+                    {
+                        case 0: value = 24; break;
+                        case 1: value = 26; break;
+                        case 2: value = 28; break;
+                        case 3: value = 30; break;
+                        default:
+                            throw new RuntimeException("Invalid compound-register value "+value+" , must not be odd");
+                    }
+                } else if ( type == ArgumentType.COMPOUND_REGISTER_FOUR_BITS ) {
+                    value <<= 1;
+                } else {
+                    throw new RuntimeException("Unreachable code reached");
+                }
+                switch( value ) 
+                {
+                    case Register.REG_X:
+                        return "X";
+                    case Register.REG_Y:
+                        return "Y";
+                    case Register.REG_Z:
+                        return "Z";
+                }
+                return "R"+(value+1)+":R"+value;
+            case R0_TO_R15:
+            case SINGLE_REGISTER:
+                return "R"+value;
+            case R16_TO_R23:
+                return "R"+(16+value);
+            case R16_TO_R31:
+                return "R"+(16+value);
+            case X_REGISTER:
+                return "X";
+            case Y_REGISTER:
+                return "Y";
+            case Y_REGISTER_DISPLACEMENT:
+                return "Y+";
+            case Z_REGISTER:
+                return "Z";
+            case Z_REGISTER_DISPLACEMENT:
+                return "Z+";
+            default:
+                // $$FALL-THROUGH$
+        }
+        throw new RuntimeException("Unhandled type: "+type);
+    }
+    
+    private String printConstant(int value,boolean signed,int bitCount) 
+    {
+//        if ( signed ) {
+//            value = signExtend(value,bitCount);
+//        }
+//        if ( bitCount <= 3 || signed) { // <= 3 bit => print decimal
+//            return Integer.toString( value ); 
+//        }
+        String result = Integer.toHexString( value );
+        if ( (result.length()&1) == 1 ) {
+            result = "0"+result;
+        }
+        return "0x"+result;
+    }
+    
+    private static int signExtend(int value,int bitCount) 
+    {
+        // 100
+        final int mask = 1<<(bitCount-1);
+        final boolean isNegative = (value&mask) != 0;
+        if ( isNegative ) {
+            final int signMask = ~((1<<bitCount)-1);
+            return value | signMask;
+        }
+        return value;
     }
 }

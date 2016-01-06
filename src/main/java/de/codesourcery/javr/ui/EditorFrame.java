@@ -26,6 +26,7 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.DecimalFormat;
 import java.time.Duration;
@@ -73,6 +74,7 @@ import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreePath;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
@@ -1027,5 +1029,16 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         final Style style = ctx.addStyle( name , parent );
         style.addAttribute(StyleConstants.Foreground, col );
         return style;
+    }
+
+    public void setCompilationUnit(CompilationUnit unit) throws IOException 
+    {
+        Validate.notNull(unit, "unit must not be NULL");
+        this.compilationUnit = unit;
+        try ( InputStream in = unit.getResource().createInputStream() ) 
+        {
+            final byte[] data = IOUtils.toByteArray( in );
+            editor.setText( new String(data, unit.getResource().getEncoding() ) );
+        }
     }    
 }
