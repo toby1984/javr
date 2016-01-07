@@ -109,7 +109,7 @@ public class PrefixTree {
         current.add( encoding );
     }
     
-    public List<InstructionEncoding> getMatch(int value) 
+    public List<InstructionEncoding> getMatches(int value) 
     {
         Node current = root;
         int mask=0b10000000_00000000_00000000_00000000;

@@ -763,12 +763,28 @@ public abstract class AbstractAchitecture implements IArchitecture
                     }
                 } 
                 if ( type == ArgumentType.X_REGISTER && result != Register.REG_X ) {
-                    return fail("Operand needs to be Z register",node,context);
+                    return fail("Operand needs to be X register",node,context);
                 } 
-                if ( ( type == ArgumentType.Y_REGISTER || type == ArgumentType.Y_REGISTER_SIX_BIT_DISPLACEMENT ) && result != Register.REG_Y ) {
+                if ( type == ArgumentType.Y_REGISTER_SIX_BIT_DISPLACEMENT ) 
+                {
+                    // Z register is implied by opcode so this method must only return the displacement offset (see getRegisterValue() )
+                    // check that the actual register used in the source code matches the implied one
+                    if ( ((RegisterNode) node).register.getRegisterNumber() != Register.REG_Y ) {
+                        return fail("Operand needs to be Y register",node,context);
+                    }
+                }                
+                if ( type == ArgumentType.Y_REGISTER && result != Register.REG_Y ) {
                     return fail("Operand needs to be Y register",node,context);
                 } 
-                if ( ( type == ArgumentType.Z_REGISTER || type == ArgumentType.Z_REGISTER_SIX_BIT_DISPLACEMENT ) && result != Register.REG_Z ) {
+                if ( type == ArgumentType.Z_REGISTER_SIX_BIT_DISPLACEMENT ) 
+                {
+                    // Z register is implied by opcode so this method must only return the displacement offset (see getRegisterValue() )
+                    // check that the actual register used in the source code matches the implied one
+                    if ( ((RegisterNode) node).register.getRegisterNumber() != Register.REG_Z ) {
+                        return fail("Operand needs to be Z register",node,context);
+                    }
+                }
+                if ( ( type == ArgumentType.Z_REGISTER && result != Register.REG_Z ) ) {
                     return fail("Operand needs to be Z register",node,context);
                 }
                 return result;
@@ -971,7 +987,7 @@ public abstract class AbstractAchitecture implements IArchitecture
             value = reverseBytes( value , bytesToProcess );
             
             System.out.println("0x"+Integer.toHexString( ptr+settings.startAddress)+": Trying to match "+bytesToProcess+" bytes : "+Integer.toBinaryString( value ) );
-            final List<InstructionEncoding> matches = prefixTree.getMatch( value );
+            final List<InstructionEncoding> matches = prefixTree.getMatches( value );
             if ( buffer.length() > 0 ) 
             {
                 buffer.append("\n");
@@ -1065,7 +1081,13 @@ public abstract class AbstractAchitecture implements IArchitecture
             } else {
                 buffer.append( prettyPrint( operands.get(0) , result.dstType , settings) );
             }
-            buffer.append(",").append( prettyPrint( operands.get(1) , result.srcType , settings) );
+            buffer.append(",");
+            if ( result.disasmImplicitSource != null ) 
+            {
+                buffer.append( result.disasmImplicitSource );
+            } else {
+                buffer.append( prettyPrint( operands.get(1) , result.srcType , settings) );
+            }
         }
     }
     
@@ -1110,6 +1132,7 @@ public abstract class AbstractAchitecture implements IArchitecture
                         break;
                     case TWENTYTWO_BIT_FLASH_MEM_ADDRESS:
                         bitCount = 22;
+                        value <<= 1; // word -> byte address
                         break;
                     case SIXTEEN_BIT_SRAM_MEM_ADDRESS:  
                         bitCount = 16 ;

@@ -104,7 +104,7 @@ public class ATMega88 extends AbstractAchitecture
         
         // ELPM
         final InstructionEncoding elpmNoArgs = new InstructionEncoding( "elpm" , new InstructionEncoder( "1001 0101 1101 1000" ) , ArgumentType.NONE, ArgumentType.NONE);
-        final InstructionEncoding elpmOnlyZ = new InstructionEncoding( "elpm" , new InstructionEncoder(  "1001 000d dddd 0110" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER);
+        final InstructionEncoding elpmOnlyZ = new InstructionEncoding( "elpm" , new InstructionEncoder(  "1001 000d dddd 0110" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER).disasmImplicitSource("Z");
         final InstructionEncoding elpmZWithPostIncrement = new InstructionEncoding( "elpm" , new InstructionEncoder( "1001 000d dddd 0111" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER);
         
         final InstructionSelector elpmSelector = new InstructionSelector() {
@@ -227,10 +227,7 @@ public class ATMega88 extends AbstractAchitecture
         
         insn("ldi",    "1110 ssss dddd ssss" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT );
         
-        // LDS
-        //                                                                                             1010 0kkk dddd kkkk
         final InstructionEncoding ldsShort = new InstructionEncoding( "lds" , new InstructionEncoder( "1010 0kkk dddd kkkk" ) , ArgumentType.R16_TO_R31, ArgumentType.SEVEN_BIT_SRAM_MEM_ADDRESS);
-        //                                                                                             1001 000d dddd 0000 kkkk kkkk kkkk kkkk
         final InstructionEncoding ldsLong  = new InstructionEncoding( "lds" , new InstructionEncoder( "1001 000d dddd 0000 kkkk kkkk kkkk kkkk" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.SIXTEEN_BIT_SRAM_MEM_ADDRESS);
         
         final InstructionSelector ldsSelector = new InstructionSelector() {
@@ -448,9 +445,9 @@ public class ATMega88 extends AbstractAchitecture
         add( new EncodingEntry( stSelector , candidates ) );        
         
         // STS
-        // short: 1010 1kkk dddd kkkk
-        // long:  1001 001d dddd 0000 kkkk kkkk kkkk kkkk
+        // short:                                                                                      1010 1kkk dddd kkkk
         final InstructionEncoding stsShort = new InstructionEncoding( "sts" , new InstructionEncoder( "1010 1ddd ssss dddd" ) , ArgumentType.SEVEN_BIT_SRAM_MEM_ADDRESS , ArgumentType.R16_TO_R31);
+        // long:                                                                                       1001 001d dddd 0000 kkkk kkkk kkkk kkkk
         final InstructionEncoding stsLong  = new InstructionEncoding( "sts" , new InstructionEncoder( "1001 001s ssss 0000 dddd dddd dddd dddd" ) , ArgumentType.SIXTEEN_BIT_SRAM_MEM_ADDRESS, ArgumentType.SINGLE_REGISTER );
         
         final InstructionSelector stsSelector = new InstructionSelector() {

@@ -31,6 +31,25 @@ public class DisassembleTest extends TestCase {
     
     private static final DecompilationSettings settings = new DecompilationSettings();
     
+    // sts 0x02,r20 ; ; 42 a8 ==>  ldd r4, z+50 
+    public void testDisassemble4() {
+        
+        final byte[] bytes = new byte[] { (byte) 0x42  ,(byte) 0xa8 };
+        
+        final String output = arch.disassemble( bytes , bytes.length , settings );
+        System.out.println("Got "+output);
+        assertEquals("ldd r4, z+50" , output );
+    }
+    
+    // call 0x2bdfac  ; 5f 95 ac df ==> needs to be  call 0x57bf58
+    public void testDisassemble3() {
+        
+        final byte[] bytes = new byte[] { (byte) 0x5f ,(byte) 0x95 ,(byte) 0xac ,(byte) 0xdf};
+        
+        final String output = arch.disassemble( bytes , bytes.length , settings );
+        assertEquals("call 0x57bf58" , output );
+    }
+    
     // 8f 83
     // st y+24,r7 ==> NEEDS TO BE  std y+7, r24
     public void testDisassemble2() {
@@ -38,7 +57,7 @@ public class DisassembleTest extends TestCase {
         final byte[] bytes = new byte[] { (byte) 0x8f ,(byte) 0x83 };
         
         final String output = arch.disassemble( bytes , bytes.length , settings );
-        System.out.println( ">>>>>> "+output );
+        assertEquals("st y+7,r24" , output );
     }
     
     /*

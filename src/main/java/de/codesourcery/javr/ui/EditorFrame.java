@@ -157,13 +157,62 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         private int currentPosition;
         private String term;
 
-        public boolean search() 
+        public boolean searchBackward() 
         {
-            String text = editor.getText();
+            if ( ! canSearch() ) 
+            {
+                return false;
+            } 
+            String text = editor.getText().toLowerCase();
+            if ( currentPosition ==0 ) {
+                System.out.println("At start of text, starting from end");
+                currentPosition = text.length()-1;
+            }            
+            System.out.println("Starting to search  backwards @ "+currentPosition);
+            
+            int startIndex = 0;
+            final String searchTerm = term.toLowerCase();
+            int previousMatch = text.indexOf( searchTerm, 0 );
+            boolean searchWrapped = false;
+            while ( previousMatch != -1 && startIndex < ( text.length()-1 ) ) {
+                final int match = text.indexOf( searchTerm , startIndex );
+                if ( match == -1 || match >= (currentPosition-1) ) 
+                {
+                    if ( searchWrapped || previousMatch < (currentPosition-1 ) ) {
+                        break;
+                    }
+                    startIndex = 0;
+                    currentPosition = text.length();
+                    searchWrapped = true;
+                    continue;                    
+                } 
+                previousMatch = match;
+                startIndex = previousMatch+1;
+            }
+            if ( previousMatch != -1 ) {
+                currentPosition = previousMatch;
+                gotoMatch( currentPosition );
+                return true;
+            }
+            return false;
+        }
+        
+        private void gotoMatch(int cursorPos) 
+        {
+            editor.setCaretPosition( cursorPos );
+            editor.select( cursorPos , cursorPos+term.length() );
+            editor.requestFocus();
+            currentPosition = cursorPos+1;
+            System.out.println("Found match at "+cursorPos);            
+        }
+        
+        public boolean searchForward() 
+        {
             if ( ! canSearch() ) 
             {
                 return false;
             }            
+            final String text = editor.getText();
             if ( currentPosition >= text.length()) {
                 System.out.println("At end of text, starting from 0");
                 currentPosition = 0;
@@ -172,12 +221,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
             final int nextMatch = text.substring( currentPosition , text.length() ).toLowerCase().indexOf( term.toLowerCase() );
             if ( nextMatch != -1 ) 
             {
-                final int cursorPos = currentPosition+nextMatch;
-                editor.setCaretPosition( cursorPos );
-                editor.select( cursorPos , cursorPos+term.length() );
-                editor.requestFocus();
-                currentPosition = cursorPos+1;
-                System.out.println("Found match at "+cursorPos);
+                gotoMatch( currentPosition + nextMatch );
                 return true;
             }
             System.out.println("No more matches");
@@ -720,8 +764,13 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
                     } 
                     else if ( e.getKeyChar() == 0x0b && searchHelper.canSearch() ) 
                     {
-                        searchHelper.search();
-                    } else if ( e.getKeyChar() == 0x07 ) 
+                        searchHelper.searchForward();
+                    } 
+                    else if ( e.getKeyChar() == 0x02 && searchHelper.canSearch() ) 
+                    {
+                        searchHelper.searchBackward();
+                    }                     
+                    else if ( e.getKeyChar() == 0x07 ) 
                     {
                         gotoLine();
                     }                    
@@ -1177,11 +1226,11 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
             boolean foundMatch  = false;
             if ( searchHelper.canSearch() ) 
             {
-                foundMatch = searchHelper.search(); 
+                foundMatch = searchHelper.searchForward(); 
                 if ( ! foundMatch )
                 {
                     searchHelper.startFromBeginning();
-                    foundMatch = searchHelper.search();
+                    foundMatch = searchHelper.searchForward();
                 }
             }
             if ( foundMatch ) {
