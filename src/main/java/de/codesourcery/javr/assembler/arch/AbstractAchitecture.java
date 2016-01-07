@@ -1049,7 +1049,7 @@ public abstract class AbstractAchitecture implements IArchitecture
             } 
             else if ( result.disasmImplicitSource != null ) 
             {
-                buffer.append( prettyPrint( operands.get(0) , result.dstType , settings) ).append(",");
+                buffer.append( prettyPrint( operands.get(1) , result.dstType , settings) ).append(",");
                 buffer.append( result.disasmImplicitSource );
             } 
             else {

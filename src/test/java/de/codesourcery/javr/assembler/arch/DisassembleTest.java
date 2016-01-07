@@ -31,9 +31,11 @@ public class DisassembleTest extends TestCase {
     
     private static final DecompilationSettings settings = new DecompilationSettings();
     
+    // 8f 83
+    // st y+24,r7 ==> NEEDS TO BE  std y+7, r24
     public void testDisassemble2() {
         
-        final byte[] bytes = new byte[] { (byte) 0xff, (byte) 0xff , (byte) 0x8f, (byte) 0xef , (byte) 0x8d ,(byte) 0xbf  , (byte) 0xc8 ,(byte) 0xed };
+        final byte[] bytes = new byte[] { (byte) 0x8f ,(byte) 0x83 };
         
         final String output = arch.disassemble( bytes , bytes.length , settings );
         System.out.println( ">>>>>> "+output );

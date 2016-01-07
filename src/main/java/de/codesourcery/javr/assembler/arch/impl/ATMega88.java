@@ -392,11 +392,11 @@ public class ATMega88 extends AbstractAchitecture
         
         final InstructionEncoding stYWithPostIncrement = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 1001" ) , ArgumentType.Y_REGISTER , ArgumentType.SINGLE_REGISTER).disasmImplicitDestination("Y+");
         final InstructionEncoding stYWithPreDecrement = new InstructionEncoding( "st" , new InstructionEncoder(  "1001 001r rrrr 1010" ) , ArgumentType.Y_REGISTER , ArgumentType.SINGLE_REGISTER).disasmImplicitDestination("-Y");
-        final InstructionEncoding stYWithDisplacement = new InstructionEncoding( "st" , new InstructionEncoder(  "10s0 ss1d dddd 1sss" ) , ArgumentType.Y_REGISTER_SIX_BIT_DISPLACEMENT , ArgumentType.SINGLE_REGISTER );
+        final InstructionEncoding stYWithDisplacement = new InstructionEncoding( "st" , new InstructionEncoder(  "10d0 dd1s ssss 1ddd" ) , ArgumentType.Y_REGISTER_SIX_BIT_DISPLACEMENT , ArgumentType.SINGLE_REGISTER );
         
         final InstructionEncoding stZWithPostIncrement = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 0001" ) , ArgumentType.Z_REGISTER , ArgumentType.SINGLE_REGISTER).disasmImplicitDestination("Z+");
         final InstructionEncoding stZYWithPreDecrement = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 0010" ) , ArgumentType.Z_REGISTER , ArgumentType.SINGLE_REGISTER).disasmImplicitDestination("-Z");
-        final InstructionEncoding stZWithDisplacement = new InstructionEncoding( "st" , new InstructionEncoder(  "10s0 ss1d dddd 0sss" ) , ArgumentType.Z_REGISTER_SIX_BIT_DISPLACEMENT , ArgumentType.SINGLE_REGISTER);
+        final InstructionEncoding stZWithDisplacement = new InstructionEncoding( "st" , new InstructionEncoder(  "10d0 dd1s ssss 0ddd" ) , ArgumentType.Z_REGISTER_SIX_BIT_DISPLACEMENT , ArgumentType.SINGLE_REGISTER);
                                  
         final InstructionEncoding[] candidates = new InstructionEncoding[]{ stOnlyX, stOnlyY, 
                 stOnlyZ, stXWithPostIncrement, stYWithPostIncrement, stZWithPostIncrement, 
