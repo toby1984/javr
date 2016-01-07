@@ -144,9 +144,9 @@ public class ATMega88 extends AbstractAchitecture
         insn("in",     "1011 0ssd dddd ssss" , ArgumentType.SINGLE_REGISTER, ArgumentType.SIX_BIT_IO_REGISTER_CONSTANT );
         insn("inc",    "1001 010d dddd 0011" , ArgumentType.SINGLE_REGISTER );
         insn("jmp",    "1001 010k kkkk 110k kkkk kkkk kkkk kkkk" , ArgumentType.TWENTYTWO_BIT_FLASH_MEM_ADDRESS );
-        insn("lac",    "1001 001r rrrr 0110" , ArgumentType.SINGLE_REGISTER );
-        insn("las",    "1001 001r rrrr 0101" , ArgumentType.SINGLE_REGISTER );
-        insn("lat",    "1001 001r rrrr 0111" , ArgumentType.SINGLE_REGISTER );
+        insn("lac",    "1001 001r rrrr 0110" , ArgumentType.SINGLE_REGISTER ).disasmImplicitDestination("Z");
+        insn("las",    "1001 001r rrrr 0101" , ArgumentType.SINGLE_REGISTER ).disasmImplicitDestination("Z");
+        insn("lat",    "1001 001r rrrr 0111" , ArgumentType.SINGLE_REGISTER ).disasmImplicitDestination("Z");
         
         // LD Rd,-(X|Y|Z)+
         final InstructionEncoding ldOnlyX = new InstructionEncoding( "ld" , new InstructionEncoder( "1001 000d dddd 1100" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER ).disasmImplicitSource("X");
@@ -198,8 +198,8 @@ public class ATMega88 extends AbstractAchitecture
         add( new EncodingEntry( ldSelector , ldOnlyX , ldXWithPostIncrement , ldXWithPreDecrement ) );
         
         // LDD Y / LDD Z
-        final InstructionEncoding lddY = new InstructionEncoding( "ldd" , new InstructionEncoder( "10s0 ss0d dddd 1sss" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER_DISPLACEMENT);
-        final InstructionEncoding lddZ = new InstructionEncoding( "ldd" , new InstructionEncoder( "10s0 ss0d dddd 0sss" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER_DISPLACEMENT);
+        final InstructionEncoding lddY = new InstructionEncoding( "ldd" , new InstructionEncoder( "10s0 ss0d dddd 1sss" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER_SIX_BIT_DISPLACEMENT);
+        final InstructionEncoding lddZ = new InstructionEncoding( "ldd" , new InstructionEncoder( "10s0 ss0d dddd 0sss" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER_SIX_BIT_DISPLACEMENT);
         
         final InstructionSelector lddSelector = new InstructionSelector() {
 
@@ -228,7 +228,9 @@ public class ATMega88 extends AbstractAchitecture
         insn("ldi",    "1110 ssss dddd ssss" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT );
         
         // LDS
+        //                                                                                             1010 0kkk dddd kkkk
         final InstructionEncoding ldsShort = new InstructionEncoding( "lds" , new InstructionEncoder( "1010 0kkk dddd kkkk" ) , ArgumentType.R16_TO_R31, ArgumentType.SEVEN_BIT_SRAM_MEM_ADDRESS);
+        //                                                                                             1001 000d dddd 0000 kkkk kkkk kkkk kkkk
         final InstructionEncoding ldsLong  = new InstructionEncoding( "lds" , new InstructionEncoder( "1001 000d dddd 0000 kkkk kkkk kkkk kkkk" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.SIXTEEN_BIT_SRAM_MEM_ADDRESS);
         
         final InstructionSelector ldsSelector = new InstructionSelector() {
@@ -309,7 +311,7 @@ public class ATMega88 extends AbstractAchitecture
         insn("neg",   "1001 010d dddd 0001" , ArgumentType.SINGLE_REGISTER);
         insn("nop",   "0000 0000 0000 0000");
         insn("or",    "0010 10rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER);
-        final InstructionEncoding ori = insn("ori",   "0110 ssss dddd ssss" , ArgumentType.SINGLE_REGISTER , ArgumentType.EIGHT_BIT_CONSTANT);
+        final InstructionEncoding ori = insn("ori",   "0110 ssss dddd ssss" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT);
         
         //             1011 1AAr rrrr AAAA
         insn("out",   "1011 1dds ssss dddd" , ArgumentType.SIX_BIT_IO_REGISTER_CONSTANT, ArgumentType.SINGLE_REGISTER );
@@ -327,7 +329,7 @@ public class ATMega88 extends AbstractAchitecture
         
         insn("ror",   "1001 010d dddd 0111" , ArgumentType.SINGLE_REGISTER );
         insn("sbc",   "0000 10rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER );
-        insn("sbci",  "0100 KKKK dddd KKKK" , ArgumentType.SINGLE_REGISTER , ArgumentType.EIGHT_BIT_CONSTANT );
+        insn("sbci",  "0100 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT );
         insn("sbi",   "1001 1010 dddd dsss" , ArgumentType.FIVE_BIT_IO_REGISTER_CONSTANT, ArgumentType.THREE_BIT_CONSTANT );
         insn("sbic",  "1001 1001 dddd dsss" , ArgumentType.FIVE_BIT_IO_REGISTER_CONSTANT, ArgumentType.THREE_BIT_CONSTANT );
         insn("sbis",  "1001 1011 dddd dsss" , ArgumentType.FIVE_BIT_IO_REGISTER_CONSTANT, ArgumentType.THREE_BIT_CONSTANT );
@@ -381,20 +383,20 @@ public class ATMega88 extends AbstractAchitecture
         add( new EncodingEntry( spmSelector , spmNoArgs , spmZWithPostIncrement) );
         
         // ST
-        final InstructionEncoding stOnlyX = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 1100" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER ).disasmImplicitDestination("X");
-        final InstructionEncoding stOnlyY = new InstructionEncoding( "st" , new InstructionEncoder( "1000 001r rrrr 1000" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER ).disasmImplicitDestination("Y");
-        final InstructionEncoding stOnlyZ = new InstructionEncoding( "st" , new InstructionEncoder( "1000 001r rrrr 0000" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER ).disasmImplicitDestination("Z");
+        final InstructionEncoding stOnlyX = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 1100" ) , ArgumentType.X_REGISTER , ArgumentType.SINGLE_REGISTER).disasmImplicitDestination("X");
+        final InstructionEncoding stOnlyY = new InstructionEncoding( "st" , new InstructionEncoder( "1000 001r rrrr 1000" ) , ArgumentType.Y_REGISTER , ArgumentType.SINGLE_REGISTER).disasmImplicitDestination("Y");
+        final InstructionEncoding stOnlyZ = new InstructionEncoding( "st" , new InstructionEncoder( "1000 001r rrrr 0000" ) , ArgumentType.Z_REGISTER , ArgumentType.SINGLE_REGISTER).disasmImplicitDestination("Z");
                                   
-        final InstructionEncoding stXWithPostIncrement = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 1101" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER).disasmImplicitDestination("X+");
-        final InstructionEncoding stXWithPreDecrement = new InstructionEncoding( "st" , new InstructionEncoder(  "1001 001r rrrr 1110" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER).disasmImplicitDestination("-X");
+        final InstructionEncoding stXWithPostIncrement = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 1101" ) , ArgumentType.X_REGISTER , ArgumentType.SINGLE_REGISTER).disasmImplicitDestination("X+");
+        final InstructionEncoding stXWithPreDecrement = new InstructionEncoding( "st" , new InstructionEncoder(  "1001 001r rrrr 1110" ) , ArgumentType.X_REGISTER , ArgumentType.SINGLE_REGISTER).disasmImplicitDestination("-X");
         
-        final InstructionEncoding stYWithPostIncrement = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 1001" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER).disasmImplicitDestination("Y+");
-        final InstructionEncoding stYWithPreDecrement = new InstructionEncoding( "st" , new InstructionEncoder(  "1001 001r rrrr 1010" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER).disasmImplicitDestination("-Y");
-        final InstructionEncoding stYWithDisplacement = new InstructionEncoding( "st" , new InstructionEncoder(  "10d0 dd1s ssss 1ddd" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER_DISPLACEMENT);
+        final InstructionEncoding stYWithPostIncrement = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 1001" ) , ArgumentType.Y_REGISTER , ArgumentType.SINGLE_REGISTER).disasmImplicitDestination("Y+");
+        final InstructionEncoding stYWithPreDecrement = new InstructionEncoding( "st" , new InstructionEncoder(  "1001 001r rrrr 1010" ) , ArgumentType.Y_REGISTER , ArgumentType.SINGLE_REGISTER).disasmImplicitDestination("-Y");
+        final InstructionEncoding stYWithDisplacement = new InstructionEncoding( "st" , new InstructionEncoder(  "10s0 ss1d dddd 1sss" ) , ArgumentType.Y_REGISTER_SIX_BIT_DISPLACEMENT , ArgumentType.SINGLE_REGISTER );
         
-        final InstructionEncoding stZWithPostIncrement = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 0001" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER).disasmImplicitDestination("Z+");
-        final InstructionEncoding stZYWithPreDecrement = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 0010" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER).disasmImplicitDestination("-Z");
-        final InstructionEncoding stZWithDisplacement = new InstructionEncoding( "st" , new InstructionEncoder(  "10d0 dd1s ssss 0ddd" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER_DISPLACEMENT);
+        final InstructionEncoding stZWithPostIncrement = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 0001" ) , ArgumentType.Z_REGISTER , ArgumentType.SINGLE_REGISTER).disasmImplicitDestination("Z+");
+        final InstructionEncoding stZYWithPreDecrement = new InstructionEncoding( "st" , new InstructionEncoder( "1001 001r rrrr 0010" ) , ArgumentType.Z_REGISTER , ArgumentType.SINGLE_REGISTER).disasmImplicitDestination("-Z");
+        final InstructionEncoding stZWithDisplacement = new InstructionEncoding( "st" , new InstructionEncoder(  "10s0 ss1d dddd 0sss" ) , ArgumentType.Z_REGISTER_SIX_BIT_DISPLACEMENT , ArgumentType.SINGLE_REGISTER);
                                  
         final InstructionEncoding[] candidates = new InstructionEncoding[]{ stOnlyX, stOnlyY, 
                 stOnlyZ, stXWithPostIncrement, stYWithPostIncrement, stZWithPostIncrement, 
@@ -496,7 +498,7 @@ public class ATMega88 extends AbstractAchitecture
         
         // end 
         insn("sub",  "0001 10rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER );
-        insn("subi", "0101 KKKK dddd KKKK" , ArgumentType.SINGLE_REGISTER , ArgumentType.EIGHT_BIT_CONSTANT );
+        insn("subi", "0101 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT );
         insn("swap", "1001 010d dddd 0010" , ArgumentType.SINGLE_REGISTER );
         InstructionEncoding tst = insn("tst",  "0010 00dd dddd dddd" , ArgumentType.SINGLE_REGISTER );
         
@@ -505,7 +507,7 @@ public class ATMega88 extends AbstractAchitecture
         and.disassemblySelector( tstOrAnd );
         
         insn("wdr",  "1001 0101 1010 1000");
-        insn("xch",  "1001 001r rrrr 0100" , ArgumentType.SINGLE_REGISTER );
+        insn("xch",  "1001 001r rrrr 0100" , ArgumentType.SINGLE_REGISTER ).disasmImplicitDestination("Z");
     }
  
     public Architecture getType() {

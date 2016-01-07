@@ -9,6 +9,7 @@ import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.AbstractAchitecture.ArgumentType;
 import de.codesourcery.javr.assembler.arch.AbstractAchitecture.EncodingEntry;
 import de.codesourcery.javr.assembler.arch.AbstractAchitecture.InstructionEncoding;
+import de.codesourcery.javr.assembler.arch.IArchitecture.DecompilationSettings;
 import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.Parser;
@@ -28,11 +29,13 @@ public class DisassembleTest extends TestCase {
 
     private final ATMega88 arch = new ATMega88();
     
+    private static final DecompilationSettings settings = new DecompilationSettings();
+    
     public void testDisassemble2() {
         
         final byte[] bytes = new byte[] { (byte) 0xff, (byte) 0xff , (byte) 0x8f, (byte) 0xef , (byte) 0x8d ,(byte) 0xbf  , (byte) 0xc8 ,(byte) 0xed };
         
-        final String output = arch.disassemble( bytes , bytes.length , false , 0 , false );
+        final String output = arch.disassemble( bytes , bytes.length , settings );
         System.out.println( ">>>>>> "+output );
     }
     
@@ -45,7 +48,7 @@ public class DisassembleTest extends TestCase {
         
         final byte[] bytes = new byte[] { (byte) 0x8d, (byte) 0x93 , (byte) 0x8c, (byte) 0x93};
         
-        final String output = arch.disassemble( bytes , bytes.length , false , 0 , false );
+        final String output = arch.disassemble( bytes , bytes.length , settings );
         System.out.println( ">>>>>> "+output );
     }
     
@@ -78,7 +81,7 @@ public class DisassembleTest extends TestCase {
                 } catch(Exception e) {
                     continue;
                 }
-                final String output = arch.disassemble( ctx.buffer , ctx.ptr , false , 0 , false );
+                final String output = arch.disassemble( ctx.buffer , ctx.ptr , settings );
                 final String actual = printer.prettyPrint( parse( output ) );
                 if ( ! actual.equalsIgnoreCase( expected ) )
                 {
@@ -160,11 +163,11 @@ public class DisassembleTest extends TestCase {
                 return new RegisterNode( new Register("X",false,false) , new TextRegion(1,1) );
             case Y_REGISTER:
                 return new RegisterNode( new Register("Y",false,false) , new TextRegion(1,1) );
-            case Y_REGISTER_DISPLACEMENT:
+            case Y_REGISTER_SIX_BIT_DISPLACEMENT:
                 return new RegisterNode( new Register("Y",true,false) , new TextRegion(1,1) );   
             case Z_REGISTER:
                 return new RegisterNode( new Register("Z",false,false) , new TextRegion(1,1) );
-            case Z_REGISTER_DISPLACEMENT:
+            case Z_REGISTER_SIX_BIT_DISPLACEMENT:
                 return new RegisterNode( new Register("Z",true,false) , new TextRegion(1,1) );                
             default:
                throw new RuntimeException("Unreachable code reached");

@@ -57,8 +57,8 @@ public abstract class AbstractAchitecture implements IArchitecture
         X_REGISTER, 
         Y_REGISTER,
         Z_REGISTER,
-        Y_REGISTER_DISPLACEMENT,
-        Z_REGISTER_DISPLACEMENT,
+        Y_REGISTER_SIX_BIT_DISPLACEMENT,
+        Z_REGISTER_SIX_BIT_DISPLACEMENT,
         // unsigned constant values
         THREE_BIT_CONSTANT,
         FOUR_BIT_CONSTANT,
@@ -547,9 +547,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         }
     }
 
-    private void debugAssembly(InstructionNode node,
-            final InstructionEncoding encoding, final int dstValue,
-            final int srcValue, final int instruction) 
+    private void debugAssembly(InstructionNode node,final InstructionEncoding encoding, final int dstValue,final int srcValue, final int instruction) 
     {
         final String hex;
         final String bin;
@@ -703,10 +701,10 @@ public abstract class AbstractAchitecture implements IArchitecture
                 if ( ! isSingleRegister( node ) ) {
                     return fail( "Operand needs to be a single register",node,context);
                 }  
-                if ( result < 0 || result > getGeneralPurposeRegisterCount() ) {
+                if ( result < 0 || result >= getGeneralPurposeRegisterCount() ) {
                     throw new RuntimeException("Operand must be R0..."+(getGeneralPurposeRegisterCount()-1));
                 }                
-                return result; // TODO: Validate against number of registers the arch has
+                return result;
             case R0_TO_R15:
                 if ( ! isSingleRegister( node ) ) {
                     return fail( "Operand needs to be a single register",node,context);
@@ -714,7 +712,7 @@ public abstract class AbstractAchitecture implements IArchitecture
                 if ( result < 0 || result > 15 ) {
                     throw new RuntimeException("Operand needs to be R0...15");
                 }
-                return result; // TODO: Validate against number of registers the arch has
+                return result; 
             case R16_TO_R23:
                 if ( ! isSingleRegister( node ) ) {
                     return fail( "Operand needs to be a single register",node,context);
@@ -722,21 +720,21 @@ public abstract class AbstractAchitecture implements IArchitecture
                 if ( result < 16 || result > 23 ) {
                     return fail("Operand neeeds to be R16...R23",node,context);
                 }           
-                return result-16; // TODO: Validate against number of registers the arch has                   
+                return result-16;
             case R16_TO_R31:
                 if ( ! isSingleRegister( node ) ) {
                     return fail( "Operand needs to be a single register",node,context);
                 }                
-                if ( result < 16 || result > 31 ) {
+                if ( result < 16 || result >= getGeneralPurposeRegisterCount() ) {
                     return fail("Operand needs to be R16...R31",node,context);
                 }           
-                return result-16; // TODO: Validate against number of registers the arch has
+                return result-16;
             // compound registers
             case X_REGISTER:
             case Y_REGISTER:
             case Z_REGISTER:
-            case Y_REGISTER_DISPLACEMENT:
-            case Z_REGISTER_DISPLACEMENT:
+            case Y_REGISTER_SIX_BIT_DISPLACEMENT:
+            case Z_REGISTER_SIX_BIT_DISPLACEMENT:
             case COMPOUND_REGISTER_FOUR_BITS:
             case COMPOUND_REGISTERS_R24_TO_R30:
                 if ( ! isCompoundRegister( node ) ) 
@@ -767,10 +765,10 @@ public abstract class AbstractAchitecture implements IArchitecture
                 if ( type == ArgumentType.X_REGISTER && result != Register.REG_X ) {
                     return fail("Operand needs to be Z register",node,context);
                 } 
-                if ( ( type == ArgumentType.Y_REGISTER || type == ArgumentType.Y_REGISTER_DISPLACEMENT ) && result != Register.REG_Y ) {
+                if ( ( type == ArgumentType.Y_REGISTER || type == ArgumentType.Y_REGISTER_SIX_BIT_DISPLACEMENT ) && result != Register.REG_Y ) {
                     return fail("Operand needs to be Y register",node,context);
                 } 
-                if ( ( type == ArgumentType.Z_REGISTER || type == ArgumentType.Z_REGISTER_DISPLACEMENT ) && result != Register.REG_Z ) {
+                if ( ( type == ArgumentType.Z_REGISTER || type == ArgumentType.Z_REGISTER_SIX_BIT_DISPLACEMENT ) && result != Register.REG_Z ) {
                     return fail("Operand needs to be Z register",node,context);
                 }
                 return result;
@@ -880,7 +878,7 @@ public abstract class AbstractAchitecture implements IArchitecture
     
     private int getRegisterValue(RegisterNode node,ArgumentType type,ICompilationContext context) 
     {
-        if ( type == ArgumentType.Z_REGISTER_DISPLACEMENT || type == ArgumentType.Y_REGISTER_DISPLACEMENT )
+        if ( type == ArgumentType.Z_REGISTER_SIX_BIT_DISPLACEMENT || type == ArgumentType.Y_REGISTER_SIX_BIT_DISPLACEMENT )
         {
             if ( node.hasNoChildren() ) {
                 return 0;
@@ -941,25 +939,17 @@ public abstract class AbstractAchitecture implements IArchitecture
     } 
 
     @Override
-    public String disassemble(byte[] data,int len,boolean printAddresses,int startAddress,boolean printBytes) 
+    public String disassemble(byte[] data,int len,DecompilationSettings settings) 
     {
-        // use prefix tree to narrow-down the
+        // this code uses a prefix tree to narrow-down the
         // number of potential matches
         
-        // note that the tree requires the input 
+        // note that the prefix tree requires the input 
         // data to be in big-endian order, otherwise
         // if wouldn't work (and the instructions
         // in little-endian order have only very short
         // fixed prefixes so the tree approach would basically
         // be a waste
-        final PrefixTree tree = new PrefixTree();
-        for ( EncodingEntry entry : this.instructions.values() ) 
-        {
-            for ( InstructionEncoding i : entry.encodings ) {
-                tree.add( i );
-            }
-        }
-        
         final StringBuilder buffer = new StringBuilder();
         
         int ptr = 0;
@@ -980,8 +970,8 @@ public abstract class AbstractAchitecture implements IArchitecture
             // convert to big endian so that the prefix tree works properly 
             value = reverseBytes( value , bytesToProcess );
             
-            System.out.println("0x"+Integer.toHexString( ptr+startAddress)+": Trying to match "+bytesToProcess+" bytes : "+Integer.toBinaryString( value ) );
-            final List<InstructionEncoding> matches = tree.getMatch( value );
+            System.out.println("0x"+Integer.toHexString( ptr+settings.startAddress)+": Trying to match "+bytesToProcess+" bytes : "+Integer.toBinaryString( value ) );
+            final List<InstructionEncoding> matches = prefixTree.getMatch( value );
             if ( buffer.length() > 0 ) 
             {
                 buffer.append("\n");
@@ -1008,22 +998,22 @@ public abstract class AbstractAchitecture implements IArchitecture
                 matches.removeIf( m -> m.encoder.getOpcodeBitCount() < longestMatch );
                 
                 final InstructionEncoding result = matches.get(0).disasmSelector.pick( matches , value );
-                if ( printAddresses ) {
-                    buffer.append( StringUtils.leftPad( Integer.toHexString( startAddress+ptr ) , 4 , '0' ) ).append(":    ");
+                if ( settings.printAddresses ) {
+                    buffer.append( StringUtils.leftPad( Integer.toHexString( settings.startAddress+ptr ) , 4 , '0' ) ).append(":    ");
                 }
                 
-                if ( printBytes ) 
+                if ( settings.printBytes ) 
                 {
                     final StringBuilder tmp = new StringBuilder();
-                    print(result, tmp , value);
+                    print(result, tmp , value , settings );
                     buffer.append( StringUtils.rightPad( tmp.toString() , 15 , " " ) ).append("; ").append( toHex( data , ptr , result.getInstructionLengthInBytes() ) );
                 } else {
-                    print(result, buffer, value);                    
+                    print(result, buffer, value , settings );                    
                 }
                 ptr += result.getInstructionLengthInBytes();
             }
         }
-        return buffer.toString();
+        return buffer.toString().toLowerCase();
     }
     
     private String toHex(byte[] data,int offset,int len) 
@@ -1039,7 +1029,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         return result.toString();
     }
 
-    private void print(final InstructionEncoding result, final StringBuilder buffer, int value) 
+    private void print(final InstructionEncoding result, final StringBuilder buffer, int value,DecompilationSettings settings) 
     {
         final List<Integer> operands = result.encoder.decode( value );
         System.out.println("DECODED: "+result.mnemonic+" "+operands);
@@ -1055,15 +1045,15 @@ public abstract class AbstractAchitecture implements IArchitecture
             if ( result.disasmImplicitDestination != null ) 
             {
                 buffer.append( result.disasmImplicitDestination ).append(",");
-                buffer.append( prettyPrint( operands.get(0) , result.dstType ) );
+                buffer.append( prettyPrint( operands.get(0) , result.dstType , settings) );
             } 
             else if ( result.disasmImplicitSource != null ) 
             {
-                buffer.append( prettyPrint( operands.get(0) , result.dstType ) ).append(",");
+                buffer.append( prettyPrint( operands.get(0) , result.dstType , settings) ).append(",");
                 buffer.append( result.disasmImplicitSource );
             } 
             else {
-                buffer.append( prettyPrint( operands.get(0) , result.dstType ) );
+                buffer.append( prettyPrint( operands.get(0) , result.dstType , settings) );
             }
         } 
         else if ( result.getArgumentCount() == 2 ) 
@@ -1073,29 +1063,31 @@ public abstract class AbstractAchitecture implements IArchitecture
             {
                 buffer.append( result.disasmImplicitDestination );
             } else {
-                buffer.append( prettyPrint( operands.get(0) , result.dstType ) );
+                buffer.append( prettyPrint( operands.get(0) , result.dstType , settings) );
             }
-            buffer.append(",").append( prettyPrint( operands.get(1) , result.srcType ) );
+            buffer.append(",").append( prettyPrint( operands.get(1) , result.srcType , settings) );
         }
     }
     
-    private String prettyPrint(Integer value, ArgumentType type) 
+    private String prettyPrint(Integer value, ArgumentType type,DecompilationSettings settings) 
     {
         if ( type == ArgumentType.NONE ) {
             return "";
         }
         switch( type ) 
         {
-            case EIGHT_BIT_CONSTANT:
-            case FIVE_BIT_IO_REGISTER_CONSTANT:
+            case THREE_BIT_CONSTANT:
             case FOUR_BIT_CONSTANT:
-            case SEVEN_BIT_SIGNED_JUMP_OFFSET:
+            case FIVE_BIT_IO_REGISTER_CONSTANT:
+            case SIX_BIT_CONSTANT:
+            case SIX_BIT_IO_REGISTER_CONSTANT:
+            case EIGHT_BIT_CONSTANT:
+            // absolute addresses
             case SEVEN_BIT_SRAM_MEM_ADDRESS:
             case SIXTEEN_BIT_SRAM_MEM_ADDRESS:
             case TWENTYTWO_BIT_FLASH_MEM_ADDRESS:
-            case SIX_BIT_CONSTANT:
-            case SIX_BIT_IO_REGISTER_CONSTANT:
-            case THREE_BIT_CONSTANT:
+            // relative addresses
+            case SEVEN_BIT_SIGNED_JUMP_OFFSET:
             case TWELVE_BIT_SIGNED_JUMP_OFFSET:
                 int bitCount=0;
                 switch(type) 
@@ -1111,7 +1103,8 @@ public abstract class AbstractAchitecture implements IArchitecture
                         break;
                     case SEVEN_BIT_SIGNED_JUMP_OFFSET:  
                         bitCount = 7 ;
-                        return printConstant(2*signExtend(value,bitCount) , bitCount);  // signExtend(value,bitCount);
+                        int byteOffset = 2*signExtend(value,bitCount);
+                        return "."+ ( (byteOffset > 0 ) ? "+"+byteOffset : ""+byteOffset );
                     case SEVEN_BIT_SRAM_MEM_ADDRESS:  
                         bitCount = 7 ;
                         break;
@@ -1132,11 +1125,12 @@ public abstract class AbstractAchitecture implements IArchitecture
                         break;
                     case TWELVE_BIT_SIGNED_JUMP_OFFSET:  
                         bitCount = 12 ;
-                        return printConstant(2*signExtend(value,bitCount) , bitCount);
+                        byteOffset = 2*signExtend(value,bitCount);
+                        return "."+ ( (byteOffset > 0 ) ? "+"+byteOffset : ""+byteOffset );
                     default:
                         // $$FALL-THROUGH$$
                 }
-                return printConstant(value,bitCount);
+                return printPaddedHexValue(value,bitCount);
             default:
                 //$$FALL-THROUGH;
         }
@@ -1164,13 +1158,13 @@ public abstract class AbstractAchitecture implements IArchitecture
                 switch( value ) 
                 {
                     case Register.REG_X:
-                        return "X";
+                        return settings.printCompoundRegistersAsLower ? "r"+Register.REG_X : "X";
                     case Register.REG_Y:
-                        return "Y";
+                        return settings.printCompoundRegistersAsLower ? "r"+Register.REG_Y : "Y";
                     case Register.REG_Z:
-                        return "Z";
+                        return settings.printCompoundRegistersAsLower ? "r"+Register.REG_Z : "Z";
                 }
-                return "R"+(value+1)+":R"+value;
+                return settings.printCompoundRegistersAsLower ? "r"+value : "R"+(value+1)+":R"+value;
             case R0_TO_R15:
             case SINGLE_REGISTER:
                 return "R"+value;
@@ -1182,24 +1176,24 @@ public abstract class AbstractAchitecture implements IArchitecture
                 return "X";
             case Y_REGISTER:
                 return "Y";
-            case Y_REGISTER_DISPLACEMENT:
-                return "Y+";
+            case Y_REGISTER_SIX_BIT_DISPLACEMENT:
+                return "Y+"+value;
             case Z_REGISTER:
                 return "Z";
-            case Z_REGISTER_DISPLACEMENT:
-                return "Z+";
+            case Z_REGISTER_SIX_BIT_DISPLACEMENT:
+                return "Z+"+value;
             default:
                 throw new RuntimeException("Unhandled type: "+type);
         }
     }
     
-    private String printConstant(int value,int bitCount) 
+    private String printPaddedHexValue(int value,int bitCount) 
     {
-        if ( value < 0 ) { 
+        if ( value < 0 || bitCount <= 4 ) { 
             return Integer.toString( value ); 
         }
         String result = Integer.toHexString( value );
-        if ( (result.length()&1) == 1 ) {
+        if ( (result.length()&1) == 1 ) { // padd to even number of characters
             result = "0"+result;
         }
         return "0x"+result;

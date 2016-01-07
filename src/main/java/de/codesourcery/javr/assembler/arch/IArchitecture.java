@@ -19,8 +19,16 @@ import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 
-public interface IArchitecture {
-
+public interface IArchitecture 
+{
+    public static final class DecompilationSettings 
+    {
+        public boolean printAddresses;
+        public int startAddress;
+        public boolean printBytes;
+        public boolean printCompoundRegistersAsLower;
+    }
+    
     public Architecture getType();
     
     public boolean hasType(Architecture t);
@@ -54,5 +62,5 @@ public interface IArchitecture {
     
     public void compile(InstructionNode node,ICompilationContext context);
     
-    public String disassemble(byte[] data,int len,boolean printAddresses,int startAddress,boolean printBytes);
+    public String disassemble(byte[] data,int len,DecompilationSettings settings);
 }

@@ -35,6 +35,7 @@ import org.apache.commons.io.FileUtils;
 
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
+import de.codesourcery.javr.assembler.arch.IArchitecture.DecompilationSettings;
 import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.Parser;
@@ -48,8 +49,8 @@ public class Main
     private IConfig config; 
     private IConfigProvider configProvider;
     private EditorFrame editorFrame;
-    private File lastDisassembledFile = new File("/home/tobi/atmel/bootloader/BootLoader88.raw_stripped");
-    private File lastSourceFile = new File("/home/tobi/atmel/asm/BootLoader88_original2.asm");
+    private File lastDisassembledFile = new File("/home/tobi/atmel/asm/random.raw");
+    private File lastSourceFile = new File("/home/tobi/atmel/asm/random.raw.javr.asm");
     
     public static void main(String[] args) 
     {
@@ -153,7 +154,10 @@ public class Main
     {
         final byte[] data = FileUtils.readFileToByteArray( file );
         System.out.println("Disassembling "+data.length+" bytes");
-        String disassembly = config.getArchitecture().disassemble( data , data.length , false , 0 , true );
+        final DecompilationSettings settings = new DecompilationSettings();
+        settings.printBytes = false;
+        settings.printCompoundRegistersAsLower=true;
+        String disassembly = config.getArchitecture().disassemble( data , data.length , settings );
         disassembly = "; disassembled "+data.length+" bytes from "+file.getAbsolutePath()+"\n"+disassembly;
         
         final StringResource res = new StringResource(file.getAbsolutePath(), disassembly );
