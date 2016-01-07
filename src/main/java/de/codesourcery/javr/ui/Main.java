@@ -20,6 +20,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.stream.Stream;
 
 import javax.swing.JDesktopPane;
 import javax.swing.JFileChooser;
@@ -93,12 +94,12 @@ public class Main
         };        
     }
     
-    public void run() 
+    private void run() 
     {
         init();
         
         final JDesktopPane pane = new JDesktopPane();
-        setup( pane );
+        addWindows( pane );
         
         final JFrame frame = new JFrame();
         frame.setJMenuBar( createMenu(frame) );
@@ -110,6 +111,16 @@ public class Main
         frame.pack();
         frame.setLocationRelativeTo( null );
         frame.setVisible( true );
+        frame.setExtendedState(frame.getExtendedState() | JFrame.MAXIMIZED_BOTH);
+        
+        Stream.of( pane.getAllFrames() ).forEach( internalFrame -> 
+        {
+            try {
+                internalFrame.setMaximum(true);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
     }
     
     private JMenuBar createMenu(JFrame parent) 
@@ -195,7 +206,7 @@ public class Main
         menu.add( item );
     }
 
-    private void setup(JDesktopPane pane) 
+    private void addWindows(JDesktopPane pane) 
     {
         editorFrame = new EditorFrame( configProvider );
         editorFrame.setResizable(true);

@@ -22,7 +22,7 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.parser.TextRegion;
 
-public class NumberLiteralNode extends ASTNode implements IValueNode
+public class NumberLiteralNode extends AbstractASTNode implements IValueNode
 {
     private static final Pattern HEX_PATTERN = Pattern.compile("^[0-9A-Fa-f]+$");
     

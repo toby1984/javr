@@ -29,11 +29,13 @@ import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.CharacterLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.CommentNode;
+import de.codesourcery.javr.assembler.parser.ast.CurrentAddressNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.EquLabelNode;
 import de.codesourcery.javr.assembler.parser.ast.FunctionCallNode;
 import de.codesourcery.javr.assembler.parser.ast.FunctionDefinitionNode;
+import de.codesourcery.javr.assembler.parser.ast.IdentifierDefNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
@@ -86,7 +88,7 @@ public class ParserTest
         assertEquals( Preprocessor.IF_DEFINE , ins.type );
         assertEquals( 0 , ins.arguments.size() );
         assertEquals( 1 , ins.childCount() );
-        assertEquals( new Identifier("test") , ((IdentifierNode) ins.firstChild()).name );
+        assertEquals( new Identifier("test") , ((IdentifierDefNode) ins.firstChild()).name );
     }
     
     @Test
@@ -409,6 +411,60 @@ public class ParserTest
         final NumberLiteralNode num2 = (NumberLiteralNode) insn.child( 1 );
         assertEquals( 456 , num2.getValue().intValue()  );
         assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num2.getType() );        
+    }  
+    
+    @Test
+    public void testParseInstructionWithCurrentAddress1() 
+    {
+        AST ast = parse("rjmp .+2");
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
+        
+        final StatementNode stmt = (StatementNode) ast.child(0);
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
+        
+        final InstructionNode insn = (InstructionNode) stmt.child(0);
+        assertEquals( 1 , insn.childCount() );        
+        assertNotNull(insn);
+        assertEquals( "rjmp" , insn.instruction.getMnemonic());
+        
+        final OperatorNode op = (OperatorNode) insn.child( 0 );
+        assertEquals( 2 , op.childCount() );     
+        assertEquals( OperatorType.PLUS , op.type );
+        
+        assertEquals( CurrentAddressNode.class , op.child(0).getClass() );
+        assertEquals( NumberLiteralNode.class , op.child(1).getClass() );
+        
+        assertEquals( 2 , ((NumberLiteralNode) op.child(1)).getValue().intValue() );
+    }   
+    
+    @Test
+    public void testParseInstructionWithCurrentAddress2() 
+    {
+        AST ast = parse("rjmp .-2");
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
+        
+        final StatementNode stmt = (StatementNode) ast.child(0);
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
+        
+        final InstructionNode insn = (InstructionNode) stmt.child(0);
+        assertEquals( 1 , insn.childCount() );        
+        assertNotNull(insn);
+        assertEquals( "rjmp" , insn.instruction.getMnemonic());
+        
+        final OperatorNode op = (OperatorNode) insn.child( 0 );
+        assertEquals( 2 , op.childCount() );     
+        assertEquals( OperatorType.BINARY_MINUS , op.type );
+        
+        assertEquals( CurrentAddressNode.class , op.child(0).getClass() );
+        assertEquals( NumberLiteralNode.class , op.child(1).getClass() );
+        
+        assertEquals( 2 , ((NumberLiteralNode) op.child(1)).getValue().intValue() );
     }     
     
     @Test

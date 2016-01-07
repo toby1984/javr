@@ -1,6 +1,6 @@
 package de.codesourcery.javr.assembler.parser.ast;
 
-public class ArgumentNamesNode extends ASTNode {
+public class ArgumentNamesNode extends AbstractASTNode {
 
     public ArgumentNamesNode() {
         super();

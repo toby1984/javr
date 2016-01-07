@@ -3,7 +3,7 @@ package de.codesourcery.javr.assembler.parser.ast;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 
-public class ExpressionNode extends ASTNode implements IValueNode {
+public class ExpressionNode extends AbstractASTNode implements IValueNode , Resolvable {
 
     private Object value;
     
@@ -17,19 +17,22 @@ public class ExpressionNode extends ASTNode implements IValueNode {
     }
     
     @Override
-    public boolean resolveValue(ICompilationContext context) 
+    public boolean resolve(ICompilationContext context) 
     {
-        boolean result = ((IValueNode) child(0)).resolveValue( context );
-        if ( result ) {
-            value = ((IValueNode) child(0)).getValue();
-            return true;
+        boolean result = true;
+        if ( hasChildren() ) 
+        {
+            if ( child(0) instanceof Resolvable) 
+            {
+                result &= ((Resolvable) child(0)).resolve( context );
+            }
+            this.value = ((IValueNode) child(0)).getValue();
         }
-        return false;
+        return result;
     }
-
+    
     @Override
     public Object getValue() {
         return value;
     }
-
 }

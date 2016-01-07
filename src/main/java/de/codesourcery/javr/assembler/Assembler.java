@@ -19,6 +19,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,13 +29,12 @@ import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
-import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.phases.GatherSymbols;
 import de.codesourcery.javr.assembler.phases.GenerateCodePhase;
 import de.codesourcery.javr.assembler.phases.ParseSource;
 import de.codesourcery.javr.assembler.phases.Phase;
-import de.codesourcery.javr.assembler.phases.PrepareGenerateCode;
+import de.codesourcery.javr.assembler.phases.PrepareGenerateCodePhase;
 import de.codesourcery.javr.assembler.phases.SyntaxCheck;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Resource;
@@ -76,7 +76,16 @@ public class Assembler
                 final Resource resource = rf.getResource( seg );
                 if ( writeSegment( resource , seg ) != 0 ) 
                 {
-                    message( new CompilationMessage(Severity.INFO,"Wrote "+resource) );
+                    final int maxSizeInBytes = getArchitecture().getSegmentSize( seg );
+                    final int bytesUsed = resource.size();
+                    final float percentUsaged = 100f*( bytesUsed / (float) maxSizeInBytes);
+                    final DecimalFormat DF = new DecimalFormat("##0.00");
+                    
+                    final String msg = seg+": "+bytesUsed+" of "+maxSizeInBytes+" bytes used ("+DF.format( percentUsaged )+" %), written to "+resource;
+                    message( CompilationMessage.info( msg) );
+                    if ( bytesUsed > maxSizeInBytes ) {
+                        message( CompilationMessage.error("Code size too big, will not fit into "+seg+" segment of target architecture.") );
+                    }
                     b.setResource( seg , resource );
                 }
             }
@@ -260,33 +269,6 @@ public class Assembler
         public CompilationUnit currentCompilationUnit() {
             return compilationUnit;
         }
-
-        @Override
-        public int getBytesRemainingInCurrentSegment() 
-        {
-            final IArchitecture architecture = config.getArchitecture();
-            final int available;
-            switch( currentSegment() ) 
-            {
-             case EEPROM:
-                 available = architecture.getEEPromSize();
-                 break;
-             case FLASH:
-                 available = architecture.getFlashMemorySize();
-                 break;
-             case SRAM:
-                 available = architecture.getSRAMMemorySize();
-                 break;
-             default:
-                 throw new RuntimeException("Unreachable code reached");
-            }
-            final int remainingBytes = available - currentAddress().getByteAddress();
-            if ( remainingBytes < 0 ) {
-                LOG.warn("getBytesRemainingInCurrentSegment(): Segment overrun ("+currentSegment()+")");
-                return 0;
-            }
-            return remainingBytes;
-        }
     }
     
     public Binary compile(CompilationUnit unit,ResourceFactory rf, IConfigProvider config) throws IOException 
@@ -303,7 +285,7 @@ public class Assembler
         phases.add( new ParseSource(config) );
         phases.add( new SyntaxCheck() );
         phases.add( new GatherSymbols() );
-        phases.add( new PrepareGenerateCode() );
+        phases.add( new PrepareGenerateCodePhase() );
         phases.add( new GenerateCodePhase() );
         
         LOG.info("assemble(): Now compiling "+unit);
@@ -335,7 +317,7 @@ public class Assembler
             
             if ( p.stopOnErrors() && unit.getAST().hasErrors() ) 
             {
-                System.err.println("Stopping with errors");
+                LOG.error("compile(): Compilation failed with errors in phase "+p);
                 return null;
             }
         }

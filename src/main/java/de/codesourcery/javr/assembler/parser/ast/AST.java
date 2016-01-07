@@ -24,7 +24,7 @@ import org.apache.log4j.Logger;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.Parser.Severity;
 
-public class AST extends ASTNode 
+public class AST extends AbstractASTNode 
 {
     private static final Logger LOG = Logger.getLogger(AST.class);
     
@@ -33,7 +33,21 @@ public class AST extends ASTNode
     public void addMessage(CompilationMessage msg) 
     {
         Validate.notNull(msg, "msg must not be NULL");
-        
+
+        switch( msg.severity ) 
+        {
+            case ERROR:
+                LOG.error( msg.toString() );
+                break;
+            case INFO:
+                LOG.info( msg.toString() );
+                break;
+            case WARNING:
+                LOG.warn( msg.toString() );
+                break;
+            default:
+            
+        }
         if ( LOG.isTraceEnabled() ) 
         { 
             LOG.trace("addMessage() "+msg.message , new Exception() );

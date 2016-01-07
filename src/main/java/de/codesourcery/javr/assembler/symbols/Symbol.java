@@ -18,6 +18,7 @@ package de.codesourcery.javr.assembler.symbols;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
+import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
@@ -34,9 +35,23 @@ public final class Symbol
     
     public static enum Type 
     {
-        LABEL,
+        /**
+         * Symbol marks a memory address.
+         * 
+         * Value is of type {@link Address}.
+         */
+        ADDRESS_LABEL,
+        /**
+         * Symbol was defined through an <code>.equ</code> directive.
+         */
         EQU,
+        /**
+         * Symbol was defined through an <code>#define xxxxx()</code> directive.
+         */
         MACRO,
+        /**
+         * Symbol was declared but not defined yet (=unresolved symbol).
+         */        
         UNDEFINED
     }
     
@@ -69,6 +84,10 @@ public final class Symbol
     
     public final boolean hasType(Type t) {
         return t.equals( this.type );
+    }
+    
+    public boolean isUnresolved() {
+        return hasType( Type.UNDEFINED ) || getValue() == null;
     }
     
     public final Identifier name() {

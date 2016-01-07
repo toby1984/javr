@@ -117,7 +117,7 @@ public class PrettyPrinter
                 if ( buffer.length() > 0 ) {
                     buffer.append( newlineString );
                 }
-                if ( node.children.stream().noneMatch( n -> n instanceof LabelNode ) ) 
+                if ( node.children().stream().noneMatch( n -> n instanceof LabelNode ) ) 
                 {
                     buffer.append( indentString );
                 }

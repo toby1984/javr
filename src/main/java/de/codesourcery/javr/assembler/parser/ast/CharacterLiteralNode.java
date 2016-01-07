@@ -2,7 +2,7 @@ package de.codesourcery.javr.assembler.parser.ast;
 
 import de.codesourcery.javr.assembler.parser.TextRegion;
 
-public class CharacterLiteralNode extends ASTNode implements IValueNode {
+public class CharacterLiteralNode extends AbstractASTNode implements IValueNode {
 
     public final char value;
 

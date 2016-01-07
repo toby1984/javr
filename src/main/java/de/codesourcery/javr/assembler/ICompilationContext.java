@@ -51,6 +51,4 @@ public interface ICompilationContext
     public void message(CompilationMessage msg);
     
     public IArchitecture getArchitecture();
-    
-    public int getBytesRemainingInCurrentSegment();
 }

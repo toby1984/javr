@@ -2,18 +2,23 @@ package de.codesourcery.javr.assembler.parser.ast;
 
 import org.apache.commons.lang3.Validate;
 
+import de.codesourcery.javr.assembler.ICompilationContext;
+import de.codesourcery.javr.assembler.exceptions.ParseException;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 
-public class DirectiveNode extends ASTNode 
+public class DirectiveNode extends NodeWithMemoryLocation 
 {
+    private static final int SIZE_NOT_RESOLVED = -1;
+    
     public final Directive directive;
+    private int sizeInBytes = SIZE_NOT_RESOLVED;
     
     public static enum Directive 
     {
         CSEG("cseg",0,0),
         DSEG("dseg",0,0),
-        DEVICE("device",1,1),
         ESEG("eseg",0,0),
+        DEVICE("device",1,1),
         RESERVE("byte",1,1),
         INIT_BYTES("db",1,Integer.MAX_VALUE),
         INIT_WORDS("dw",1,Integer.MAX_VALUE),
@@ -51,7 +56,7 @@ public class DirectiveNode extends ASTNode
         return d.equals( this.directive );
     }
     
-    public DirectiveNode(Directive directive) 
+    private DirectiveNode(Directive directive) 
     {
         Validate.notNull(directive, "directive must not be NULL");
         this.directive = directive;
@@ -71,4 +76,59 @@ public class DirectiveNode extends ASTNode
         }
         return new DirectiveNode(this.directive );
     }
+    
+    @Override
+    public boolean hasMemoryLocation() 
+    {
+        switch( this.directive ) 
+        {
+            case INIT_BYTES:
+            case INIT_WORDS:
+            case RESERVE:
+                return true;
+            default:
+                return false;
+        }
+    }
+    
+    public boolean resolveSize(ICompilationContext context)
+    {
+        if ( ! hasMemoryLocation() ) {
+            return true;
+        }
+        switch( this.directive ) 
+        {
+            case INIT_BYTES: sizeInBytes = childCount(); break;
+            case INIT_WORDS: sizeInBytes = childCount()*2; break;
+            case RESERVE:
+                final IValueNode child = (IValueNode) child(0); 
+                if ( child instanceof Resolvable) {
+                    if ( ! ((Resolvable) child).resolve( context ) ) {
+                        return false;
+                    }
+                }
+                Number value = (Number) child.getValue();
+                if ( value != null ) 
+                {
+                    final int size = value.intValue();
+                    if ( size < 0 ) {
+                        throw new ParseException("Expected a positive number but got "+size,getTextRegion().start());
+                    }
+                    return true;
+                }
+                return value != null;
+            default:
+                throw new RuntimeException("Unreachable code reached");
+        }  
+        return sizeInBytes != SIZE_NOT_RESOLVED;
+    }
+    
+    @Override
+    public int getSizeInBytes() throws IllegalStateException 
+    {
+        if ( ! hasMemoryLocation() ) {
+            throw new IllegalStateException( "This statement is not associated with a memory location" );
+        }
+        return sizeInBytes;
+    }    
 }

@@ -17,24 +17,18 @@ package de.codesourcery.javr.assembler.arch.impl;
 
 import java.util.List;
 
+import org.apache.commons.lang3.Validate;
+
 import de.codesourcery.javr.assembler.Address;
-import de.codesourcery.javr.assembler.CompilationUnit;
-import de.codesourcery.javr.assembler.ICompilationContext;
-import de.codesourcery.javr.assembler.Instruction;
 import de.codesourcery.javr.assembler.Register;
 import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.AbstractAchitecture;
 import de.codesourcery.javr.assembler.arch.Architecture;
-import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.arch.InstructionEncoder;
-import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
-import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
-import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
-import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 public class ATMega88 extends AbstractAchitecture 
 {
@@ -49,38 +43,38 @@ public class ATMega88 extends AbstractAchitecture
         insn("bclr",  "1001 0100 1ddd 1000" , ArgumentType.THREE_BIT_CONSTANT );
         insn("bld",   "1111 100d dddd 0sss" , ArgumentType.SINGLE_REGISTER , ArgumentType.THREE_BIT_CONSTANT );
         
-        insn("brbs",  "1111 00ss ssss sddd" , ArgumentType.THREE_BIT_CONSTANT , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        insn("brhs",  "1111 00kk kkkk k101" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
+        insn("brbs",  "1111 00ss ssss sddd" , ArgumentType.THREE_BIT_CONSTANT , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
+        insn("brhs",  "1111 00kk kkkk k101" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
         
-        final InstructionEncoding brcc = insn("brcc",  "1111 01kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        final InstructionEncoding brcs = insn("brcs",  "1111 00kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
+        final InstructionEncoding brcc = insn("brcc",  "1111 01kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
+        final InstructionEncoding brcs = insn("brcs",  "1111 00kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
         insn("break", "1001 0101 1001 1000" );
-        insn("breq",  "1111 00kk kkkk k001" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        insn("brbc",  "1111 01ss ssss sddd" , ArgumentType.THREE_BIT_CONSTANT , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        insn("brge",  "1111 01kk kkkk k100" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        insn("brhc",  "1111 01kk kkkk k101" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        insn("brid",  "1111 01kk kkkk k111" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        insn("brie",  "1111 00kk kkkk k111" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
+        insn("breq",  "1111 00kk kkkk k001" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
+        insn("brbc",  "1111 01ss ssss sddd" , ArgumentType.THREE_BIT_CONSTANT , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
+        insn("brge",  "1111 01kk kkkk k100" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
+        insn("brhc",  "1111 01kk kkkk k101" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
+        insn("brid",  "1111 01kk kkkk k111" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
+        insn("brie",  "1111 00kk kkkk k111" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
         
-        final InstructionEncoding brlo = insn("brlo",  "1111 00kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
+        final InstructionEncoding brlo = insn("brlo",  "1111 00kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
         brlo.aliasOf( brcs );
         brcs.aliasOf( brlo );
         
-        insn("brlt",  "1111 00kk kkkk k100" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        insn("brmi",  "1111 00kk kkkk k010" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        insn("brne",  "1111 01kk kkkk k001" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        insn("brpl",  "1111 01kk kkkk k010" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        final InstructionEncoding brsh = insn("brsh",  "1111 01kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
+        insn("brlt",  "1111 00kk kkkk k100" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
+        insn("brmi",  "1111 00kk kkkk k010" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
+        insn("brne",  "1111 01kk kkkk k001" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
+        insn("brpl",  "1111 01kk kkkk k010" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
+        final InstructionEncoding brsh = insn("brsh",  "1111 01kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
         brsh.aliasOf( brcc );
         brcc.aliasOf( brsh);
-        insn("brtc",  "1111 01kk kkkk k110" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        insn("brts",  "1111 00kk kkkk k110" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        insn("brvc",  "1111 01kk kkkk k011" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
-        insn("brvs",  "1111 00kk kkkk k011" , ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET );
+        insn("brtc",  "1111 01kk kkkk k110" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
+        insn("brts",  "1111 00kk kkkk k110" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
+        insn("brvc",  "1111 01kk kkkk k011" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
+        insn("brvs",  "1111 00kk kkkk k011" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
         insn("bset",  "1001 0100 0sss 1000" , ArgumentType.THREE_BIT_CONSTANT );
         insn("bst",   "1111 101d dddd 0sss" , ArgumentType.SINGLE_REGISTER , ArgumentType.THREE_BIT_CONSTANT );
         
-        insn("call",  "1001 010k kkkk 111k kkkk kkkk kkkk kkkk" , ArgumentType.FLASH_MEM_ADDRESS );
+        insn("call",  "1001 010k kkkk 111k kkkk kkkk kkkk kkkk" , ArgumentType.TWENTYTWO_BIT_FLASH_MEM_ADDRESS );
         
         insn("cbi",   "1001 1000 dddd dsss" , ArgumentType.FIVE_BIT_IO_REGISTER_CONSTANT , ArgumentType.THREE_BIT_CONSTANT );
         final InstructionEncoding cbr = insn("cbr",   "0111 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT ).srcTransform( value -> 
@@ -149,7 +143,7 @@ public class ATMega88 extends AbstractAchitecture
         insn("ijmp",   "1001 0100 0000 1001" );
         insn("in",     "1011 0ssd dddd ssss" , ArgumentType.SINGLE_REGISTER, ArgumentType.SIX_BIT_IO_REGISTER_CONSTANT );
         insn("inc",    "1001 010d dddd 0011" , ArgumentType.SINGLE_REGISTER );
-        insn("jmp",    "1001 010k kkkk 110k kkkk kkkk kkkk kkkk" , ArgumentType.FLASH_MEM_ADDRESS );
+        insn("jmp",    "1001 010k kkkk 110k kkkk kkkk kkkk kkkk" , ArgumentType.TWENTYTWO_BIT_FLASH_MEM_ADDRESS );
         insn("lac",    "1001 001r rrrr 0110" , ArgumentType.SINGLE_REGISTER );
         insn("las",    "1001 001r rrrr 0101" , ArgumentType.SINGLE_REGISTER );
         insn("lat",    "1001 001r rrrr 0111" , ArgumentType.SINGLE_REGISTER );
@@ -455,7 +449,7 @@ public class ATMega88 extends AbstractAchitecture
         // short: 1010 1kkk dddd kkkk
         // long:  1001 001d dddd 0000 kkkk kkkk kkkk kkkk
         final InstructionEncoding stsShort = new InstructionEncoding( "sts" , new InstructionEncoder( "1010 1ddd ssss dddd" ) , ArgumentType.SEVEN_BIT_SRAM_MEM_ADDRESS , ArgumentType.R16_TO_R31);
-        final InstructionEncoding stsLong  = new InstructionEncoding( "sts" , new InstructionEncoder( "1001 001s ssss 0000 dddd dddd dddd dddd" ) , ArgumentType.DATASPACE_16_BIT_ADDESS, ArgumentType.SINGLE_REGISTER );
+        final InstructionEncoding stsLong  = new InstructionEncoding( "sts" , new InstructionEncoder( "1001 001s ssss 0000 dddd dddd dddd dddd" ) , ArgumentType.SIXTEEN_BIT_SRAM_MEM_ADDRESS, ArgumentType.SINGLE_REGISTER );
         
         final InstructionSelector stsSelector = new InstructionSelector() {
 
@@ -519,134 +513,54 @@ public class ATMega88 extends AbstractAchitecture
     }
     
     @Override
-    public int getFlashMemorySize() {
-        return 8192;
-    }
-
-    @Override
-    public int getSRAMMemorySize() {
-        return 1024;
-    }
-
-    @Override
-    public int getEEPromSize() {
-        return 512;
-    }
-    
-    public static void main(String[] args) 
+    public int getSegmentSize(Segment seg) 
     {
-        final ATMega88 arch = new ATMega88();
-        
-        FakeContext ctx = new FakeContext(arch);
-        
-        for ( EncodingEntry entry : arch.instructions.values() ) 
-        {
-            for ( InstructionEncoding enc : entry.encodings ) 
-            {
-                final InstructionNode in = new InstructionNode( new Instruction( enc.mnemonic) , new TextRegion(1,1) );
-                in.addChild( new NumberLiteralNode( "1" , new TextRegion(1,1) ) );
-                in.addChild( new NumberLiteralNode( "2" , new TextRegion(1,1) ) );
-                ctx.reset();
-                arch.compile( in , ctx  );
-                arch.disassemble( ctx.buffer , ctx.ptr , true , 0 , false );
-            }
+        Validate.notNull(seg, "segment must not be NULL");
+        switch(seg) {
+            case EEPROM: return 512;
+            case FLASH: return 8192;
+            case SRAM: return 1024;
+            default:
+                throw new RuntimeException("Unhandled segment type: "+seg);
         }
     }
     
-    protected static final class FakeContext implements ICompilationContext {
-        
-        private final IArchitecture arch;
-        
-        public final byte[] buffer = new byte[1024];
-        public int ptr = 0;
-        
-        public FakeContext(IArchitecture arch) {
-            this.arch = arch;
-        }
-        
-        public void reset() {
-            ptr = 0;
-        }
+    @Override
+    protected boolean isValidFlashAdress(int address) 
+    {
+        return address >= 0 && address < getSegmentSize(Segment.FLASH);
+    }
 
-        @Override
-        public void writeWord(int value) {
-            writeByte( value );
-            writeByte( value >> 8 );
-        }
-        
-        @Override
-        public void writeByte(int value) {
-            buffer[ptr++] = (byte) (value & 0xff);
-        }
-        
-        @Override
-        public void setSegment(Segment s) {
-            throw new UnsupportedOperationException();
-        }
-        
-        @Override
-        public void message(CompilationMessage msg) {
-            System.err.println( msg );
-        }
-        
-        @Override
-        public SymbolTable globalSymbolTable() {
-            throw new UnsupportedOperationException();
-        }
-        
-        @Override
-        public int getBytesRemainingInCurrentSegment() {
-            throw new UnsupportedOperationException();
-        }
-        
-        @Override
-        public IArchitecture getArchitecture() {
-            return arch;
-        }
-        
-        @Override
-        public void error(String message, ASTNode node) {
-            System.err.println( message );            
-        }
-        
-        @Override
-        public SymbolTable currentSymbolTable() {
-            throw new UnsupportedOperationException();
-        }
-        
-        @Override
-        public Segment currentSegment() {
-            return Segment.FLASH;
-        }
-        
-        @Override
-        public int currentOffset() {
-            return 0;
-        }
-        
-        @Override
-        public CompilationUnit currentCompilationUnit() {
-            throw new UnsupportedOperationException();
-        }
-        
-        @Override
-        public Address currentAddress() {
-            return Address.wordAddress(Segment.FLASH, currentOffset() );
-        }
-        
-        @Override
-        public void allocateWord() {
-            throw new UnsupportedOperationException();            
-        }
-        
-        @Override
-        public void allocateBytes(int numberOfBytes) {
-            throw new UnsupportedOperationException();            
-        }
-        
-        @Override
-        public void allocateByte() {
-            throw new UnsupportedOperationException();            
-        }
-    };
+    @Override
+    protected boolean isValidSRAMAdress(int address) 
+    {
+        return address >= 0 && address < getSegmentSize(Segment.SRAM);
+    }
+
+    @Override
+    protected boolean isValidRegisterNumber(int number) {
+        return number >= 0 && number <= 31;
+    }
+
+    @Override
+    protected boolean isValidIOSpaceAdress(int address) 
+    {
+        /*
+         * Address space layout:
+         * 
+         * 0...1f   register file
+         * 20...5f  i/o space
+         * 60..ff   extended IO space
+         */        
+        return address >= 0x20 && address <= 0xff;
+    }
+
+    @Override
+    protected boolean isValidEEPROMAdress(int address) {
+        return address >= 0 && address < getSegmentSize(Segment.EEPROM);
+    }
+    
+    protected int getGeneralPurposeRegisterCount() {
+        return 32;
+    }
 }

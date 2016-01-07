@@ -16,7 +16,6 @@
 package de.codesourcery.javr.ui;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 import org.apache.commons.lang3.Validate;
@@ -107,7 +106,6 @@ public class LineMap
     
     private void add(LineInfo l) 
     {
-        System.out.println("LINEINFO: "+l);
         lines.add( l );
     }
     

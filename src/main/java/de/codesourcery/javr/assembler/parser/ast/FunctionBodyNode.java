@@ -1,6 +1,6 @@
 package de.codesourcery.javr.assembler.parser.ast;
 
-public class FunctionBodyNode extends ASTNode 
+public class FunctionBodyNode extends AbstractASTNode 
 {
     @Override
     protected FunctionBodyNode createCopy() {

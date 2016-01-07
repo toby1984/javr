@@ -28,6 +28,12 @@ public class InMemoryResource implements Resource
         updateContentHash();
     }
     
+    @Override
+    public boolean pointsToSameData(Resource other) 
+    {
+        return other == this;
+    }    
+    
     private void updateContentHash() 
     {
         this.contentHash = new HashingAlgorithm().update( this.data , 0 , len ).finish();

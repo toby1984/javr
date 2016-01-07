@@ -184,6 +184,9 @@ public class SymbolTable
         if ( existing != null && ! existing.hasType( Type.UNDEFINED ) ) {
             throw new DuplicateSymbolException( symbol , existing );
         }
+        if ( parent != null ) {
+            parent.defineSymbol( symbol );
+        }
         putSymbol(symbol);
     }
     

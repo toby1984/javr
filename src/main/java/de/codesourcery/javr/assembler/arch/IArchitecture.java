@@ -16,6 +16,7 @@
 package de.codesourcery.javr.assembler.arch;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
+import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 
 public interface IArchitecture {
@@ -25,26 +26,15 @@ public interface IArchitecture {
     public boolean hasType(Architecture t);
     
     /**
+     * Returns total segment size in bytes.
      * 
-     * @return size of program memory in bytes
+     * @param seg
+     * @return
      */
-    public int getFlashMemorySize();
-    
-    /**
-     * 
-     * @return size of SRAM memory in bytes
-     */
-    public int getSRAMMemorySize();
-    
-    /**
-     * 
-     * @return size of EEPROM in bytes
-     */
-    public int getEEPromSize();    
-    
+    public int getSegmentSize(Segment seg);
     // --
     
-    public boolean isValidInstruction(String s);
+    public boolean isValidMnemonic(String s);
     
     public boolean validate(InstructionNode node,ICompilationContext context);
     
@@ -52,7 +42,7 @@ public interface IArchitecture {
      * Get/estimate instruction length.
      * 
      * <p>If the AST contains all required information this method will return the actual instruction length. If
-     * the AST does not contain all information required to select the shortest encoding, this method will return the length
+     * the AST does not contain all information required to select the shortest possible encoding, this method will return the length
      * of the worst-case (=longest encoding).</p>
      * 
      * @param node

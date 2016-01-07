@@ -3,6 +3,8 @@ package de.codesourcery.javr.assembler.phases;
 import java.util.Stack;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.Validate;
+
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
@@ -24,6 +26,13 @@ public abstract class AbstractPhase implements Phase
 
     private final Stack<ASTNode> ifDefStack = new Stack<>();
 
+    private final String name;
+    
+    public AbstractPhase(String name) {
+        Validate.notBlank(name, "name must not be NULL or blank");
+        this.name = name;
+    }
+    
     @Override
     public final void beforeRun(ICompilationContext ctx) 
     {
@@ -92,6 +101,8 @@ public abstract class AbstractPhase implements Phase
                     case CSEG: context.setSegment( Segment.FLASH ); break;
                     case DSEG: context.setSegment( Segment.SRAM ) ; break;
                     case ESEG: context.setSegment( Segment.EEPROM ); break;
+                    default:
+                        // $$FALL-THROUGH$$
                 }
             }
         } else if ( node instanceof PreprocessorNode ) {
@@ -160,5 +171,10 @@ public abstract class AbstractPhase implements Phase
             throw new RuntimeException("Only supported for nodes without children");
         }
         return "(@ "+node.getTextRegion()+") "+node.arguments.stream().collect(Collectors.joining(" "));
+    }
+    
+    @Override
+    public final String getName() {
+        return name;
     }
 }

@@ -26,6 +26,11 @@ public class ParseSource implements Phase {
     }
     
     @Override
+    public String getName() {
+        return "parse";
+    }
+    
+    @Override
     public void run(ICompilationContext context) throws IOException 
     {
         final Resource resource = context.currentCompilationUnit().getResource();

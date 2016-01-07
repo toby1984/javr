@@ -18,11 +18,14 @@ package de.codesourcery.javr.assembler.parser.ast;
 import java.util.ArrayList;
 import java.util.List;
 
-public class StatementNode extends ASTNode {
+import de.codesourcery.javr.assembler.Address;
+import de.codesourcery.javr.assembler.ICompilationContext;
+
+public class StatementNode extends AbstractASTNode implements Resolvable {
 
     private LabelNode getLabelNode() 
     {
-        for ( ASTNode child : children ) {
+        for ( ASTNode child : children() ) {
             if ( child instanceof LabelNode) {
                 return (LabelNode) child;
             }
@@ -69,5 +72,62 @@ public class StatementNode extends ASTNode {
             }
         }
         return results;
+    }
+    
+    private ASTNode findInstruction() 
+    {
+        ASTNode result = null;
+        for ( ASTNode child : children() ) 
+        {
+            if ( child.hasMemoryLocation() ) 
+            {
+                if ( result != null ) 
+                {
+                    // currently this cannot happen
+                    throw new IllegalStateException("Statement is associated with more than one memory location ??");
+                }
+                result = child;
+            }
+        }
+        return result;
+    }
+    
+    @Override
+    public boolean hasMemoryLocation() {
+        return findInstruction() != null;
+    }
+    
+    @Override
+    public Address getMemoryLocation() throws IllegalStateException 
+    {
+        final ASTNode ins = findInstruction();
+        if ( ins == null ) {
+            throw new IllegalStateException( "This statement is not associated with a memory location" );
+        }
+        return ins.getMemoryLocation();
+    }
+    
+    @Override
+    public boolean assignMemoryLocation(Address address) 
+    {
+        final ASTNode ins = findInstruction();
+        if ( ins == null ) {
+            throw new IllegalStateException( "This statement is not associated with a memory location" );
+        }
+        return ins.assignMemoryLocation( address );
+    }
+
+    @Override
+    public boolean resolve(ICompilationContext context) 
+    {
+        boolean result = true;
+        for ( ASTNode child : children() ) 
+        {
+            if ( child instanceof Resolvable) 
+            {
+                result &= ((Resolvable) child).resolve(context);
+            }
+        }
+        return result;
     }    
 }

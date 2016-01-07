@@ -20,7 +20,11 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.awt.event.ActionListener;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
@@ -44,6 +48,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import javax.swing.JButton;
@@ -53,12 +58,14 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.JToolBar;
 import javax.swing.JTree;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.event.TableModelEvent;
@@ -67,10 +74,8 @@ import javax.swing.event.TreeModelEvent;
 import javax.swing.event.TreeModelListener;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableModel;
-import javax.swing.text.AbstractDocument;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
-import javax.swing.text.DefaultStyledDocument;
 import javax.swing.text.Document;
 import javax.swing.text.DocumentFilter;
 import javax.swing.text.Element;
@@ -406,14 +411,12 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
             Validate.notNull(table,"table must not be NULL");
             this.symbols.clear();
             final List<Symbol> allSymbolsSorted = table.getAllSymbolsSorted();
-            System.out.println("Setting "+allSymbolsSorted.size()+" symbols on "+this);            
             this.symbols.addAll( allSymbolsSorted );
             tableChanged();
         }        
 
         public void clear() 
         {
-            System.out.println("Symbols CLEARED on "+this);
             symbols.clear();
             setFilterString( this.filterString );
         }
@@ -642,7 +645,6 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
             this.ast = ast;
 
             final TreeModelEvent ev = new TreeModelEvent(this, new TreePath(this.ast) );
-            System.out.println("Tree has "+ast.childCount()+" statements");
             listeners.forEach( l -> l.treeStructureChanged( ev  ) );
         }
 
@@ -731,13 +733,19 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         editor.setPreferredSize( new Dimension(200,300 ) );
 
         final JPanel panel = new JPanel();
-        panel.setLayout( new BorderLayout() );
+        panel.setLayout( new GridBagLayout() );
 
-        // toolbar
-        panel.add( createToolbar() , BorderLayout.NORTH );
+        // add toolbar
+        GridBagConstraints cnstrs = new GridBagConstraints();
+        cnstrs.fill = GridBagConstraints.HORIZONTAL;
+        cnstrs.weightx = 1.0; cnstrs.weighty=0;
+        cnstrs.gridwidth=1; cnstrs.gridheight = 1 ;
+        cnstrs.gridx = 0; cnstrs.gridy = 0;
+        
+        panel.add( createToolbar() , cnstrs );
 
-        // editor
-        panel.add( new JScrollPane( editor ) , BorderLayout.CENTER );
+        // editor        
+        JScrollPane editorPane = new JScrollPane( editor );
 
         // error messages table
         final JTable errorTable = new JTable( messageModel );
@@ -784,8 +792,40 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
                 }
             }
         });
-        panel.add( new JScrollPane( errorTable ) , BorderLayout.SOUTH);
+        
+        final JScrollPane errorTablePane = new JScrollPane( errorTable );
+        final JSplitPane splitPane = new JSplitPane( JSplitPane.VERTICAL_SPLIT , editorPane, errorTablePane );
 
+        // ugly hack to adjust splitpane size after it has become visible
+        addComponentListener( new ComponentAdapter() 
+        {
+            private boolean sizeAdjusted = false;
+            
+            @Override
+            public void componentShown(ComponentEvent e) 
+            {
+                if ( ! sizeAdjusted ) 
+                {
+                    sizeAdjusted = true;
+                    final AtomicReference<Timer> timer = new AtomicReference<Timer>();
+                    final ActionListener listener = ev -> 
+                    {
+                        timer.get().stop();
+                        splitPane.setDividerLocation(0.9d);
+                    };
+                    timer.set( new Timer( 250 , listener) );
+                    timer.get().start();
+                }
+            }
+        });
+        cnstrs = new GridBagConstraints();
+        cnstrs.fill = GridBagConstraints.BOTH;
+        cnstrs.weightx = 1.0; cnstrs.weighty=1;
+        cnstrs.gridwidth=1; cnstrs.gridheight = 1 ;
+        cnstrs.gridx = 0; cnstrs.gridy = 1;
+        
+        panel.add( splitPane , cnstrs );
+        
         getContentPane().add( panel );
 
         this.lineMap = new LineMap("",provider);
@@ -1242,8 +1282,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
             IOUtils.copy( in , out );
         }
         final byte[] data = out.toByteArray();
-        String source = new String(data, unit.getResource().getEncoding() );
-        System.out.println("\n=========================\n"+source+"\n===================");
+        final String source = new String(data, unit.getResource().getEncoding() );
         editor.setDocument( createDocument() );
         editor.setText( source );
         editor.setCaretPosition( 0 );

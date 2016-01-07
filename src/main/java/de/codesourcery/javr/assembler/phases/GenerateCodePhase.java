@@ -17,14 +17,15 @@ public class GenerateCodePhase extends AbstractPhase
 {
     private static final Logger LOG = Logger.getLogger(GenerateCodePhase.class);
     
-    private final boolean onlyAllocation;
+    private final boolean isInResolvePhase;
     
     public GenerateCodePhase() {
-        this(false);
+        this("generate_code",false);
     }
     
-    protected GenerateCodePhase(boolean onlyAllocation) {
-        this.onlyAllocation = onlyAllocation;
+    protected GenerateCodePhase(String name,boolean onlyAllocation) {
+        super(name);
+        this.isInResolvePhase = onlyAllocation;
     }
     
     @Override
@@ -37,13 +38,13 @@ public class GenerateCodePhase extends AbstractPhase
             @Override
             public void visit(ASTNode node, IIterationContext ctx) 
             {
-                visitNode(context, node, ctx); 
+                generateCode(context, node, ctx); 
             }
         };
         ast.visitBreadthFirst( visitor );        
     }
     
-    protected boolean visitNode(ICompilationContext context, ASTNode node,IIterationContext ctx) 
+    protected boolean generateCode(ICompilationContext context, ASTNode node,IIterationContext ctx) 
     {
         if ( ! super.visitNode( context , node , ctx ) ) {
             return false;
@@ -52,11 +53,18 @@ public class GenerateCodePhase extends AbstractPhase
         if ( node instanceof InstructionNode ) 
         {
             try {            
-                if ( onlyAllocation ) 
+                if ( isInResolvePhase ) 
                 {
+                    context.getArchitecture().validate( (InstructionNode) node , context );
                     final int bytes = context.getArchitecture().getInstructionLengthInBytes( (InstructionNode) node , context , true );
+                    if ( LOG.isDebugEnabled() ) {
+                        LOG.debug("generateCode(): Allocating "+bytes+" at "+context.currentAddress()+" segment for "+node);
+                    }
                     context.allocateBytes( bytes );
                 } else {
+                    if ( LOG.isDebugEnabled() ) {
+                        LOG.debug("generateCode(): Compiling instruction at "+context.currentAddress()+" segment for "+node);
+                    }                    
                     context.getArchitecture().compile( (InstructionNode) node , context );
                 }
             } catch(Exception e) {
@@ -72,7 +80,7 @@ public class GenerateCodePhase extends AbstractPhase
             {
                 case INIT_BYTES:
                 case INIT_WORDS:
-                    for ( ASTNode child : node.children ) 
+                    for ( ASTNode child : node.children() ) 
                     {
                         Object value = ((IValueNode) child).getValue();
                         final int iValue = ((Number) value).intValue();

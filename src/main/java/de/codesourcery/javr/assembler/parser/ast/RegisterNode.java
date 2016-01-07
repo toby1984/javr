@@ -20,7 +20,7 @@ import org.apache.commons.lang3.Validate;
 import de.codesourcery.javr.assembler.Register;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 
-public class RegisterNode extends ASTNode {
+public class RegisterNode extends AbstractASTNode {
 
     public final Register register;
 

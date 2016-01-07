@@ -17,7 +17,7 @@ package de.codesourcery.javr.assembler.parser.ast;
 
 import de.codesourcery.javr.assembler.parser.TextRegion;
 
-public class CommentNode extends ASTNode {
+public class CommentNode extends AbstractASTNode {
 
     public final String value;
     

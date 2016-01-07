@@ -6,7 +6,7 @@ import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.parser.OperatorType;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 
-public class OperatorNode extends ASTNode implements IValueNode
+public class OperatorNode extends AbstractASTNode implements IValueNode , Resolvable
 {
     public OperatorType type;
     
@@ -38,7 +38,7 @@ public class OperatorNode extends ASTNode implements IValueNode
     }
     
     @Override
-    public boolean resolveValue(ICompilationContext context) 
+    public boolean resolve(ICompilationContext context) 
     {
         this.value = OperatorType.evaluate( this , context.currentSymbolTable() );
         return value != null;
@@ -52,6 +52,6 @@ public class OperatorNode extends ASTNode implements IValueNode
     @Override
     public String toString() 
     {
-        return "Operator: "+this.type.getSymbol()+"( "+children+")";
+        return "Operator: "+this.type.getSymbol()+"( "+children()+")";
     }
 }

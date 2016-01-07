@@ -33,6 +33,7 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.ArgumentNamesNode;
 import de.codesourcery.javr.assembler.parser.ast.CharacterLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.CommentNode;
+import de.codesourcery.javr.assembler.parser.ast.CurrentAddressNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.EquLabelNode;
@@ -67,6 +68,20 @@ public class Parser
         public final String message;
         public final TextRegion region;
         public final ASTNode node;
+        
+        @Override
+        public String toString() 
+        {
+            final String offset;
+            if ( region != null ) {
+                offset = "offset "+region.start();
+            } else if ( node != null && node.getTextRegion() != null ) {
+                offset = "offset "+node.getTextRegion().start();
+            } else {
+                offset="<unknown location>";
+            }
+            return severity+" - "+offset+" - "+message;
+        }
 
         public CompilationMessage(Severity severity, String message,TextRegion region) 
         {
@@ -81,7 +96,7 @@ public class Parser
             this.severity = severity;
             this.message = message;
             this.node = node;
-            this.region = node.getTextRegion();
+            this.region = node == null ? null : node.getTextRegion();
         }        
 
         public CompilationMessage(Severity severity, String message) 
@@ -101,14 +116,18 @@ public class Parser
             return new CompilationMessage(Severity.ERROR , msg , region ); 
         }        
 
+        public static CompilationMessage info(String msg) {
+            return new CompilationMessage(Severity.INFO , msg , (ASTNode) null ); 
+        }
+        
         public static CompilationMessage info(String msg,ASTNode node) {
             return new CompilationMessage(Severity.INFO , msg , node ); 
         }
 
         public static CompilationMessage info(String msg,TextRegion region) {
             return new CompilationMessage(Severity.INFO, msg , region ); 
-        }        
-
+        }    
+        
         public static CompilationMessage warning(String msg,ASTNode node) {
             return new CompilationMessage(Severity.WARNING , msg , node ); 
         }        
@@ -378,7 +397,7 @@ public class Parser
                 final ASTNode expr = parseExpression();
                 if ( expr != null ) 
                 {
-                    final DirectiveNode result = new DirectiveNode( Directive.RESERVE );
+                    final DirectiveNode result = new DirectiveNode( Directive.RESERVE , tok2.region() );
                     result.addChild( expr );
                     return result;
                 }
@@ -388,7 +407,7 @@ public class Parser
             case "cseg": return new DirectiveNode(Directive.CSEG , tok2.region() );
             case "db":
             case "dw":
-                final DirectiveNode result =  new DirectiveNode( value.toLowerCase().equals("db") ? Directive.INIT_BYTES : Directive.INIT_WORDS ); 
+                final DirectiveNode result =  new DirectiveNode( value.toLowerCase().equals("db") ? Directive.INIT_BYTES : Directive.INIT_WORDS , tok2.region() ); 
                 final List<ASTNode> values = parseExpressionList();                
                 if ( values.isEmpty() ) {
                     throw new ParseException( "Missing expression" , lexer.peek() );
@@ -406,7 +425,7 @@ public class Parser
                         lexer.next();
                         final ASTNode expr2 = parseExpression();
                         if ( expr2 != null ) {
-                            final DirectiveNode result2 = new DirectiveNode(Directive.EQU);
+                            final DirectiveNode result2 = new DirectiveNode(Directive.EQU , tok2.region() );
                             result2.addChild( new EquLabelNode( name , tok.region() ) );
                             result2.addChild( expr2 );
                             return result2;
@@ -462,7 +481,7 @@ public class Parser
     private InstructionNode parseInstruction() 
     {
         Token tok = lexer.peek();
-        if ( tok.hasType( TokenType.TEXT ) && arch.isValidInstruction( tok.value ) ) 
+        if ( tok.hasType( TokenType.TEXT ) && arch.isValidMnemonic( tok.value ) ) 
         {
             lexer.next();
             final Instruction instruction = new Instruction( tok.value );
@@ -631,8 +650,15 @@ public class Parser
             }
             else if ( yard.isFunctionOnStack() && tok.hasType(TokenType.COMMA ) ) {
                 yard.pushOperator( new ExpressionToken(ExpressionTokenType.ARGUMENT_DELIMITER, lexer.next() ) );
-            } else {
-                final ASTNode node = parseAtom();
+            } 
+            else 
+            {
+                final ASTNode node ;
+                if ( lexer.peek(TokenType.DOT ) ) {
+                    node = new CurrentAddressNode( lexer.next().region() );
+                } else {
+                    node = parseAtom();
+                }
                 if ( node != null ) 
                 {
                     if ( node instanceof IdentifierNode && lexer.peek(TokenType.PARENS_OPEN ) ) 

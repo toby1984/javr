@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.CharacterLiteralNode;
+import de.codesourcery.javr.assembler.parser.ast.CurrentAddressNode;
 import de.codesourcery.javr.assembler.parser.ast.ExpressionNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
@@ -134,6 +135,18 @@ public enum OperatorType
         }
     }
     
+    public static Number evaluateToNumber(ASTNode node,SymbolTable symbolTable) 
+    {
+        Object result = evaluate(node,symbolTable);
+        if ( result == null ) {
+            return null;
+        }
+        if ( !(result instanceof Number) ) {
+            throw new RuntimeException("Expected node "+node+" to evaluate to a number but got "+result);
+        }
+        return (Number) result;
+    }
+    
     public static Object evaluate(ASTNode node,SymbolTable symbolTable) 
     {
         if ( node instanceof ExpressionNode ) {
@@ -141,6 +154,9 @@ public enum OperatorType
         }
         if ( node instanceof IdentifierNode) {
             return symbolTable.get( ((IdentifierNode) node).name ).getValue();
+        }
+        if ( node instanceof CurrentAddressNode ) {
+            return ((CurrentAddressNode ) node).getValue();
         }
         if ( node instanceof StringLiteral) {
             return ((StringLiteral) node).value;
@@ -243,7 +259,7 @@ public enum OperatorType
                     break;
             }
         }
-        throw new RuntimeException("Don't know how to evaluate "+node);
+        throw new RuntimeException("Don't know how to evaluate "+node.getClass().getName());
     }
     
     private static int toInt(Object o) 

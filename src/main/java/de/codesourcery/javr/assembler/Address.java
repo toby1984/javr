@@ -22,12 +22,17 @@ public final class Address {
         return byteOffset;
     }
     
+    @Override
+    public int hashCode() {
+        return 31*(31 + byteOffset)+segment.hashCode();
+    }
+
     public int getWordAddress() 
     {
         if ( ( byteOffset & 1) != 0 ) {
             throw new IllegalStateException("Refusing to convert odd byte-address "+this+" into word address");
         }
-        return byteOffset >> 1;
+        return byteOffset >>> 1;
     }
     
     public Segment getSegment() {

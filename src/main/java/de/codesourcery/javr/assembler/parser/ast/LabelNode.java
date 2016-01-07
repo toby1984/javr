@@ -17,12 +17,15 @@ package de.codesourcery.javr.assembler.parser.ast;
 
 import org.apache.commons.lang3.Validate;
 
+import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.TextRegion;
+import de.codesourcery.javr.assembler.symbols.Symbol;
 
-public class LabelNode extends ASTNode 
+public class LabelNode extends AbstractASTNode implements Resolvable
 {
     public final Identifier identifier;
+    private Symbol symbol;
     
     public LabelNode(Identifier id,TextRegion region) {
         super(region);
@@ -33,11 +36,26 @@ public class LabelNode extends ASTNode
     @Override
     protected LabelNode createCopy() 
     {
-        return new LabelNode( this.identifier , getTextRegion().createCopy() );
+        final LabelNode result = new LabelNode( this.identifier , getTextRegion().createCopy() );
+        result.symbol = symbol;
+        return result;
     }    
     
     @Override
     public String getAsString() {
         return identifier.value+":";
+    }
+    
+    public void setSymbol(Symbol symbol) 
+    {
+        Validate.notNull(symbol, "symbol must not be NULL");
+        this.symbol = symbol;
+    }
+
+    @Override
+    public boolean resolve(ICompilationContext context) 
+    {
+        symbol.setValue( context.currentAddress() );
+        return true;
     }
 }

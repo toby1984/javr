@@ -9,8 +9,8 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode.IASTVisitor;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
-import de.codesourcery.javr.assembler.parser.ast.EquLabelNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
+import de.codesourcery.javr.assembler.parser.ast.EquLabelNode;
 import de.codesourcery.javr.assembler.parser.ast.FunctionDefinitionNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
@@ -19,6 +19,7 @@ import de.codesourcery.javr.assembler.symbols.Symbol;
 public class GatherSymbols extends AbstractPhase
 {
     public GatherSymbols() {
+        super("gather_symbols");
     }
     
     @Override
@@ -26,8 +27,8 @@ public class GatherSymbols extends AbstractPhase
 
         final AST ast = context.currentCompilationUnit().getAST();
         
-        final IASTVisitor visitor = new IASTVisitor() {
-            
+        final IASTVisitor visitor = new IASTVisitor() 
+        {
             @Override
             public void visit(ASTNode node, IIterationContext ctx) 
             {
@@ -57,7 +58,9 @@ public class GatherSymbols extends AbstractPhase
                 else if ( node instanceof LabelNode ) 
                 {
                     final LabelNode label = (LabelNode) node;
-                    defineSymbol( label , new Symbol( label.identifier , Symbol.Type.LABEL , context.currentCompilationUnit() , label ) );
+                    final Symbol symbol = new Symbol( label.identifier , Symbol.Type.ADDRESS_LABEL , context.currentCompilationUnit() , label );
+                    label.setSymbol( symbol );
+                    defineSymbol( label , symbol );
                 } 
             }
 
@@ -77,6 +80,8 @@ public class GatherSymbols extends AbstractPhase
                 }
             }
         };
+        
+        // gather symbols
         ast.visitBreadthFirst( visitor );
     }
 }

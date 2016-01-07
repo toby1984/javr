@@ -44,211 +44,37 @@ public abstract class AbstractAchitecture implements IArchitecture
 
     private static final long VALUE_UNAVAILABLE= 0xdeadabcdbeefdeadL;
     
-    private static final InstructionSelector DEFAULT_INSN_SELECTOR = new InstructionSelector() {
-
-        @Override
-        public InstructionEncoding pick(InstructionNode node,List<InstructionEncoding> candidates) 
-        {
-            if ( candidates.size() != 1 ) {
-                throw new RuntimeException("This instruction selector only supports exactly 1 candidate encoding (got: "+candidates+")");
-            }
-            return candidates.get(0);
-        }
-
-        @Override
-        public int getMaxInstructionLengthInBytes(InstructionNode node,List<InstructionEncoding> candidates,boolean estimate) 
-        {
-            if ( candidates.size() != 1 ) {
-                throw new RuntimeException("This instruction selector only supports exactly 1 candidate encoding (got: "+candidates+")");
-            }            
-            return candidates.get(0).getInstructionLengthInBytes();
-        }
-    };
-    
-    private static final Transform TRANSFORM_R16_TO_R31 =  x -> 
-    {
-        if ( x < 16 || x > 31 ) {
-            throw new RuntimeException("Illegal register r"+x+", expected r16...r31");
-        }
-        return x-16;
-    };
-    
-    private static final Transform TRANSFORM_R16_TO_R23 =  x -> 
-    {
-        if ( x < 16 || x > 23 ) {
-            throw new RuntimeException("Illegal register r"+x+", expected r16...r23");
-        }
-        return x-16;
-    };    
-    
-    public interface InstructionSelector 
-    {
-        public InstructionEncoding pick(InstructionNode node,List<InstructionEncoding> candidates);
-        
-        public int getMaxInstructionLengthInBytes(InstructionNode node,List<InstructionEncoding> candidates,boolean estimate);
-    }
-    
-    public static final class EncodingEntry 
-    {
-        public final InstructionSelector selector;
-        public final List<InstructionEncoding> encodings = new ArrayList<>();
-        
-        public EncodingEntry(InstructionSelector chooser,InstructionEncoding[] encodings) 
-        {
-            this( chooser , encodings[0] , Arrays.copyOfRange( encodings , 1 , encodings.length) );
-        }
-        
-        public EncodingEntry(InstructionSelector chooser,InstructionEncoding encoding1,InstructionEncoding... additional) 
-        {
-            Validate.notNull(chooser, "chooser must not be NULL");
-            this.selector = chooser;
-            add( encoding1 );
-            if ( additional != null ) 
-            {
-                Stream.of(additional).forEach( this::add );
-            }
-        }
-        
-        public void add( InstructionEncoding enc) 
-        {
-            Validate.notNull(enc, "enc must not be NULL");
-            if ( ! this.encodings.isEmpty() ) 
-            {
-                if ( ! enc.mnemonic.equals( this.encodings.get(0).mnemonic ) ) {
-                    throw new IllegalArgumentException("Mnemonics differ");
-                }
-            }
-            this.encodings.add(enc);
-        }
-        
-        public InstructionEncoding getEncoding(InstructionNode insn) {
-            return selector.pick( insn , encodings );
-        }
-        
-        public int getInstructionLengthInBytes(InstructionNode insn,boolean estimate) {
-            return selector.getMaxInstructionLengthInBytes( insn , encodings , estimate );
-        }
-    }
-    
-    protected final Map<String,EncodingEntry> instructions = new HashMap<>();
-    
-    protected InstructionEncoding insn(String mnemonic,String pattern) 
-    {
-        return insn( mnemonic , pattern , ArgumentType.NONE , ArgumentType.NONE , false , DEFAULT_INSN_SELECTOR);
-    }
-    
-    protected InstructionEncoding insn(String mnemonic,String pattern,ArgumentType dstType) 
-    {
-        return insn( mnemonic , pattern , dstType , ArgumentType.NONE , false , DEFAULT_INSN_SELECTOR );
-    }  
-    
-    protected InstructionEncoding insn(String mnemonic,String pattern,ArgumentType dstType,ArgumentType srcType) 
-    {
-        return insn( mnemonic , pattern , dstType , srcType , false , DEFAULT_INSN_SELECTOR );
-    }
-    
-    protected InstructionEncoding insn(String mnemonic,String pattern,ArgumentType dstType,ArgumentType srcType,InstructionSelector chooser) 
-    {
-        if ( chooser == DEFAULT_INSN_SELECTOR ) {
-            throw new IllegalArgumentException("Internal error, default selector does not support multiple encodings");
-        }    
-        return insn(mnemonic, pattern, dstType, srcType, true , chooser);
-    }
-    
-    protected final void add(EncodingEntry entry) 
-    {
-        Validate.notNull(entry, "entry must not be NULL");
-        if ( entry.encodings.isEmpty() ) {
-            throw new IllegalArgumentException("Encoding entry needs to have at least one encoding");
-        }
-        final String mnemonic = entry.encodings.get(0).mnemonic;
-        if ( ! mnemonic.toLowerCase().equals( mnemonic ) ) {
-            throw new RuntimeException("Mnemonics need to be lower-case");
-        }        
-        if ( entry.encodings.stream().anyMatch( enc -> ! enc.mnemonic.equals( mnemonic ) ) ) {
-            throw new RuntimeException("Refusing to add entry that contains mixed mnemonics");
-        }
-        if ( instructions.containsKey( mnemonic ) ) {
-            throw new RuntimeException("Duplicate entry for mnemonic '"+mnemonic+"'");
-        }
-        instructions.put( mnemonic , entry );
-    }
-    
-    protected InstructionEncoding insn(String mnemonic,String pattern,ArgumentType dstType,ArgumentType srcType,boolean multipleEncodings,InstructionSelector chooser) 
-    {
-        if ( ! mnemonic.toLowerCase().equals( mnemonic ) ) {
-            throw new RuntimeException("Mnemonics need to be lower-case");
-        }
-        final InstructionEncoder enc = new InstructionEncoder( pattern );
-        final int expArgCount = ( (dstType==ArgumentType.NONE) ? 0 : 1 ) + ( (srcType==ArgumentType.NONE) ? 0 : 1 );
-        if ( enc.getArgumentCount() != expArgCount ) {
-            throw new RuntimeException("Internal error, number of arguments in pattern ("+enc.getArgumentCount()+") does not match expectations ("+expArgCount+")");
-        }
-        
-        final InstructionEncoding ins = new InstructionEncoding( mnemonic , enc , dstType , srcType );
-        
-        final EncodingEntry existing = instructions.get( mnemonic );
-        if ( existing != null ) 
-        {
-            if ( ! multipleEncodings ) {
-                throw new RuntimeException("Internal error, duplicate instruction '"+mnemonic+"'");
-            }
-            existing.add( ins );
-        } 
-        else 
-        {
-            instructions.put( mnemonic , new EncodingEntry( chooser , ins ) );
-        }
-        
-        if ( dstType == ArgumentType.R16_TO_R23 ) 
-        {
-            ins.encoder.dstTransform(TRANSFORM_R16_TO_R23);
-        } 
-        else if ( dstType == ArgumentType.R16_TO_R31 ) 
-        {
-            ins.encoder.dstTransform(TRANSFORM_R16_TO_R31);
-        }
-        
-        if ( srcType == ArgumentType.R16_TO_R23 ) 
-        {
-            ins.encoder.srcTransform(TRANSFORM_R16_TO_R23);
-        } 
-        else if ( srcType == ArgumentType.R16_TO_R31 ) 
-        {
-            ins.encoder.srcTransform(TRANSFORM_R16_TO_R31);
-        }       
-        return ins;
-    }     
-    
     public static enum ArgumentType 
     {
+        // single register
         SINGLE_REGISTER,
-        COMPOUND_REGISTERS_R24_TO_R30,
-        COMPOUND_REGISTER_FOUR_BITS,
+        // compound register
+        COMPOUND_REGISTERS_R24_TO_R30, // register is encoded as two-bit value, 00=r25:r24 , 01 = r27:r26 , 10 = r29:r28 , 11 = r31:r30  
+        COMPOUND_REGISTER_FOUR_BITS, // value used in opcode is the number of the lower register
         R0_TO_R15,
-        R16_TO_R31,
-        R16_TO_R23,
-        X_REGISTER,
+        R16_TO_R31, // value used in opcode is regNum-16
+        R16_TO_R23, // value used in opcode is regNum-16
+        X_REGISTER, 
         Y_REGISTER,
         Z_REGISTER,
         Y_REGISTER_DISPLACEMENT,
         Z_REGISTER_DISPLACEMENT,
-        // addresses
-        FLASH_MEM_ADDRESS, // device-dependent, covers whole address range
-        SIXTEEN_BIT_SRAM_MEM_ADDRESS, // device-dependent, covers whole address range
-        SEVEN_BIT_SRAM_MEM_ADDRESS,
-        DATASPACE_16_BIT_ADDESS,
-        // constant values
+        // unsigned constant values
         THREE_BIT_CONSTANT,
         FOUR_BIT_CONSTANT,
-        SIX_BIT_CONSTANT,
-        SEVEN_BIT_SIGNED_BRANCH_OFFSET,
+        SIX_BIT_CONSTANT,        
         EIGHT_BIT_CONSTANT,
+        // absolute addresses
+        TWENTYTWO_BIT_FLASH_MEM_ADDRESS, // device-dependent, covers whole address range
+        SIXTEEN_BIT_SRAM_MEM_ADDRESS, // device-dependent, covers whole address range
+        SEVEN_BIT_SRAM_MEM_ADDRESS,
+        // signed jump offsets
+        SEVEN_BIT_SIGNED_JUMP_OFFSET,
         TWELVE_BIT_SIGNED_JUMP_OFFSET,
         // IO register constants
         FIVE_BIT_IO_REGISTER_CONSTANT,
         SIX_BIT_IO_REGISTER_CONSTANT,        
-        // no-argument marker
+        // special no-argument type
         NONE
     }
     
@@ -435,13 +261,161 @@ public abstract class AbstractAchitecture implements IArchitecture
         }
     }
     
+    private static final InstructionSelector DEFAULT_INSN_SELECTOR = new InstructionSelector() {
+
+        @Override
+        public InstructionEncoding pick(InstructionNode node,List<InstructionEncoding> candidates) 
+        {
+            if ( candidates.size() != 1 ) {
+                throw new RuntimeException("This instruction selector only supports exactly 1 candidate encoding (got: "+candidates+")");
+            }
+            return candidates.get(0);
+        }
+
+        @Override
+        public int getMaxInstructionLengthInBytes(InstructionNode node,List<InstructionEncoding> candidates,boolean estimate) 
+        {
+            if ( candidates.size() != 1 ) {
+                throw new RuntimeException("This instruction selector only supports exactly 1 candidate encoding (got: "+candidates+")");
+            }            
+            return candidates.get(0).getInstructionLengthInBytes();
+        }
+    };
+    
+    public interface InstructionSelector 
+    {
+        public InstructionEncoding pick(InstructionNode node,List<InstructionEncoding> candidates);
+        
+        public int getMaxInstructionLengthInBytes(InstructionNode node,List<InstructionEncoding> candidates,boolean estimate);
+    }
+    
+    public static final class EncodingEntry 
+    {
+        public final InstructionSelector selector;
+        public final List<InstructionEncoding> encodings = new ArrayList<>();
+        
+        public EncodingEntry(InstructionSelector chooser,InstructionEncoding[] encodings) 
+        {
+            this( chooser , encodings[0] , Arrays.copyOfRange( encodings , 1 , encodings.length) );
+        }
+        
+        public EncodingEntry(InstructionSelector chooser,InstructionEncoding encoding1,InstructionEncoding... additional) 
+        {
+            Validate.notNull(chooser, "chooser must not be NULL");
+            this.selector = chooser;
+            add( encoding1 );
+            if ( additional != null ) 
+            {
+                Stream.of(additional).forEach( this::add );
+            }
+        }
+        
+        public void add( InstructionEncoding enc) 
+        {
+            Validate.notNull(enc, "enc must not be NULL");
+            if ( ! this.encodings.isEmpty() ) 
+            {
+                if ( ! enc.mnemonic.equals( this.encodings.get(0).mnemonic ) ) {
+                    throw new IllegalArgumentException("Mnemonics differ");
+                }
+            }
+            this.encodings.add(enc);
+        }
+        
+        public InstructionEncoding getEncoding(InstructionNode insn) {
+            return selector.pick( insn , encodings );
+        }
+        
+        public int getInstructionLengthInBytes(InstructionNode insn,boolean estimate) {
+            return selector.getMaxInstructionLengthInBytes( insn , encodings , estimate );
+        }
+    }
+    
+    // key is mnemonic in lower-case, value is corresponding encoding entry
+    protected final Map<String,EncodingEntry> instructions = new HashMap<>();
+    
+    // holds instruction prefixes in big-endian order
+    protected final PrefixTree prefixTree = new PrefixTree();
+    
+    protected InstructionEncoding insn(String mnemonic,String pattern) 
+    {
+        return insn( mnemonic , pattern , ArgumentType.NONE , ArgumentType.NONE , false , DEFAULT_INSN_SELECTOR);
+    }
+    
+    protected InstructionEncoding insn(String mnemonic,String pattern,ArgumentType dstType) 
+    {
+        return insn( mnemonic , pattern , dstType , ArgumentType.NONE , false , DEFAULT_INSN_SELECTOR );
+    }  
+    
+    protected InstructionEncoding insn(String mnemonic,String pattern,ArgumentType dstType,ArgumentType srcType) 
+    {
+        return insn( mnemonic , pattern , dstType , srcType , false , DEFAULT_INSN_SELECTOR );
+    }
+    
+    protected InstructionEncoding insn(String mnemonic,String pattern,ArgumentType dstType,ArgumentType srcType,InstructionSelector chooser) 
+    {
+        if ( chooser == DEFAULT_INSN_SELECTOR ) {
+            throw new IllegalArgumentException("Internal error, default selector does not support multiple encodings");
+        }    
+        return insn(mnemonic, pattern, dstType, srcType, true , chooser);
+    }
+    
+    protected InstructionEncoding insn(String mnemonic,String pattern,ArgumentType dstType,ArgumentType srcType,boolean multipleEncodings,InstructionSelector chooser) 
+    {
+        if ( ! mnemonic.toLowerCase().equals( mnemonic ) ) {
+            throw new RuntimeException("Mnemonics need to be all lower-case");
+        }
+        final InstructionEncoder enc = new InstructionEncoder( pattern );
+        final int expArgCount = ( (dstType==ArgumentType.NONE) ? 0 : 1 ) + ( (srcType==ArgumentType.NONE) ? 0 : 1 );
+        if ( enc.getArgumentCount() != expArgCount ) {
+            throw new RuntimeException("Internal error, number of arguments in pattern ("+enc.getArgumentCount()+") does not match expectations ("+expArgCount+")");
+        }
+        
+        final InstructionEncoding ins = new InstructionEncoding( mnemonic , enc , dstType , srcType );
+        
+        final EncodingEntry existing = instructions.get( mnemonic );
+        if ( existing != null ) 
+        {
+            if ( ! multipleEncodings ) {
+                throw new RuntimeException("Internal error, duplicate instruction '"+mnemonic+"'");
+            }
+            existing.add( ins );
+        } 
+        else 
+        {
+            instructions.put( mnemonic , new EncodingEntry( chooser , ins ) );
+        }
+        prefixTree.add( ins );        
+        return ins;
+    }     
+    
+    protected final void add(EncodingEntry entry) 
+    {
+        Validate.notNull(entry, "entry must not be NULL");
+        if ( entry.encodings.isEmpty() ) {
+            throw new IllegalArgumentException("Encoding entry needs to have at least one encoding");
+        }
+        final String mnemonic = entry.encodings.get(0).mnemonic;
+        if ( ! mnemonic.toLowerCase().equals( mnemonic ) ) {
+            throw new RuntimeException("Mnemonics need to be lower-case");
+        }        
+        if ( entry.encodings.stream().anyMatch( enc -> ! enc.mnemonic.equals( mnemonic ) ) ) {
+            throw new RuntimeException("Refusing to add entry that contains mixed mnemonics");
+        }
+        if ( instructions.containsKey( mnemonic ) ) {
+            throw new RuntimeException("Already existing entry for mnemonic '"+mnemonic+"'");
+        }
+        instructions.put( mnemonic , entry );
+        entry.encodings.forEach( prefixTree::add );
+    }    
+    
     @Override
     public final boolean hasType(Architecture t) {
         return t.equals( getType() );
     }
 
     @Override
-    public boolean isValidInstruction(String s) 
+    public boolean isValidMnemonic(String s) 
     {
         if ( StringUtils.isNotBlank( s ) ) 
         {
@@ -463,37 +437,51 @@ public abstract class AbstractAchitecture implements IArchitecture
     @Override
     public boolean validate(InstructionNode node,ICompilationContext context) 
     {
-        ASTNode child1 = null;
-        ASTNode child2 = null;
+        ASTNode dstArgument = null;
+        ASTNode srcArgument = null;
         switch( node.childCount() ) 
         {
             case 0: 
                 break;
-            case 2: child2 = node.child(1);
+            case 2: srcArgument = node.child(1);
             //      $$FALL-THROUGH$$
-            case 1: child1 = node.child(0); 
+            case 1: dstArgument = node.child(0); 
                 break;
             default:
         }
-        final int argCount = ( child1 != null ? 1 : 0 ) + (child2 != null ? 1 : 0 );
+        final int argCount = ( dstArgument != null ? 1 : 0 ) + (srcArgument != null ? 1 : 0 );
         
         final EncodingEntry variants = instructions.get( node.instruction.getMnemonic().toLowerCase() );
         if ( variants == null ) {
             throw new RuntimeException("Unknown instruction: "+node.instruction.getMnemonic()); 
         }        
         final InstructionEncoding encoding = variants.getEncoding( node );
-        if ( argCount != encoding.getArgumentCount() ) 
+        int expectedArgumentCount = encoding.getArgumentCount();
+        if ( encoding.hasImplicitSourceArgument() ) 
+        {
+            expectedArgumentCount++;
+        }
+        if ( encoding.hasImplicitDestinationArgument() ) 
+        {
+            expectedArgumentCount++;
+            // destination is implied so the first child of the InstructionNode is actually the source, not the destination 
+            final ASTNode tmp = dstArgument;
+            dstArgument = srcArgument;
+            srcArgument = tmp;            
+        }        
+        
+        if ( argCount != expectedArgumentCount ) 
         {
             context.message( CompilationMessage.error( encoding.mnemonic.toUpperCase()+" expects "+encoding.getArgumentCount()+" arguments but got "+argCount,node ) );
             return false;
-        }  
+        }        
         
         boolean result = true;
         if ( encoding.dstType != ArgumentType.NONE ) {
-            result &= ( getDstValue( child1 , encoding.dstType , context ,false ) != VALUE_UNAVAILABLE );
+            result &= ( getDstValue( dstArgument , encoding.dstType , context ,true ) != VALUE_UNAVAILABLE );
         }
         if ( encoding.srcType != ArgumentType.NONE ) {
-            result &= ( getSrcValue( child2 , encoding.srcType , context ,false ) != VALUE_UNAVAILABLE );
+            result &= ( getSrcValue( srcArgument , encoding.srcType , context ,true) != VALUE_UNAVAILABLE );
         }
         return result;
     }
@@ -539,24 +527,23 @@ public abstract class AbstractAchitecture implements IArchitecture
             throw new RuntimeException( encoding.mnemonic+" expects "+encoding.getArgumentCount()+" arguments but got "+argCount);
         }
         
-        final long dstValue = getDstValue( dstArgument , encoding.dstType , context , true );
-        final long srcValue = getSrcValue( srcArgument , encoding.srcType , context , true );
+        final int dstValue = (int) getDstValue( dstArgument , encoding.dstType , context , false );
+        final int srcValue = (int) getSrcValue( srcArgument , encoding.srcType , context , false );
 
-        if ( dstValue != VALUE_UNAVAILABLE && srcValue != VALUE_UNAVAILABLE ) 
-        {
-            final int instruction = encoding.encode( (int) dstValue , (int) srcValue );
-            debugAssembly(node, encoding, (int) dstValue, (int) srcValue, instruction); // TODO: Remove debug code
-            switch( encoding.getInstructionLengthInBytes() ) {
-                case 2:
-                    context.writeWord( instruction );
-                    break;
-                case 4:
-                    context.writeWord( instruction >> 16 );
-                    context.writeWord( instruction );
-                    break;
-                default:
-                    throw new RuntimeException("Unsupported instruction word length: "+encoding.getInstructionLengthInBytes()+" bytes");
-            }
+        final int instruction = encoding.encode( dstValue , srcValue );
+        if ( LOG.isDebugEnabled() ) {
+            debugAssembly(node, encoding, dstValue, srcValue, instruction); // TODO: Remove debug code
+        }
+        switch( encoding.getInstructionLengthInBytes() ) {
+            case 2:
+                context.writeWord( instruction );
+                break;
+            case 4:
+                context.writeWord( instruction >> 16 );
+                context.writeWord( instruction );
+                break;
+            default:
+                throw new RuntimeException("Unsupported instruction word length: "+encoding.getInstructionLengthInBytes()+" bytes");
         }
     }
 
@@ -587,9 +574,9 @@ public abstract class AbstractAchitecture implements IArchitecture
             default:
                 throw new RuntimeException( "Unreachable code reached");
         }
-        System.out.println( node.instruction.getMnemonic().toUpperCase()+" "+dstValue+" , "+srcValue+" [ "+node+" ]"+
+        LOG.debug( "compile():"+node.instruction.getMnemonic().toUpperCase()+" "+dstValue+" , "+srcValue+" [ "+node+" ]"+
                             " compiled => "+prettyPrint(hex,2)+" ( "+prettyPrint(bin,4)+" )");
-        System.out.println( "ENCODING: "+encoding);
+        LOG.debug( "compile(): ENCODING: "+encoding);
     }
     
     private static String prettyPrint(final String hex,int indent) 
@@ -604,22 +591,22 @@ public abstract class AbstractAchitecture implements IArchitecture
         return hex2.toString();
     }
     
-    private long getSrcValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean validateAddressRanges) 
+    private long getSrcValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase) 
     {
         try 
         {
-            return getValue(node,type,context,validateAddressRanges);
+            return getValue(node,type,context,calledInResolvePhase);
         } 
         catch(Exception e) {
             throw new RuntimeException("SRC operand: "+e.getMessage(),e);
         }
     }
     
-    private long getDstValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean validateAddressRanges) 
+    private long getDstValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase) 
     {
         try 
         {
-            return getValue(node,type,context,validateAddressRanges);
+            return getValue(node,type,context,calledInResolvePhase);
         } 
         catch(Exception e) {
             throw new RuntimeException("DST operand: "+e.getMessage(),e);
@@ -632,10 +619,119 @@ public abstract class AbstractAchitecture implements IArchitecture
         return VALUE_UNAVAILABLE;
     }
     
-    private long getValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean validateAddressRanges) 
+    private static boolean isSingleRegister(ASTNode node) {
+        return node instanceof RegisterNode && ! ((RegisterNode) node).register.isCompoundRegister();
+    }
+    
+    private static boolean isCompoundRegister(ASTNode node) {
+        return node instanceof RegisterNode && ((RegisterNode) node).register.isCompoundRegister();
+    }    
+    
+    private static boolean fitsInBitfield(int value,int bitCount) 
     {
+        // 3 bits = 0111
+        // 1<<3    = 1000
+        // 1<<3 -1 = 0111 
+        final int mask = ~((1<<bitCount)-1);
+        return ( value & mask ) == 0;
+    }
+    
+    private static boolean fitsInSignedBitfield(int value,int bitCount) 
+    {
+        // 3 bits  = 0111
+        // 1<<3    = 1000
+        // 1<<3 -1 = 0111 
+        final int mask = ~((1<<bitCount)-1);
+        if ( ( value & mask ) == 0 ) {
+            return true; // ok, positive number
+        }
+        // might be negative, make sure all upper bits are set
+        return ( value & mask ) == mask;
+    }    
+    
+    /**
+     * Returns the raw value for a given instruction operand, ready for encoding it into the opcode.
+     * 
+     * <p>The returned value is validated and transformed in such a way that it satisfies all requirements/constraints
+     * of the given argument type and is ready to be incorporated into the opcode.</p>
+     * 
+     * @param node
+     * @param type
+     * @param context
+     * @param calledInResolvePhase
+     * @return argument value or {@link #VALUE_UNAVAILABLE} if for some reason the value could not be determined.
+     *           Messages will be added to the {@link ICompilationContext#error(String, ASTNode) context} as needed.
+     */
+    private long getValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase) 
+    {
+        if ( type == ArgumentType.NONE ) {
+            return 0;
+        }
+        
+        final int result;
+        if ( node instanceof IValueNode ) 
+        {
+            final Object value = ((IValueNode) node).getValue();
+            
+            if ( value == null && calledInResolvePhase ) {
+                return VALUE_UNAVAILABLE;
+            }
+            if ( value instanceof Number) {
+                result = ((Number) value).intValue();
+            } 
+            else if ( value instanceof Address) 
+            {
+                result = ((Address) value).getByteAddress();
+            } else {
+                return fail("Operand needs to evaluate to a number but was "+value,node,context);
+            }
+        } 
+        else if ( node instanceof RegisterNode) 
+        {
+            result = getRegisterValue( (RegisterNode) node , type , context );
+            if ( result == -1 ) { // something went wrong...
+                return fail("Failed to get register value from ",node,context);
+            }
+        } else {
+            throw new RuntimeException("Internal error, don't know how to get value from unhandled node type: "+node);
+        }
+        
         switch( type ) 
         {
+            // single register
+            case SINGLE_REGISTER:
+                if ( ! isSingleRegister( node ) ) {
+                    return fail( "Operand needs to be a single register",node,context);
+                }  
+                if ( result < 0 || result > getGeneralPurposeRegisterCount() ) {
+                    throw new RuntimeException("Operand must be R0..."+(getGeneralPurposeRegisterCount()-1));
+                }                
+                return result; // TODO: Validate against number of registers the arch has
+            case R0_TO_R15:
+                if ( ! isSingleRegister( node ) ) {
+                    return fail( "Operand needs to be a single register",node,context);
+                }                   
+                if ( result < 0 || result > 15 ) {
+                    throw new RuntimeException("Operand needs to be R0...15");
+                }
+                return result; // TODO: Validate against number of registers the arch has
+            case R16_TO_R23:
+                if ( ! isSingleRegister( node ) ) {
+                    return fail( "Operand needs to be a single register",node,context);
+                }                   
+                if ( result < 16 || result > 23 ) {
+                    return fail("Operand neeeds to be R16...R23",node,context);
+                }           
+                return result-16; // TODO: Validate against number of registers the arch has                   
+            case R16_TO_R31:
+                if ( ! isSingleRegister( node ) ) {
+                    return fail( "Operand needs to be a single register",node,context);
+                }                
+                if ( result < 16 || result > 31 ) {
+                    return fail("Operand needs to be R16...R31",node,context);
+                }           
+                return result-16; // TODO: Validate against number of registers the arch has
+            // compound registers
             case X_REGISTER:
             case Y_REGISTER:
             case Z_REGISTER:
@@ -643,19 +739,18 @@ public abstract class AbstractAchitecture implements IArchitecture
             case Z_REGISTER_DISPLACEMENT:
             case COMPOUND_REGISTER_FOUR_BITS:
             case COMPOUND_REGISTERS_R24_TO_R30:
-                if ( ! (node instanceof RegisterNode) || ! ((RegisterNode) node).register.isCompoundRegister() ) 
+                if ( ! isCompoundRegister( node ) ) 
                 {
                     return fail( "Operand needs to be a compound register expression",node,context );
                 }
-                final int val = ((RegisterNode) node).register.getRegisterNumber();
                 if ( type == ArgumentType.COMPOUND_REGISTER_FOUR_BITS ) 
                 {
-                    // REG e {0,2,4,...30} encoded as 4 bit value 
-                    return val >>> 1;
+                    // REG e {0,2,4,...30} encoded as 4-bit value 
+                    return result >>> 1;
                 }
-                if ( type == ArgumentType.COMPOUND_REGISTERS_R24_TO_R30 ) 
+                if ( type == ArgumentType.COMPOUND_REGISTERS_R24_TO_R30 ) // encoded as 3-bit value
                 {
-                    switch( val ) 
+                    switch( result ) 
                     {
                         case 24:
                             return 0;
@@ -666,148 +761,124 @@ public abstract class AbstractAchitecture implements IArchitecture
                         case Register.REG_Z:
                             return 3;
                         default:
-                            return fail("Operand needs to be a compound register expression with X/Y/Z (r25:r24/r27:r26/r29:r28/r31:r30)",node,context);
+                            return fail("Operand needs to be a compound register expression with ?/X/Y/Z (r25:r24/r27:r26/r29:r28/r31:r30)",node,context);
                     }
                 } 
-                if ( type == ArgumentType.X_REGISTER && val != Register.REG_X ) {
+                if ( type == ArgumentType.X_REGISTER && result != Register.REG_X ) {
                     return fail("Operand needs to be Z register",node,context);
                 } 
-                if ( ( type == ArgumentType.Y_REGISTER || type == ArgumentType.Y_REGISTER_DISPLACEMENT ) && val != Register.REG_Y ) {
+                if ( ( type == ArgumentType.Y_REGISTER || type == ArgumentType.Y_REGISTER_DISPLACEMENT ) && result != Register.REG_Y ) {
                     return fail("Operand needs to be Y register",node,context);
                 } 
-                if ( ( type == ArgumentType.Z_REGISTER || type == ArgumentType.Z_REGISTER_DISPLACEMENT ) && val != Register.REG_Z ) {
+                if ( ( type == ArgumentType.Z_REGISTER || type == ArgumentType.Z_REGISTER_DISPLACEMENT ) && result != Register.REG_Z ) {
                     return fail("Operand needs to be Z register",node,context);
                 }
-                break;
-            case SINGLE_REGISTER:
-                if ( ! (node instanceof RegisterNode) || ((RegisterNode) node).register.isCompoundRegister() ) 
-                {
-                    return fail( "Operand needs to be a single register",node,context );
-                }                
-                break;
+                return result;
             case EIGHT_BIT_CONSTANT:
-            case SEVEN_BIT_SIGNED_BRANCH_OFFSET:
-            case TWELVE_BIT_SIGNED_JUMP_OFFSET:                
+                if ( ! fitsInBitfield( result , 8 ) ) {
+                    return fail("Operand out of 8-bit range: "+result,node,context);
+                }
+                return result;
             case SIX_BIT_CONSTANT:
+                if ( ! fitsInBitfield( result , 6 ) ) {
+                    return fail("Operand out of 6-bit range: "+result,node,context);
+                }
+                return result;                
             case FOUR_BIT_CONSTANT:
+                if ( ! fitsInBitfield( result , 4 ) ) {
+                    return fail("Operand out of 4-bit range: "+result,node,context);
+                }
+                return result;                 
             case THREE_BIT_CONSTANT:
-            case FIVE_BIT_IO_REGISTER_CONSTANT:
-            case SIX_BIT_IO_REGISTER_CONSTANT:
-            case DATASPACE_16_BIT_ADDESS: // TODO: Validate range according to spec
-            case SEVEN_BIT_SRAM_MEM_ADDRESS:                
-            case SIXTEEN_BIT_SRAM_MEM_ADDRESS:                
-            case FLASH_MEM_ADDRESS:                
+                if ( ! fitsInBitfield( result , 3 ) ) {
+                    return fail("Operand out of 3-bit range: "+result,node,context);
+                }
+                return result;                  
+            case FIVE_BIT_IO_REGISTER_CONSTANT:  // 0..63
+                if ( ! fitsInBitfield( result , 5 ) ) {
+                    return fail("Operand out of 5-bit range (IO register): "+result,node,context);
+                }
+                if ( ! isValidIOSpaceAdress( getGeneralPurposeRegisterCount() + result ) ) { // I/O address space starts right after register file
+                    return fail("Operand is not a valid I/O register address: "+result,node,context);
+                }
+                return result;
+            case SIX_BIT_IO_REGISTER_CONSTANT: 
+                if ( ! fitsInBitfield( result , 6 ) ) {
+                    return fail("Operand out of 6-bit range (IO register): "+result,node,context);
+                }
+                if ( ! isValidIOSpaceAdress( getGeneralPurposeRegisterCount() + result ) ) { // I/O address space starts right after register file
+                    return fail("Operand is not a valid I/O register address: "+result,node,context);
+                }                
+                return result; 
+            case SEVEN_BIT_SRAM_MEM_ADDRESS:       
+                if ( ! fitsInBitfield( result , 7 ) ) {
+                    return fail("Operand out of 7-bit range (SRAM address): "+result,node,context);
+                }
+                if ( ! isValidSRAMAdress( result ) ) {
+                    return fail("SRAM address out of range (0..."+(getSegmentSize(Segment.SRAM)-1)+"): "+result,node,context);                    
+                }
+                return result;
+            case SIXTEEN_BIT_SRAM_MEM_ADDRESS:
+                if ( ! fitsInBitfield( result , 16 ) ) {
+                    return fail("Operand out of 16-bit range (SRAM address): "+result,node,context);
+                }
+                if ( ! isValidSRAMAdress( result ) ) {
+                    return fail("SRAM address out of range (0..."+(getSegmentSize(Segment.SRAM)-1)+"): "+result,node,context);                    
+                }                
+                return result;
+            // flash ram addresses / branch offsets
+            case SEVEN_BIT_SIGNED_JUMP_OFFSET:
+            case TWELVE_BIT_SIGNED_JUMP_OFFSET:                     
+            case TWENTYTWO_BIT_FLASH_MEM_ADDRESS:                
                 if ( ! (node instanceof IValueNode)) {
                     return fail("Operand must evaluate to a constant (expected: " +type+", was: "+node.getClass().getName()+")",node,context);
                 }                
-                break;
-            case NONE:
-                if ( node != null ) {
-                    return fail("Instruction does not support any operands",node,context);
+                // convert to word address since the assembler uses byte addresses internally
+                if ( ( result & 1 ) != 0 ) {
+                    return fail("FLASH memory destination address needs to be even but was 0x"+Integer.toHexString(result),node,context);
                 }
-                return 0;
-            case R0_TO_R15:
-            case R16_TO_R31:
-                if ( ! (node instanceof RegisterNode)) {
-                    return fail( "Operand must be a register",node,context);
-                }                
-                final RegisterNode reg = (RegisterNode) node;
-                if ( reg.register.isCompoundRegister() ) {
-                    return fail("Operand must not be a compound register expression",node,context);
+                if ( ! isValidFlashAdress( result ) ) {
+                    return fail("Destination out of FLASH memory range (0.."+(getSegmentSize(Segment.FLASH)-1)+":"+result,node,context);
                 }
-                final int regNum = reg.register.getRegisterNumber();
-                if ( type == ArgumentType.R0_TO_R15 ) {
-                    if ( regNum > 15 ) {
-                        throw new RuntimeException("Operand must be R0...15");
-                    }
-                } else if ( type == ArgumentType.R16_TO_R31 ) {
-                    if ( regNum < 16 ) {
-                        return fail("Operand must be R16...R31",node,context);
-                    }                    
-                } else {
-                    throw new RuntimeException("Unreachable code reached");
+                
+                final int wordAddress = result >>> 1; 
+                final Address current = context.currentAddress();
+                if ( current.getSegment() != Segment.FLASH ) {
+                    return fail("Operand must evaluate to a constant (expected: " +type+", was: "+node.getClass().getName()+")",node,context);                    
                 }
-                break;
-            default:
-                throw new RuntimeException("Internal error,unhandled switch/case: "+type);
-        }
-        
-        int result;
-        if ( node instanceof IValueNode ) 
-        {
-            final Object value = ((IValueNode) node).getValue();
-            if ( value instanceof Number) {
-                result = ((Number) value).intValue();
-            } 
-            else if ( value instanceof Address) 
-            {
-                result = ((Address) value).getByteAddress();
-            } else {
-                return fail("Operand needs to evaluate to a number",node,context);
-            }
-        } 
-        else if ( node instanceof RegisterNode) 
-        {
-            result = getValue( (RegisterNode) node , type , context );
-            if ( result == -1 ) { // something went wrong
-                return 0; // RETURN zero value as this should always be encodeable by the InstructionEncoder 
-            }
-        } else {
-            throw new RuntimeException("Internal error, don't know how to get value from "+node);
-        }
-        
-        if ( type == ArgumentType.FLASH_MEM_ADDRESS ||  type == ArgumentType.TWELVE_BIT_SIGNED_JUMP_OFFSET || type == ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET ) 
-        {
-            result = result >>> 1; // byte address -> word address
-        }
-        if ( type == ArgumentType.TWELVE_BIT_SIGNED_JUMP_OFFSET || type == ArgumentType.SEVEN_BIT_SIGNED_BRANCH_OFFSET ) 
-        {
-            if ( ! context.currentSegment().equals( Segment.FLASH ) ) 
-            {
-                throw new RuntimeException("Expected the ICompilationContext to be in FLASH");
-            }              
-            final Address actual = Address.byteAddress( Segment.FLASH , context.currentOffset() + result*2 );
-            if ( ! actual.hasSegment( Segment.FLASH ) ) {
-                return fail("Expected at address in the code segment",node,context);
-            }
-            final Address current = context.currentAddress();   
-            final int delta = actual.getWordAddress() - current.getWordAddress();
-            switch( type ) 
-            {
-                case TWELVE_BIT_SIGNED_JUMP_OFFSET:
-                    if ( validateAddressRanges && ( delta < -2048 || delta > 2047 ) ) {
-                        return fail("Jump distance out of 12-bit range (was: "+delta+")",node,context);
-                    }
-                    result = delta;
-                    break;
-                case SEVEN_BIT_SIGNED_BRANCH_OFFSET:
-                    if ( validateAddressRanges && ( delta < -64 || delta > 63 ) ) 
+                
+                if ( type == ArgumentType.TWELVE_BIT_SIGNED_JUMP_OFFSET || type == ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET ) 
+                {
+                    // relative jump using signed offset
+                    final int deltaWords = wordAddress - current.getWordAddress();
+                    switch( type ) 
                     {
-                        return fail("Jump distance out of 7-bit range (was: "+delta+")",node,context);
-                    }                        
-                    result = delta;
-                    break;
-            }        
-        }
-        
-        switch ( type ) 
-        {
-            case FLASH_MEM_ADDRESS:
-                if ( result < 0 || result > getFlashMemorySize()/2 ) {
-                    return fail("Address "+result+" is out-of-range, target architecture only has "+getFlashMemorySize()+" bytes of flash memory",node,context);
+                        case TWELVE_BIT_SIGNED_JUMP_OFFSET:
+                            if ( ! fitsInSignedBitfield( deltaWords,  12 ) ) {
+                                return fail("Jump distance out of 12-bit range (was: "+result+")",node,context);
+                            }
+                            return deltaWords;
+                        case SEVEN_BIT_SIGNED_JUMP_OFFSET:
+                            if ( ! fitsInSignedBitfield( deltaWords,  7 ) ) 
+                            {
+                                return fail("Jump distance out of 7-bit range (was: "+result+")",node,context);
+                            }                        
+                            return deltaWords;
+                        default:
+                            throw new RuntimeException("Unreachable code reached");                            
+                    }                     
                 }
-                break;
-            case SEVEN_BIT_SRAM_MEM_ADDRESS:
-            case SIXTEEN_BIT_SRAM_MEM_ADDRESS: 
-                if ( result < 0 || result > getSRAMMemorySize() ) {
-                    return fail("Address "+result+" is out-of-range, target architecture only has "+getSRAMMemorySize()+" bytes of SRAM memory",node,context);
-                }
-                break;
+                // jump to absolute address
+                if ( ! fitsInBitfield( wordAddress ,  22 ) ) {
+                    return fail("Flash address out of 22-bit range (was: 0x"+Integer.toHexString(result)+")",node,context);
+                }                
+                return wordAddress;
+            default:
+                throw new RuntimeException("Unhandled argument type: "+type);
         }
-        return result;
     }
     
-    private int getValue(RegisterNode node,ArgumentType type,ICompilationContext context) 
+    private int getRegisterValue(RegisterNode node,ArgumentType type,ICompilationContext context) 
     {
         if ( type == ArgumentType.Z_REGISTER_DISPLACEMENT || type == ArgumentType.Y_REGISTER_DISPLACEMENT )
         {
@@ -839,18 +910,6 @@ public abstract class AbstractAchitecture implements IArchitecture
         return result;
     }
     
-    private static String insertEvery(String input,int distance,String s) 
-    {
-        final StringBuilder builder = new StringBuilder();
-        for ( int i = 0 ; i < input.length() ; i++ ) {
-            if ( i > 0 && (i%distance) == 0 ) {
-                builder.append( s );
-            }
-            builder.append( input.charAt(i) );
-        }
-        return builder.toString();
-    }
-    
     private static int reverseBytes(int value,int byteCount) 
     {
         final int result;
@@ -863,10 +922,6 @@ public abstract class AbstractAchitecture implements IArchitecture
             default:
                 throw new RuntimeException("Illegal byte count: "+byteCount);
         }
-        
-        String in = StringUtils.leftPad( Integer.toBinaryString( value ) , 8*byteCount , '0' );
-        String out = StringUtils.leftPad( Integer.toBinaryString( result ) , 8*byteCount , '0' );
-        System.out.println("REVERSED: \n"+insertEvery(in,8,"_")+"\n"+insertEvery(out,8,"_"));
         return result;
     }    
     
@@ -932,9 +987,7 @@ public abstract class AbstractAchitecture implements IArchitecture
                 buffer.append("\n");
             }
             
-//            buffer.append("; 0x").append( StringUtils.leftPad( Integer.toHexString( startAddress+ptr ) , 4 , '0' ) ).append(":    ");            
-            
-            if ( matches.isEmpty() )
+            if ( matches.isEmpty() ) // print as .db XX
             {
                 buffer.append(".db ");
                 final int skip = remaining >= 2 ? 2 : remaining;
@@ -1033,14 +1086,13 @@ public abstract class AbstractAchitecture implements IArchitecture
         }
         switch( type ) 
         {
-            case DATASPACE_16_BIT_ADDESS:
             case EIGHT_BIT_CONSTANT:
             case FIVE_BIT_IO_REGISTER_CONSTANT:
             case FOUR_BIT_CONSTANT:
-            case SEVEN_BIT_SIGNED_BRANCH_OFFSET:
+            case SEVEN_BIT_SIGNED_JUMP_OFFSET:
             case SEVEN_BIT_SRAM_MEM_ADDRESS:
             case SIXTEEN_BIT_SRAM_MEM_ADDRESS:
-            case FLASH_MEM_ADDRESS:
+            case TWENTYTWO_BIT_FLASH_MEM_ADDRESS:
             case SIX_BIT_CONSTANT:
             case SIX_BIT_IO_REGISTER_CONSTANT:
             case THREE_BIT_CONSTANT:
@@ -1048,9 +1100,6 @@ public abstract class AbstractAchitecture implements IArchitecture
                 int bitCount=0;
                 switch(type) 
                 {
-                    case DATASPACE_16_BIT_ADDESS: 
-                        bitCount = 16 ;
-                        break;
                     case EIGHT_BIT_CONSTANT:      
                         bitCount =  8 ;
                         break;
@@ -1060,16 +1109,18 @@ public abstract class AbstractAchitecture implements IArchitecture
                     case FOUR_BIT_CONSTANT:  
                         bitCount = 4 ;
                         break;
-                    case SEVEN_BIT_SIGNED_BRANCH_OFFSET:  
+                    case SEVEN_BIT_SIGNED_JUMP_OFFSET:  
                         bitCount = 7 ;
                         return printConstant(2*signExtend(value,bitCount) , bitCount);  // signExtend(value,bitCount);
                     case SEVEN_BIT_SRAM_MEM_ADDRESS:  
                         bitCount = 7 ;
                         break;
+                    case TWENTYTWO_BIT_FLASH_MEM_ADDRESS:
+                        bitCount = 22;
+                        break;
                     case SIXTEEN_BIT_SRAM_MEM_ADDRESS:  
                         bitCount = 16 ;
-                        return printConstant(value,bitCount);                        
-                    case FLASH_MEM_ADDRESS: 
+                        break;                        
                     case SIX_BIT_CONSTANT:  
                         bitCount = 6 ;
                         break;
@@ -1082,6 +1133,8 @@ public abstract class AbstractAchitecture implements IArchitecture
                     case TWELVE_BIT_SIGNED_JUMP_OFFSET:  
                         bitCount = 12 ;
                         return printConstant(2*signExtend(value,bitCount) , bitCount);
+                    default:
+                        // $$FALL-THROUGH$$
                 }
                 return printConstant(value,bitCount);
             default:
@@ -1136,9 +1189,8 @@ public abstract class AbstractAchitecture implements IArchitecture
             case Z_REGISTER_DISPLACEMENT:
                 return "Z+";
             default:
-                // $$FALL-THROUGH$
+                throw new RuntimeException("Unhandled type: "+type);
         }
-        throw new RuntimeException("Unhandled type: "+type);
     }
     
     private String printConstant(int value,int bitCount) 
@@ -1164,4 +1216,11 @@ public abstract class AbstractAchitecture implements IArchitecture
         }
         return value;
     }
+    
+    protected abstract boolean isValidFlashAdress(int address);
+    protected abstract boolean isValidSRAMAdress(int address);
+    protected abstract boolean isValidRegisterNumber(int number);
+    protected abstract boolean isValidIOSpaceAdress(int address);
+    protected abstract boolean isValidEEPROMAdress(int address);
+    protected abstract int getGeneralPurposeRegisterCount();
 }

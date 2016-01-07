@@ -1,278 +1,128 @@
-/**
- * Copyright 2015 Tobias Gierke <tobias.gierke@code-sourcery.de>
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package de.codesourcery.javr.assembler.parser.ast;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.apache.commons.lang3.Validate;
-
-import de.codesourcery.javr.assembler.ICompilationContext;
-import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
-import de.codesourcery.javr.assembler.parser.Parser.Severity;
+import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.parser.TextRegion;
+import de.codesourcery.javr.assembler.parser.ast.AbstractASTNode.IterationContext;
 
-public abstract class ASTNode 
-{
-    public final List<ASTNode> children=new ArrayList<>();
-    
-    private boolean skip;
-    private TextRegion region;
-    private ASTNode parent;
-    
-    public ASTNode() {
-    }
-    
-    /**
-     * Marks this subtree as to be skipped because of conditional compilation.
-     */
-    public final void markAsSkip() 
-    {
-        this.skip = true;
-        for ( ASTNode child : children ) 
-        {
-            child.markAsSkip();
-        }
-    }
-    
-    /**
-     * Check whether conditional compilation marked this subtree as to be skipped
-     * @return
-     */
-    public boolean isSkip() {
-        return skip;
-    }
-    
-    public final ASTNode createCopy(boolean deep) 
-    {
-        final ASTNode result = createCopy();
-        result.skip = this.skip;
-        
-        if ( deep ) 
-        {
-            for ( ASTNode child : children ) 
-            {
-                result.addChild( child.createCopy( true ) );
-            }
-        }
-        return result;
-    }
-    
-    protected abstract ASTNode createCopy();
-    
-    public ASTNode(TextRegion region) 
-    {
-        Validate.notNull(region, "region must not be NULL");
-        this.region = region;
-    }
-    
-    public void setRegion(TextRegion region) {
-        Validate.notNull(region, "region must not be NULL");
-        this.region = region;
-    }
-    
-    public ASTNode getParent() {
-        return parent;
-    }
-    
-    public boolean hasParent() {
-        return parent != null;
-    }
-    
-    public boolean hasNoParent() {
-        return parent == null;
-    }
-    
-    public void setParent(ASTNode parent) 
-    {
-        Validate.notNull(parent, "parent must not be NULL");
-        if ( this.parent != null && this.parent != parent) {
-            throw new IllegalStateException("refusing to re-assign node parent");
-        }
-        this.parent = parent;
-    }
-    
-    public int childCount() {
-        return children.size();
-    }    
-    
-    public interface IIterationContext 
-    {
-        public void stop();
-        public void dontGoDeeper();
-    }
-    
-    protected class IterationContext implements IIterationContext {
+public interface ASTNode {
 
-        public boolean stop;
-        public boolean dontGoDeeper;
-        
-        public void reset() {
-            dontGoDeeper = false;
-        }
-        @Override
-        public void stop() {
-            stop = true;
-        }
-
-        @Override
-        public void dontGoDeeper() {
-            dontGoDeeper = true;
-        }
-    }
-    
+    @FunctionalInterface
     public interface IASTVisitor {
         
         public void visit(ASTNode node,IIterationContext ctx);
     }
     
-    public void visitBreadthFirst(IASTVisitor n) 
+    public interface IIterationContext 
     {
-        visitBreadthFirst( n , new IterationContext() );
-    }
-    
-    private void visitBreadthFirst(IASTVisitor n,IterationContext ctx)  
-    {
-        n.visit( this , ctx );
-        if ( ctx.stop ) {
-            return;
-        }
-        if ( ctx.dontGoDeeper ) {
-            ctx.reset();
-            return;
-        }
-        
-        for ( ASTNode child : children ) 
-        {
-            child.visitBreadthFirst( n , ctx );
-            if ( ctx.stop ) 
-            {
-                return;
-            }
-        }
+        public void stop();
+        public void dontGoDeeper();
     }    
-    
-    public void visitDepthFirst(IASTVisitor n) 
-    {
-        visitDepthFirst( n , new IterationContext() 
-        {
-            public void dontGoDeeper() {
-                throw new UnsupportedOperationException("dontGoDeeper() doesn't make sense with depth-first traversal");
-            }
-        } );
-    }
-    
-    private void visitDepthFirst(IASTVisitor n,IterationContext ctx)  
-    {
-        for ( ASTNode child : children ) 
-        {
-            child.visitDepthFirst( n , ctx );
-            if ( ctx.stop ) 
-            {
-                return;
-            }
-        }
-        
-        n.visit( this , ctx );
-        if ( ctx.stop ) {
-            return;
-        }
-    }      
-    
-    public TextRegion getTextRegion() {
-        return region;
-    }
-    
-    public void insertChild(int index,ASTNode child) 
-    {
-        Validate.notNull(child, "child must not be NULL");
-        this.children.add( index , child );
-        child.setParent( this );
-    }
-    
-    public void addChild(ASTNode child) 
-    {
-        Validate.notNull(child, "child must not be NULL");
-        this.children.add( child );
-        child.setParent( this );
-    }
-    
-    public void addChildren(Collection<? extends ASTNode> children) 
-    {
-        Validate.notNull(children, "child must not be NULL");
-        for ( ASTNode child : children ) {
-            addChild( child );
-        }
-    }
-    
-    public ASTNode firstChild() {
-        return children.get(0);
-    }
-    
-    public ASTNode child(int index) {
-        return children.get(index);
-    }
-    
-    public boolean hasChildren() {
-        return ! children.isEmpty();
-    }
-    
-    public boolean hasNoChildren() {
-        return children.isEmpty();
-    }
+    /**
+     * Marks this subtree as to be skipped because of conditional compilation.
+     */
+    void markAsSkip();
 
-    public int indexOf(ASTNode child) {
-        return children.indexOf( child );
-    }
+    List<ASTNode> children();
+
+    /**
+     * Check whether conditional compilation marked this subtree as to be skipped
+     * @return
+     */
+    boolean isSkip();
+
+    ASTNode createCopy(boolean deep);
+
+    void setRegion(TextRegion region);
+
+    ASTNode getParent();
+
+    boolean hasParent();
+
+    boolean hasNoParent();
+
+    void setParent(ASTNode parent);
+
+    int childCount();
+
+    void visitBreadthFirst(IASTVisitor n);
     
-    public void compile(ICompilationContext ctx) 
-    {
-        for ( ASTNode child : children ) 
-        {
-            try {
-                child.compile(ctx);
-            } catch(Exception e) {
-                ctx.message( new CompilationMessage( Severity.ERROR , e.getMessage() , child ) );
-            }
-        }
-    }
+    public StatementNode getStatement();
+
+    /**
+     * DO NOT USE - PART OF INTERNAL API.     
+     * @param n
+     * @param ctx
+     * @Deprecated
+     */
+    @Deprecated
+    public void visitBreadthFirst(IASTVisitor n,IterationContext ctx);      
+
+    void visitDepthFirst(IASTVisitor n);
     
-    public String getAsString() {
-        return null;
-    }
+    /**
+     * DO NOT USE - PART OF INTERNAL API.
+     * @param n
+     * @param ctx
+     * @Deprecated
+     */
+    @Deprecated
+    public void visitDepthFirst(IASTVisitor n,IterationContext ctx);    
+
+    TextRegion getTextRegion();
+
+    void insertChild(int index, ASTNode child);
+
+    void addChild(ASTNode child);
+
+    void addChildren(Collection<? extends ASTNode> children);
+
+    ASTNode firstChild();
+
+    ASTNode child(int index);
+
+    boolean hasChildren();
+
+    boolean hasNoChildren();
+
+    int indexOf(ASTNode child);
+
+    String getAsString();
+
+    String toString();
+
+    /**
+     * Returns whether this AST node is associated with a location in memory.
+     * 
+     * @return
+     */
+    public boolean hasMemoryLocation();
     
-    @Override
-    public String toString() 
-    {
-        final StringBuilder buffer = new StringBuilder();
-        String s = getAsString();
-        if ( s != null ) {
-            buffer.append( s );
-        }
-        for ( ASTNode child : children ) {
-            s = child.toString();
-            if ( s.length() > 0 ) 
-            {
-                if ( buffer.length() > 0 ) {
-                    buffer.append(",");
-                }
-                buffer.append( s );
-            }
-        }
-        return buffer.toString();
-    }
+    /**
+     * Returns the memory address this AST node is associated with.
+     * @return
+     * @throws IllegalStateException if this AST node cannot be associated with a memory location.
+     * @see #hasMemoryLocation()       
+     */
+    public Address getMemoryLocation() throws IllegalStateException;
+    
+    /**
+     * Assigns a memory location to this AST node.
+     * 
+     * @param address
+     * @return
+     * @throws IllegalStateException if this AST node cannot be associated with a memory location.
+     * @see #hasMemoryLocation()     
+     */
+    public boolean assignMemoryLocation(Address address);
+    
+    /**
+     * Returns the number of bytes in memory that are associated with this AST node and all of its children.
+     * 
+     * @return
+     * @throws IllegalStateException
+     */
+    public int getSizeInBytes() throws IllegalStateException;
 }

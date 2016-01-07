@@ -124,13 +124,11 @@ public class DisassembleTest extends TestCase {
                 return new RegisterNode( new Register( isDst ? "Y" : "Z" ,false,false) , new TextRegion(1,1) ); 
             case COMPOUND_REGISTERS_R24_TO_R30:
                 return new RegisterNode( new Register( isDst ? "Y" : "Z",false,false) , new TextRegion(1,1) );
-            case DATASPACE_16_BIT_ADDESS:
-                return new NumberLiteralNode( isDst ? "0x1234" : "0x4322" , new TextRegion(1,1));
             case EIGHT_BIT_CONSTANT:
                 return new NumberLiteralNode( isDst ? "0x12" : "0x24" , new TextRegion(1,1));
             case FIVE_BIT_IO_REGISTER_CONSTANT:
                 return new NumberLiteralNode( isDst ? "%10101" : "%01010" , new TextRegion(1,1));
-            case FLASH_MEM_ADDRESS:
+            case TWENTYTWO_BIT_FLASH_MEM_ADDRESS:
                 return new NumberLiteralNode( isDst ? "0x1234" : "00x0136" , new TextRegion(1,1));
             case FOUR_BIT_CONSTANT:
                 return new NumberLiteralNode( isDst ? "%1001" : "%1111" , new TextRegion(1,1));
@@ -142,7 +140,7 @@ public class DisassembleTest extends TestCase {
                 return new RegisterNode( new Register( isDst ? "r16" : "r17" ,false,false) , new TextRegion(1,1) );
             case R16_TO_R31:
                 return new RegisterNode( new Register( isDst ? "r16" : "r31" ,false,false) , new TextRegion(1,1) );
-            case SEVEN_BIT_SIGNED_BRANCH_OFFSET:
+            case SEVEN_BIT_SIGNED_JUMP_OFFSET:
                 return new NumberLiteralNode( isDst ? "%1101011" : "%1010111"  , new TextRegion(1,1));
             case SINGLE_REGISTER:
                 return new RegisterNode( new Register( isDst ? "r0" : "r1" ,false,false) , new TextRegion(1,1) );
@@ -211,11 +209,6 @@ public class DisassembleTest extends TestCase {
         
         @Override
         public SymbolTable globalSymbolTable() {
-            throw new UnsupportedOperationException();
-        }
-        
-        @Override
-        public int getBytesRemainingInCurrentSegment() {
             throw new UnsupportedOperationException();
         }
         

@@ -17,12 +17,14 @@ package de.codesourcery.javr.assembler.parser.ast;
 
 import org.apache.commons.lang3.Validate;
 
+import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Instruction;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 
-public class InstructionNode extends ASTNode 
+public class InstructionNode extends NodeWithMemoryLocation implements Resolvable
 {
     public final Instruction instruction;
+    private int sizeInBytes;
 
     public InstructionNode(Instruction insn,TextRegion region) 
     {
@@ -47,5 +49,37 @@ public class InstructionNode extends ASTNode
     @Override
     public String getAsString() {
         return instruction.getMnemonic().toUpperCase();
+    }
+    
+    @Override
+    public boolean hasMemoryLocation() {
+        return true;
+    }
+    
+    @Override
+    public int getSizeInBytes() throws IllegalStateException 
+    {
+        if ( this.sizeInBytes <= 0 ) {
+            throw new IllegalStateException("Size not resolved yet");
+        }
+        return sizeInBytes;
+    }    
+    
+    @Override
+    public boolean resolve(ICompilationContext context) 
+    {
+        assignMemoryLocation( context.currentAddress() );
+        for ( ASTNode child : children() ) 
+        {
+            child.visitDepthFirst( (node,ctx) -> 
+            {
+                if ( node instanceof Resolvable) 
+                {
+                    ((Resolvable) node).resolve( context );
+                }
+            });
+        }
+        this.sizeInBytes = context.getArchitecture().getInstructionLengthInBytes( this, context , true );        
+        return true;
     }
 }

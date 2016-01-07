@@ -15,8 +15,6 @@
  */
 package de.codesourcery.javr.assembler.parser.ast;
 
-import java.util.Optional;
-
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
@@ -24,11 +22,11 @@ import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.symbols.Symbol;
 
-public class IdentifierNode extends ASTNode implements IValueNode {
+public class IdentifierNode extends AbstractASTNode implements IValueNode,Resolvable {
 
     public final Identifier name;
 
-    private Object resolvedValue;
+    private Symbol symbol;
     
     public IdentifierNode(Identifier id,TextRegion region) {
         super(region);
@@ -41,18 +39,10 @@ public class IdentifierNode extends ASTNode implements IValueNode {
         return name.value;
     }
     
-    public boolean resolveValue(ICompilationContext context) 
-    {
-        final Optional<Symbol> symbol = context.currentSymbolTable().maybeGet( name );
-        final Object value = symbol.isPresent() ? symbol.get().getValue() : null;
-        this.resolvedValue = value;
-        return value != null;
-    }
-
     @Override
     public Object getValue()
     {
-        return resolvedValue;
+        return symbol != null ? symbol.getValue() : null;
     }
     
     @Override
@@ -63,6 +53,13 @@ public class IdentifierNode extends ASTNode implements IValueNode {
     
     @Override
     public String toString() {
-        return "Identifier[ "+name+" ] = "+resolvedValue;
+        return "Identifier[ "+name+" ] = "+symbol;
+    }
+
+    @Override
+    public boolean resolve(ICompilationContext context) 
+    {
+        symbol = context.currentSymbolTable().maybeGet( name ).orElse( null );
+        return symbol != null;
     }
 }

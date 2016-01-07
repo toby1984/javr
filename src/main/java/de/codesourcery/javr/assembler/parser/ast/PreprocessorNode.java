@@ -5,9 +5,10 @@ import java.util.List;
 
 import org.apache.commons.lang3.Validate;
 
+import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 
-public class PreprocessorNode extends ASTNode {
+public class PreprocessorNode extends AbstractASTNode implements Resolvable {
 
     public final Preprocessor type;
     public final List<String> arguments;
@@ -32,7 +33,8 @@ public class PreprocessorNode extends ASTNode {
         public static Preprocessor parse(String s) 
         {
             Preprocessor[] v = values();
-            for ( int i = 0, len = v.length ; i < len ; i++ ) {
+            for ( int i = 0, len = v.length ; i < len ; i++ ) 
+            {
                 if ( s.equalsIgnoreCase( v[i].literal ) ) {
                     return v[i];
                 }
@@ -62,5 +64,20 @@ public class PreprocessorNode extends ASTNode {
     @Override
     public String toString() {
         return this.type+" ("+this.arguments+")";
+    }
+
+    @Override
+    public boolean resolve(ICompilationContext context) 
+    {
+        if ( type == Preprocessor.DEFINE ) 
+        {
+            children().forEach( child -> child.visitDepthFirst( (n,ctx) -> 
+            { 
+                if ( n instanceof Resolvable) { 
+                    ((Resolvable)n).resolve( context ); 
+                }
+            }));
+        }
+        return true;
     }
 }

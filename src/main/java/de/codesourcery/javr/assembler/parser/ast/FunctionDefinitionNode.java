@@ -5,7 +5,7 @@ import org.apache.commons.lang3.Validate;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 
-public class FunctionDefinitionNode extends ASTNode 
+public class FunctionDefinitionNode extends AbstractASTNode 
 {
     public final Identifier name;
     

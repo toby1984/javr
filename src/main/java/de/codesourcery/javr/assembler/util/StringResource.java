@@ -23,6 +23,11 @@ public class StringResource implements Resource {
     }
     
     @Override
+    public boolean pointsToSameData(Resource other) {
+        return other == this;
+    }
+    
+    @Override
     public InputStream createInputStream() throws IOException {
         return res.createInputStream();
     }

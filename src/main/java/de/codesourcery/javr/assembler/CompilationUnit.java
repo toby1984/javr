@@ -33,6 +33,11 @@ public class CompilationUnit
         Validate.notNull(symbolTable, "symbolTable must not be NULL");
         this.symbolTable = symbolTable;
     }
+
+    public boolean hasSameResourceAs(CompilationUnit other) 
+    {
+        return this.resource.pointsToSameData( other.resource );
+    }
     
     public boolean isDirty() 
     {

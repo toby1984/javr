@@ -33,6 +33,12 @@ public class FileResource implements Resource
         updateContentHash();
     }
     
+    @Override
+    public boolean pointsToSameData(Resource other) 
+    {
+        return other == this || ( other instanceof FileResource && ((FileResource) other).file.equals( this.file ) );
+    }
+    
     private void updateContentHash() throws FileNotFoundException, IOException 
     {
         final HashingAlgorithm digest = new HashingAlgorithm();

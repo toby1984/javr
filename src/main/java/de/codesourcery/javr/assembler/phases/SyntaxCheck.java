@@ -14,6 +14,11 @@ import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 public class SyntaxCheck implements Phase 
 {
     @Override
+    public String getName() {
+        return "syntax_check";
+    }
+    
+    @Override
     public void run(ICompilationContext context) throws Exception
     {
         final AST ast = context.currentCompilationUnit().getAST();

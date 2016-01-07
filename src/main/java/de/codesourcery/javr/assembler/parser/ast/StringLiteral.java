@@ -4,7 +4,7 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.parser.TextRegion;
 
-public class StringLiteral extends ASTNode implements IValueNode
+public class StringLiteral extends AbstractASTNode implements IValueNode
 {
     public final String value;
 

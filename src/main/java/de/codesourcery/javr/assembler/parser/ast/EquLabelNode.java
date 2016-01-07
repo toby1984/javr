@@ -5,7 +5,7 @@ import org.apache.commons.lang3.Validate;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 
-public class EquLabelNode extends ASTNode {
+public class EquLabelNode extends AbstractASTNode {
 
     public final Identifier name;
 
