@@ -65,7 +65,18 @@ public class GenerateCodePhase extends AbstractPhase
                     if ( LOG.isDebugEnabled() ) {
                         LOG.debug("generateCode(): Compiling instruction at "+context.currentAddress()+" segment for "+node);
                     }                    
+                    int ptr = context.currentOffset();
                     context.getArchitecture().compile( (InstructionNode) node , context );
+                    final int delta = context.currentOffset() - ptr;
+                    if ( delta != node.getSizeInBytes() ) 
+                    {
+                        // fail because following labels might be wrong ...
+                        
+                        // TODO: Properly handle the case where the size of an instruction changed because
+                        // TODO: some expression that could previously not be calculated evaluated to something small enough 
+                        // TODO: so that the compiler picked a smaller encoding
+                        throw new RuntimeException("Internal error, size of instruction changed between compilation passes");
+                    }
                 }
             } catch(Exception e) {
                 LOG.debug("visitNode(): "+e.getMessage(),e);
