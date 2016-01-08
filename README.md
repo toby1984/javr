@@ -23,7 +23,6 @@ java -jar target/javr.jar
 
 ## To do
 
-- Write object file(s) to disk
 - Add parse error recovery
 - Testing...
 - Add support for #xxx directives
