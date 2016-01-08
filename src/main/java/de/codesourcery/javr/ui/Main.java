@@ -155,7 +155,7 @@ public class Main
         final byte[] data = FileUtils.readFileToByteArray( file );
         System.out.println("Disassembling "+data.length+" bytes");
         final DisassemblerSettings settings = new DisassemblerSettings();
-        settings.printBytes = false;
+        settings.printBytes = true;
         settings.printAddresses = true;
         settings.resolveRelativeAddresses = true;
         settings.printCompoundRegistersAsLower=false;

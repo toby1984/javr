@@ -279,6 +279,18 @@ public abstract class AbstractAchitecture implements IArchitecture
         
         public int encode(int dstValue,int srcValue) 
         {
+            if ( getArgumentCountFromPattern() == 1 && srcType != ArgumentType.NONE && dstType != ArgumentType.NONE ) 
+            {
+                // pattern has only one placeholder but ASM syntax takes two arguments => one of the arguments needs to be implicit
+                if ( ! hasImplicitDestinationArgument() && ! hasImplicitSourceArgument() ) {
+                    throw new RuntimeException("Pattern declares only one argument but encoding specified two argument types");
+                }
+                if ( hasImplicitDestinationArgument() ) { // need to swap src and dst because InstructionEncoder will always use the destination if pattern has only one value
+                    int tmp = dstValue;
+                    dstValue = srcValue;
+                    srcValue = tmp;
+                }
+            }
             return encoder.encode( dstValue , srcValue );
         }
 
@@ -982,7 +994,7 @@ public abstract class AbstractAchitecture implements IArchitecture
                             return deltaWords;
                         case SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET:
                             if ( deltaWords == 0 ) {
-                                return fail("Conditional branch with offset 0 is not possible",node,context);                                
+                                return fail("Conditional branch to next instruction is not possible",node,context);                                
                             }
                             if ( ! fitsInSignedBitfield( deltaWords,  7 ) ) 
                             {
@@ -1113,6 +1125,8 @@ public abstract class AbstractAchitecture implements IArchitecture
             bigEndianMSBLeft = reverseBytes( bigEndianMSBLeft , bytesToProcess );
             
             final int currentByteAddress = ptr+settings.startAddress;
+            String comment = "";
+            
             System.out.println("0x"+Integer.toHexString( currentByteAddress )+": Trying to match "+bytesToProcess+" bytes : "+Integer.toBinaryString( bigEndianMSBLeft ) );
             final List<InstructionEncoding> matches = getMatches(bigEndianMSBLeft,bytesToProcess);
             if ( buffer.length() > 0 ) 
@@ -1142,16 +1156,16 @@ public abstract class AbstractAchitecture implements IArchitecture
                 
                 final InstructionEncoding result = matches.get(0).disasmSelector.pick( matches , bigEndianMSBLeft );
                 if ( settings.printAddresses ) {
-                    buffer.append( StringUtils.leftPad( Integer.toHexString( currentByteAddress ) , 4 , '0' ) ).append(":    ");
+                    comment += StringUtils.leftPad( Integer.toHexString( currentByteAddress ) , 4 , '0' )+":    ";
                 }
                 
-                if ( settings.printBytes ) 
-                {
-                    final StringBuilder tmp = new StringBuilder();
-                    print(result, tmp , bigEndianMSBLeft , settings , currentByteAddress );
-                    buffer.append( StringUtils.rightPad( tmp.toString() , 15 , " " ) ).append("; ").append( toHex( data , ptr , result.getInstructionLengthInBytes() ) );
-                } else {
-                    print(result, buffer, bigEndianMSBLeft , settings , currentByteAddress);                    
+                if ( settings.printBytes ) {
+                    comment += toHex( data , ptr , result.getInstructionLengthInBytes() );
+                }
+                print(result, buffer, bigEndianMSBLeft , settings , currentByteAddress);                    
+
+                if ( comment.length() > 0 ) {
+                    buffer.append("; ").append( comment );
                 }
                 ptr += result.getInstructionLengthInBytes();
             }
