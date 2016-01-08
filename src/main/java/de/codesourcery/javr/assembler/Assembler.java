@@ -90,6 +90,7 @@ public class Assembler
                     
                     final String msg = seg+": "+bytesUsed+" of "+maxSizeInBytes+" bytes used ("+DF.format( percentUsaged )+" %), written to "+resource;
                     message( CompilationMessage.info( msg) );
+                    
                     if ( bytesUsed > maxSizeInBytes ) 
                     {
                         final String errorMsg = "Code size too big, will not fit into "+seg+" segment of target architecture.";

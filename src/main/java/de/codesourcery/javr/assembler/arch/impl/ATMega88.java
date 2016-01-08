@@ -320,8 +320,8 @@ public class ATMega88 extends AbstractAchitecture
         insn("sleep", "1001 0101 1000 1000");
         
         // SPM
-        final InstructionEncoding spmNoArgs = new InstructionEncoding( "spm" , new InstructionEncoder( "1001 0101 1110 1000" ) , ArgumentType.NONE, ArgumentType.NONE);
-        final InstructionEncoding spmZWithPostIncrement = new InstructionEncoding( "spm" , new InstructionEncoder( "1001 0101 1111 1000" ) , ArgumentType.Z_REGISTER , ArgumentType.NONE ).disasmImplicitDestination("Z+");
+        final InstructionEncoding spmNoArgs = new InstructionEncoding( "spm" ,             new InstructionEncoder( "1001 0101 1110 1000" ) , ArgumentType.NONE, ArgumentType.NONE);
+        final InstructionEncoding spmZWithPostIncrement = new InstructionEncoding( "spm" , new InstructionEncoder( "1001 0101 1111 1000" ) , ArgumentType.Z_REGISTER_POST_INCREMENT , ArgumentType.NONE ).disasmImplicitDestination("Z+");
         
         final InstructionSelector spmSelector = new InstructionSelector() {
 
@@ -331,7 +331,10 @@ public class ATMega88 extends AbstractAchitecture
                 if ( node.hasNoChildren() ) {
                     return spmNoArgs;
                 }
-                final RegisterNode reg = (RegisterNode) node.child(1);
+                if ( node.childCount() != 1 ) {
+                    throw new RuntimeException("Expected exactly one child node");
+                }
+                final RegisterNode reg = (RegisterNode) node.child(0);
                 if ( reg.register.isPreDecrement() ) {
                     throw new RuntimeException("Pre-decrement is not supported by LPM");
                 }

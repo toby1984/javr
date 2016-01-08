@@ -27,7 +27,7 @@ public interface IArchitecture
         public int startAddress;
         public boolean printBytes;
         public boolean printCompoundRegistersAsLower;
-        public boolean resolveRelativeAddresses;
+        public boolean resolveRelativeAddresses=true;
     }
     
     public Architecture getType();

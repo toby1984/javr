@@ -4,7 +4,7 @@ import de.codesourcery.javr.assembler.ICompilationContext.ICompilationSettings;
 
 public class CompilationSettings implements ICompilationSettings {
 
-    private boolean failOnAddressOutOfRange;
+    private boolean failOnAddressOutOfRange=true;
 
     public CompilationSettings setFailOnAddressOutOfRange(boolean failOnAddressOutOfRange) {
         this.failOnAddressOutOfRange = failOnAddressOutOfRange;

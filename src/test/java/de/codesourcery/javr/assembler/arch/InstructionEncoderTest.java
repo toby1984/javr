@@ -102,14 +102,6 @@ public class InstructionEncoderTest
         assertEquals( 0b01 , decoded.get(1).intValue() );
     }     
     
-    /*
-        //               f   f     e    9
-        // actual  :   1111 1111 1110 1001
-        //               f   7     e    9
-        // expected:   1111 0111 1110 1001
-        insn("brne",  "1111 01kk kkkk k001" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );     
-     */
-    
     @Test
     public void testEncodeDecode27() {
         
@@ -147,11 +139,16 @@ public class InstructionEncoderTest
         assertEquals(2,decoded.size());
         assertEquals( 0b1111 , decoded.get(0).intValue() );
         assertNull(decoded.get(1) );
-        assertTrue( enc.matches( 0b0101010000010010 ) );
-        assertTrue( enc.matches( 0b0101010110011110 ) );
-        assertTrue( enc.matches( 0b0101010010010110 ) );
-        assertTrue( enc.matches( 0b0101010100011010 ) );
     }      
+    
+    @Test
+    public void testMatching() {
+        enc = new InstructionEncoder("0101010dd001dd10");
+        assertTrue( enc.matches( 0b0101_0100_0001_0010 << 16) );
+        assertTrue( enc.matches( 0b0101_0101_1001_1110 << 16) );
+        assertTrue( enc.matches( 0b0101_0100_1001_0110 << 16) );
+        assertTrue( enc.matches( 0b0101_0101_0001_1010 << 16) );
+    }
     
     @Test
     public void testEncodeDecode6() {

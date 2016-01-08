@@ -1127,7 +1127,7 @@ public abstract class AbstractAchitecture implements IArchitecture
             final int currentByteAddress = ptr+settings.startAddress;
             String comment = "";
             
-            System.out.println("0x"+Integer.toHexString( currentByteAddress )+": Trying to match "+bytesToProcess+" bytes : "+Integer.toBinaryString( bigEndianMSBLeft ) );
+//            System.out.println("0x"+Integer.toHexString( currentByteAddress )+": Trying to match "+bytesToProcess+" bytes : "+Integer.toBinaryString( bigEndianMSBLeft ) );
             final List<InstructionEncoding> matches = getMatches(bigEndianMSBLeft,bytesToProcess);
             if ( buffer.length() > 0 ) 
             {
@@ -1148,9 +1148,10 @@ public abstract class AbstractAchitecture implements IArchitecture
             } 
             else 
             {
-                matches.sort( (a,b) -> {
+                matches.sort( (a,b) -> { // sort descending by number of significant ('1' or '0' bits) in matched pattern
                     return Integer.compare( b.encoder.getOpcodeBitCount() , a.encoder.getOpcodeBitCount() );
                 });
+                // keep only the longest matches and discard anything else
                 final int longestMatch = matches.get(0).encoder.getOpcodeBitCount();
                 matches.removeIf( m -> m.encoder.getOpcodeBitCount() < longestMatch );
                 
@@ -1196,9 +1197,26 @@ public abstract class AbstractAchitecture implements IArchitecture
         }
         
         final String mnemonic = result.disasmMnemonic == null ? result.mnemonic : result.disasmMnemonic;
-        System.out.println("DECODED: "+mnemonic+" "+operands);
+//        System.out.println("DECODED: "+mnemonic+" "+operands);
         buffer.append( mnemonic.toUpperCase() );
-        if ( result.getArgumentCountFromPattern() == 1 ) 
+        if ( result.getArgumentCountFromPattern() == 0 ) 
+        {
+            buffer.append(" ");
+            
+            if ( result.disasmImplicitSource != null && result.disasmImplicitDestination != null ) {
+                throw new IllegalStateException("Command may only have implicit src or destination but not both");
+            } 
+            
+            if ( result.disasmImplicitDestination != null ) 
+            {
+                buffer.append( result.disasmImplicitDestination );
+            } 
+            else if ( result.disasmImplicitSource != null ) 
+            {
+                buffer.append( result.disasmImplicitSource );
+            } 
+        }  
+        else if ( result.getArgumentCountFromPattern() == 1 ) 
         {
             buffer.append(" ");
             
