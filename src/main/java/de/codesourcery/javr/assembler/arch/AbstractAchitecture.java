@@ -39,7 +39,6 @@ import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 
 public abstract class AbstractAchitecture implements IArchitecture 
 {
-    @SuppressWarnings("unused")
     private static final Logger LOG = Logger.getLogger(AbstractAchitecture.class);
 
     private static final long VALUE_UNAVAILABLE= 0xdeadabcdbeefdeadL;

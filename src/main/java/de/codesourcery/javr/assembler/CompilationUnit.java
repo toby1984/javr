@@ -12,6 +12,7 @@ import de.codesourcery.javr.assembler.util.Resource;
 
 public class CompilationUnit 
 {
+    @SuppressWarnings("unused")
     private static final Logger LOG = Logger.getLogger(CompilationUnit.class);
     
     private final Resource resource;

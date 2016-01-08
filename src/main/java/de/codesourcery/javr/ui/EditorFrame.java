@@ -557,10 +557,6 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         public void removeTableModelListener(TableModelListener l) {
             listeners.remove(l);
         }
-
-        public Symbol getRow(int row) {
-            return symbols.get( row );
-        }
     }
 
     private final class MessageTableModel implements TableModel {

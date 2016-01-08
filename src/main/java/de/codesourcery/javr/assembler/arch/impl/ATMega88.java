@@ -60,10 +60,6 @@ public class ATMega88 extends AbstractAchitecture
         insn("brlt",  "1111 00kk kkkk k100" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
         insn("brmi",  "1111 00kk kkkk k010" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
         
-        //               f   f     e    9
-        // actual  :   1111 1111 1110 1001
-        //               f   7     e    9
-        // expected:   1111 0111 1110 1001
         insn("brne",  "1111 01kk kkkk k001" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
         insn("brpl",  "1111 01kk kkkk k010" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
         final InstructionEncoding brsh = insn("brsh",  "1111 01kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ).disasmMnemonic("brcc");
