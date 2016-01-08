@@ -35,7 +35,7 @@ import org.apache.commons.io.FileUtils;
 
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
-import de.codesourcery.javr.assembler.arch.IArchitecture.DecompilationSettings;
+import de.codesourcery.javr.assembler.arch.IArchitecture.DisassemblerSettings;
 import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.Parser;
@@ -154,8 +154,9 @@ public class Main
     {
         final byte[] data = FileUtils.readFileToByteArray( file );
         System.out.println("Disassembling "+data.length+" bytes");
-        final DecompilationSettings settings = new DecompilationSettings();
+        final DisassemblerSettings settings = new DisassemblerSettings();
         settings.printBytes = false;
+        settings.resolveRelativeAddresses = true;
         settings.printCompoundRegistersAsLower=false;
         String disassembly = config.getArchitecture().disassemble( data , data.length , settings );
         disassembly = "; disassembled "+data.length+" bytes from "+file.getAbsolutePath()+"\n"+disassembly;

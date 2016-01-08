@@ -10,7 +10,7 @@ import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.AbstractAchitecture.ArgumentType;
 import de.codesourcery.javr.assembler.arch.AbstractAchitecture.EncodingEntry;
 import de.codesourcery.javr.assembler.arch.AbstractAchitecture.InstructionEncoding;
-import de.codesourcery.javr.assembler.arch.IArchitecture.DecompilationSettings;
+import de.codesourcery.javr.assembler.arch.IArchitecture.DisassemblerSettings;
 import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.Parser;
@@ -30,7 +30,7 @@ public class DisassembleTest extends TestCase {
 
     private final ATMega88 arch = new ATMega88();
     
-    private static final DecompilationSettings settings = new DecompilationSettings();
+    private static final DisassemblerSettings settings = new DisassemblerSettings();
     
     // ; disassembled 8192 bytes from /home/tobi/atmel/asm/random.ra
     //  ld r17, z+                                                   | .db 0x11 , 0x91

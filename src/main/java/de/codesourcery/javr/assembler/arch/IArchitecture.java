@@ -21,12 +21,13 @@ import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 
 public interface IArchitecture 
 {
-    public static final class DecompilationSettings 
+    public static final class DisassemblerSettings 
     {
         public boolean printAddresses;
         public int startAddress;
         public boolean printBytes;
         public boolean printCompoundRegistersAsLower;
+        public boolean resolveRelativeAddresses;
     }
     
     public Architecture getType();
@@ -62,5 +63,5 @@ public interface IArchitecture
     
     public void compile(InstructionNode node,ICompilationContext context);
     
-    public String disassemble(byte[] data,int len,DecompilationSettings settings);
+    public String disassemble(byte[] data,int len,DisassemblerSettings settings);
 }

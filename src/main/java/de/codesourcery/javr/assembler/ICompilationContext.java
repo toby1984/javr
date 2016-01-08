@@ -22,8 +22,10 @@ import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 public interface ICompilationContext 
 {
-    public interface ICompilationSettings {
+    public interface ICompilationSettings 
+    {
         public boolean isFailOnAddressOutOfRange();
+        public ICompilationSettings setFailOnAddressOutOfRange(boolean failOnAddressOutOfRange);
     }
     
     public ICompilationSettings getCompilationSettings();

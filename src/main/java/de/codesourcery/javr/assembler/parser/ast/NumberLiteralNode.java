@@ -21,6 +21,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.parser.TextRegion;
+import de.codesourcery.javr.assembler.util.Misc;
 
 public class NumberLiteralNode extends AbstractASTNode implements IValueNode
 {
@@ -49,7 +50,7 @@ public class NumberLiteralNode extends AbstractASTNode implements IValueNode
         if ( isHexadecimalNumber( value ) ) 
         {
             this.type = LiteralType.HEXADECIMAL;
-            this.value = Integer.parseInt(value.substring(2 ) , 16 );
+            this.value = Misc.parseHexInt( value.substring(2 ) );
         } else if ( isBinaryNumber( value ) ) {
             this.type = LiteralType.BINARY;
             this.value = Integer.parseInt(value.substring(1) , 2 );
@@ -60,7 +61,7 @@ public class NumberLiteralNode extends AbstractASTNode implements IValueNode
             throw new IllegalArgumentException("Not a valid number literal: '"+value+"'");
         }
     }
-
+    
     @Override
     protected NumberLiteralNode createCopy() 
     {

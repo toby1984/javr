@@ -972,7 +972,7 @@ public abstract class AbstractAchitecture implements IArchitecture
                 if ( type == ArgumentType.TWELVE_BIT_SIGNED_JUMP_OFFSET || type == ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ) 
                 {
                     // relative jump using signed offset
-                    int deltaWords = wordAddress - current.getWordAddress();
+                    int deltaWords = wordAddress - current.getWordAddress() - 1; // relative branch instructions implicitly add +1 to the offset 
                     switch( type ) 
                     {
                         case TWELVE_BIT_SIGNED_JUMP_OFFSET:
@@ -984,7 +984,6 @@ public abstract class AbstractAchitecture implements IArchitecture
                             if ( deltaWords == 0 ) {
                                 return fail("Conditional branch with offset 0 is not possible",node,context);                                
                             }
-                            deltaWords -= 1 ; // conditional branch instructions implicitly add +1 to the offset                            
                             if ( ! fitsInSignedBitfield( deltaWords,  7 ) ) 
                             {
                                 return fail("Jump distance out of 7-bit range (was: "+deltaWords+" words)",node,context);
@@ -1082,7 +1081,7 @@ public abstract class AbstractAchitecture implements IArchitecture
     }
     
     @Override
-    public String disassemble(byte[] data,int len,DecompilationSettings settings) 
+    public String disassemble(byte[] data,int len,DisassemblerSettings settings) 
     {
         // this code uses a prefix tree to narrow-down the
         // number of potential matches
@@ -1113,7 +1112,8 @@ public abstract class AbstractAchitecture implements IArchitecture
             // convert to big endian so that the prefix tree works properly 
             bigEndianMSBLeft = reverseBytes( bigEndianMSBLeft , bytesToProcess );
             
-            System.out.println("0x"+Integer.toHexString( ptr+settings.startAddress)+": Trying to match "+bytesToProcess+" bytes : "+Integer.toBinaryString( bigEndianMSBLeft ) );
+            final int currentByteAddress = ptr+settings.startAddress;
+            System.out.println("0x"+Integer.toHexString( currentByteAddress )+": Trying to match "+bytesToProcess+" bytes : "+Integer.toBinaryString( bigEndianMSBLeft ) );
             final List<InstructionEncoding> matches = getMatches(bigEndianMSBLeft,bytesToProcess);
             if ( buffer.length() > 0 ) 
             {
@@ -1142,16 +1142,16 @@ public abstract class AbstractAchitecture implements IArchitecture
                 
                 final InstructionEncoding result = matches.get(0).disasmSelector.pick( matches , bigEndianMSBLeft );
                 if ( settings.printAddresses ) {
-                    buffer.append( StringUtils.leftPad( Integer.toHexString( settings.startAddress+ptr ) , 4 , '0' ) ).append(":    ");
+                    buffer.append( StringUtils.leftPad( Integer.toHexString( currentByteAddress ) , 4 , '0' ) ).append(":    ");
                 }
                 
                 if ( settings.printBytes ) 
                 {
                     final StringBuilder tmp = new StringBuilder();
-                    print(result, tmp , bigEndianMSBLeft , settings );
+                    print(result, tmp , bigEndianMSBLeft , settings , currentByteAddress );
                     buffer.append( StringUtils.rightPad( tmp.toString() , 15 , " " ) ).append("; ").append( toHex( data , ptr , result.getInstructionLengthInBytes() ) );
                 } else {
-                    print(result, buffer, bigEndianMSBLeft , settings );                    
+                    print(result, buffer, bigEndianMSBLeft , settings , currentByteAddress);                    
                 }
                 ptr += result.getInstructionLengthInBytes();
             }
@@ -1172,7 +1172,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         return result.toString();
     }
 
-    private void print(final InstructionEncoding result, final StringBuilder buffer, int value,DecompilationSettings settings) 
+    private void print(final InstructionEncoding result, final StringBuilder buffer, int value,DisassemblerSettings settings,int currentByteAddress) 
     {
         final List<Integer> operands = result.encoder.decode( value );
         final int argCountInAsmSyntax = (result.srcType == ArgumentType.NONE ? 0:1)+(result.dstType == ArgumentType.NONE ? 0:1);
@@ -1195,15 +1195,15 @@ public abstract class AbstractAchitecture implements IArchitecture
             if ( result.disasmImplicitDestination != null ) 
             {
                 buffer.append( result.disasmImplicitDestination ).append(",");
-                buffer.append( prettyPrint( operands.get(0) , result.srcType , settings) );
+                buffer.append( prettyPrint( operands.get(0) , result.srcType , settings, currentByteAddress ) );
             } 
             else if ( result.disasmImplicitSource != null ) 
             {
-                buffer.append( prettyPrint( operands.get(0) , result.dstType , settings) ).append(",");
+                buffer.append( prettyPrint( operands.get(0) , result.dstType , settings, currentByteAddress ) ).append(",");
                 buffer.append( result.disasmImplicitSource );
             } 
             else {
-                buffer.append( prettyPrint( operands.get(0) , result.dstType , settings) );
+                buffer.append( prettyPrint( operands.get(0) , result.dstType , settings, currentByteAddress ) );
             }
         } 
         else if ( result.getArgumentCountFromPattern() == 2 ) 
@@ -1214,19 +1214,19 @@ public abstract class AbstractAchitecture implements IArchitecture
             {
                 buffer.append( result.disasmImplicitDestination );
             } else {
-                buffer.append( prettyPrint( operands.get(0) , result.dstType , settings) );
+                buffer.append( prettyPrint( operands.get(0) , result.dstType , settings, currentByteAddress ) );
             }
             buffer.append(",");
             if ( result.disasmImplicitSource != null ) 
             {
                 buffer.append( result.disasmImplicitSource );
             } else {
-                buffer.append( prettyPrint( operands.get(1) , result.srcType , settings) );
+                buffer.append( prettyPrint( operands.get(1) , result.srcType , settings, currentByteAddress ) );
             }
         }
     }
     
-    private String prettyPrint(Integer value, ArgumentType type,DecompilationSettings settings) 
+    private String prettyPrint(Integer value, ArgumentType type,DisassemblerSettings settings,int currentByteAddress) 
     {
         if ( type == ArgumentType.NONE ) {
             return "";
@@ -1261,6 +1261,12 @@ public abstract class AbstractAchitecture implements IArchitecture
                     case SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET:  
                         bitCount = 7 ;
                         int byteOffset = 2*signExtend(value,bitCount);
+                        if ( settings.resolveRelativeAddresses ) 
+                        {
+                            // all branch instructions implicitly add +1 word to the offset since BRANCH 0 makes no sense
+                            byteOffset += 2;
+                            return "0x"+Integer.toHexString( currentByteAddress + byteOffset ); // always print addresses as bytes
+                        }
                         return "."+ ( (byteOffset >= 0 ) ? "+"+byteOffset : ""+byteOffset );
                     case SEVEN_BIT_SRAM_MEM_ADDRESS:  
                         bitCount = 7 ;
@@ -1284,6 +1290,12 @@ public abstract class AbstractAchitecture implements IArchitecture
                     case TWELVE_BIT_SIGNED_JUMP_OFFSET:  
                         bitCount = 12 ;
                         byteOffset = 2*signExtend(value,bitCount);
+                        if ( settings.resolveRelativeAddresses ) 
+                        {
+                            // all branch instructions implicitly add +1 word to the offset since BRANCH 0 makes no sense
+                            byteOffset += 2;
+                            return "0x"+Integer.toHexString( currentByteAddress + byteOffset ); // always print addresses as bytes
+                        }                        
                         return "."+ ( (byteOffset >= 0 ) ? "+"+byteOffset : ""+byteOffset );
                     default:
                         // $$FALL-THROUGH$$
