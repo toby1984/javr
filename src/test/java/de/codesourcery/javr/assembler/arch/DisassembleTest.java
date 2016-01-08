@@ -31,6 +31,18 @@ public class DisassembleTest extends TestCase {
     
     private static final DecompilationSettings settings = new DecompilationSettings();
     
+    // ; disassembled 8192 bytes from /home/tobi/atmel/asm/random.ra
+    //  ld r17, z+                                                   | .db 0x11 , 0x91
+    
+    public void testDisassemble7() {
+        
+        final byte[] bytes = new byte[] { (byte) 0x11 ,(byte) 0x91 };
+        
+        final String output = arch.disassemble( bytes , bytes.length , settings );
+        System.out.println("Got "+output);
+        assertEquals("ld r17,z+" , output );
+    }
+    
     public void testDisassemble6() {
         
         final byte[] bytes = new byte[] { (byte) 0x44 ,(byte) 0x92 };

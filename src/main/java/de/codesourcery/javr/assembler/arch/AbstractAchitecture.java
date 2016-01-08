@@ -1027,7 +1027,6 @@ public abstract class AbstractAchitecture implements IArchitecture
 
     private List<InstructionEncoding> getMatches(int bigEndianMSBLeft,int bytesInValue) 
     {
-        // return prefixTree.getMatches( bigEndianMSBLeft );
         final List<InstructionEncoding> result = new ArrayList<>();
         for ( EncodingEntry entry : instructions.values() ) 
         {

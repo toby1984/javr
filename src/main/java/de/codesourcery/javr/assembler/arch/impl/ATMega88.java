@@ -153,11 +153,11 @@ public class ATMega88 extends AbstractAchitecture
         final InstructionEncoding ldXWithPostIncrement = new InstructionEncoding( "ld" , new InstructionEncoder(  "1001 000d dddd 1101" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER_POST_INCREMENT).disasmImplicitSource("X+");
         final InstructionEncoding ldYWithPostIncrement = new InstructionEncoding( "ld" , new InstructionEncoder(  "1001 000d dddd 1001" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER_POST_INCREMENT).disasmImplicitSource("Y+");
         final InstructionEncoding ldZWithPostIncrement = new InstructionEncoding( "ld" , new InstructionEncoder(  "1001 000d dddd 0001" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER_POST_INCREMENT).disasmImplicitSource("Z+");
+        final InstructionEncoding ldXWithPreDecrement  = new InstructionEncoding(  "ld" , new InstructionEncoder( "1001 000d dddd 1110" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER).disasmImplicitSource("-X");
+        final InstructionEncoding ldYWithPreDecrement  = new InstructionEncoding(  "ld" , new InstructionEncoder( "1001 000d dddd 1010" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER).disasmImplicitSource("-Y");
+        final InstructionEncoding ldZYWithPreDecrement  = new InstructionEncoding( "ld" , new InstructionEncoder( "1001 000d dddd 0010" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER).disasmImplicitSource("-Z");
         
-        final InstructionEncoding ldXWithPreDecrement = new InstructionEncoding(  "ld" , new InstructionEncoder( "1001 000d dddd 1110" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER).disasmImplicitSource("-X");
-        final InstructionEncoding ldYWithPreDecrement = new InstructionEncoding(  "ld" , new InstructionEncoder( "1001 000d dddd 1010" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER).disasmImplicitSource("-Y");
-        final InstructionEncoding ldZYWithPreDecrement = new InstructionEncoding( "ld" , new InstructionEncoder( "1001 000d dddd 0010" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER).disasmImplicitSource("-Z");
-        
+        final InstructionEncoding[] lddEncodings = { ldOnlyX, ldOnlyY, ldOnlyZ, ldXWithPostIncrement, ldYWithPostIncrement, ldZWithPostIncrement, ldXWithPreDecrement, ldYWithPreDecrement, ldZYWithPreDecrement };
         final InstructionSelector ldSelector = new InstructionSelector() {
 
             @Override
@@ -192,7 +192,7 @@ public class ATMega88 extends AbstractAchitecture
                 return pick( node ,candidates ).getInstructionLengthInBytes();
             }
         };
-        add( new EncodingEntry( ldSelector , ldOnlyX , ldXWithPostIncrement , ldXWithPreDecrement ) );
+        add( new EncodingEntry( ldSelector , lddEncodings ) );
         
         // LDD Y / LDD Z
         final InstructionEncoding lddY = new InstructionEncoding( "ldd" , new InstructionEncoder( "10s0 ss0d dddd 1sss" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Y_REGISTER_SIX_BIT_DISPLACEMENT);
