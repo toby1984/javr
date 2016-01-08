@@ -22,6 +22,12 @@ import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 public interface ICompilationContext 
 {
+    public interface ICompilationSettings {
+        public boolean isFailOnAddressOutOfRange();
+    }
+    
+    public ICompilationSettings getCompilationSettings();
+    
     public SymbolTable globalSymbolTable();
     
     public SymbolTable currentSymbolTable();

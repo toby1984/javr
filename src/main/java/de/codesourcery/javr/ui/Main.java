@@ -156,7 +156,7 @@ public class Main
         System.out.println("Disassembling "+data.length+" bytes");
         final DecompilationSettings settings = new DecompilationSettings();
         settings.printBytes = false;
-        settings.printCompoundRegistersAsLower=true;
+        settings.printCompoundRegistersAsLower=false;
         String disassembly = config.getArchitecture().disassemble( data , data.length , settings );
         disassembly = "; disassembled "+data.length+" bytes from "+file.getAbsolutePath()+"\n"+disassembly;
         

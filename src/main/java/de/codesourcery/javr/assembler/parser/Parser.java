@@ -134,7 +134,11 @@ public class Parser
 
         public static CompilationMessage warning(String msg,TextRegion region) {
             return new CompilationMessage(Severity.WARNING, msg , region ); 
-        }        
+        }
+        
+        public static CompilationMessage warning(String msg) {
+            return new CompilationMessage(Severity.WARNING, msg , (ASTNode) null ); 
+        }         
     }
 
     public Parser() {

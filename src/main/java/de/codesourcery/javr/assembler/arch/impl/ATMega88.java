@@ -40,34 +40,34 @@ public class ATMega88 extends AbstractAchitecture
         insn("bclr",  "1001 0100 1ddd 1000" , ArgumentType.THREE_BIT_CONSTANT );
         insn("bld",   "1111 100d dddd 0sss" , ArgumentType.SINGLE_REGISTER , ArgumentType.THREE_BIT_CONSTANT );
         
-        insn("brbs",  "1111 00ss ssss sddd" , ArgumentType.THREE_BIT_CONSTANT , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
-        insn("brhs",  "1111 00kk kkkk k101" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
+        insn("brbs",  "1111 00ss ssss sddd" , ArgumentType.THREE_BIT_CONSTANT , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        insn("brhs",  "1111 00kk kkkk k101" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
         
-        final InstructionEncoding brcc = insn("brcc",  "1111 01kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
-        final InstructionEncoding brcs = insn("brcs",  "1111 00kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
+        final InstructionEncoding brcc = insn("brcc",  "1111 01kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        final InstructionEncoding brcs = insn("brcs",  "1111 00kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
         insn("break", "1001 0101 1001 1000" );
-        insn("breq",  "1111 00kk kkkk k001" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
-        insn("brbc",  "1111 01ss ssss sddd" , ArgumentType.THREE_BIT_CONSTANT , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
-        insn("brge",  "1111 01kk kkkk k100" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
-        insn("brhc",  "1111 01kk kkkk k101" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
-        insn("brid",  "1111 01kk kkkk k111" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
-        insn("brie",  "1111 00kk kkkk k111" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
+        insn("breq",  "1111 00kk kkkk k001" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        insn("brbc",  "1111 01ss ssss sddd" , ArgumentType.THREE_BIT_CONSTANT , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        insn("brge",  "1111 01kk kkkk k100" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        insn("brhc",  "1111 01kk kkkk k101" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        insn("brid",  "1111 01kk kkkk k111" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        insn("brie",  "1111 00kk kkkk k111" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
         
-        final InstructionEncoding brlo = insn("brlo",  "1111 00kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
+        final InstructionEncoding brlo = insn("brlo",  "1111 00kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
         brlo.aliasOf( brcs );
         brcs.aliasOf( brlo );
         
-        insn("brlt",  "1111 00kk kkkk k100" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
-        insn("brmi",  "1111 00kk kkkk k010" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
-        insn("brne",  "1111 01kk kkkk k001" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
-        insn("brpl",  "1111 01kk kkkk k010" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
-        final InstructionEncoding brsh = insn("brsh",  "1111 01kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET ).disasmMnemonic("brcc");
+        insn("brlt",  "1111 00kk kkkk k100" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        insn("brmi",  "1111 00kk kkkk k010" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        insn("brne",  "1111 01kk kkkk k001" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        insn("brpl",  "1111 01kk kkkk k010" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        final InstructionEncoding brsh = insn("brsh",  "1111 01kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ).disasmMnemonic("brcc");
         brsh.aliasOf( brcc );
         brcc.aliasOf( brsh);
-        insn("brtc",  "1111 01kk kkkk k110" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
-        insn("brts",  "1111 00kk kkkk k110" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
-        insn("brvc",  "1111 01kk kkkk k011" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
-        insn("brvs",  "1111 00kk kkkk k011" , ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET );
+        insn("brtc",  "1111 01kk kkkk k110" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        insn("brts",  "1111 00kk kkkk k110" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        insn("brvc",  "1111 01kk kkkk k011" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        insn("brvs",  "1111 00kk kkkk k011" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
         insn("bset",  "1001 0100 0sss 1000" , ArgumentType.THREE_BIT_CONSTANT );
         insn("bst",   "1111 101d dddd 0sss" , ArgumentType.SINGLE_REGISTER , ArgumentType.THREE_BIT_CONSTANT );
         
@@ -446,15 +446,15 @@ public class ATMega88 extends AbstractAchitecture
     }
     
     @Override
-    protected boolean isValidFlashAdress(int address) 
+    protected boolean isValidFlashAdress(int byteAddress) 
     {
-        return address >= 0 && address < getSegmentSize(Segment.FLASH);
+        return byteAddress >= 0 && byteAddress < getSegmentSize(Segment.FLASH);
     }
 
     @Override
-    protected boolean isValidSRAMAdress(int address) 
+    protected boolean isValidSRAMAdress(int byteAddress) 
     {
-        return address >= 0 && address < getSegmentSize(Segment.SRAM);
+        return byteAddress >= 0 && byteAddress < getSegmentSize(Segment.SRAM);
     }
 
     @Override
@@ -463,7 +463,7 @@ public class ATMega88 extends AbstractAchitecture
     }
 
     @Override
-    protected boolean isValidIOSpaceAdress(int address) 
+    protected boolean isValidIOSpaceAdress(int byteAddress) 
     {
         /*
          * Address space layout:
@@ -472,12 +472,12 @@ public class ATMega88 extends AbstractAchitecture
          * 20...5f  i/o space
          * 60..ff   extended IO space
          */        
-        return address >= 0x20 && address <= 0xff;
+        return byteAddress >= 0x20 && byteAddress <= 0xff;
     }
 
     @Override
-    protected boolean isValidEEPROMAdress(int address) {
-        return address >= 0 && address < getSegmentSize(Segment.EEPROM);
+    protected boolean isValidEEPROMAdress(int byteAddress) {
+        return byteAddress >= 0 && byteAddress < getSegmentSize(Segment.EEPROM);
     }
     
     protected int getGeneralPurposeRegisterCount() {

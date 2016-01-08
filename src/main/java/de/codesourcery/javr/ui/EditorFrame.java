@@ -962,6 +962,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         // assemble
         long assembleTime = 0;
         final Assembler asm = new Assembler();
+        asm.getCompilerSettings().setFailOnAddressOutOfRange( false );
         try {
             final long start = System.currentTimeMillis();
             asm.compile( compilationUnit , FileResourceFactory.createInstance( new File("/home/tobi/atmel/asm") , "dummy" ) , configProvider );

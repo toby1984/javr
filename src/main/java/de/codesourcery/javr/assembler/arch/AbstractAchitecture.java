@@ -20,7 +20,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
@@ -31,8 +30,6 @@ import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Register;
 import de.codesourcery.javr.assembler.Segment;
-import de.codesourcery.javr.assembler.arch.AbstractAchitecture.ArgumentType;
-import de.codesourcery.javr.assembler.arch.AbstractAchitecture.InstructionEncoding;
 import de.codesourcery.javr.assembler.arch.InstructionEncoder.Transform;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
@@ -81,7 +78,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         SIXTEEN_BIT_SRAM_MEM_ADDRESS, // device-dependent, covers whole address range
         SEVEN_BIT_SRAM_MEM_ADDRESS,
         // signed jump offsets
-        SEVEN_BIT_SIGNED_JUMP_OFFSET,
+        SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET,
         TWELVE_BIT_SIGNED_JUMP_OFFSET,
         // IO register constants
         FIVE_BIT_IO_REGISTER_CONSTANT,
@@ -106,10 +103,10 @@ public abstract class AbstractAchitecture implements IArchitecture
             Validate.notNull(differentOperands, "differentOperands must not be NULL");
             this.sameOperands = sameOperands;
             this.differentOperands = differentOperands;
-            if ( ! ( sameOperands.getArgumentCount() == 2 && differentOperands.getArgumentCount() == 1 ) &&
-                 ! ( sameOperands.getArgumentCount() == 1 && differentOperands.getArgumentCount() == 2 ) ) 
+            if ( ! ( sameOperands.getArgumentCountFromPattern() == 2 && differentOperands.getArgumentCountFromPattern() == 1 ) &&
+                 ! ( sameOperands.getArgumentCountFromPattern() == 1 && differentOperands.getArgumentCountFromPattern() == 2 ) ) 
             {
-                throw new IllegalArgumentException("Unsupported argument counts: "+sameOperands.getArgumentCount()+" <-> "+differentOperands.getArgumentCount());
+                throw new IllegalArgumentException("Unsupported argument counts: "+sameOperands.getArgumentCountFromPattern()+" <-> "+differentOperands.getArgumentCountFromPattern());
             }
         }
         
@@ -258,7 +255,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         }
         
         /**
-         * Returns the number of arguments (values) that are encoded IN THE OPCODE.
+         * Returns the number of arguments (values) that are EXPLICITLY encoded IN THE OPCODE.
          * 
          * <p>Note that some opcodes automatically imply a certain src/dst argument ,
          * implied arguments are not accounted for by this method.</p>
@@ -266,7 +263,7 @@ public abstract class AbstractAchitecture implements IArchitecture
          * 
          * @return
          */
-        public int getArgumentCount() {
+        public int getArgumentCountFromPattern() {
             return encoder.getArgumentCount();
         }
         
@@ -530,7 +527,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         
         final EncodingEntry variants = lookupInstruction( node.instruction.getMnemonic() );
         final InstructionEncoding encoding = variants.getEncoding( node );
-        int expectedArgumentCount = encoding.getArgumentCount();
+        int expectedArgumentCount = encoding.getArgumentCountFromPattern();
         if ( encoding.hasImplicitSourceArgument() ) 
         {
             expectedArgumentCount++;
@@ -538,24 +535,21 @@ public abstract class AbstractAchitecture implements IArchitecture
         if ( encoding.hasImplicitDestinationArgument() ) 
         {
             expectedArgumentCount++;
-            // destination is implied so the first child of the InstructionNode is actually the source, not the destination 
-            final ASTNode tmp = dstArgument;
-            dstArgument = srcArgument;
-            srcArgument = tmp;            
         }        
         
         if ( argCount != expectedArgumentCount ) 
         {
-            context.message( CompilationMessage.error( encoding.mnemonic.toUpperCase()+" expects "+encoding.getArgumentCount()+" arguments but got "+argCount,node ) );
+            context.message( CompilationMessage.error( encoding.mnemonic.toUpperCase()+" expects "+encoding.getArgumentCountFromPattern()+" arguments but got "+argCount,node ) );
             return false;
         }        
         
+        final boolean failOnAddressOutOfBounds = context.getCompilationSettings().isFailOnAddressOutOfRange();
         boolean result = true;
         if ( encoding.dstType != ArgumentType.NONE ) {
-            result &= ( getDstValue( dstArgument , encoding.dstType , context ,true ) != VALUE_UNAVAILABLE );
+            result &= ( getDstValue( dstArgument , encoding.dstType , context ,true , failOnAddressOutOfBounds) != VALUE_UNAVAILABLE );
         }
         if ( encoding.srcType != ArgumentType.NONE ) {
-            result &= ( getSrcValue( srcArgument , encoding.srcType , context ,true) != VALUE_UNAVAILABLE );
+            result &= ( getSrcValue( srcArgument , encoding.srcType , context ,true , failOnAddressOutOfBounds) != VALUE_UNAVAILABLE );
         }
         return result;
     }
@@ -579,7 +573,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         
         final EncodingEntry variants = lookupInstruction( node.instruction.getMnemonic() );
         final InstructionEncoding encoding = variants.getEncoding( node );
-        int expectedArgumentCount = encoding.getArgumentCount();
+        int expectedArgumentCount = encoding.getArgumentCountFromPattern();
         if ( encoding.hasImplicitSourceArgument() ) 
         {
             expectedArgumentCount++;
@@ -587,19 +581,16 @@ public abstract class AbstractAchitecture implements IArchitecture
         if ( encoding.hasImplicitDestinationArgument() ) 
         {
             expectedArgumentCount++;
-            // destination is implied so the first child of the InstructionNode is actually the source, not the destination 
-            final ASTNode tmp = dstArgument;
-            dstArgument = srcArgument;
-            srcArgument = tmp;
         }        
         
         if ( argCount != expectedArgumentCount ) 
         {
-            throw new RuntimeException( encoding.mnemonic+" expects "+encoding.getArgumentCount()+" arguments but got "+argCount);
+            throw new RuntimeException( encoding.mnemonic+" expects "+encoding.getArgumentCountFromPattern()+" arguments but got "+argCount);
         }
         
-        final int dstValue = (int) getDstValue( dstArgument , encoding.dstType , context , false );
-        final int srcValue = (int) getSrcValue( srcArgument , encoding.srcType , context , false );
+        final boolean failOnAddressOutOfBounds = context.getCompilationSettings().isFailOnAddressOutOfRange();        
+        final int dstValue = (int) getDstValue( dstArgument , encoding.dstType , context , false , failOnAddressOutOfBounds );
+        final int srcValue = (int) getSrcValue( srcArgument , encoding.srcType , context , false , failOnAddressOutOfBounds );
 
         final int instruction = encoding.encode( dstValue , srcValue );
         if ( LOG.isDebugEnabled() ) {
@@ -660,22 +651,22 @@ public abstract class AbstractAchitecture implements IArchitecture
         return hex2.toString();
     }
     
-    private long getSrcValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase) 
+    private long getSrcValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase,boolean failOnAddressOutOfBounds) 
     {
         try 
         {
-            return getValue(node,type,context,calledInResolvePhase);
+            return getValue(node,type,context,calledInResolvePhase,failOnAddressOutOfBounds);
         } 
         catch(Exception e) {
             throw new RuntimeException("SRC operand: "+e.getMessage(),e);
         }
     }
     
-    private long getDstValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase) 
+    private long getDstValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase,boolean failOnAddressOutOfBounds) 
     {
         try 
         {
-            return getValue(node,type,context,calledInResolvePhase);
+            return getValue(node,type,context,calledInResolvePhase,failOnAddressOutOfBounds);
         } 
         catch(Exception e) {
             throw new RuntimeException("DST operand: "+e.getMessage(),e);
@@ -686,6 +677,11 @@ public abstract class AbstractAchitecture implements IArchitecture
     {
         context.message( CompilationMessage.error( msg , node ) );
         return VALUE_UNAVAILABLE;
+    }
+    
+    private void warn(String msg,ASTNode node,ICompilationContext context) 
+    {
+        context.message( CompilationMessage.warning( msg , node ) );
     }
     
     private static boolean isSingleRegister(ASTNode node) {
@@ -731,7 +727,7 @@ public abstract class AbstractAchitecture implements IArchitecture
      * @return argument value or {@link #VALUE_UNAVAILABLE} if for some reason the value could not be determined.
      *           Messages will be added to the {@link ICompilationContext#error(String, ASTNode) context} as needed.
      */
-    private long getValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase) 
+    private long getValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase,boolean failOnAddressOutOfBounds) 
     {
         if ( type == ArgumentType.NONE ) {
             return 0;
@@ -801,6 +797,28 @@ public abstract class AbstractAchitecture implements IArchitecture
                 }           
                 return result-16;
             // compound registers
+            case X_REGISTER_POST_INCREMENT:
+            case Y_REGISTER_POST_INCREMENT:
+            case Z_REGISTER_POST_INCREMENT:
+                if ( ! isCompoundRegister( node ) ) 
+                {
+                    return fail( "Operand needs to be a compound register expression",node,context );
+                }   
+                if ( ! ((RegisterNode) node).register.isPostIncrement() ) {
+                    return fail( "Operand needs to be a post-increment compound register expression",node,context );
+                }
+                return 0; // value doesn't matter, these argument types are used for operands that are always implied by the opcode itself 
+            case X_REGISTER_PREDECREMENT:
+            case Y_REGISTER_PREDECREMENT:
+            case Z_REGISTER_PREDECREMENT:
+                if ( ! isCompoundRegister( node ) ) 
+                {
+                    return fail( "Operand needs to be a compound register expression",node,context );
+                }      
+                if ( ! ((RegisterNode) node).register.isPreDecrement() ) {
+                    return fail( "Operand needs to be a pre-decrement compound register expression",node,context );
+                }                
+                return 0; // value doesn't matter, these argument types are used for operands that are always implied by the opcode itself
             case X_REGISTER:
             case Y_REGISTER:
             case Z_REGISTER:
@@ -892,27 +910,41 @@ public abstract class AbstractAchitecture implements IArchitecture
                     return fail("Operand out of 6-bit range (IO register): "+result,node,context);
                 }
                 if ( ! isValidIOSpaceAdress( getGeneralPurposeRegisterCount() + result ) ) { // I/O address space starts right after register file
-                    return fail("Operand is not a valid I/O register address: "+result,node,context);
+                    final String msg = "Operand is not a valid I/O register address: "+result;
+                    if ( failOnAddressOutOfBounds ) { 
+                        return fail(msg,node,context);
+                    } 
+                    warn(msg,node,context);
                 }                
                 return result; 
             case SEVEN_BIT_SRAM_MEM_ADDRESS:       
                 if ( ! fitsInBitfield( result , 7 ) ) {
                     return fail("Operand out of 7-bit range (SRAM address): "+result,node,context);
                 }
-                if ( ! isValidSRAMAdress( result ) ) {
-                    return fail("SRAM address out of range (0..."+(getSegmentSize(Segment.SRAM)-1)+"): "+result,node,context);                    
+                if ( ! isValidSRAMAdress( result ) ) 
+                {
+                    final String msg = "SRAM address out of range (0..."+(getSegmentSize(Segment.SRAM)-1)+"): "+result;
+                    if ( failOnAddressOutOfBounds ) { 
+                        return fail(msg,node,context);
+                    }
+                    warn(msg,node,context);
                 }
                 return result;
             case SIXTEEN_BIT_SRAM_MEM_ADDRESS:
                 if ( ! fitsInBitfield( result , 16 ) ) {
                     return fail("Operand out of 16-bit range (SRAM address): "+result,node,context);
                 }
-                if ( ! isValidSRAMAdress( result ) ) {
-                    return fail("SRAM address out of range (0..."+(getSegmentSize(Segment.SRAM)-1)+"): "+result,node,context);                    
+                if ( ! isValidSRAMAdress( result ) ) 
+                {
+                    final String msg = "SRAM address out of range (0..."+(getSegmentSize(Segment.SRAM)-1)+"): "+result;
+                    if ( failOnAddressOutOfBounds ) {
+                        return fail(msg,node,context);
+                    }
+                    warn(msg,node,context);
                 }                
                 return result;
             // flash ram addresses / branch offsets
-            case SEVEN_BIT_SIGNED_JUMP_OFFSET:
+            case SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET:
             case TWELVE_BIT_SIGNED_JUMP_OFFSET:                     
             case TWENTYTWO_BIT_FLASH_MEM_ADDRESS:                
                 if ( ! (node instanceof IValueNode)) {
@@ -922,32 +954,41 @@ public abstract class AbstractAchitecture implements IArchitecture
                 if ( ( result & 1 ) != 0 ) {
                     return fail("FLASH memory destination address needs to be even but was 0x"+Integer.toHexString(result),node,context);
                 }
-                if ( ! isValidFlashAdress( result ) ) {
-                    return fail("Destination out of FLASH memory range (0.."+(getSegmentSize(Segment.FLASH)-1)+":"+result,node,context);
+                if ( ! isValidFlashAdress( result ) ) 
+                {
+                    final String msg = "Destination address out of FLASH memory range (0.."+(getSegmentSize(Segment.FLASH)-1)+"): "+result;
+                    if ( failOnAddressOutOfBounds ) {
+                        return fail(msg,node,context);
+                    }
+                    warn(msg,node,context);
                 }
                 
-                final int wordAddress = result >>> 1; 
+                final int wordAddress = result >> 1; // convert byte -> word address
                 final Address current = context.currentAddress();
                 if ( current.getSegment() != Segment.FLASH ) {
                     return fail("Operand must evaluate to a constant (expected: " +type+", was: "+node.getClass().getName()+")",node,context);                    
                 }
                 
-                if ( type == ArgumentType.TWELVE_BIT_SIGNED_JUMP_OFFSET || type == ArgumentType.SEVEN_BIT_SIGNED_JUMP_OFFSET ) 
+                if ( type == ArgumentType.TWELVE_BIT_SIGNED_JUMP_OFFSET || type == ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ) 
                 {
                     // relative jump using signed offset
-                    final int deltaWords = wordAddress - current.getWordAddress();
+                    int deltaWords = wordAddress - current.getWordAddress();
                     switch( type ) 
                     {
                         case TWELVE_BIT_SIGNED_JUMP_OFFSET:
                             if ( ! fitsInSignedBitfield( deltaWords,  12 ) ) {
-                                return fail("Jump distance out of 12-bit range (was: "+result+")",node,context);
+                                return fail("Jump distance out of 12-bit range (was: "+deltaWords+" words)",node,context);
                             }
                             return deltaWords;
-                        case SEVEN_BIT_SIGNED_JUMP_OFFSET:
+                        case SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET:
+                            if ( deltaWords == 0 ) {
+                                return fail("Conditional branch with offset 0 is not possible",node,context);                                
+                            }
+                            deltaWords -= 1 ; // conditional branch instructions implicitly add +1 to the offset                            
                             if ( ! fitsInSignedBitfield( deltaWords,  7 ) ) 
                             {
-                                return fail("Jump distance out of 7-bit range (was: "+result+")",node,context);
-                            }                        
+                                return fail("Jump distance out of 7-bit range (was: "+deltaWords+" words)",node,context);
+                            }                      
                             return deltaWords;
                         default:
                             throw new RuntimeException("Unreachable code reached");                            
@@ -955,7 +996,7 @@ public abstract class AbstractAchitecture implements IArchitecture
                 }
                 // jump to absolute address
                 if ( ! fitsInBitfield( wordAddress ,  22 ) ) {
-                    return fail("Flash address out of 22-bit range (was: 0x"+Integer.toHexString(result)+")",node,context);
+                    return fail("FLASH address out of 22-bit range (was: 0x"+Integer.toHexString(result)+")",node,context);
                 }                
                 return wordAddress;
             default:
@@ -1143,7 +1184,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         final String mnemonic = result.disasmMnemonic == null ? result.mnemonic : result.disasmMnemonic;
         System.out.println("DECODED: "+mnemonic+" "+operands);
         buffer.append( mnemonic.toUpperCase() );
-        if ( result.getArgumentCount() == 1 ) 
+        if ( result.getArgumentCountFromPattern() == 1 ) 
         {
             buffer.append(" ");
             
@@ -1165,7 +1206,7 @@ public abstract class AbstractAchitecture implements IArchitecture
                 buffer.append( prettyPrint( operands.get(0) , result.dstType , settings) );
             }
         } 
-        else if ( result.getArgumentCount() == 2 ) 
+        else if ( result.getArgumentCountFromPattern() == 2 ) 
         {
             // new InstructionEncoding( "lpm" , new InstructionEncoder(  "1001 000d dddd 0100" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER).disasmImplicitSource("Z");
             buffer.append(" ");
@@ -1203,7 +1244,7 @@ public abstract class AbstractAchitecture implements IArchitecture
             case SIXTEEN_BIT_SRAM_MEM_ADDRESS:
             case TWENTYTWO_BIT_FLASH_MEM_ADDRESS:
             // relative addresses
-            case SEVEN_BIT_SIGNED_JUMP_OFFSET:
+            case SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET:
             case TWELVE_BIT_SIGNED_JUMP_OFFSET:
                 int bitCount=0;
                 switch(type) 
@@ -1217,7 +1258,7 @@ public abstract class AbstractAchitecture implements IArchitecture
                     case FOUR_BIT_CONSTANT:  
                         bitCount = 4 ;
                         break;
-                    case SEVEN_BIT_SIGNED_JUMP_OFFSET:  
+                    case SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET:  
                         bitCount = 7 ;
                         int byteOffset = 2*signExtend(value,bitCount);
                         return "."+ ( (byteOffset >= 0 ) ? "+"+byteOffset : ""+byteOffset );
@@ -1328,11 +1369,11 @@ public abstract class AbstractAchitecture implements IArchitecture
         return value;
     }
     
-    protected abstract boolean isValidFlashAdress(int address);
-    protected abstract boolean isValidSRAMAdress(int address);
+    protected abstract boolean isValidFlashAdress(int byteAddress);
+    protected abstract boolean isValidSRAMAdress(int byteAddress);
     protected abstract boolean isValidRegisterNumber(int number);
-    protected abstract boolean isValidIOSpaceAdress(int address);
-    protected abstract boolean isValidEEPROMAdress(int address);
+    protected abstract boolean isValidIOSpaceAdress(int byteAddress);
+    protected abstract boolean isValidEEPROMAdress(int byteAddress);
     protected abstract int getGeneralPurposeRegisterCount();
     protected abstract void initInstructions();
     

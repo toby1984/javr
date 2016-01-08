@@ -48,6 +48,8 @@ public class Assembler
     private IConfig config;
     private CompilationContext compilationContext;
     private SymbolTable globalSymbolTable = new SymbolTable( SymbolTable.GLOBAL );
+
+    private final CompilationSettings compilerSettings = new CompilationSettings();
     
     private final class CompilationContext implements ICompilationContext 
     {
@@ -69,6 +71,11 @@ public class Assembler
             unit.setSymbolTable( new SymbolTable( compilationUnit.getResource().toString() , globalSymbolTable) );
         }
         
+        @Override
+        public ICompilationSettings getCompilationSettings() {
+            return compilerSettings;
+        }
+        
         public void save(Binary b , ResourceFactory rf) throws IOException 
         {
             for ( Segment seg : Segment.values() ) 
@@ -83,8 +90,14 @@ public class Assembler
                     
                     final String msg = seg+": "+bytesUsed+" of "+maxSizeInBytes+" bytes used ("+DF.format( percentUsaged )+" %), written to "+resource;
                     message( CompilationMessage.info( msg) );
-                    if ( bytesUsed > maxSizeInBytes ) {
-                        message( CompilationMessage.error("Code size too big, will not fit into "+seg+" segment of target architecture.") );
+                    if ( bytesUsed > maxSizeInBytes ) 
+                    {
+                        final String errorMsg = "Code size too big, will not fit into "+seg+" segment of target architecture.";
+                        if ( getCompilerSettings().isFailOnAddressOutOfRange() ) {
+                            message( CompilationMessage.error(errorMsg) );
+                        } else {
+                            message( CompilationMessage.warning(errorMsg) );
+                        }
                     }
                     b.setResource( seg , resource );
                 }
@@ -331,5 +344,9 @@ public class Assembler
     public SymbolTable getGlobalSymbolTable() 
     {
         return globalSymbolTable;
+    }
+    
+    public CompilationSettings getCompilerSettings() {
+        return compilerSettings;
     }
 }

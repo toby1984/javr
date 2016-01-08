@@ -1,6 +1,7 @@
 package de.codesourcery.javr.assembler.arch;
 
 import de.codesourcery.javr.assembler.Address;
+import de.codesourcery.javr.assembler.CompilationSettings;
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Instruction;
@@ -117,11 +118,11 @@ public class DisassembleTest extends TestCase {
             for ( InstructionEncoding enc : entry.encodings ) 
             {
                 final InstructionNode in = new InstructionNode( new Instruction( enc.mnemonic ) , new TextRegion(1,1) );
-                if ( enc.getArgumentCount() > 0 ) 
+                if ( enc.getArgumentCountFromPattern() > 0 ) 
                 {
                     in.addChild( createFakeValue( enc.dstType , Kind.DST) );
                 }
-                if ( enc.getArgumentCount() > 1 ) {
+                if ( enc.getArgumentCountFromPattern() > 1 ) {
                     in.addChild( createFakeValue( enc.srcType , Kind.SRC ) );
                 }
                 final String expected = printer.prettyPrint( in );
@@ -195,7 +196,7 @@ public class DisassembleTest extends TestCase {
                 return new RegisterNode( new Register( isDst ? "r16" : "r17" ,false,false) , new TextRegion(1,1) );
             case R16_TO_R31:
                 return new RegisterNode( new Register( isDst ? "r16" : "r31" ,false,false) , new TextRegion(1,1) );
-            case SEVEN_BIT_SIGNED_JUMP_OFFSET:
+            case SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET:
                 return new NumberLiteralNode( isDst ? "%1101011" : "%1010111"  , new TextRegion(1,1));
             case SINGLE_REGISTER:
                 return new RegisterNode( new Register( isDst ? "r0" : "r1" ,false,false) , new TextRegion(1,1) );
@@ -229,9 +230,11 @@ public class DisassembleTest extends TestCase {
     protected static final class FakeContext implements ICompilationContext {
         
         private final IArchitecture arch;
+        private final ICompilationSettings compilationSettings = new CompilationSettings();
         
         public final byte[] buffer = new byte[1024];
         public int ptr = 0;
+
         
         public FakeContext(IArchitecture arch) {
             this.arch = arch;
@@ -315,6 +318,11 @@ public class DisassembleTest extends TestCase {
         @Override
         public void allocateByte() {
             throw new UnsupportedOperationException();            
+        }
+
+        @Override
+        public ICompilationSettings getCompilationSettings() {
+            return compilationSettings;
         }
     };
     
