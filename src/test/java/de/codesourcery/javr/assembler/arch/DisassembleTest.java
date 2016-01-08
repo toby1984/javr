@@ -1,11 +1,22 @@
 package de.codesourcery.javr.assembler.arch;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
+
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
+
 import de.codesourcery.javr.assembler.Address;
+import de.codesourcery.javr.assembler.Assembler;
+import de.codesourcery.javr.assembler.Binary;
 import de.codesourcery.javr.assembler.CompilationSettings;
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Instruction;
 import de.codesourcery.javr.assembler.Register;
+import de.codesourcery.javr.assembler.ResourceFactory;
 import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.AbstractAchitecture.ArgumentType;
 import de.codesourcery.javr.assembler.arch.AbstractAchitecture.EncodingEntry;
@@ -23,7 +34,12 @@ import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
+import de.codesourcery.javr.assembler.util.InMemoryResource;
 import de.codesourcery.javr.assembler.util.PrettyPrinter;
+import de.codesourcery.javr.assembler.util.Resource;
+import de.codesourcery.javr.assembler.util.StringResource;
+import de.codesourcery.javr.ui.IConfig;
+import de.codesourcery.javr.ui.IConfigProvider;
 import junit.framework.TestCase;
 
 public class DisassembleTest extends TestCase {
@@ -31,6 +47,14 @@ public class DisassembleTest extends TestCase {
     private final ATMega88 arch = new ATMega88();
     
     private static final DisassemblerSettings settings = new DisassemblerSettings();
+    
+    
+    public void testDisassemble8() throws IOException {
+        
+        final byte[] bytes = new byte[] { (byte) 0x8d ,(byte) 0x93 };
+        roundTrip( bytes );
+    }
+    
     
     // ; disassembled 8192 bytes from /home/tobi/atmel/asm/random.ra
     //  ld r17, z+                                                   | .db 0x11 , 0x91
@@ -103,6 +127,85 @@ public class DisassembleTest extends TestCase {
         
         final String output = arch.disassemble( bytes , bytes.length , settings );
         System.out.println( ">>>>>> "+output );
+    }
+    
+    private void roundTrip(byte[] expected) throws IOException 
+    {
+        final String output = arch.disassemble( expected , expected.length , settings );
+     
+        Assembler asm = new Assembler();
+        CompilationUnit unit = new CompilationUnit( new StringResource("dummy" , output ) );
+        final ResourceFactory factory = new ResourceFactory() 
+        {
+            
+            @Override
+            public Resource resolveResource(Resource parent, String child) throws IOException {
+                throw new UnsupportedOperationException();
+            }
+            
+            @Override
+            public Resource getResource(Segment segment) throws IOException {
+                return new InMemoryResource( segment.name() , Resource.ENCODING_UTF );
+            }
+        };
+        
+        final IConfig config = new IConfig() {
+            
+            @Override
+            public String getEditorIndentString() {
+                return "  ";
+            }
+            
+            @Override
+            public IArchitecture getArchitecture() {
+                return arch;
+            }
+            
+            @Override
+            public Parser createParser() {
+                Parser p = new Parser();
+                p.setArchitecture( arch );
+                return p;
+            }
+            
+            @Override
+            public Lexer createLexer(Scanner s) {
+                return new Lexer( s );
+            }
+        };
+        IConfigProvider configProvider = new IConfigProvider() {
+            
+            @Override
+            public IConfig getConfig() {
+                return config;
+            }
+        };
+        final Binary binary = asm.compile(unit , factory , configProvider );
+        final Resource resource = binary.getResource(Segment.FLASH).orElse( null );
+        assertNotNull( resource );
+        
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        final InputStream in = resource.createInputStream();
+        IOUtils.copy( in , out );
+        in.close();
+        out.close();
+        
+        final byte[] actual = out.toByteArray();
+        assertTrue( "Arrays do not match: \n"+printArrays(expected,actual) , Arrays.equals( expected , actual ) );
+    }
+    
+    private String printArrays(byte[] expected,byte[] actual) {
+        
+        String s1 = "";
+        String s2 = "";
+        
+        final int max = Math.max(expected.length,actual.length);
+        for ( int i = 0 ; i < max ; i++ ) {
+            s1 += "0x" + (i < expected.length ? StringUtils.leftPad( Integer.toHexString( expected[i] & 0xff ) , 2 , '0' )+" " : "   ");
+            s2 += "0x" + (i < actual.length ? StringUtils.leftPad( Integer.toHexString( actual[i] & 0xff ) , 2 , '0' )+" " : "   ");
+        }
+        return "Expected: "+s1+"\n"+
+               "Actual  : "+s2;
     }
     
     public void testDisassembl3()

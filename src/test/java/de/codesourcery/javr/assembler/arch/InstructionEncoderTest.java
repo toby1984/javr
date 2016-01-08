@@ -22,6 +22,8 @@ import static org.junit.Assert.*;
 import org.junit.Before;
 import org.junit.Test;
 
+import de.codesourcery.javr.assembler.arch.AbstractAchitecture.ArgumentType;
+
 public class InstructionEncoderTest 
 {
     private InstructionEncoder enc;
@@ -99,6 +101,27 @@ public class InstructionEncoderTest
         assertEquals( 0b1111 , decoded.get(0).intValue() );
         assertEquals( 0b01 , decoded.get(1).intValue() );
     }     
+    
+    /*
+        //               f   f     e    9
+        // actual  :   1111 1111 1110 1001
+        //               f   7     e    9
+        // expected:   1111 0111 1110 1001
+        insn("brne",  "1111 01kk kkkk k001" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );     
+     */
+    
+    @Test
+    public void testEncodeDecode27() {
+        
+        enc = new InstructionEncoder("1111 01kk kkkk k001");
+        int value = enc.encode( -3 , 0 );
+        assertBinary( 0b1111_0111_1110_1001 , value & 0xffff );
+        value <<= (enc.getInstructionLengthInBytes()*8);
+        final List<Integer> decoded = enc.decode( value );
+        assertEquals(2,decoded.size());
+        assertEquals( 125 , decoded.get(0).intValue() );
+        assertNull(decoded.get(1) );
+    }    
     
     @Test
     public void testEncodeDecode4() {
@@ -240,7 +263,7 @@ public class InstructionEncoderTest
     {
         final String exp = "0b"+StringUtils.leftPad( Integer.toBinaryString( expected ) , 16 , '0' ); 
         final String act = "0b"+StringUtils.leftPad( Integer.toBinaryString( actual ) , 16 , '0' ); 
-        assertEquals( "Expected \n"+exp+" but got \n"+act, expected , actual );
+        assertEquals( "Expected \n"+exp+" (0x"+Integer.toHexString(expected)+") but got \n"+act+" (0x"+Integer.toHexString(actual)+")", expected , actual );
     }
     
 }

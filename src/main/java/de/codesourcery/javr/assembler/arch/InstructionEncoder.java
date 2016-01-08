@@ -362,7 +362,7 @@ public class InstructionEncoder
                 throw new IllegalArgumentException("Bit count must be > 0,was: "+bitCount);
             }
             this.bitCount = bitCount;
-            this.mask = ~( (1<<(bitCount+1))-1);
+            this.mask = (1<<(bitCount))-1;
         }
         
         @Override
@@ -373,13 +373,13 @@ public class InstructionEncoder
         @Override
         public final int encode(int value) 
         {
-            if ( ( value & mask ) != 0 ) 
-            {
-                if ( (value & 0x80000000) == 0 ) { // don't fail on signed numbers 
-                    throw new RuntimeException("Value "+value+" is out of "+bitCount+"-bit range, expected 0.."+((1<<(bitCount))-1));
-                }
-            }
-            return doEncode(value);
+//            if ( ( value & mask ) != 0 ) 
+//            {
+////                if ( (value & 0x80000000) == 0 ) { // don't fail on signed numbers 
+//                    throw new RuntimeException("Value "+value+" is out of "+bitCount+"-bit range, expected 0.."+((1<<(bitCount))-1));
+////                }
+//            }
+            return doEncode(value & mask );
         }
         
         protected abstract int doEncode(int value);

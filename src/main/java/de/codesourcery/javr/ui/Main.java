@@ -156,6 +156,7 @@ public class Main
         System.out.println("Disassembling "+data.length+" bytes");
         final DisassemblerSettings settings = new DisassemblerSettings();
         settings.printBytes = false;
+        settings.printAddresses = true;
         settings.resolveRelativeAddresses = true;
         settings.printCompoundRegistersAsLower=false;
         String disassembly = config.getArchitecture().disassemble( data , data.length , settings );
