@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
@@ -30,6 +31,8 @@ import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Register;
 import de.codesourcery.javr.assembler.Segment;
+import de.codesourcery.javr.assembler.arch.AbstractAchitecture.ArgumentType;
+import de.codesourcery.javr.assembler.arch.AbstractAchitecture.InstructionEncoding;
 import de.codesourcery.javr.assembler.arch.InstructionEncoder.Transform;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
@@ -57,6 +60,15 @@ public abstract class AbstractAchitecture implements IArchitecture
         X_REGISTER, 
         Y_REGISTER,
         Z_REGISTER,
+        // predecrement
+        X_REGISTER_PREDECREMENT, 
+        Y_REGISTER_PREDECREMENT,
+        Z_REGISTER_PREDECREMENT,
+        // post inc
+        X_REGISTER_POST_INCREMENT,
+        Y_REGISTER_POST_INCREMENT,
+        Z_REGISTER_POST_INCREMENT,
+        // displacement
         Y_REGISTER_SIX_BIT_DISPLACEMENT,
         Z_REGISTER_SIX_BIT_DISPLACEMENT,
         // unsigned constant values
@@ -152,7 +164,13 @@ public abstract class AbstractAchitecture implements IArchitecture
                     return candidates.get(0);
                 }
             default:
-                throw new IllegalArgumentException("More than one candidate: "+candidates);
+                final int maxLenInBytes = candidates.stream().mapToInt( cand -> cand.encoder.getInstructionLengthInBytes() ).max().getAsInt();
+                LOG.error("pick(): More than one matching candidate",new Exception("More than one matching candidate"));
+                LOG.error("pick(): value = "+StringUtils.leftPad( Integer.toBinaryString( value ) , maxLenInBytes*8, '0' ));
+                candidates.forEach( cand -> {
+                    LOG.error("pick(): "+cand);
+                });
+                throw new IllegalArgumentException("More than one matching candidate: "+candidates);
         }
     };
     
@@ -166,6 +184,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         public InstructionEncoding aliasOf;
         public String disasmImplicitDestination;
         public String disasmImplicitSource;
+        public String disasmMnemonic;
         
         public InstructionEncoding(String mnemonic,InstructionEncoder enc,ArgumentType dstType,ArgumentType srcType) 
         {
@@ -188,14 +207,25 @@ public abstract class AbstractAchitecture implements IArchitecture
         
         public boolean hasImplicitDestinationArgument() {
             return disasmImplicitDestination != null;
-        }            
+        }          
+        
+        public InstructionEncoding disasmMnemonic(String mnemonic) {
+            Validate.notBlank(mnemonic, "mnemonic must not be NULL or blank");
+            if ( ! mnemonic.toLowerCase().equals( mnemonic ) ) {
+                throw new RuntimeException("mnemonics need to be all lower-case: "+mnemonic);
+            }
+            this.disasmMnemonic= mnemonic;
+            return this;
+        }        
         
         public InstructionEncoding disasmImplicitDestination(String disasmImplicitDestination) {
+            Validate.notBlank(disasmImplicitDestination, "disasmImplicitDestination must not be NULL or blank");
             this.disasmImplicitDestination = disasmImplicitDestination;
             return this;
         }
         
         public InstructionEncoding disasmImplicitSource(String disasmImplicitSource) {
+            Validate.notBlank(disasmImplicitSource, "disasmImplicitSource must not be NULL or blank");
             this.disasmImplicitSource = disasmImplicitSource;
             return this;
         }        
@@ -316,7 +346,7 @@ public abstract class AbstractAchitecture implements IArchitecture
             if ( ! this.encodings.isEmpty() ) 
             {
                 if ( ! enc.mnemonic.equals( this.encodings.get(0).mnemonic ) ) {
-                    throw new IllegalArgumentException("Mnemonics differ");
+                    throw new IllegalArgumentException("Mnemonics differ: "+enc.mnemonic+" vs. "+this.encodings.get(0).mnemonic );
                 }
             }
             this.encodings.add(enc);
@@ -334,8 +364,43 @@ public abstract class AbstractAchitecture implements IArchitecture
     // key is mnemonic in lower-case, value is corresponding encoding entry
     protected final Map<String,EncodingEntry> instructions = new HashMap<>();
     
+    // map of alternative names
+    // key is alternative mnemonic, value is mnemonic used as key in 'instructions' hashmap
+    private final Map<String,String> alternativeMnemonics = new HashMap<>();
+    
     // holds instruction prefixes in big-endian order
     protected final PrefixTree prefixTree = new PrefixTree();
+    
+    public AbstractAchitecture() 
+    {
+        initInstructions();
+        
+        // check for ambiguous patterns
+        final Map<Integer,List<InstructionEncoding>> patterns = new HashMap<>();
+        for ( EncodingEntry entry : instructions.values() ) 
+        {
+            for ( InstructionEncoding enc : entry.encodings ) 
+            {
+                sanityCheck( enc );
+                List<InstructionEncoding> list = patterns.get( enc.encoder.getBinaryPattern() );
+                if ( list == null ) {
+                    list = new ArrayList<>();
+                    patterns.put( enc.encoder.getBinaryPattern() , list );
+                }
+                list.add( enc );
+            }
+        }
+        patterns.values().stream().filter( list -> list.size() > 1 ).forEach( list -> 
+        {
+            
+            LOG.debug("Instruction encodings with ambiguous bit patterns:");
+            final int longestPattern  = list.stream().mapToInt( enc -> enc.encoder.getPattern().length() ).max().orElse(0);
+            for ( InstructionEncoding enc : list ) 
+            {
+                LOG.debug( StringUtils.leftPad( enc.mnemonic , 5 , " ")+" : "+StringUtils.leftPad( enc.encoder.getPattern() , longestPattern, ' ' ) );
+            }
+        });
+    }
     
     protected InstructionEncoding insn(String mnemonic,String pattern) 
     {
@@ -363,16 +428,10 @@ public abstract class AbstractAchitecture implements IArchitecture
     protected InstructionEncoding insn(String mnemonic,String pattern,ArgumentType dstType,ArgumentType srcType,boolean multipleEncodings,InstructionSelector chooser) 
     {
         if ( ! mnemonic.toLowerCase().equals( mnemonic ) ) {
-            throw new RuntimeException("Mnemonics need to be all lower-case");
-        }
+            throw new IllegalArgumentException("Mnemonics need to be lower-case");
+        }            
         final InstructionEncoder enc = new InstructionEncoder( pattern );
-        final int expArgCount = ( (dstType==ArgumentType.NONE) ? 0 : 1 ) + ( (srcType==ArgumentType.NONE) ? 0 : 1 );
-        if ( enc.getArgumentCount() != expArgCount ) {
-            throw new RuntimeException("Internal error, number of arguments in pattern ("+enc.getArgumentCount()+") does not match expectations ("+expArgCount+")");
-        }
-        
         final InstructionEncoding ins = new InstructionEncoding( mnemonic , enc , dstType , srcType );
-        
         final EncodingEntry existing = instructions.get( mnemonic );
         if ( existing != null ) 
         {
@@ -389,6 +448,27 @@ public abstract class AbstractAchitecture implements IArchitecture
         return ins;
     }     
     
+    private void sanityCheck(InstructionEncoding entry) 
+    {
+        final String mnemonic = entry.mnemonic;
+        if ( ! mnemonic.toLowerCase().equals( mnemonic ) ) {
+            throw new RuntimeException("Mnemonics need to be all lower-case: "+entry);
+        }
+        int expArgCount = ( (entry.dstType==ArgumentType.NONE) ? 0 : 1 ) + ( (entry.srcType==ArgumentType.NONE) ? 0 : 1 );
+        if ( entry.hasImplicitDestinationArgument() ) {
+            expArgCount--;
+        }
+        if ( entry.hasImplicitSourceArgument() ) {
+            expArgCount--;
+        }        
+        if ( expArgCount < 0  ) {
+            throw new RuntimeException("Internal error, number of implied arguments does what's in the pattern ("+entry.encoder.getArgumentCount()+" vs. "+expArgCount+"): "+entry);
+        }
+        if ( entry.encoder.getArgumentCount() != expArgCount ) {
+            throw new RuntimeException("Internal error, number of arguments in pattern ("+entry.encoder.getArgumentCount()+") does not match expectations ("+expArgCount+"): "+entry);
+        }        
+    }
+    
     protected final void add(EncodingEntry entry) 
     {
         Validate.notNull(entry, "entry must not be NULL");
@@ -396,9 +476,6 @@ public abstract class AbstractAchitecture implements IArchitecture
             throw new IllegalArgumentException("Encoding entry needs to have at least one encoding");
         }
         final String mnemonic = entry.encodings.get(0).mnemonic;
-        if ( ! mnemonic.toLowerCase().equals( mnemonic ) ) {
-            throw new RuntimeException("Mnemonics need to be lower-case");
-        }        
         if ( entry.encodings.stream().anyMatch( enc -> ! enc.mnemonic.equals( mnemonic ) ) ) {
             throw new RuntimeException("Refusing to add entry that contains mixed mnemonics");
         }
@@ -419,7 +496,7 @@ public abstract class AbstractAchitecture implements IArchitecture
     {
         if ( StringUtils.isNotBlank( s ) ) 
         {
-            return instructions.containsKey( s.toLowerCase() );
+            return lookupInstruction( s ) != null;
         }
         return false;
     }
@@ -427,7 +504,7 @@ public abstract class AbstractAchitecture implements IArchitecture
     @Override
     public int getInstructionLengthInBytes(InstructionNode node, ICompilationContext context,boolean estimate) 
     {
-        final EncodingEntry variants = instructions.get( node.instruction.getMnemonic().toLowerCase() );
+        final EncodingEntry variants = lookupInstruction( node.instruction.getMnemonic().toLowerCase() );
         if ( variants == null ) {
             throw new RuntimeException("Unknown instruction: "+node.instruction.getMnemonic()); 
         }          
@@ -451,10 +528,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         }
         final int argCount = ( dstArgument != null ? 1 : 0 ) + (srcArgument != null ? 1 : 0 );
         
-        final EncodingEntry variants = instructions.get( node.instruction.getMnemonic().toLowerCase() );
-        if ( variants == null ) {
-            throw new RuntimeException("Unknown instruction: "+node.instruction.getMnemonic()); 
-        }        
+        final EncodingEntry variants = lookupInstruction( node.instruction.getMnemonic() );
         final InstructionEncoding encoding = variants.getEncoding( node );
         int expectedArgumentCount = encoding.getArgumentCount();
         if ( encoding.hasImplicitSourceArgument() ) 
@@ -503,10 +577,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         }
         final int argCount = ( dstArgument != null ? 1 : 0 ) + (srcArgument != null ? 1 : 0 );
         
-        final EncodingEntry variants = instructions.get( node.instruction.getMnemonic().toLowerCase() );
-        if ( variants == null ) {
-            throw new RuntimeException("Unknown instruction: "+node.instruction.getMnemonic()); 
-        }        
+        final EncodingEntry variants = lookupInstruction( node.instruction.getMnemonic() );
         final InstructionEncoding encoding = variants.getEncoding( node );
         int expectedArgumentCount = encoding.getArgumentCount();
         if ( encoding.hasImplicitSourceArgument() ) 
@@ -954,6 +1025,22 @@ public abstract class AbstractAchitecture implements IArchitecture
         return (value & 0xff000000) >>> 8  | (value & 0x00ff0000) << 8;
     } 
 
+    private List<InstructionEncoding> getMatches(int bigEndianMSBLeft,int bytesInValue) 
+    {
+        // return prefixTree.getMatches( bigEndianMSBLeft );
+        final List<InstructionEncoding> result = new ArrayList<>();
+        for ( EncodingEntry entry : instructions.values() ) 
+        {
+            for ( InstructionEncoding enc : entry.encodings ) 
+            {
+                if ( enc.encoder.matches( bigEndianMSBLeft ) ) {
+                    result.add( enc );
+                }
+            }
+        }
+        return result;
+    }
+    
     @Override
     public String disassemble(byte[] data,int len,DecompilationSettings settings) 
     {
@@ -973,27 +1060,27 @@ public abstract class AbstractAchitecture implements IArchitecture
         {
             final int remaining = len - ptr;
             final int bytesToProcess = remaining >= 4 ? 4 : remaining;
-            int value=0;
+            int bigEndianMSBLeft=0;
             for ( int i = 0 ; i < bytesToProcess ; i++ ) 
             {
-                value <<= 8;
-                value |= data[ptr+i] & 0xff;
+                bigEndianMSBLeft <<= 8;
+                bigEndianMSBLeft |= data[ptr+i] & 0xff;
             }
             // decoding assumes that data
             // starts with the MSB
-            value <<= (4-bytesToProcess)*8;
+            bigEndianMSBLeft <<= (4-bytesToProcess)*8;
             
             // convert to big endian so that the prefix tree works properly 
-            value = reverseBytes( value , bytesToProcess );
+            bigEndianMSBLeft = reverseBytes( bigEndianMSBLeft , bytesToProcess );
             
-            System.out.println("0x"+Integer.toHexString( ptr+settings.startAddress)+": Trying to match "+bytesToProcess+" bytes : "+Integer.toBinaryString( value ) );
-            final List<InstructionEncoding> matches = prefixTree.getMatches( value );
+            System.out.println("0x"+Integer.toHexString( ptr+settings.startAddress)+": Trying to match "+bytesToProcess+" bytes : "+Integer.toBinaryString( bigEndianMSBLeft ) );
+            final List<InstructionEncoding> matches = getMatches(bigEndianMSBLeft,bytesToProcess);
             if ( buffer.length() > 0 ) 
             {
                 buffer.append("\n");
             }
             
-            if ( matches.isEmpty() ) // print as .db XX
+            if ( matches.isEmpty() ) // unknown opcode, print as .db XX
             {
                 buffer.append(".db ");
                 final int skip = remaining >= 2 ? 2 : remaining;
@@ -1013,7 +1100,7 @@ public abstract class AbstractAchitecture implements IArchitecture
                 final int longestMatch = matches.get(0).encoder.getOpcodeBitCount();
                 matches.removeIf( m -> m.encoder.getOpcodeBitCount() < longestMatch );
                 
-                final InstructionEncoding result = matches.get(0).disasmSelector.pick( matches , value );
+                final InstructionEncoding result = matches.get(0).disasmSelector.pick( matches , bigEndianMSBLeft );
                 if ( settings.printAddresses ) {
                     buffer.append( StringUtils.leftPad( Integer.toHexString( settings.startAddress+ptr ) , 4 , '0' ) ).append(":    ");
                 }
@@ -1021,10 +1108,10 @@ public abstract class AbstractAchitecture implements IArchitecture
                 if ( settings.printBytes ) 
                 {
                     final StringBuilder tmp = new StringBuilder();
-                    print(result, tmp , value , settings );
+                    print(result, tmp , bigEndianMSBLeft , settings );
                     buffer.append( StringUtils.rightPad( tmp.toString() , 15 , " " ) ).append("; ").append( toHex( data , ptr , result.getInstructionLengthInBytes() ) );
                 } else {
-                    print(result, buffer, value , settings );                    
+                    print(result, buffer, bigEndianMSBLeft , settings );                    
                 }
                 ptr += result.getInstructionLengthInBytes();
             }
@@ -1048,8 +1135,15 @@ public abstract class AbstractAchitecture implements IArchitecture
     private void print(final InstructionEncoding result, final StringBuilder buffer, int value,DecompilationSettings settings) 
     {
         final List<Integer> operands = result.encoder.decode( value );
-        System.out.println("DECODED: "+result.mnemonic+" "+operands);
-        buffer.append( result.mnemonic.toUpperCase() );
+        final int argCountInAsmSyntax = (result.srcType == ArgumentType.NONE ? 0:1)+(result.dstType == ArgumentType.NONE ? 0:1);
+        if ( argCountInAsmSyntax != result.encoder.getArgumentCount() ) 
+        {
+            
+        }
+        
+        final String mnemonic = result.disasmMnemonic == null ? result.mnemonic : result.disasmMnemonic;
+        System.out.println("DECODED: "+mnemonic+" "+operands);
+        buffer.append( mnemonic.toUpperCase() );
         if ( result.getArgumentCount() == 1 ) 
         {
             buffer.append(" ");
@@ -1061,11 +1155,11 @@ public abstract class AbstractAchitecture implements IArchitecture
             if ( result.disasmImplicitDestination != null ) 
             {
                 buffer.append( result.disasmImplicitDestination ).append(",");
-                buffer.append( prettyPrint( operands.get(0) , result.dstType , settings) );
+                buffer.append( prettyPrint( operands.get(0) , result.srcType , settings) );
             } 
             else if ( result.disasmImplicitSource != null ) 
             {
-                buffer.append( prettyPrint( operands.get(1) , result.dstType , settings) ).append(",");
+                buffer.append( prettyPrint( operands.get(0) , result.dstType , settings) ).append(",");
                 buffer.append( result.disasmImplicitSource );
             } 
             else {
@@ -1074,6 +1168,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         } 
         else if ( result.getArgumentCount() == 2 ) 
         {
+            // new InstructionEncoding( "lpm" , new InstructionEncoder(  "1001 000d dddd 0100" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER).disasmImplicitSource("Z");
             buffer.append(" ");
             if ( result.disasmImplicitDestination != null ) 
             {
@@ -1240,4 +1335,42 @@ public abstract class AbstractAchitecture implements IArchitecture
     protected abstract boolean isValidIOSpaceAdress(int address);
     protected abstract boolean isValidEEPROMAdress(int address);
     protected abstract int getGeneralPurposeRegisterCount();
+    protected abstract void initInstructions();
+    
+    protected final EncodingEntry lookupInstruction(String mnemonic) 
+    {
+        Validate.notBlank(mnemonic, "mnemonic must not be NULL or blank");
+        final String lowerCaseMnemonic = mnemonic.toLowerCase();
+        EncodingEntry result = instructions.get( lowerCaseMnemonic );
+        if ( result == null ) 
+        {
+            final String alias = alternativeMnemonics.get( lowerCaseMnemonic );
+            if ( alias != null ) {
+                result = instructions.get( alias );
+            }
+            if ( result == null ) {
+                throw new RuntimeException("Unknown instruction: "+mnemonic);
+            }
+        }         
+        return result;
+    }
+    
+    protected final void aliasMnemonic(String alias,String realDeal) 
+    {
+        Validate.notBlank(alias, "alias must not be NULL or blank");
+        Validate.notBlank(realDeal, "mnemonic must not be NULL or blank");
+        if ( ! alias.toLowerCase().equals( alias ) ) {
+            throw new RuntimeException("Mnemonics need to be all lower-case: "+alias);
+        }
+        if ( ! realDeal.toLowerCase().equals( realDeal ) ) {
+            throw new RuntimeException("Mnemonics need to be all lower-case: "+realDeal);
+        }        
+        if ( instructions.get( realDeal ) == null ) {
+            throw new RuntimeException("Refusing to register alias '"+alias+"' for non-existent instruction '"+realDeal+"'");
+        }
+        if ( alternativeMnemonics.containsKey( alias ) ) {
+            throw new RuntimeException("Alias already exists: "+alias+" -> "+alternativeMnemonics.get(alias) );
+        }
+        alternativeMnemonics.put( alias , realDeal );
+    }
 }

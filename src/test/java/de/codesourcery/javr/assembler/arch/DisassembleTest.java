@@ -31,6 +31,25 @@ public class DisassembleTest extends TestCase {
     
     private static final DecompilationSettings settings = new DecompilationSettings();
     
+    public void testDisassemble6() {
+        
+        final byte[] bytes = new byte[] { (byte) 0x44 ,(byte) 0x92 };
+        
+        final String output = arch.disassemble( bytes , bytes.length , settings );
+        System.out.println("Got "+output);
+        assertEquals("xch z,r4" , output );
+    } 
+    
+    // 97 91           elpm    r25, Z+
+    public void testDisassemble5() {
+        
+        final byte[] bytes = new byte[] { (byte) 0x97 ,(byte) 0x91 };
+        
+        final String output = arch.disassemble( bytes , bytes.length , settings );
+        System.out.println("Got "+output);
+        assertEquals("elpm r25,z+" , output );
+    }    
+    
     // sts 0x02,r20 ; ; 42 a8 ==>  ldd r4, z+50 
     public void testDisassemble4() {
         
@@ -38,7 +57,7 @@ public class DisassembleTest extends TestCase {
         
         final String output = arch.disassemble( bytes , bytes.length , settings );
         System.out.println("Got "+output);
-        assertEquals("ldd r4, z+50" , output );
+        assertEquals("ldd r4,z+50" , output );
     }
     
     // call 0x2bdfac  ; 5f 95 ac df ==> needs to be  call 0x57bf58
@@ -57,7 +76,7 @@ public class DisassembleTest extends TestCase {
         final byte[] bytes = new byte[] { (byte) 0x8f ,(byte) 0x83 };
         
         final String output = arch.disassemble( bytes , bytes.length , settings );
-        assertEquals("st y+7,r24" , output );
+        assertEquals("std y+7,r24" , output );
     }
     
     /*

@@ -124,7 +124,11 @@ public class InstructionEncoderTest
         assertEquals(2,decoded.size());
         assertEquals( 0b1111 , decoded.get(0).intValue() );
         assertNull(decoded.get(1) );
-    }       
+        assertTrue( enc.matches( 0b0101010000010010 ) );
+        assertTrue( enc.matches( 0b0101010110011110 ) );
+        assertTrue( enc.matches( 0b0101010010010110 ) );
+        assertTrue( enc.matches( 0b0101010100011010 ) );
+    }      
     
     @Test
     public void testEncodeDecode6() {

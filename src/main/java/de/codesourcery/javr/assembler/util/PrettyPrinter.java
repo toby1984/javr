@@ -6,6 +6,7 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode.IASTVisitor;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
 import de.codesourcery.javr.assembler.parser.ast.CharacterLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.CommentNode;
+import de.codesourcery.javr.assembler.parser.ast.CurrentAddressNode;
 import de.codesourcery.javr.assembler.parser.ast.ExpressionNode;
 import de.codesourcery.javr.assembler.parser.ast.FunctionCallNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierDefNode;
@@ -70,7 +71,7 @@ public class PrettyPrinter
                     buffer.append( operatorArgSpacing );
                     op.child(0).visitBreadthFirst( this );
                 } 
-                else if ( op.type.getArgumentCount() == 1 ) 
+                else if ( op.type.getArgumentCount() == 2 ) 
                 {
                     op.child(0).visitBreadthFirst( this );
                     buffer.append( operatorArgSpacing );
@@ -152,6 +153,9 @@ public class PrettyPrinter
             } else if ( node instanceof StringLiteral) { // STRING LITERAL
                 buffer.append("\"").append( ((CharacterLiteralNode) node).value ).append("\"");
             } 
+            else if ( node instanceof CurrentAddressNode) {
+                buffer.append(".");
+            }
             else if ( node instanceof NumberLiteralNode) // NUMBER
             {
                 final NumberLiteralNode num = (NumberLiteralNode) node;
@@ -177,7 +181,7 @@ public class PrettyPrinter
                     }
                 }
             } else {
-                throw new RuntimeException("Internal error, unhandled node: "+node);
+                throw new RuntimeException("Internal error, unhandled node: "+node.getClass().getName());
             }
         }
     }

@@ -36,6 +36,10 @@ public class InstructionEncoder
     
     private final String pattern;
     private final String trimmedPattern;
+    // bitmask containing '1' bits where the input pattern contained a fixed value (either '0' or '1' instead of a placeholder character)
+    private final int andMask;
+    
+    // bitmask where all placeholder characters are '0' bits and all other bits are set according to the fixed '0'/'1' values in the input pattern
     private final int binaryPattern;
     private final Encoding srcEncoding;
     private final Encoding dstEncoding;
@@ -49,6 +53,10 @@ public class InstructionEncoder
     public interface Transform 
     {
         public int transform(int value);
+    }
+    
+    public int getBinaryPattern() {
+        return binaryPattern;
     }
     
     public String getPattern() {
@@ -89,25 +97,10 @@ public class InstructionEncoder
     
     public boolean matches(int value) 
     {
-        int mask = 0b10000000_00000000_00000000_00000000;
-        for ( int i = 0,len=trimmedPattern.length() ; i < len ; i++ ) 
-        {
-            final boolean bitSet = (value&mask) != 0;
-            final char c = trimmedPattern.charAt(i);
-            if ( c == '0' ) {
-                if ( bitSet ) {
-                    return false;
-                }
-            } 
-            else if ( c == '1' ) 
-            {
-                if ( ! bitSet ) {
-                    return false;
-                }
-            } // else { /* the pattern contains a data bit at this position, both 0 and 1 are valid */ }
-            mask >>>= 1;
-        }
-        return true;
+        final int shiftedMask    = andMask << (4-getInstructionLengthInBytes())*8;
+        final int shiftedPattern = binaryPattern << (4-getInstructionLengthInBytes())*8;
+        return (value & shiftedMask) == shiftedPattern;
+//        return (value & andMask) == binaryPattern;
     }
     
     public InstructionEncoder(String pat) 
@@ -154,6 +147,7 @@ public class InstructionEncoder
         int srcBitCount=0;
         int dstBitCount=0;
         int binaryPattern =0;
+        int andMask = 0;
         int mask = 1;
         int opcodeBitCount = 0;
         for ( int i = pattern.length()-1 ; i >= 0 ; i-- ) 
@@ -162,11 +156,13 @@ public class InstructionEncoder
             if (c == '0') 
             {
                 opcodeBitCount++;
+                andMask |= mask;
             } 
             else if (c == '1') 
             {
                 opcodeBitCount++;
                 binaryPattern |= mask;
+                andMask |= mask;
             } 
             else if ( hasMoreThanOneArgument && c == SRC_PATTERN) 
             {
@@ -185,6 +181,7 @@ public class InstructionEncoder
             throw new IllegalArgumentException("One-argument patterns must only use '"+DST_PATTERN+"'");
         }
         
+        this.andMask = andMask;
         this.opcodeBitCount = opcodeBitCount;
         this.binaryPattern = binaryPattern;
         this.pattern = pattern;
@@ -229,10 +226,7 @@ public class InstructionEncoder
     
     public int getArgumentCount() 
     {
-        if ( dstEncoding == NOP ) {
-            return 0;
-        }
-        return srcEncoding == NOP ? 1 : 2;
+        return (dstEncoding == NOP ? 0 : 1 ) +  (srcEncoding == NOP ? 0 : 1 );
     }
     
     private static int[] toBitMapping(String pattern,char p,int bitCount) 
