@@ -1220,7 +1220,7 @@ public abstract class AbstractAchitecture implements IArchitecture
                     case SEVEN_BIT_SIGNED_JUMP_OFFSET:  
                         bitCount = 7 ;
                         int byteOffset = 2*signExtend(value,bitCount);
-                        return "."+ ( (byteOffset > 0 ) ? "+"+byteOffset : ""+byteOffset );
+                        return "."+ ( (byteOffset >= 0 ) ? "+"+byteOffset : ""+byteOffset );
                     case SEVEN_BIT_SRAM_MEM_ADDRESS:  
                         bitCount = 7 ;
                         break;
@@ -1243,7 +1243,7 @@ public abstract class AbstractAchitecture implements IArchitecture
                     case TWELVE_BIT_SIGNED_JUMP_OFFSET:  
                         bitCount = 12 ;
                         byteOffset = 2*signExtend(value,bitCount);
-                        return "."+ ( (byteOffset > 0 ) ? "+"+byteOffset : ""+byteOffset );
+                        return "."+ ( (byteOffset >= 0 ) ? "+"+byteOffset : ""+byteOffset );
                     default:
                         // $$FALL-THROUGH$$
                 }
