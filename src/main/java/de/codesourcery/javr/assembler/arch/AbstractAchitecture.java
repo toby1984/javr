@@ -993,9 +993,6 @@ public abstract class AbstractAchitecture implements IArchitecture
                             }
                             return deltaWords;
                         case SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET:
-                            if ( deltaWords == 0 ) {
-                                return fail("Conditional branch to next instruction is not possible",node,context);                                
-                            }
                             if ( ! fitsInSignedBitfield( deltaWords,  7 ) ) 
                             {
                                 return fail("Jump distance out of 7-bit range (was: "+deltaWords+" words)",node,context);

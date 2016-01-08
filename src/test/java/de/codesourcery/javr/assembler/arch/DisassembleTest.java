@@ -39,38 +39,11 @@ public class DisassembleTest  {
     
     @Test public void testRoundTrip() throws IOException 
     {
-        
-/*
-brcs 0x1e2; 01e0:    00 f0
-brcc 0x1ea; 01e8:    00 f4
-breq 0x3e2; 03e0:    01 f0
-brne 0x3ea; 03e8:    01 f4
-brmi 0x5e2; 05e0:    02 f0
-brpl 0x5ea; 05e8:    02 f4
-brvs 0x7e2; 07e0:    03 f0
-brvc 0x7ea; 07e8:    03 f4
-brlt 0x9e2; 09e0:    04 f0
-brge 0x9ea; 09e8:    04 f4
-brhs 0xbe2; 0be0:    05 f0
-brhc 0xbea; 0be8:    05 f4
-brts 0xde2; 0de0:    06 f0
-brtc 0xdea; 0de8:    06 f4
-brie 0xfe2; 0fe0:    07 f0
-brid 0xfea; 0fe8:    07 f4 
- */
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         for ( int i = 0 ; i < 256 ; i++ ) 
         {
             for ( int j = 0 ; j < 256 ; j++ ) 
             {
-                if ( i >= 0 && i <= 7 ) {
-                    if ( j == 0xf0 || j == 0xf4 ) 
-                    {
-                        out.write( 0xff );
-                        out.write( 0xff );                        
-                        continue;
-                    }
-                }
                 out.write( (byte) i);
                 out.write( (byte) j);
             }
