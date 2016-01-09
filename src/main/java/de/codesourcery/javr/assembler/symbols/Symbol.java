@@ -48,7 +48,7 @@ public final class Symbol
         /**
          * Symbol was defined through an <code>#define xxxxx()</code> directive.
          */
-        MACRO,
+        PREPROCESSOR_MACRO,
         /**
          * Symbol was declared but not defined yet (=unresolved symbol).
          */        
@@ -60,7 +60,7 @@ public final class Symbol
         Validate.notNull(compilationUnit, "com must not be NULL");
         Validate.notNull(name, "name must not be NULL");
         Validate.notNull(type, "type must not be NULL");
-        if ( type != Type.UNDEFINED && type != Type.MACRO ) {
+        if ( type != Type.UNDEFINED && type != Type.PREPROCESSOR_MACRO ) {
             Validate.notNull(node, "node must not be NULL");
         }
         this.compilationUnit = compilationUnit;
@@ -104,9 +104,15 @@ public final class Symbol
     
     public final void setValue(Object value,Type type) 
     {
-        LOG.debug("setValue( "+name+" ) = "+value);
+        Validate.notNull(type, "type must not be NULL");
+        
+        if ( LOG.isDebugEnabled() ) {
+            LOG.debug("setValue( "+name+","+type+" ) = "+value);
+        }
+        
         Validate.notNull(value, "value for symbol '"+name+"' must not be NULL");
-        if ( ! hasType(Type.UNDEFINED ) ) {
+        if ( ! hasType(Type.UNDEFINED ) ) 
+        {
             throw new IllegalStateException("Refusing to set value on symbol that already has a type "+this);
         }        
         this.type = type;

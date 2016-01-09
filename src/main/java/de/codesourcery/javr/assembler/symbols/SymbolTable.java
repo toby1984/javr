@@ -119,7 +119,7 @@ public class SymbolTable
         return result;
     }
     
-    public void internalDeclareSymbol(Symbol s) 
+    private void internalDeclareSymbol(Symbol s) 
     {
         Validate.notNull(s, "symbol must not be NULL");
         Symbol existing = internalGet(s.name());
@@ -175,6 +175,12 @@ public class SymbolTable
         final Symbol existing = internalGet( name );
         return existing != null && ! existing.hasType( Type.UNDEFINED );
     }
+    
+    public boolean isDeclared(Identifier name) 
+    {
+        Validate.notNull(name, "name must not be NULL");
+        return internalGet( name ) != null;
+    }    
     
     public void defineSymbol(Symbol symbol) 
     {

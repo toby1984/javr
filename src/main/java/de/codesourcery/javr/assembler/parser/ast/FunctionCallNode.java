@@ -1,13 +1,19 @@
 package de.codesourcery.javr.assembler.parser.ast;
 
+import java.util.Optional;
+
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.TextRegion;
+import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 
 public class FunctionCallNode extends AbstractASTNode implements IValueNode, Resolvable {
 
+    public static final Identifier BUILDIN_FUNCTION_DEFINED = new Identifier("defined");
+    
     public final Identifier functionName;
     
     private Object value;
@@ -30,6 +36,17 @@ public class FunctionCallNode extends AbstractASTNode implements IValueNode, Res
         {
             final IValueNode child = (IValueNode) child(0);
             final String name = functionName.value;
+            if ( BUILDIN_FUNCTION_DEFINED.equals( functionName ) )
+            {
+                if ( !(child instanceof IdentifierNode )) {
+                    context.error("Expected an identifier", child);
+                    return false;
+                }
+                final Identifier identifier = ((IdentifierNode) child).name;
+                final Optional<Symbol> result = context.currentSymbolTable().maybeGet( identifier );
+                this.value = result.isPresent() && result.get().getType() == Type.PREPROCESSOR_MACRO;
+                return true;
+            } 
             if ( name.equals("HIGH") || name.equals("LOW" ) ) 
             {
                 if ( child instanceof Resolvable) {

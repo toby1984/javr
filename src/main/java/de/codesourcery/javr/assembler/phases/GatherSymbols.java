@@ -48,7 +48,7 @@ public class GatherSymbols extends AbstractPhase
                 else if ( node instanceof FunctionDefinitionNode ) 
                 {
                     final FunctionDefinitionNode func =(FunctionDefinitionNode) node;
-                    defineSymbol( func , new Symbol(func.name,Symbol.Type.MACRO , context.currentCompilationUnit() , func ) ); 
+                    defineSymbol( func , new Symbol(func.name,Symbol.Type.PREPROCESSOR_MACRO , context.currentCompilationUnit() , func ) ); 
                 } 
                 else if ( node instanceof IdentifierNode) 
                 {

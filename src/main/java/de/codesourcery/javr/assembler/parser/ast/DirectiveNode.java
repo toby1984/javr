@@ -4,9 +4,11 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
+import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.TextRegion;
+import de.codesourcery.javr.assembler.symbols.Symbol;
 
-public class DirectiveNode extends NodeWithMemoryLocation 
+public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
 {
     private static final int SIZE_NOT_RESOLVED = -1;
     
@@ -130,5 +132,30 @@ public class DirectiveNode extends NodeWithMemoryLocation
             throw new IllegalStateException( "This statement is not associated with a memory location" );
         }
         return sizeInBytes;
+    }
+
+    @Override
+    public boolean resolve(ICompilationContext context) 
+    {
+        if ( directive == Directive.EQU ) 
+        {
+            // child 0 is EquLabelNode
+            final Identifier identifier = ((EquLabelNode) child(0)).name;
+            final ASTNode child1 = child(1);
+            // chidl 1 is expression
+            final boolean valueResolved;
+            if ( child1 instanceof Resolvable) {
+                valueResolved = ((Resolvable) child1).resolve( context );
+            } else {
+                valueResolved = true;
+            }
+            if ( valueResolved )
+            {
+                context.currentSymbolTable().get( identifier ).setValue( ((IValueNode) child(1)).getValue() , Symbol.Type.EQU ); 
+            } else {
+                context.error("Failed to resolve value",child1);
+            }
+        }
+        return false;
     }    
 }

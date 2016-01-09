@@ -33,6 +33,10 @@ public class FileResource implements Resource
         updateContentHash();
     }
     
+    public File getFile() {
+        return file;
+    }
+    
     @Override
     public boolean pointsToSameData(Resource other) 
     {

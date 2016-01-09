@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import de.codesourcery.javr.assembler.Address;
+import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.CharacterLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.CurrentAddressNode;
@@ -135,25 +136,26 @@ public enum OperatorType
         }
     }
     
-    public static Number evaluateToNumber(ASTNode node,SymbolTable symbolTable) 
+    public static Number evaluateToNumber(ASTNode node,ICompilationContext context) 
     {
-        Object result = evaluate(node,symbolTable);
+        Object result = evaluate(node,context);
         if ( result == null ) {
             return null;
         }
-        if ( !(result instanceof Number) ) {
-            throw new RuntimeException("Expected node "+node+" to evaluate to a number but got "+result);
+        if ( result != null && !(result instanceof Number) ) {
+            context.error("Expected node "+node+" to evaluate to a number but got "+result,node);
+            return null;
         }
         return (Number) result;
     }
     
-    public static Object evaluate(ASTNode node,SymbolTable symbolTable) 
+    public static Object evaluate(ASTNode node,ICompilationContext context) 
     {
         if ( node instanceof ExpressionNode ) {
-            return evaluate( ((ExpressionNode) node).child(0) , symbolTable );
+            return evaluate( ((ExpressionNode) node).child(0) , context);
         }
         if ( node instanceof IdentifierNode) {
-            return symbolTable.get( ((IdentifierNode) node).name ).getValue();
+            return context.currentSymbolTable().get( ((IdentifierNode) node).name ).getValue();
         }
         if ( node instanceof CurrentAddressNode ) {
             return ((CurrentAddressNode ) node).getValue();
@@ -170,18 +172,21 @@ public enum OperatorType
         if( node instanceof OperatorNode ) 
         {
             final OperatorType type = ((OperatorNode) node).type;
-            final Object value1 = node.childCount() >= 1 ? evaluate( node.child(0) , symbolTable ) : null;
-            final Object value2 = node.childCount() >= 2 ? evaluate( node.child(1) , symbolTable ) : null;
+            final Object value1 = node.childCount() >= 1 ? evaluate( node.child(0) , context ) : null;
+            final Object value2 = node.childCount() >= 2 ? evaluate( node.child(1) , context ) : null;
             final int argCount = ( value1 == null ? 0 : 1 ) + ( value2 == null ? 0 : 1 );
-            if ( argCount != type.getArgumentCount() ) {
-                throw new RuntimeException("Operator '"+type.symbol+"' requires "+type.getArgumentCount()+" arguments , got "+argCount);
+            if ( argCount != type.getArgumentCount() ) 
+            {
+                context.error("Operator '"+type.symbol+"' requires "+type.getArgumentCount()+" arguments , got "+argCount,node);
+                return null;
             }
             switch(type) 
             {
                 case REF_EQ:
                 case REF_NEQ:
                     if ( value1.getClass() != value2.getClass() ) {
-                        throw new RuntimeException("'==' / '!=' operators require arguments of the same type, got "+value1.getClass().getSimpleName()+" and "+value2.getClass().getSimpleName());
+                        context.error("'==' / '!=' operators require arguments of the same type, got "+value1.getClass().getSimpleName()+" and "+value2.getClass().getSimpleName(),node);
+                        return null;
                     }
                     return type == REF_EQ ? value1.equals(value2) : ! value1.equals(value2); 
                 default:
@@ -191,16 +196,19 @@ public enum OperatorType
                 // logical operators
                 case LOGICAL_NOT:
                     if ( !(value1 instanceof Boolean)) {
-                        throw new RuntimeException("'!' operator requires a boolean argument");
+                        context.error("'!' operator requires a boolean argument",node);
+                        return null;
                     }
                     return ! ((Boolean) value1).booleanValue();
                 case LOGICAL_AND:
                 case LOGICAL_OR:
                     if ( !(value1 instanceof Boolean)) {
-                        throw new RuntimeException("'"+type.symbol+"' operator requires boolean arguments");
+                        context.error("'"+type.symbol+"' operator requires boolean arguments",node);
+                        return null;
                     }
                     if ( !(value2 instanceof Boolean)) {
-                        throw new RuntimeException("'"+type.symbol+"' operator requires boolean arguments");
+                        context.error("'"+type.symbol+"' operator requires boolean arguments",node);
+                        return null;
                     }              
                     final boolean b1 = ((Boolean) value1).booleanValue();
                     final boolean b2 = ((Boolean) value2).booleanValue();
@@ -215,7 +223,7 @@ public enum OperatorType
                         case REF_NEQ:
                             return b1 != b2;
                     }
-                    throw new RuntimeException("Unreachable code reached");
+                    throw new RuntimeException("Internal error - unreachable code reached");
                 default:
                     // $$FALL-THROUGH
             }
@@ -259,7 +267,7 @@ public enum OperatorType
                     break;
             }
         }
-        throw new RuntimeException("Don't know how to evaluate "+node.getClass().getName());
+        throw new RuntimeException("Internal error - don't know how to evaluate "+node.getClass().getName());
     }
     
     private static int toInt(Object o) 

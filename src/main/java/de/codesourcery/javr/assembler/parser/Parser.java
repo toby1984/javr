@@ -47,6 +47,7 @@ import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
 import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
 import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode.Preprocessor;
+import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
 import de.codesourcery.javr.assembler.parser.ast.StringLiteral;
@@ -242,12 +243,24 @@ public class Parser
                 if ( proc == Preprocessor.IF_DEFINE || proc == Preprocessor.IF_NDEFINE ) 
                 {
                     final TextRegion r = new TextRegion( offset , lexer.peek().offset - offset );
-                    final IdentifierNode idNode = parseIdentifier();
-                    if ( idNode == null ) {
-                        throw new ParseException("Expected an identifier", lexer.peek() );
+                    ASTNode expr = parseExpression();
+                    if ( expr == null ) {
+                        throw new ParseException("Expected an identifier/expression", lexer.peek() );
+                    }
+                    if ( expr.hasNoChildren() && expr instanceof IdentifierNode) { // shorthand syntax for "#ifdef defined(identifier)"
+                        final IdentifierNode idNode = (IdentifierNode) expr;
+                        expr = new FunctionCallNode( new Identifier("defined") , idNode.getTextRegion().createCopy() );
+                        expr.addChild( idNode );
+                        
+                        if ( proc == Preprocessor.IF_NDEFINE ) // => negate condition
+                        {
+                            final OperatorNode op = new OperatorNode( OperatorType.LOGICAL_NOT , idNode.getTextRegion().createCopy() );
+                            op.addChild( expr );
+                            expr = op;
+                        }
                     }
                     final PreprocessorNode preproc = new PreprocessorNode( proc , r );
-                    preproc.addChild( new IdentifierDefNode( idNode.name , idNode.getTextRegion() ) );
+                    preproc.addChild( expr );
                     return preproc;
                 } 
                 if ( proc == Preprocessor.DEFINE ) 
@@ -276,7 +289,7 @@ public class Parser
                      * #define a (1+2)
                      * #define a(x) x*x
                      */
-                    final FunctionDefinitionNode funcDef = new FunctionDefinitionNode( name , nameToken.region() );
+                    final FunctionDefinitionNode funcDef = new FunctionDefinitionNode( name , Symbol.Type.PREPROCESSOR_MACRO , nameToken.region() );
 
                     boolean expectingFunctionBody= false;
                     if ( ! gotWhitespace &&  lexer.peek(TokenType.PARENS_OPEN ) ) 
@@ -358,7 +371,7 @@ public class Parser
         return result;
     }
 
-    private ASTNode parseDirective() 
+    private ASTNode parseDirective() // parse .XXXX commands
     {
         Token tok = lexer.peek();
         if ( tok.hasType( TokenType.DOT ) ) 
@@ -411,14 +424,15 @@ public class Parser
             case "cseg": return new DirectiveNode(Directive.CSEG , tok2.region() );
             case "db":
             case "dw":
-                final DirectiveNode result =  new DirectiveNode( value.toLowerCase().equals("db") ? Directive.INIT_BYTES : Directive.INIT_WORDS , tok2.region() ); 
+            case "word":
+                final Directive dirType = value.toLowerCase().equals("db") ? Directive.INIT_BYTES : Directive.INIT_WORDS;
+                final DirectiveNode result =  new DirectiveNode( dirType , tok2.region() ); 
                 final List<ASTNode> values = parseExpressionList();                
                 if ( values.isEmpty() ) {
                     throw new ParseException( "Missing expression" , lexer.peek() );
                 }
                 result.addChildren( values );
                 return result;
-
             case "equ":
                 if ( lexer.peek(TokenType.TEXT ) && Identifier.isValidIdentifier( lexer.peek().value ) ) 
                 {

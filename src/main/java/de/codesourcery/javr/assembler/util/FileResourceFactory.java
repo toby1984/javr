@@ -50,9 +50,9 @@ public class FileResourceFactory implements ResourceFactory {
         final String suffix;
         switch( segment ) 
         {
-            case EEPROM: suffix = ".eeprom"; break;
-            case FLASH:  suffix = ".flash"; break;
-            case SRAM:   suffix = ".sram"; break;
+            case EEPROM: suffix = ".eeprom.hex"; break;
+            case FLASH:  suffix = ".flash.hex"; break;
+            case SRAM:   suffix = ".sram.hex"; break;
             default: throw new RuntimeException("Unhandled segment type: "+segment);
         }
         return new FileResource( new File( pwd + File.separatorChar + fileBaseName + suffix )  , Resource.ENCODING_UTF );

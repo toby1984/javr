@@ -8,23 +8,22 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
-import java.util.Arrays;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.junit.Test;
 
 import de.codesourcery.javr.assembler.Assembler;
-import de.codesourcery.javr.assembler.Binary;
+import de.codesourcery.javr.assembler.Buffer;
 import de.codesourcery.javr.assembler.CompilationUnit;
+import de.codesourcery.javr.assembler.ObjectCodeWriter;
 import de.codesourcery.javr.assembler.ResourceFactory;
 import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.IArchitecture.DisassemblerSettings;
 import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.Parser;
-import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.parser.Parser.Severity;
+import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.util.InMemoryResource;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
@@ -201,10 +200,11 @@ public class DisassembleTest  {
         };
         System.err.println("Compiling ...");
         System.err.flush();
-        final Binary binary = asm.compile(unit , factory , configProvider );
+        final ObjectCodeWriter objectCodeWriter = new ObjectCodeWriter();
+        final boolean success = asm.compile(unit , objectCodeWriter, factory , configProvider );
         System.err.println("Compilation finished");
         System.err.flush();
-        if ( binary == null ) {
+        if ( ! success ) {
             System.err.println("Compilation had errors: \n");
             unit.getAST().getMessages().stream().filter( msg -> msg.severity == Severity.ERROR ).forEach( msg -> 
             { 
@@ -229,7 +229,7 @@ public class DisassembleTest  {
             fail("Compilation failed with errors");
         }
         
-        final Resource resource = binary.getResource(Segment.FLASH).orElse( null );
+        final Buffer resource = objectCodeWriter.getBuffer(Segment.FLASH);
         assertNotNull( resource );
         
         final ByteArrayOutputStream out = new ByteArrayOutputStream();

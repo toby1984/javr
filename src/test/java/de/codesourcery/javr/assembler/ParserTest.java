@@ -88,8 +88,42 @@ public class ParserTest
         assertEquals( Preprocessor.IF_DEFINE , ins.type );
         assertEquals( 0 , ins.arguments.size() );
         assertEquals( 1 , ins.childCount() );
-        assertEquals( new Identifier("test") , ((IdentifierDefNode) ins.firstChild()).name );
+        
+        FunctionCallNode fn = (FunctionCallNode) ins.firstChild();
+        assertEquals( FunctionCallNode.BUILDIN_FUNCTION_DEFINED , fn.functionName );
+        assertEquals(1 , fn.childCount() );
+        IdentifierNode in = (IdentifierNode) fn.firstChild();
+        assertEquals( Identifier.of("test") ,in.name );
     }
+    
+    @Test
+    public void testParseIfnDef() 
+    {
+        AST ast = parse("#ifndef test");
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() );
+        
+        final StatementNode stmt = (StatementNode) ast.child(0);
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
+        
+        final PreprocessorNode ins = (PreprocessorNode) stmt.child(0);
+        assertNotNull(ins);
+        assertEquals( Preprocessor.IF_NDEFINE , ins.type );
+        assertEquals( 0 , ins.arguments.size() );
+        assertEquals( 1 , ins.childCount() );
+        
+        final OperatorNode op = (OperatorNode) ins.firstChild();
+        assertEquals(OperatorType.LOGICAL_NOT , op.type );
+        assertEquals(1 , op.childCount() );
+        
+        final FunctionCallNode fn = (FunctionCallNode) op.firstChild();
+        assertEquals( FunctionCallNode.BUILDIN_FUNCTION_DEFINED , fn.functionName );
+        assertEquals(1 , fn.childCount() );
+        IdentifierNode in = (IdentifierNode) fn.firstChild();
+        assertEquals( Identifier.of("test") ,in.name );
+    }    
     
     @Test
     public void testParseDefine1() 

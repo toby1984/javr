@@ -8,6 +8,7 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
 import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 
 public class PrepareGenerateCodePhase extends GenerateCodePhase
 {
@@ -46,7 +47,10 @@ public class PrepareGenerateCodePhase extends GenerateCodePhase
         // sanity check
         context.globalSymbolTable().getAllSymbolsUnsorted().stream().filter( Symbol::isUnresolved ).forEach( symbol -> 
         {
-            context.error("Unresolved symbol '"+symbol.name()+"'",symbol.getNode());
+            if ( ! symbol.hasType( Type.PREPROCESSOR_MACRO ) ) // preprocessor macros/defines are special since "#define something" is a valid statement and needs to value/body
+            {
+                context.error("Unresolved symbol '"+symbol.name()+"'",symbol.getNode());
+            }
         });                 
     }
 }

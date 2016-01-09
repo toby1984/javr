@@ -14,9 +14,9 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.FunctionDefinitionNode;
-import de.codesourcery.javr.assembler.parser.ast.IdentifierDefNode;
+import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
-import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode.Preprocessor;
+import de.codesourcery.javr.assembler.parser.ast.Resolvable;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
 
 public abstract class AbstractPhase implements Phase 
@@ -112,7 +112,6 @@ public abstract class AbstractPhase implements Phase
             {
                 case DEFINE:
                     final FunctionDefinitionNode fn = (FunctionDefinitionNode) preproc.child(0);
-                    context.globalSymbolTable().declareSymbol( fn.name , context.currentCompilationUnit() );
                     context.currentSymbolTable().declareSymbol( fn.name , context.currentCompilationUnit() );
                     break;
                 case ENDIF:
@@ -127,11 +126,15 @@ public abstract class AbstractPhase implements Phase
                     break;
                 case IF_DEFINE:
                 case IF_NDEFINE:
-                    final IdentifierDefNode fn2 = (IdentifierDefNode) preproc.child(0);
-                    boolean isDefined = context.globalSymbolTable().isDefined( fn2.name );
-                    if( preproc.type == Preprocessor.IF_NDEFINE ) {
-                        isDefined = ! isDefined;
+                    if ( ! ((Resolvable) preproc.child(0)).resolve( context ) ) {
+                        return false;                        
                     }
+                    Object value = ((IValueNode) preproc.child(0)).getValue();
+                    if ( !(value instanceof Boolean ) ) {
+                        context.error("Expression did not resolve to a boolean, got "+value,preproc.child(0));
+                        return false;
+                    }
+                    final boolean isDefined = ((Boolean) value).booleanValue();
                     ifDefStack.push(node);
                     if ( ! isDefined ) 
                     {

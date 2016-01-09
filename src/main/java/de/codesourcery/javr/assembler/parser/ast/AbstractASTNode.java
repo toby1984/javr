@@ -35,6 +35,23 @@ public abstract class AbstractASTNode implements ASTNode
     public AbstractASTNode() {
     }
     
+    public final TextRegion getMergedTextRegion() {
+        
+        final TextRegion[] result = {null};
+        visitBreadthFirst( (node,ctx) -> 
+        {
+            final TextRegion r = node.getTextRegion();
+            if ( r != null ) {
+                if ( result[0] == null ) {
+                    result[0] = r.createCopy();
+                } else {
+                    result[0].merge( r );
+                }
+            }
+        }); 
+        return result[0];
+    }
+    
     /* (non-Javadoc)
      * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#markAsSkip()
      */

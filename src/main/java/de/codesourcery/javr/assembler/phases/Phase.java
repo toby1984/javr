@@ -14,8 +14,4 @@ public interface Phase
     public String getName();
     
     public void run(ICompilationContext context) throws Exception;
-    
-    public default boolean stopOnErrors() {
-        return true;
-    }
 }

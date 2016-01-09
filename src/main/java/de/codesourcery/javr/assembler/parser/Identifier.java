@@ -37,6 +37,10 @@ public final class Identifier {
         return value;
     }
     
+    public static Identifier of(String s) {
+        return new Identifier(s);
+    }
+    
     @Override
     public boolean equals(Object obj) {
         if ( obj instanceof Identifier) {

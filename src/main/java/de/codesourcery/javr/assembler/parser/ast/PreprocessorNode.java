@@ -18,6 +18,7 @@ public class PreprocessorNode extends AbstractASTNode implements Resolvable {
         IF_DEFINE("ifdef"),
         IF_NDEFINE("ifndef"),
         PRAGMA("pragma"),
+        INCLUDE("include"),
         ENDIF("endif"),
         ERROR("error"),
         WARNING("warning"),

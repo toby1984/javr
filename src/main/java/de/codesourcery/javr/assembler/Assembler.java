@@ -15,20 +15,16 @@
  */
 package de.codesourcery.javr.assembler;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
+import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.phases.GatherSymbols;
 import de.codesourcery.javr.assembler.phases.GenerateCodePhase;
@@ -44,124 +40,70 @@ import de.codesourcery.javr.ui.IConfigProvider;
 public class Assembler 
 {
     private static final Logger LOG = Logger.getLogger(Assembler.class);
-    
+
     private IConfig config;
     private CompilationContext compilationContext;
     private SymbolTable globalSymbolTable = new SymbolTable( SymbolTable.GLOBAL );
+    
+    private ResourceFactory resourceFactory;
 
     private final CompilationSettings compilerSettings = new CompilationSettings();
-    
+
     private final class CompilationContext implements ICompilationContext 
     {
-        private Segment segment = Segment.FLASH;
-        
-        private int codeOffset = 0;
-        private int initDataOffset = 0;
-        private int uninitDataOffset = 0;
-        
-        private byte[] codeSegment = new byte[0];
-        private byte[] initDataSegment = new byte[0];
-        
         private final CompilationUnit compilationUnit;
-        
-        public CompilationContext(CompilationUnit unit) 
+        private final IObjectCodeWriter objectCodeWriter;
+
+        public CompilationContext(CompilationUnit unit,IObjectCodeWriter objectCodeWriter) 
         {
             Validate.notNull(unit, "unit must not be NULL");
+            Validate.notNull(objectCodeWriter, "objectCodeWriter must not be NULL");
             this.compilationUnit = unit;
+            this.objectCodeWriter = objectCodeWriter;
             unit.setSymbolTable( new SymbolTable( compilationUnit.getResource().toString() , globalSymbolTable) );
         }
         
+        public AST parseInclude(String path) throws IOException
+        {
+            final Resource newResource = resourceFactory.resolveResource( compilationUnit.getResource() , path );
+            for ( CompilationUnit existing : compilationUnit.getDependencies() ) 
+            {
+                if ( existing.getResource().pointsToSameData( newResource ) ) 
+                {
+                    return (AST) existing.getAST().createCopy(true);
+                }
+            }
+            
+            final CompilationUnit result = new CompilationUnit( newResource );
+            
+            final AST ast = ParseSource.parseSource( newResource , config );
+            result.setAst( ast );
+            compilationUnit.addDependency( result );
+            
+            return ast;
+        }
+
         @Override
         public ICompilationSettings getCompilationSettings() {
             return compilerSettings;
         }
-        
-        public void save(Binary b , ResourceFactory rf) throws IOException 
-        {
-            for ( Segment seg : Segment.values() ) 
-            {
-                final Resource resource = rf.getResource( seg );
-                if ( writeSegment( resource , seg ) != 0 ) 
-                {
-                    final int maxSizeInBytes = getArchitecture().getSegmentSize( seg );
-                    final int bytesUsed = resource.size();
-                    final float percentUsaged = 100f*( bytesUsed / (float) maxSizeInBytes);
-                    final DecimalFormat DF = new DecimalFormat("##0.00");
-                    
-                    final String msg = seg+": "+bytesUsed+" of "+maxSizeInBytes+" bytes used ("+DF.format( percentUsaged )+" %), written to "+resource;
-                    message( CompilationMessage.info( msg) );
-                    
-                    if ( bytesUsed > maxSizeInBytes ) 
-                    {
-                        final String errorMsg = "Code size too big, will not fit into "+seg+" segment of target architecture.";
-                        if ( getCompilerSettings().isFailOnAddressOutOfRange() ) {
-                            message( CompilationMessage.error(errorMsg) );
-                        } else {
-                            message( CompilationMessage.warning(errorMsg) );
-                        }
-                    }
-                    b.setResource( seg , resource );
-                }
-            }
-        }
-        
-        private int writeSegment(Resource r,Segment segment) throws IOException 
-        {
-            final int len;
-            final byte[] data;
-            switch( segment ) 
-            {
-                case EEPROM:
-                    data = new byte[ uninitDataOffset ];
-                    len = uninitDataOffset;
-                    break;
-                case FLASH:
-                    len = codeOffset;
-                    data = codeSegment;
-                    break;
-                case SRAM:
-                    len = initDataOffset;
-                    data = initDataSegment;
-                    break;
-                default:
-                    throw new RuntimeException("Unhandled switch/case: "+segment);
-            }
-            if ( len > 0 ) {
-                writeResource( r , data , len );
-            } else {
-                r.delete();
-            }
-            return len;
-        }
-        
-        private void writeResource(Resource flash,byte[] data,int len) throws IOException 
-        {
-            try ( OutputStream out = flash.createOutputStream() ; InputStream in = new ByteArrayInputStream( data , 0 , len ) ) 
-            {
-                IOUtils.copy( in , out );
-            }        
-        }
-        
+
         public void beforePhase() 
         {
-            segment = Segment.FLASH;
-            codeOffset = 0;
-            initDataOffset = 0;
-            uninitDataOffset = 0;
-            codeSegment = new byte[0];
-            initDataSegment = new byte[0];
+            objectCodeWriter.reset();
+            objectCodeWriter.setCurrentSegment( Segment.FLASH );
         }
-        
+
         @Override
         public SymbolTable currentSymbolTable() {
             return compilationUnit.getSymbolTable();
         }
-        
+
         @Override
         public SymbolTable globalSymbolTable() {
             return globalSymbolTable;
         }
-        
+
         @Override
         public Address currentAddress() 
         {
@@ -171,70 +113,31 @@ public class Assembler
         @Override
         public int currentOffset() 
         {
-            switch( segment ) 
-            {
-                case FLASH:
-                    return codeOffset;
-                case SRAM:
-                    return initDataOffset;
-                case EEPROM:
-                    return uninitDataOffset;
-                default:
-                    throw new RuntimeException("Unhandled segment type:"+segment);
-            }
+            return objectCodeWriter.getCurrentByteAddress();
         }
 
         @Override
         public Segment currentSegment() {
-            return segment;
+            return objectCodeWriter.getCurrentSegment();
         }
 
         @Override
         public void setSegment(Segment s) {
-            Validate.notNull(s, "segment must not be NULL");
-            this.segment = s;
+            objectCodeWriter.setCurrentSegment( s );
         }
-        
+
         @Override
         public void writeByte(int value) 
         {
-            switch( segment ) 
-            {
-                case FLASH:
-                    if ( codeOffset+1 >= codeSegment.length ) {
-                        codeSegment = realloc( codeSegment , codeOffset+1);
-                    }
-                    codeSegment[ codeOffset++ ] = (byte) value;
-                    break;
-                case SRAM:
-                    if ( initDataOffset+1 >= initDataSegment.length ) {
-                        initDataSegment = realloc( initDataSegment , initDataOffset+1 );
-                    }
-                    initDataSegment[ initDataOffset++ ] = (byte) value;
-                    break;
-                case EEPROM:
-                    uninitDataOffset += 1;
-                    break;
-                default:
-                    throw new RuntimeException("Unhandled segment type:"+segment);
-            }
+            objectCodeWriter.writeByte(value);
         }
-        
-        private byte[] realloc(byte[] input,int minLength) 
-        {
-            final int len = Math.max( input.length*2 , minLength );
-            byte[] newArray = new byte[ len ];
-            System.arraycopy( input , 0 , newArray , 0 , input.length );
-            return newArray;
-        }
-        
+
         @Override
-        public void writeWord(int value) {
-            // AVR is little endian
-            writeByte( value );
-            writeByte( value >> 8 );
+        public void writeWord(int value) 
+        {
+            objectCodeWriter.writeWord( value );
         }
-        
+
         @Override
         public void error(String message, ASTNode node) {
             message( CompilationMessage.error(message,node ) );
@@ -255,23 +158,10 @@ public class Assembler
         {
             allocateBytes(1);
         }
-        
+
         public void allocateBytes(int bytes)
         {
-            switch( segment ) 
-            {
-                case FLASH:
-                    codeOffset+=bytes;
-                    break;
-                case SRAM:
-                    initDataOffset+=bytes;
-                    break;
-                case EEPROM:
-                    uninitDataOffset += bytes;
-                    break;
-                default:
-                    throw new RuntimeException("Unhandled segment type:"+segment);
-            }               
+            objectCodeWriter.allocateBytes( bytes );
         }
 
         @Override
@@ -284,16 +174,18 @@ public class Assembler
             return compilationUnit;
         }
     }
-    
-    public Binary compile(CompilationUnit unit,ResourceFactory rf, IConfigProvider config) throws IOException 
+
+    public boolean compile(CompilationUnit unit,IObjectCodeWriter codeWriter,ResourceFactory rf, IConfigProvider config) throws IOException 
     {
-        Validate.notNull(unit, "unit must not be NULL");
-        Validate.notNull(rf, "rf must not be NULL");
+        Validate.notNull(unit, "compilation unit must not be NULL");
+        Validate.notNull(codeWriter, "codeWriter must not be NULL");
+        Validate.notNull(rf, "resourceFactory must not be NULL");
         Validate.notNull(config, "provider must not be NULL");
-        
+
         this.globalSymbolTable = new SymbolTable(SymbolTable.GLOBAL);
-        this.compilationContext = new CompilationContext( unit );
+        this.compilationContext = new CompilationContext( unit , codeWriter );
         this.config = config.getConfig();
+        this.resourceFactory = rf;
         
         final List<Phase> phases = new ArrayList<>();
         phases.add( new ParseSource(config) );
@@ -301,52 +193,57 @@ public class Assembler
         phases.add( new GatherSymbols() );
         phases.add( new PrepareGenerateCodePhase() );
         phases.add( new GenerateCodePhase() );
-        
+
         LOG.info("assemble(): Now compiling "+unit);
-        
-        for ( Phase p : phases )
+
+        boolean success = false;
+        try 
         {
-            compilationContext.beforePhase();
-            
-            LOG.debug("Assembler phase: "+p);
-            
-            try 
+            for ( Phase p : phases )
             {
-                p.beforeRun( compilationContext );
-                
-                p.run( compilationContext );
-                
-                if ( ! unit.getAST().hasErrors() ) {
-                    p.afterSuccessfulRun( compilationContext );
+                LOG.debug("Assembler phase: "+p);
+                compilationContext.beforePhase();
+
+                try 
+                {
+                    p.beforeRun( compilationContext );
+
+                    p.run( compilationContext );
+
+                    if ( ! unit.getAST().hasErrors() ) {
+                        p.afterSuccessfulRun( compilationContext );
+                    } 
                 } 
-            } 
-            catch (Exception e) 
-            {
-                LOG.error("assemble(): ",e);
-                if ( e instanceof RuntimeException) {
-                    throw (RuntimeException) e;
+                catch (Exception e) 
+                {
+                    LOG.error("assemble(): ",e);
+                    if ( e instanceof RuntimeException) {
+                        throw (RuntimeException) e;
+                    }
+                    throw new RuntimeException(e);
                 }
-                throw new RuntimeException(e);
+
+                if ( unit.getAST().hasErrors() ) 
+                {
+                    LOG.error("compile(): Compilation failed with errors in phase "+p);
+                    return false;
+                }
             }
             
-            if ( p.stopOnErrors() && unit.getAST().hasErrors() ) 
-            {
-                LOG.error("compile(): Compilation failed with errors in phase "+p);
-                return null;
-            }
+            success = true;
+        } 
+        finally 
+        {
+            codeWriter.finish( success );
         }
-        
-        // write output
-        final Binary b = new Binary();
-        compilationContext.save( b , rf );
-        return b;
+        return true;
     }
-    
+
     public SymbolTable getGlobalSymbolTable() 
     {
         return globalSymbolTable;
     }
-    
+
     public CompilationSettings getCompilerSettings() {
         return compilerSettings;
     }

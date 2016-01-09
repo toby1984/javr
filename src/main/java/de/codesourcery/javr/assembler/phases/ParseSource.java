@@ -11,6 +11,7 @@ import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.Parser;
 import de.codesourcery.javr.assembler.parser.Scanner;
+import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.ui.IConfig;
 import de.codesourcery.javr.ui.IConfigProvider;
@@ -33,8 +34,11 @@ public class ParseSource implements Phase {
     @Override
     public void run(ICompilationContext context) throws IOException 
     {
-        final Resource resource = context.currentCompilationUnit().getResource();
-        
+        context.currentCompilationUnit().setAst( parseSource(context.currentCompilationUnit().getResource() , provider.getConfig() ) );
+    }
+
+    public static AST parseSource(Resource resource,IConfig config) throws IOException 
+    {
         final String input;
         try ( ByteArrayOutputStream out = new ByteArrayOutputStream() ; InputStream in = resource.createInputStream() ) 
         {
@@ -43,11 +47,9 @@ public class ParseSource implements Phase {
         }
         final Scanner scanner = new Scanner( input );
         
-        final IConfig config = provider.getConfig();
         final Lexer lexer = config.createLexer( scanner );
         final Parser parser = config.createParser();
 
-        context.currentCompilationUnit().setAst( parser.parse( lexer ) );
+        return parser.parse( lexer );
     }
-
 }
