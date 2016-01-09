@@ -2,6 +2,7 @@ package de.codesourcery.javr.assembler.parser;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import de.codesourcery.javr.assembler.Address;
@@ -10,11 +11,15 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.CharacterLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.CurrentAddressNode;
 import de.codesourcery.javr.assembler.parser.ast.ExpressionNode;
+import de.codesourcery.javr.assembler.parser.ast.FunctionCallNode;
+import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
+import de.codesourcery.javr.assembler.parser.ast.Resolvable;
 import de.codesourcery.javr.assembler.parser.ast.StringLiteral;
-import de.codesourcery.javr.assembler.symbols.SymbolTable;
+import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 
 public enum OperatorType
 {
@@ -154,6 +159,9 @@ public enum OperatorType
         if ( node instanceof ExpressionNode ) {
             return evaluate( ((ExpressionNode) node).child(0) , context);
         }
+        if ( node instanceof FunctionCallNode ) {
+            return evaluateBuiltInFunction( (FunctionCallNode) node , context );
+        }
         if ( node instanceof IdentifierNode) {
             return context.currentSymbolTable().get( ((IdentifierNode) node).name ).getValue();
         }
@@ -279,5 +287,43 @@ public enum OperatorType
             return ((Address) o).getByteAddress();
         }
         throw new RuntimeException("Don't know to create number from "+o);
+    }
+    
+    private static Object evaluateBuiltInFunction(FunctionCallNode fn,ICompilationContext context) 
+    {
+        if ( fn.childCount() == 1 ) 
+        {
+            final IValueNode child = (IValueNode) fn.child(0);
+            final String name = fn.functionName.value;
+            if ( FunctionCallNode.BUILDIN_FUNCTION_DEFINED.equals( fn.functionName ) )
+            {
+                if ( !(child instanceof IdentifierNode )) {
+                    context.error("Expected an identifier", child);
+                    return false;
+                }
+                final Identifier identifier = ((IdentifierNode) child).name;
+                final Optional<Symbol> result = context.currentSymbolTable().maybeGet( identifier );
+                return result.isPresent() && result.get().getType() == Type.PREPROCESSOR_MACRO;
+            } 
+            if ( name.equals("HIGH") || name.equals("LOW" ) ) 
+            {
+                if ( child instanceof Resolvable) {
+                    ((Resolvable) child).resolve( context );
+                }
+                Number v = (Number) child.getValue();
+                if ( v == null ) {
+                    return false;
+                }
+                
+                switch ( name ) {
+                    case "HIGH": v = ( v.intValue() >>> 8 ) & 0xff; break;
+                    case "LOW ": v = v.intValue() & 0xff; break;
+                    default: throw new RuntimeException("Unreachable code reached");
+                }
+                return v;
+            }
+        }
+        context.error("Not a built-in function: "+fn.functionName,fn);
+        return null;
     }
 }

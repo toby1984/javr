@@ -31,6 +31,7 @@ import de.codesourcery.javr.assembler.phases.GenerateCodePhase;
 import de.codesourcery.javr.assembler.phases.ParseSource;
 import de.codesourcery.javr.assembler.phases.Phase;
 import de.codesourcery.javr.assembler.phases.PrepareGenerateCodePhase;
+import de.codesourcery.javr.assembler.phases.Preprocess;
 import de.codesourcery.javr.assembler.phases.SyntaxCheck;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Resource;
@@ -189,6 +190,7 @@ public class Assembler
         
         final List<Phase> phases = new ArrayList<>();
         phases.add( new ParseSource(config) );
+        phases.add( new Preprocess() );
         phases.add( new SyntaxCheck() );
         phases.add( new GatherSymbols() );
         phases.add( new PrepareGenerateCodePhase() );
