@@ -13,7 +13,8 @@ public abstract class AbstractPhase implements Phase
 {
     private final String name;
     
-    public AbstractPhase(String name) {
+    public AbstractPhase(String name) 
+    {
         Validate.notBlank(name, "name must not be NULL or blank");
         this.name = name;
     }

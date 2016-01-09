@@ -8,6 +8,7 @@ import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
+import de.codesourcery.javr.assembler.parser.ast.ASTNode.IASTVisitor;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
 import de.codesourcery.javr.assembler.parser.ast.FunctionDefinitionNode;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
@@ -26,21 +27,38 @@ public class PreProcessor
 
     public void preprocess(AST ast,ICompilationContext ctx) 
     {
-        ast.visitBreadthFirst( (node,itContext) -> visitNode( ctx , node , itContext ) );
+        ast.visitBreadthFirst( createVisitor(ctx) );
+        
         if ( ! ifDefStack.isEmpty() ) {
             ctx.message( CompilationMessage.error( "Missing #endif" , ifDefStack.peek() ) );
         }           
     }
 
+    private IASTVisitor createVisitor(ICompilationContext ctx) 
+    {
+        final IASTVisitor n = (node,itContext) -> visitNode( ctx , node , itContext );
+        return n;
+    }
+
     protected void visitNode(ICompilationContext context, ASTNode node,IIterationContext ctx) 
     {
-        if ( node.isSkip() ) {
+        if ( node.isSkip() ) 
+        {
             return;
         }
         
         if ( skipToEndIf ) 
         {
-            if ( node instanceof PreprocessorNode ) 
+            if ( node instanceof StatementNode ) 
+            {
+                final IASTVisitor createVisitor = createVisitor( context );
+                for (ASTNode child : node.children() ) 
+                {
+                    child.visitBreadthFirst( createVisitor );
+                }
+                node.markAsSkip();
+            } 
+            else if ( node instanceof PreprocessorNode ) 
             {
                 final PreprocessorNode preproc = (PreprocessorNode) node;
                 switch( preproc.type ) 
@@ -68,9 +86,7 @@ public class PreProcessor
                         // $$FALL-THROUGH$$
                 }
             }
-            if ( ! (node instanceof StatementNode ) ) {
-                node.markAsSkip();
-            }
+            node.markAsSkip();
             return;
         }
 

@@ -22,6 +22,8 @@ public interface ASTNode {
     }    
     /**
      * Marks this subtree as to be skipped because of conditional compilation.
+     * This is also used to make all later compilation phases ignore preprocessor directives so these
+     * don't get evaluated more than once.
      */
     void markAsSkip();
 
