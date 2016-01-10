@@ -284,15 +284,7 @@ public enum OperatorType
                     return num1*num2;
                 case UNARY_MINUS:
                     return -num1;
-                // logical operators
-                case LOGICAL_AND:
-                case LOGICAL_NOT:
-                case LOGICAL_OR:
-                case REF_EQ:
-                case REF_NEQ:
-                    
                 default:
-                    break;
             }
         }
         throw new RuntimeException("Internal error - don't know how to evaluate "+node.getClass().getName());
