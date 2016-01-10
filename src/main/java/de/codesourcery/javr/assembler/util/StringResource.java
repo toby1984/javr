@@ -43,6 +43,11 @@ public class StringResource implements Resource {
     }
 
     @Override
+    public String toString() {
+        return res.toString();
+    }
+    
+    @Override
     public boolean exists() {
         return true;
     }

@@ -141,7 +141,7 @@ public class InMemoryResource implements Resource
     
     @Override
     public String toString() {
-        return "InMemoryResource[ "+name+" , len="+size()+", hash="+contentHash+", readers: "+openReaders+", writers: "+openWriters+" ]";
+        return name;
     }
     
     @Override

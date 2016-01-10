@@ -25,31 +25,35 @@ public interface ASTNode {
      * This is also used to make all later compilation phases ignore preprocessor directives so these
      * don't get evaluated more than once.
      */
-    void markAsSkip();
+    public void markAsSkip();
 
-    List<ASTNode> children();
+    public List<ASTNode> children();
+    
+    public void replaceWith(ASTNode other);
+    
+    public void replaceChild(ASTNode child,  ASTNode newNode);
 
     /**
      * Check whether conditional compilation marked this subtree as to be skipped
      * @return
      */
-    boolean isSkip();
+    public boolean isSkip();
 
-    ASTNode createCopy(boolean deep);
+    public ASTNode createCopy(boolean deep);
 
-    void setRegion(TextRegion region);
+    public void setRegion(TextRegion region);
 
-    ASTNode getParent();
+    public ASTNode getParent();
 
-    boolean hasParent();
+    public boolean hasParent();
 
-    boolean hasNoParent();
+    public boolean hasNoParent();
 
-    void setParent(ASTNode parent);
+    public void setParent(ASTNode parent);
 
-    int childCount();
+    public int childCount();
 
-    void visitBreadthFirst(IASTVisitor n);
+    public void visitBreadthFirst(IASTVisitor n);
     
     public StatementNode getStatement();
 
@@ -73,27 +77,27 @@ public interface ASTNode {
     @Deprecated
     public void visitDepthFirst(IASTVisitor n,IterationContext ctx);    
 
-    TextRegion getTextRegion();
+    public TextRegion getTextRegion();
 
-    void insertChild(int index, ASTNode child);
+    public void insertChild(int index, ASTNode child);
 
-    void addChild(ASTNode child);
+    public void addChild(ASTNode child);
 
-    void addChildren(Collection<? extends ASTNode> children);
+    public void addChildren(Collection<? extends ASTNode> children);
 
-    ASTNode firstChild();
+    public ASTNode firstChild();
 
-    ASTNode child(int index);
+    public ASTNode child(int index);
 
-    boolean hasChildren();
+    public boolean hasChildren();
 
-    boolean hasNoChildren();
+    public boolean hasNoChildren();
 
-    int indexOf(ASTNode child);
+    public int indexOf(ASTNode child);
 
-    String getAsString();
+    public String getAsString();
 
-    String toString();
+    public String toString();
 
     /**
      * Returns whether this AST node is associated with a location in memory.

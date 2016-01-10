@@ -4,7 +4,7 @@ import java.io.IOException;
 
 public interface IObjectCodeWriter 
 {
-    public void reset();
+    public void reset() throws IOException;
     
     public Segment getCurrentSegment();
     

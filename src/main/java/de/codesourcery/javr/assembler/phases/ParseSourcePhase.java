@@ -16,11 +16,11 @@ import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.ui.IConfig;
 import de.codesourcery.javr.ui.IConfigProvider;
 
-public class ParseSource implements Phase {
+public class ParseSourcePhase implements Phase {
 
     private final IConfigProvider provider;
     
-    public ParseSource(IConfigProvider provider) 
+    public ParseSourcePhase(IConfigProvider provider) 
     {
         Validate.notNull(provider, "provider must not be NULL");
         this.provider = provider;

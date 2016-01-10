@@ -26,13 +26,13 @@ import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
-import de.codesourcery.javr.assembler.phases.GatherSymbols;
+import de.codesourcery.javr.assembler.phases.GatherSymbolsPhase;
 import de.codesourcery.javr.assembler.phases.GenerateCodePhase;
-import de.codesourcery.javr.assembler.phases.ParseSource;
+import de.codesourcery.javr.assembler.phases.ParseSourcePhase;
 import de.codesourcery.javr.assembler.phases.Phase;
 import de.codesourcery.javr.assembler.phases.PrepareGenerateCodePhase;
-import de.codesourcery.javr.assembler.phases.Preprocess;
-import de.codesourcery.javr.assembler.phases.SyntaxCheck;
+import de.codesourcery.javr.assembler.phases.PreprocessPhase;
+import de.codesourcery.javr.assembler.phases.SyntaxCheckPhase;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.ui.IConfig;
@@ -48,7 +48,7 @@ public class Assembler
     
     private ResourceFactory resourceFactory;
 
-    private final CompilationSettings compilerSettings = new CompilationSettings();
+    private final CompilerSettings compilerSettings = new CompilerSettings();
 
     private final class CompilationContext implements ICompilationContext 
     {
@@ -77,7 +77,7 @@ public class Assembler
             
             final CompilationUnit result = new CompilationUnit( newResource );
             
-            final AST ast = ParseSource.parseSource( newResource , config );
+            final AST ast = ParseSourcePhase.parseSource( newResource , config );
             result.setAst( ast );
             compilationUnit.addDependency( result );
             
@@ -89,7 +89,7 @@ public class Assembler
             return compilerSettings;
         }
 
-        public void beforePhase() 
+        public void beforePhase() throws IOException
         {
             objectCodeWriter.reset();
             objectCodeWriter.setCurrentSegment( Segment.FLASH );
@@ -189,10 +189,10 @@ public class Assembler
         this.resourceFactory = rf;
         
         final List<Phase> phases = new ArrayList<>();
-        phases.add( new ParseSource(config) );
-        phases.add( new Preprocess() );
-        phases.add( new SyntaxCheck() );
-        phases.add( new GatherSymbols() );
+        phases.add( new ParseSourcePhase(config) );
+        phases.add( new PreprocessPhase() );
+        phases.add( new SyntaxCheckPhase() );
+        phases.add( new GatherSymbolsPhase() );
         phases.add( new PrepareGenerateCodePhase() );
         phases.add( new GenerateCodePhase() );
 
@@ -246,7 +246,7 @@ public class Assembler
         return globalSymbolTable;
     }
 
-    public CompilationSettings getCompilerSettings() {
+    public CompilerSettings getCompilerSettings() {
         return compilerSettings;
     }
 }

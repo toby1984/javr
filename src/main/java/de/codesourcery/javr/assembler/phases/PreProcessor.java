@@ -1,9 +1,13 @@
 package de.codesourcery.javr.assembler.phases;
 
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Optional;
 import java.util.Stack;
 import java.util.stream.Collectors;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
+import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.parser.ast.AST;
@@ -12,6 +16,7 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode.IASTVisitor;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
 import de.codesourcery.javr.assembler.parser.ast.FunctionDefinitionNode;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
+import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
 import de.codesourcery.javr.assembler.parser.ast.Resolvable;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
@@ -31,7 +36,52 @@ public class PreProcessor
         
         if ( ! ifDefStack.isEmpty() ) {
             ctx.message( CompilationMessage.error( "Missing #endif" , ifDefStack.peek() ) );
-        }           
+        }         
+        
+        // expand macros
+        maybeExpand(ast,ctx);
+    }
+    
+    private void maybeExpand(ASTNode subtree, ICompilationContext ctx) 
+    {
+        subtree.visitBreadthFirst( (node,iCtx) -> 
+        {
+            // TODO: Support expanding FunctionCallNodes that invoke a preprocessor macro
+            if ( node instanceof IdentifierNode) 
+            {
+                final Identifier id = ((IdentifierNode) node).name;
+                final Optional<Symbol> symbol = ctx.currentSymbolTable().maybeGet( id );
+                if ( symbol.isPresent() && symbol.get().hasType( Type.PREPROCESSOR_MACRO ) ) 
+                {
+                    final ASTNode expanded = expand( (FunctionDefinitionNode) symbol.get().getNode() ,
+                            Collections.emptyList(),
+                            (IdentifierNode) node , 
+                            ctx 
+                    );
+                    if ( expanded != null ) {
+                        node.replaceWith( expanded );
+                    }
+                    iCtx.dontGoDeeper();
+                }
+            }
+        });        
+    }
+    private ASTNode expand(FunctionDefinitionNode funcToExpand,Collection<ASTNode> argsToUse, IdentifierNode idNode,ICompilationContext context) 
+    {
+        if ( funcToExpand.getArgumentCount() != argsToUse.size() ) 
+        {
+            context.error("Expanding preprocessor macro '' failed, macro needs "+funcToExpand.getArgumentCount()+" arguments but "+argsToUse.size()+" were provided" ,idNode); 
+            return null;
+        }
+        
+        if ( funcToExpand.getArgumentCount() != 0 ) { // TODO: Implement this
+            throw new RuntimeException("Expanding macros with arguments not implemented yet");
+        }
+        
+        final ASTNode result = funcToExpand.child(1).createCopy( true );
+        maybeExpand( result , context );
+        result.setRegion( idNode.getTextRegion() );
+        return result;
     }
 
     private IASTVisitor createVisitor(ICompilationContext ctx) 
@@ -90,9 +140,8 @@ public class PreProcessor
             return;
         }
 
-        if ( node instanceof PreprocessorNode ) {
-
-            node.getParent().markAsSkip();
+        if ( node instanceof PreprocessorNode ) 
+        {
             final PreprocessorNode preproc = (PreprocessorNode) node;
             switch( preproc.type ) 
             {
@@ -113,14 +162,18 @@ public class PreProcessor
                     break;
                 case IF_DEFINE:
                 case IF_NDEFINE:
+                    
+                    maybeExpand( preproc.child(0) , context );
+                    
                     if ( ! ((Resolvable) preproc.child(0)).resolve( context ) ) 
                     {
-                        return;
+                        context.message( CompilationMessage.warning("Failed to resolve expression",preproc.child(0)) );
+                        break;
                     }
                     Object value = ((IValueNode) preproc.child(0)).getValue();
                     if ( !(value instanceof Boolean ) ) {
                         context.error("Expression did not resolve to a boolean, got "+value,preproc.child(0));
-                        return;
+                        break;
                     }
                     final boolean isDefined = ((Boolean) value).booleanValue();
                     ifDefStack.push(node);
@@ -128,7 +181,6 @@ public class PreProcessor
                     {
                         resumeDepth = ifDefStack.size()-1;
                         skipToEndIf=true;
-                        return;
                     }
                     break;
                 case MESSAGE:
@@ -150,6 +202,9 @@ public class PreProcessor
                 default:
                     // $$FALL-THROUGH$$
             }
+            
+            // ignore AST node on all future passes
+            node.getParent().markAsSkip();            
         }
         return;
     }

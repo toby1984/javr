@@ -16,9 +16,9 @@ import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
 import de.codesourcery.javr.assembler.symbols.Symbol;
 
-public class GatherSymbols extends AbstractPhase
+public class GatherSymbolsPhase extends AbstractPhase
 {
-    public GatherSymbols() {
+    public GatherSymbolsPhase() {
         super("gather_symbols");
     }
     

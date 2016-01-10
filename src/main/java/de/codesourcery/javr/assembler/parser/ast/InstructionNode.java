@@ -68,6 +68,7 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
     @Override
     public boolean resolve(ICompilationContext context) 
     {
+        System.out.println("resolve(): "+this);
         assignMemoryLocation( context.currentAddress() );
         for ( ASTNode child : children() ) 
         {

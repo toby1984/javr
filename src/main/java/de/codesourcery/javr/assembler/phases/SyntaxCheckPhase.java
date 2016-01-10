@@ -11,7 +11,7 @@ import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 
-public class SyntaxCheck implements Phase 
+public class SyntaxCheckPhase implements Phase 
 {
     @Override
     public String getName() {

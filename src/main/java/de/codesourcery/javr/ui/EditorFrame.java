@@ -22,6 +22,7 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.GridLayout;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
@@ -34,12 +35,10 @@ import java.awt.event.WindowEvent;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.nio.file.Paths;
 import java.text.DecimalFormat;
 import java.time.Duration;
 import java.time.ZonedDateTime;
@@ -52,9 +51,9 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
-import java.util.stream.Stream;
 
 import javax.swing.JButton;
+import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JInternalFrame;
 import javax.swing.JLabel;
@@ -63,6 +62,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.JToolBar;
@@ -95,13 +95,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
-import de.codesourcery.hex2raw.IntelHex;
-import de.codesourcery.javr.assembler.Assembler;
-import de.codesourcery.javr.assembler.Buffer;
 import de.codesourcery.javr.assembler.CompilationUnit;
-import de.codesourcery.javr.assembler.ObjectCodeWriter;
-import de.codesourcery.javr.assembler.ResourceFactory;
-import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
 import de.codesourcery.javr.assembler.parser.Location;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
@@ -124,19 +118,17 @@ import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
 import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
-import de.codesourcery.javr.assembler.util.FileResource;
-import de.codesourcery.javr.assembler.util.FileResourceFactory;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
 
-public class EditorFrame extends JInternalFrame implements IViewComponent {
+public class EditorFrame extends JInternalFrame {
 
     private static final Logger LOG = Logger.getLogger(EditorFrame.class);
 
     public static final Duration RECOMPILATION_DELAY = Duration.ofMillis( 150 );
 
     private final JTextPane editor = new JTextPane();
-    private final IConfigProvider configProvider;
+    private IProject project;
 
     private final ASTTreeModel astTreeModel = new ASTTreeModel();
     private JFrame astWindow = null;
@@ -156,7 +148,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
     protected final Style STYLE_MNEMONIC;
     protected final Style STYLE_COMMENT;
 
-    private CompilationUnit compilationUnit = new CompilationUnit( new StringResource( "dummy","" ) );
+    private CompilationUnit currentUnit = new CompilationUnit( new StringResource("dummy",  "" ) );
 
     private LineMap lineMap;
 
@@ -346,7 +338,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         }
 
         private String replaceTabs(String in) {
-            return in.replace("\t" ,  configProvider.getConfig().getEditorIndentString() );
+            return in.replace("\t" ,  project.getConfig().getEditorIndentString() );
         }
 
         public void replace(FilterBypass fb, int offs, int length, String str, AttributeSet a) throws BadLocationException
@@ -747,12 +739,14 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         }
     }
 
-    public EditorFrame(IConfigProvider provider) 
+    public EditorFrame(IProject project, CompilationUnit unit) throws IOException 
     {
         super("Editor");
-        Validate.notNull(provider, "provider must not be NULL");
+        Validate.notNull(project, "project must not be NULL");
+        Validate.notNull(unit, "unit must not be NULL");
 
-        this.configProvider = provider;
+        this.project = project;
+        this.currentUnit = unit;
 
         editor.addKeyListener( new KeyAdapter() {
 
@@ -883,7 +877,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         
         getContentPane().add( panel );
 
-        this.lineMap = new LineMap("",provider);
+        this.lineMap = new LineMap("",project);
 
         // setup styles
         final StyleContext ctx = new StyleContext();
@@ -900,7 +894,7 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         // setup recompilation
         recompilationThread.start();
 
-        editor.setDocument( createDocument() );
+        setProject( project , currentUnit );
     }
     
     private Document createDocument() 
@@ -928,23 +922,89 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         result.add( button("Compile" , ev -> this.compile() ) );
         result.add( button("AST" , ev -> this.toggleASTWindow() ) );
         result.add( button("Symbols" , ev -> this.toggleSymbolTableWindow() ) );
+        result.add( button("Upload to uC" , ev -> this.uploadToController() ) );
 
         return result;
     }
+    
+    private void uploadToController() 
+    {
+        if ( project.canUploadToController() ) 
+        {
+            final ByteArrayOutputStream stdOut = new ByteArrayOutputStream();
+            final ByteArrayOutputStream stdErr = new ByteArrayOutputStream();
+            boolean success = false;
+            try 
+            {
+                project.uploadToController( stdOut , stdErr );
+                
+                success = true;
+                
+                if ( LOG.isDebugEnabled() ) {
+                    LOG.debug("UPLOAD - Std out: "+new String( stdOut.toByteArray() ) );
+                    LOG.debug("UPLOAD - Std err: "+new String( stdErr.toByteArray() ) );
+                }
+            } 
+            catch(Exception e) 
+            {
+                LOG.error("UPLOAD failed - Std out: "+new String( stdOut.toByteArray() ) );
+                LOG.error("UPLOAD failed - Std err: "+new String( stdErr.toByteArray() ) );                
+                LOG.error("uploadToController(): Upload failed",e);
+            } finally {
+                showUploadResult( stdOut , stdErr, success );
+            }
+        } else 
+        {
+            JOptionPane.showMessageDialog(null, "Upload not possible", "Program upload", JOptionPane.INFORMATION_MESSAGE );
+        }
+    }
+    
+    private void showUploadResult(ByteArrayOutputStream stdOut,ByteArrayOutputStream stdErr,boolean success) {
+        
+        final  JTextArea stdOutList = new JTextArea();
+        stdOutList.setColumns( 40 );
+        stdOutList.setText( new String(stdOut.toByteArray()) );
+        
+        final JTextArea stdErrList = new JTextArea();
+        stdErrList.setColumns( 40 );
+        stdErrList.setText( new String( stdErr.toByteArray() ) );
+        
+        final JPanel panel = new JPanel();
+        panel.setLayout( new GridLayout(5,1) );
 
-    private void save() throws IOException 
+        panel.add( new JLabel( "Standard output") );
+        panel.add( new JScrollPane( stdOutList ) );
+        
+        panel.add( new JLabel( "Standard error") );
+        panel.add( new JScrollPane( stdErrList ) );
+        
+        final JButton close = new JButton("Close");
+        panel.add( close );
+        
+        final JDialog dialog = new JDialog( (java.awt.Frame) null , "Upload result" , true );
+        dialog.getContentPane().add( panel );
+        
+        close.addActionListener( ev -> dialog.dispose() );
+        
+        dialog.pack();
+        dialog.setVisible( true );
+        dialog.setLocationRelativeTo( null );
+    }
+
+    private void saveSource() throws IOException 
     {
         String text = editor.getText();
         text = text == null ? "" : text;
 
-        final Resource resource = compilationUnit.getResource();
+        final Resource resource = currentUnit.getResource();
+        LOG.info("saveSource(): Saving source to "+currentUnit.getResource());
         try ( OutputStream out = resource.createOutputStream() ) 
         {
             out.write( text.getBytes( resource.getEncoding() ) );
         }
     }
 
-    private void compile() 
+    public void compile() 
     {
         messageModel.clear();
         symbolModel.clear();
@@ -952,11 +1012,11 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         String text = editor.getText();
         text = text == null ? "" : text;
 
-        this.lineMap = new LineMap( text , configProvider);            
+        this.lineMap = new LineMap( text , project);            
 
         // save source to file
         try {
-            save();
+            saveSource();
         } 
         catch(IOException e) 
         {
@@ -966,59 +1026,24 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         }
 
         // assemble
+        final CompilationUnit root = project.getCompileRoot();
+        
         long assembleTime = 0;
-        final Assembler asm = new Assembler();
-        asm.getCompilerSettings().setFailOnAddressOutOfRange( false );
+        boolean compilationSuccessful = false;
         try 
         {
             final long start = System.currentTimeMillis();
-            final File parentPath;
-            final String baseName;
-            if ( compilationUnit.getResource() instanceof FileResource ) 
-            {
-                parentPath = ((FileResource) compilationUnit.getResource()).getFile().getParentFile();
-                baseName = ((FileResource) compilationUnit.getResource()).getFile().getName();
-            } else {
-                parentPath = new File( Paths.get(".").toAbsolutePath().normalize().toString() );
-                baseName = "dummy";
-            }
-            // delete any artifacts generated by a previous compilation run
-            final File template = new File( parentPath , baseName );
-            Stream.of( Segment.values() ).forEach( segment ->  createOutputFileName( segment , template ).delete() );
-            
-            final ResourceFactory resourceFactory = FileResourceFactory.createInstance( parentPath , baseName );
-            final ObjectCodeWriter objectCodeWriter = new ObjectCodeWriter();
-            
-            // compile
-            if ( asm.compile( compilationUnit , objectCodeWriter, resourceFactory , configProvider ) ) 
-            {
-                // save generated artifacts
-                for ( Segment s : Segment.values() ) 
-                {
-                    final Buffer buffer = objectCodeWriter.getBuffer( s );
-                    if ( ! buffer.isEmpty() ) 
-                    {
-                        final File outputFile = createOutputFileName( s , template );
-                        final int bytesWritten = saveBuffer( buffer , outputFile );
-                        final int segSize = configProvider.getConfig().getArchitecture().getSegmentSize( s );
-                        final float percentage = 100.0f*(bytesWritten/(float) segSize);
-                        final DecimalFormat DF = new DecimalFormat("#####0.00");
-                        final String msg = s+": Wrote "+bytesWritten+" bytes ("+DF.format(percentage)+" %) to "+outputFile.getAbsolutePath();
-                        compilationUnit.getAST().addMessage( CompilationMessage.info( msg ) );
-                    }
-                }
-            }
+            compilationSuccessful = project.compile();
             assembleTime = System.currentTimeMillis() -start;
         } 
         catch(Exception e) 
         {
             e.printStackTrace();
-            compilationUnit.getAST().addMessage( toCompilationMessage( e ) );
+            root.getAST().addMessage( toCompilationMessage( e ) );
         }
-
-        symbolModel.setSymbolTable( asm.getGlobalSymbolTable() );        
-        messageModel.addAll( compilationUnit.getAST().getMessages() );        
-        astTreeModel.setAST( compilationUnit.getAST() );
+        symbolModel.setSymbolTable( currentUnit.getSymbolTable() );        
+        messageModel.addAll( root.getAST().getMessages() );        
+        astTreeModel.setAST( root.getAST() );
 
         doSyntaxHighlighting();
 
@@ -1029,32 +1054,11 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
 
         messageModel.add( new CompilationMessage(Severity.INFO, time) );
 
-        final String success = compilationUnit.getAST().hasErrors() ? "failed" : "successful"; 
+        final String success = compilationSuccessful ? "successful" : "failed"; 
         final DateTimeFormatter df = DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss");
         messageModel.add( new CompilationMessage(Severity.INFO, "Compilation "+success+" ("+assembleTime+" millis) on "+df.format( ZonedDateTime.now() ) ) );
     }
     
-    private File createOutputFileName(Segment segment,File template) 
-    {
-        switch(segment) 
-        {
-            case EEPROM: return new File( template.getParentFile() , template.getName()+".eeprom.hex" );
-            case FLASH: return new File( template.getParentFile() , template.getName()+".flash.hex" ); 
-            case SRAM: return new File( template.getParentFile() , template.getName()+".sram.hex" ); 
-            default:
-                throw new RuntimeException("Unhandled segment: "+segment);
-        }
-    }
-    
-    private int saveBuffer(Buffer buffer,File outputFile) throws IOException 
-    {
-        final IntelHex hex = new IntelHex();
-        try ( FileOutputStream out = new FileOutputStream(outputFile) ; InputStream in = buffer.createInputStream() ) 
-        {
-            return hex.rawToHex( in , out , buffer.getStartAddress().getByteAddress() );
-        }
-    }
-
     private static CompilationMessage toCompilationMessage(Exception e)
     {
         if ( e instanceof ParseException ) {
@@ -1387,11 +1391,13 @@ public class EditorFrame extends JInternalFrame implements IViewComponent {
         style.addAttribute(StyleConstants.Foreground, col );
         return style;
     }
-
-    public void setCompilationUnit(CompilationUnit unit) throws IOException 
+    
+    public void setProject(IProject project,CompilationUnit unit) throws IOException 
     {
+        Validate.notNull(project, "project must not be NULL");
         Validate.notNull(unit, "unit must not be NULL");
-        this.compilationUnit = unit;
+        this.project = project;
+        this.currentUnit = unit;
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try ( InputStream in = unit.getResource().createInputStream() ) 
         {

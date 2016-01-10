@@ -52,9 +52,28 @@ public abstract class AbstractASTNode implements ASTNode
         return result[0];
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#markAsSkip()
-     */
+    @Override
+    public final void replaceWith(ASTNode other) 
+    {
+        if ( hasNoParent() ) {
+            throw new IllegalStateException("Cannot replace node "+this+" that has no parent");
+        }
+        parent.replaceChild( this , other );
+    }
+    
+    public final void replaceChild(ASTNode child,  ASTNode newNode) 
+    {
+        Validate.notNull(child, "child must not be NULL");
+        Validate.notNull(newNode,"newNode must not be NULL");
+        final int idx = children.indexOf( child );
+        if ( idx == -1 ) {
+            throw new IllegalArgumentException( child+" is no child of "+this);
+        }
+        children.set( idx , newNode );
+        newNode.setParent( this );
+        child.setParent( null );
+    }
+    
     @Override
     public final void markAsSkip() 
     {
@@ -78,33 +97,25 @@ public abstract class AbstractASTNode implements ASTNode
         return (StatementNode) current;
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#children()
-     */
     @Override
     public final List<ASTNode> children() {
         return children;
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#isSkip()
-     */
     @Override
     public final boolean isSkip() {
         return skip;
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#createCopy(boolean)
-     */
     @Override
     public final ASTNode createCopy(boolean deep) 
     {
+        /*
+         * 'skip' (ignore subtree) flag is INTENTIONALLY
+         * not cloned here since preprocessor macro expansion
+         * would otherwise have to always undo this
+         */
         final ASTNode result = createCopy();
-        if ( this.skip ) {
-            result.markAsSkip();
-        }
-        
         if ( deep ) 
         {
             for ( ASTNode child : children ) 
@@ -123,55 +134,33 @@ public abstract class AbstractASTNode implements ASTNode
         this.region = region;
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#setRegion(de.codesourcery.javr.assembler.parser.TextRegion)
-     */
     @Override
     public final void setRegion(TextRegion region) {
         Validate.notNull(region, "region must not be NULL");
         this.region = region;
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#getParent()
-     */
     @Override
     public final ASTNode getParent() {
         return parent;
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#hasParent()
-     */
     @Override
     public final boolean hasParent() {
         return parent != null;
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#hasNoParent()
-     */
     @Override
     public final boolean hasNoParent() {
         return parent == null;
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#setParent(de.codesourcery.javr.assembler.parser.ast.ASTNode)
-     */
     @Override
     public final void setParent(ASTNode parent) 
     {
-        Validate.notNull(parent, "parent must not be NULL");
-        if ( this.parent != null && this.parent != parent) {
-            throw new IllegalStateException("refusing to re-assign node parent");
-        }
         this.parent = parent;
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#childCount()
-     */
     @Override
     public final int childCount() {
         return children.size();
@@ -196,9 +185,6 @@ public abstract class AbstractASTNode implements ASTNode
         }
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#visitBreadthFirst(de.codesourcery.javr.assembler.parser.ast.ASTNode.IASTVisitor)
-     */
     @Override
     public final void visitBreadthFirst(IASTVisitor n) 
     {
@@ -228,9 +214,6 @@ public abstract class AbstractASTNode implements ASTNode
         }
     }    
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#visitDepthFirst(de.codesourcery.javr.assembler.parser.ast.ASTNode.IASTVisitor)
-     */
     @Override
     public final void visitDepthFirst(IASTVisitor n) 
     {
@@ -261,17 +244,11 @@ public abstract class AbstractASTNode implements ASTNode
         }
     }      
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#getTextRegion()
-     */
     @Override
     public final TextRegion getTextRegion() {
         return region;
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#insertChild(int, de.codesourcery.javr.assembler.parser.ast.ASTNode)
-     */
     @Override
     public final void insertChild(int index,ASTNode child) 
     {
@@ -280,9 +257,6 @@ public abstract class AbstractASTNode implements ASTNode
         child.setParent( this );
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#addChild(de.codesourcery.javr.assembler.parser.ast.ASTNode)
-     */
     @Override
     public final void addChild(ASTNode child) 
     {
@@ -291,9 +265,6 @@ public abstract class AbstractASTNode implements ASTNode
         child.setParent( this );
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#addChildren(java.util.Collection)
-     */
     @Override
     public final void addChildren(Collection<? extends ASTNode> children) 
     {
@@ -303,57 +274,36 @@ public abstract class AbstractASTNode implements ASTNode
         }
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#firstChild()
-     */
     @Override
     public final ASTNode firstChild() {
         return children.get(0);
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#child(int)
-     */
     @Override
     public final ASTNode child(int index) {
         return children.get(index);
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#hasChildren()
-     */
     @Override
     public final boolean hasChildren() {
         return ! children.isEmpty();
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#hasNoChildren()
-     */
     @Override
     public final boolean hasNoChildren() {
         return children.isEmpty();
     }
 
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#indexOf(de.codesourcery.javr.assembler.parser.ast.ASTNode)
-     */
     @Override
     public final int indexOf(ASTNode child) {
         return children.indexOf( child );
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#getAsString()
-     */
     @Override
     public String getAsString() {
         return null;
     }
     
-    /* (non-Javadoc)
-     * @see de.codesourcery.javr.assembler.parser.ast.ASTNodeIf#toString()
-     */
     @Override
     public String toString() 
     {

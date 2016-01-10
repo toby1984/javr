@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.Address;
-import de.codesourcery.javr.assembler.CompilationSettings;
+import de.codesourcery.javr.assembler.CompilerSettings;
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Segment;
@@ -130,7 +130,7 @@ public class PreprocessorTest extends TestCase
     
     protected static final class FakeCtx implements ICompilationContext {
 
-        private final CompilationSettings settings = new CompilationSettings();
+        private final CompilerSettings settings = new CompilerSettings();
         private final SymbolTable global = new SymbolTable( SymbolTable.GLOBAL );
         private final SymbolTable local = new SymbolTable("local",global);
         

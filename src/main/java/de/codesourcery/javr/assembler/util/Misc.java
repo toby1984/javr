@@ -1,15 +1,19 @@
 package de.codesourcery.javr.assembler.util;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
+
+import de.codesourcery.javr.assembler.exceptions.ParseException;
 
 public class Misc 
 {
     private static final String CHARS = "0123456789abcdef";
-    
-    public static void main(String[] args) {
-        System.out.println("Value: "+Integer.toHexString( parseHexInt( "ffffe5be" ) ));
-    }
     
     /**
      * Convert a hexadecimal number literal into a 32-bit value.
@@ -38,5 +42,73 @@ public class Misc
             result |= idx;
         }
         return result;
+    }
+    
+    protected static enum QuoteType {
+        SINGLE,DOUBLE,NONE
+    }
+    
+    public static List<String> expand(String input,Map<String,String> placeholders) 
+    {
+        final List<String> cmdLine = new ArrayList<>();
+        final StringBuilder command = new StringBuilder();
+        QuoteType quoted= QuoteType.NONE;
+        for ( int i = 0 , len = input.length() ; i < len ; i++ )
+        {
+            final char c = input.charAt(i);
+            if ( (c == '\'' || c == '"' ) ) 
+            {
+                command.append( c );
+                if ( quoted == QuoteType.NONE ) {
+                    quoted = c == '\'' ? QuoteType.SINGLE : QuoteType.DOUBLE;
+                } else if ( quoted == QuoteType.DOUBLE && c == '"' ) {
+                    quoted = QuoteType.NONE;
+                } else if ( quoted == QuoteType.SINGLE && c == '\'' ) {
+                    quoted = QuoteType.NONE;
+                }
+                continue;
+            }
+            if ( quoted == QuoteType.NONE && Character.isWhitespace( c ) ) 
+            {
+                if ( command.length() > 0 && StringUtils.isNotBlank( command.toString() ) ) 
+                {
+                    cmdLine.add( command.toString() );
+                    command.setLength(0);
+                }
+                continue;
+            }
+            if ( c == '%' ) 
+            {
+                int end = i+1;
+                while ( end < len )
+                {
+                    final char current = input.charAt(end);
+                    if ( !( Character.isLetter( current ) || Character.isDigit( current ) ) ) 
+                    {
+                        break;
+                    }
+                    
+                    end++;
+                }
+                if ( end == i ) {
+                    throw new ParseException("'%' character lacks variable name",end);
+                }
+
+                final String key = input.substring( i+1 , end  );
+                final String value = placeholders.get( key );
+                if ( value == null ) {
+                    throw new ParseException("Unknown placeholder '%"+key+"'", i );
+                }
+                command.append( value );
+                i+= key.length();
+                continue;
+            } 
+            command.append( c );
+        }
+        if ( command.length() > 0 && StringUtils.isNotBlank( command ) ) 
+        {
+            cmdLine.add( command.toString() );
+        }        
+        return cmdLine;
     }
 }

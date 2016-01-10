@@ -16,13 +16,22 @@
 package de.codesourcery.javr.ui;
 
 import java.awt.Dimension;
+import java.awt.Frame;
+import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Stream;
 
 import javax.swing.JDesktopPane;
+import javax.swing.JDialog;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JMenu;
@@ -32,72 +41,128 @@ import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.CompilationUnit;
-import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.arch.IArchitecture.DisassemblerSettings;
-import de.codesourcery.javr.assembler.arch.impl.ATMega88;
-import de.codesourcery.javr.assembler.parser.Lexer;
-import de.codesourcery.javr.assembler.parser.Parser;
-import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.util.FileResource;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
 
 public class Main 
 {
-    private IConfig config; 
-    private IConfigProvider configProvider;
+    private static final String WORKSPACE_FILE = ".javr_workspace";
+    
+    private static final Logger LOG = Logger.getLogger(Main.class);
+    
+    private final List<IProject> projects = new ArrayList<>();
+    
+    private IProject project;
     private EditorFrame editorFrame;
+    private File lastOpenedProject = new File("/home/tobi/atmel/asm/testproject.properties");
     private File lastDisassembledFile = new File("/home/tobi/atmel/asm/random.raw");
     private File lastSourceFile = new File("/home/tobi/atmel/asm/random.raw.javr.asm");
     
     public static void main(String[] args) 
     {
-        SwingUtilities.invokeLater( () -> new Main().run() );
-    }
-    
-    private void init() 
-    {
-        config = new IConfig() {
-            
-            private final IArchitecture arch = new ATMega88();
-            
-            @Override
-            public Parser createParser() 
-            {
-                final Parser p = new Parser();
-                p.setArchitecture( arch );
-                return p;
-            }
-            
-            @Override
-            public IArchitecture getArchitecture() {
-                return arch;
-            }
-
-            @Override
-            public Lexer createLexer(Scanner s) {
-                return new Lexer(s);
-            }
-
-            @Override
-            public String getEditorIndentString() {
-                return "  ";
+        final Runnable runnable = () -> 
+        {
+            try {
+                new Main().run();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
         };
-        configProvider = new IConfigProvider() {
-            
-            @Override
-            public IConfig getConfig() {
-                return config;
-            }
-        };        
+        SwingUtilities.invokeLater( runnable );
+    }
+
+    private static String getWorkingDir() {
+        return System.getProperty("user.home" , Project.getCurrentWorkingDirectory().getAbsolutePath() );
     }
     
-    private void run() 
+    private static File getWorkspaceFile() 
     {
-        init();
+        return new File( getWorkingDir() , WORKSPACE_FILE );
+    }
+    
+    private List<IProject> findProjects(File workspaceDir) throws IOException {
+        
+        final List<IProject>  result = new ArrayList<>();
+        final File[] filesInWorkspaceDir = workspaceDir.listFiles();
+        if ( filesInWorkspaceDir != null ) 
+        {
+            for ( File projDirectory : filesInWorkspaceDir ) 
+            {
+                if ( ! projDirectory.isDirectory() ) {
+                    continue;
+                }
+                final File projFile = new File( projDirectory , IProject.PROJECT_FILE );
+                if ( projFile.exists() ) 
+                {
+                    try ( InputStream in = new FileInputStream(projFile) ) 
+                    {
+                        final ProjectConfiguration config = ProjectConfiguration.load( projDirectory , in );
+                        final File sourceFolder = new File( projDirectory , config.getSourceFolder() );
+                        if ( ! sourceFolder.exists() ) {
+                            if ( ! sourceFolder.mkdirs() ) {
+                                throw new IOException("Failed to create source folder "+sourceFolder.getAbsolutePath());
+                            }
+                        }
+                        result.add( new Project( new CompilationUnit( config.getCompilationRootResource() )  ,config ) );
+                    } 
+                    catch(Exception e) 
+                    {
+                        LOG.error("findProjects()",e);
+                    }
+                }
+            }
+        }
+        return result;
+    }
+    
+    private void run() throws Exception 
+    {
+        final File projectsFile = getWorkspaceFile();
+        File workspaceDir = new File( getWorkingDir() , "javr_workspace");
+        
+        if ( projectsFile.exists() ) 
+        {
+            try ( FileInputStream in = new FileInputStream(projectsFile) ) 
+            {
+                final List<String> lines = IOUtils.readLines( in );
+                if ( lines.size() > 0 ) 
+                {
+                    workspaceDir = new File( lines.get(0) );
+                    LOG.info("run(): Workspace dir: "+workspaceDir);
+                    projects.addAll( findProjects( workspaceDir ) );
+                } 
+            }
+        } 
+        else 
+        {
+            workspaceDir.mkdirs();
+            try ( BufferedWriter writer = new BufferedWriter( new FileWriter( projectsFile ) ) ) 
+            {
+                writer.write( workspaceDir.getAbsolutePath() );
+            }
+        }
+        
+        if ( projects.isEmpty() ) 
+        {
+            final ProjectConfiguration config = new ProjectConfiguration();
+            final File projDir = new File( workspaceDir , config.getProjectName() );
+            projDir.mkdirs();
+            config.setBaseDir( projDir );
+            try ( FileOutputStream out = new FileOutputStream( new File( projDir , IProject.PROJECT_FILE ) ) ) 
+            {
+                config.save( out );
+            }
+            project = new Project( new CompilationUnit( config.getCompilationRootResource() ) , config );
+            projects.add(project);
+        } else {
+            project = projects.get(0);
+        }
         
         final JDesktopPane pane = new JDesktopPane();
         addWindows( pane );
@@ -121,7 +186,38 @@ public class Main
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        });
+        });        
+    }
+    
+    private void editProjectConfiguration() 
+    {
+        final JDialog dialog = new JDialog( (Frame) null, "Edit project configuration", true );
+        dialog.getContentPane().add( new ProjectConfigWindow( project.getConfiguration() ) 
+        {
+            @Override
+            protected void onSave(ProjectConfiguration config) 
+            {
+                final File configFile = new File( project.getConfiguration().getBaseDir() , IProject.PROJECT_FILE );
+                LOG.info("editProjectConfiguration(): Saving configuration to "+configFile.getAbsolutePath());
+                try ( FileOutputStream out = new FileOutputStream( configFile ) ) 
+                {
+                    config.save( out );
+                    project.setConfiguration( config );
+                } catch(Exception e) {
+                    fail(e);
+                }
+                dialog.dispose();
+                editorFrame.compile();
+            }
+
+            @Override
+            protected void onCancel() {
+                dialog.dispose();
+            }
+        } );
+        
+        dialog.pack();
+        dialog.setVisible( true );
     }
     
     private JMenuBar createMenu(JFrame parent) 
@@ -130,21 +226,47 @@ public class Main
         
         final JMenu menu = new JMenu("File");
         result.add( menu );
+        
+        addItem( menu , "Open project" , () -> doWithFile( parent , true , lastOpenedProject, file -> 
+        {
+            try ( FileInputStream in = new FileInputStream( file ) )
+            {
+                final ProjectConfiguration config = ProjectConfiguration.load( file.getParentFile() , in );
+                lastOpenedProject = file;
+                this.project = new Project( new CompilationUnit( new StringResource("unnamed", "" ) ) , config );
+            } 
+            catch(Exception e) 
+            {
+                fail(e);
+            }
+        }));
+        
+        addItem( menu , "Edit project configuration" , () -> editProjectConfiguration() );        
+        
         addItem( menu , "Disassemble" , () -> doWithFile( parent , true , lastDisassembledFile, file -> 
         {
             disassemble(file);
             lastDisassembledFile = file;
         }));
         
-        addItem( menu , "Save source" , () -> doWithFile( parent , false , lastSourceFile, file -> 
+        final ThrowingRunnable eventHandler = () -> 
         {
-            editorFrame.save(file); 
-            lastSourceFile = file;
-        }));  
+            final File srcFolder = new File( project.getConfiguration().getSourceFolder() ); 
+            if ( ! srcFolder.exists() ) 
+            {
+                srcFolder.mkdirs();
+            }
+            doWithFile( parent , false , srcFolder , file -> 
+            {
+                editorFrame.save(file); 
+                lastSourceFile = file;
+            });
+        };
+        addItem( menu , "Save source" , eventHandler);  
         addItem( menu , "Load source" , () -> doWithFile( parent , true , lastSourceFile, file -> 
         {
             final CompilationUnit unit = new CompilationUnit( new FileResource(file , Resource.ENCODING_UTF ) );
-            editorFrame.setCompilationUnit( unit );
+            editorFrame.setProject( project , unit );
             lastSourceFile = file;
         })); 
         return result;
@@ -159,16 +281,18 @@ public class Main
         settings.printAddresses = true;
         settings.resolveRelativeAddresses = true;
         settings.printCompoundRegistersAsLower=false;
-        String disassembly = config.getArchitecture().disassemble( data , data.length , settings );
+        String disassembly = project.getArchitecture().disassemble( data , data.length , settings );
         disassembly = "; disassembled "+data.length+" bytes from "+file.getAbsolutePath()+"\n"+disassembly;
         
         final StringResource res = new StringResource(file.getAbsolutePath(), disassembly );
         final CompilationUnit unit = new CompilationUnit(res);
-        editorFrame.setCompilationUnit( unit );        
+        editorFrame.setProject( project , unit );        
     }
     
-    protected static void fail(Exception e) 
+    public static void fail(Exception e) 
     {
+        LOG.error("fail(): "+e.getMessage(),e);
+        
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         final PrintWriter writer = new PrintWriter( out );
         e.printStackTrace( writer );
@@ -212,9 +336,9 @@ public class Main
         menu.add( item );
     }
 
-    private void addWindows(JDesktopPane pane) 
+    private void addWindows(JDesktopPane pane) throws IOException 
     {
-        editorFrame = new EditorFrame( configProvider );
+        editorFrame = new EditorFrame( project , project.getCompileRoot() );
         editorFrame.setResizable(true);
         editorFrame.setMaximizable(true);
         editorFrame.pack();

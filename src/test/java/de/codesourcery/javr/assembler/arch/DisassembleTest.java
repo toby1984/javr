@@ -160,10 +160,10 @@ public class DisassembleTest  {
             public Resource resolveResource(Resource parent, String child) throws IOException {
                 throw new UnsupportedOperationException();
             }
-            
+
             @Override
-            public Resource getResource(Segment segment) throws IOException {
-                return new InMemoryResource( segment.name() , Resource.ENCODING_UTF );
+            public Resource resolveResource(String child) throws IOException {
+                throw new UnsupportedOperationException();
             }
         };
         

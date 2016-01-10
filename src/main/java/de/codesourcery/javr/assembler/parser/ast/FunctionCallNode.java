@@ -59,12 +59,13 @@ public class FunctionCallNode extends AbstractASTNode implements IValueNode, Res
                 
                 switch ( name ) {
                     case "HIGH": v = ( v.intValue() >>> 8 ) & 0xff; break;
-                    case "LOW ": v = v.intValue() & 0xff; break;
+                    case "LOW": v = v.intValue() & 0xff; break;
                     default: throw new RuntimeException("Unreachable code reached");
                 }
                 this.value = v;
                 return true;
             }
+            context.error("Unknown built-in function "+name,this);
         }
         return false;
     }    

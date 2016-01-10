@@ -23,23 +23,39 @@ import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 
 public enum OperatorType
 {
-    GT(">",2,6),
-    LT("<",2,6),
-    GTE(">=",2,6),
-    LTE("<=",2,6),
-    REF_EQ("==",2,5),
-    REF_NEQ("!=",2,5),
+    UNARY_MINUS("-",1,11),
+    LOGICAL_NOT("!",1,10),
+    BITWISE_NEGATION("~",1,10),
+    DIVIDE("/",2,9),
+    TIMES("*",2,9),
+    BINARY_MINUS("-",2,8),
     PLUS("+",2,7),
-    BINARY_MINUS("-",2,7),
-    TIMES("*",2,8),
-    DIVIDE("/",2,8),
-    LOGICAL_NOT("!",1,9),
-    BITWISE_NEGATION("~",1,9),
-    UNARY_MINUS("-",1,10),
-    LOGICAL_AND("&&",2,2),
-    LOGICAL_OR("||",2,1),
-    BITWISE_AND("&",2,4),
-    BITWISE_OR("|",2,3);
+    SHIFT_LEFT("<<",2,6),
+    SHIFT_RIGHT(">>",2,6),
+    GT(">",2,5),
+    LT("<",2,5),
+    GTE(">=",2,5),
+    LTE("<=",2,5),    
+    REF_EQ("==",2,4),
+    REF_NEQ("!=",2,4),    
+    BITWISE_AND("&",2,3),
+    BITWISE_OR("|",2,2),
+    LOGICAL_AND("&&",2,1),
+    LOGICAL_OR("||",2,0);
+    
+    /*
+     *  1. ||
+     *  2. &&
+     *  3. |
+     *  4. &
+     *  5. == !=
+     *  6. < > >= <=
+     *  7. << >>
+     *  8. - (binary ) +
+     *  9. * /
+     *  10. ~ !
+     *  11. - (unary)
+     */
 
     private final String symbol;
     private final int argumentCount;
@@ -240,6 +256,10 @@ public enum OperatorType
             final int num2 = value2 == null ? 0 : toInt( value2 );            
             switch( type ) 
             {
+                case SHIFT_LEFT:
+                    return num1 << num2;
+                case SHIFT_RIGHT:
+                    return num1 >> num2;                    
                 case BINARY_MINUS:
                     return num1-num2;
                 case BITWISE_AND:

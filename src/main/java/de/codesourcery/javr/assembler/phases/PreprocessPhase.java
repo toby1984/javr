@@ -2,7 +2,7 @@ package de.codesourcery.javr.assembler.phases;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 
-public class Preprocess implements Phase 
+public class PreprocessPhase implements Phase 
 {
     @Override
     public String getName() {
