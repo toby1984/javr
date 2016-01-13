@@ -27,8 +27,17 @@ public class FileResourceFactory implements ResourceFactory {
     }
     
     @Override
-    public Resource resolveResource(Resource parent, String child) throws IOException {
-        return new FileResource( new File(baseDir,child) ,  Resource.ENCODING_UTF );
+    public Resource resolveResource(Resource parent, String child) throws IOException 
+    {
+    	if ( child.startsWith("/" ) ) 
+    	{
+            return new FileResource( new File(baseDir,child) ,  Resource.ENCODING_UTF );
+    	}
+    	if ( parent instanceof FileResource) {
+    		 final File root = ((FileResource) parent).getFile().getParentFile();
+    		return new FileResource(new File(root , child ) , Resource.ENCODING_UTF ); 
+    	}
+    	throw new RuntimeException("Don't know how to resolve child '"+child+"' relative to "+parent);
     }
 
     @Override

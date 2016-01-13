@@ -21,10 +21,10 @@ import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.IArchitecture.DisassemblerSettings;
 import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.parser.Lexer;
+import de.codesourcery.javr.assembler.parser.LexerImpl;
 import de.codesourcery.javr.assembler.parser.Parser;
 import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.parser.Scanner;
-import de.codesourcery.javr.assembler.util.InMemoryResource;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
 import de.codesourcery.javr.ui.IConfig;
@@ -188,7 +188,7 @@ public class DisassembleTest  {
             
             @Override
             public Lexer createLexer(Scanner s) {
-                return new Lexer( s );
+                return new LexerImpl( s );
             }
         };
         IConfigProvider configProvider = new IConfigProvider() {
@@ -206,7 +206,7 @@ public class DisassembleTest  {
         System.err.flush();
         if ( ! success ) {
             System.err.println("Compilation had errors: \n");
-            unit.getAST().getMessages().stream().filter( msg -> msg.severity == Severity.ERROR ).forEach( msg -> 
+            unit.getMessages(true).stream().filter( msg -> msg.severity == Severity.ERROR ).forEach( msg -> 
             { 
                 System.err.println( msg );
                 if ( msg.region != null ) 

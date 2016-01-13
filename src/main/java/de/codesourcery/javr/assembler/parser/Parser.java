@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.Validate;
 
+import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.Instruction;
 import de.codesourcery.javr.assembler.Register;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
@@ -151,7 +152,7 @@ public class Parser
         this.arch = arch;
     }
 
-    public AST parse(Lexer lexer) 
+    public AST parse(CompilationUnit unit,Lexer lexer) 
     {
         Validate.notNull(lexer, "lexer must not be NULL");
         if ( arch == null ) {
@@ -173,10 +174,12 @@ public class Parser
             catch(Exception e) 
             {
                 e.printStackTrace();
-                ast.addMessage( new CompilationMessage(Severity.ERROR,e.getMessage(),lexer.peek().region() ) );
+                unit.addMessage( new CompilationMessage(Severity.ERROR,e.getMessage(),lexer.peek().region() ) );
                 break; // TODO: Implement parse recovery
             }
         }
+        unit.setAst( ast );
+        ast.setCompilationUnit( unit );
         return ast;
     }
 
@@ -305,10 +308,14 @@ public class Parser
                     {
                         funcDef.addChild( macroBody );
                     } 
-                    else if ( expectingFunctionBody ) 
+                    else if ( ! expectingFunctionBody ) 
+                    {
+                    	funcDef.addChild( new NumberLiteralNode("1", nameToken.region() ) );
+                    }
+                    else 
                     { 
                         throw new ParseException("Expected an expression",lexer.peek());
-                    }
+                    } 
 
                     final TextRegion r = new TextRegion( offset , keywordToken.endOffset() - offset );
                     final PreprocessorNode preproc= new PreprocessorNode(Preprocessor.DEFINE , r);                        

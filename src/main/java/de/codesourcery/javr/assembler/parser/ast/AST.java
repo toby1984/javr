@@ -15,65 +15,44 @@
  */
 package de.codesourcery.javr.assembler.parser.ast;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
-import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
-import de.codesourcery.javr.assembler.parser.Parser.Severity;
+import de.codesourcery.javr.assembler.CompilationUnit;
+import de.codesourcery.javr.assembler.ICompilationContext;
 
-public class AST extends AbstractASTNode 
+public class AST extends AbstractASTNode implements Resolvable
 {
     private static final Logger LOG = Logger.getLogger(AST.class);
     
-    private final List<CompilationMessage> messages = new ArrayList<>();
+    private CompilationUnit compilationUnit;
     
-    public void addMessage(CompilationMessage msg) 
-    {
-        Validate.notNull(msg, "msg must not be NULL");
-
-        switch( msg.severity ) 
-        {
-            case ERROR:
-                LOG.error( msg.toString() );
-                break;
-            case INFO:
-                LOG.info( msg.toString() );
-                break;
-            case WARNING:
-                LOG.warn( msg.toString() );
-                break;
-            default:
-            
-        }
-        if ( LOG.isTraceEnabled() ) 
-        { 
-            LOG.trace("addMessage() "+msg.message , new Exception() );
-        }
-        this.messages.add(msg);
-    }
-    
-    public List<CompilationMessage> getMessages() 
-    {
-        return new ArrayList<>( this.messages );
-    }
-    
-    public boolean hasErrors() {
-        return messages.stream().anyMatch( msg -> msg.severity == Severity.ERROR );
-    }
-    
-    public boolean hasWarning() {
-        return messages.stream().anyMatch( msg -> msg.severity == Severity.WARNING );
-    }
-    
-    public boolean hasInfo() {
-        return messages.stream().anyMatch( msg -> msg.severity == Severity.INFO );
-    }
-
     @Override
     protected AST createCopy() {
         return new AST();
-    }    
+    }
+    
+    public void setCompilationUnit(CompilationUnit compilationUnit) 
+    {
+		Validate.notNull(compilationUnit, "compilationUnit must not be NULL");
+		this.compilationUnit = compilationUnit;
+	}
+    
+    @Override
+    public CompilationUnit getCompilationUnit() {
+    	return compilationUnit;
+    }
+
+	@Override
+	public boolean resolve(ICompilationContext context) 
+	{
+		for ( ASTNode child : children() ) 
+		{
+			if ( child instanceof Resolvable) 
+			{
+				((Resolvable) child).resolve( context );
+			}
+		}
+		return true;
+	}
 }

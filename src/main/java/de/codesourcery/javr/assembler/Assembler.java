@@ -17,21 +17,21 @@ package de.codesourcery.javr.assembler;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Stack;
 
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
-import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.phases.GatherSymbolsPhase;
 import de.codesourcery.javr.assembler.phases.GenerateCodePhase;
 import de.codesourcery.javr.assembler.phases.ParseSourcePhase;
 import de.codesourcery.javr.assembler.phases.Phase;
 import de.codesourcery.javr.assembler.phases.PrepareGenerateCodePhase;
-import de.codesourcery.javr.assembler.phases.PreprocessPhase;
 import de.codesourcery.javr.assembler.phases.SyntaxCheckPhase;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Resource;
@@ -52,36 +52,82 @@ public class Assembler
 
     private final class CompilationContext implements ICompilationContext 
     {
-        private final CompilationUnit compilationUnit;
+        private final Stack<CompilationUnit> compilationUnits = new Stack<>();
+        private final CompilationUnit rootCompilationUnit;
+        private CompilationUnit compilationUnit;
+        
         private final IObjectCodeWriter objectCodeWriter;
 
         public CompilationContext(CompilationUnit unit,IObjectCodeWriter objectCodeWriter) 
         {
             Validate.notNull(unit, "unit must not be NULL");
             Validate.notNull(objectCodeWriter, "objectCodeWriter must not be NULL");
+            this.rootCompilationUnit = unit;
             this.compilationUnit = unit;
             this.objectCodeWriter = objectCodeWriter;
-            unit.setSymbolTable( new SymbolTable( compilationUnit.getResource().toString() , globalSymbolTable) );
         }
         
-        public AST parseInclude(String path) throws IOException
+        @Override
+        public void pushCompilationUnit(CompilationUnit newUnit) 
         {
-            final Resource newResource = resourceFactory.resolveResource( compilationUnit.getResource() , path );
-            for ( CompilationUnit existing : compilationUnit.getDependencies() ) 
+			Validate.notNull(newUnit, "unit must not be NULL");
+        	if ( newUnit == currentCompilationUnit() ) {
+        		throw new IllegalArgumentException("Cannot push current compilation unit");
+        	}
+        	final Stack<CompilationUnit> stack = new Stack<>();
+        	stack.push( currentCompilationUnit() );
+        	
+        	final IdentityHashMap<CompilationUnit, Boolean> unique = new IdentityHashMap<>();
+        	
+        	while ( ! stack.isEmpty() ) 
+        	{
+        		final CompilationUnit current = stack.pop();
+        		
+        		if ( unique.containsKey( current ) ) 
+        		{
+        			error("Circular includes detected: "+unique.keySet(),newUnit.getAST());
+        			return;
+        		}
+        		unique.put( current, Boolean.TRUE );
+        		stack.addAll( current.getDependencies() );
+        		if ( current == currentCompilationUnit() ) // fake adding the new compilation unit
+        		{
+        			stack.add( newUnit );
+        		}
+        	}
+        	
+        	currentCompilationUnit().addDependency( newUnit );
+        	compilationUnits.add( newUnit );
+        	this.compilationUnit = newUnit;
+        }
+        
+        @Override
+        public ResourceFactory getResourceFactory() {
+        	return resourceFactory;
+        }
+        
+        @Override
+        public void popCompilationUnit() 
+        {
+        	this.compilationUnit = compilationUnits.pop();
+        }        
+        
+        public CompilationUnit parseInclude(String path) throws IOException
+        {
+            final Resource newResource = resourceFactory.resolveResource( currentCompilationUnit().getResource() , path );
+            for ( CompilationUnit existing : currentCompilationUnit().getDependencies() ) 
             {
                 if ( existing.getResource().pointsToSameData( newResource ) ) 
                 {
-                    return (AST) existing.getAST().createCopy(true);
+                    return currentCompilationUnit();
                 }
             }
             
-            final CompilationUnit result = new CompilationUnit( newResource );
+            final SymbolTable symbolTable = new SymbolTable( path , currentSymbolTable() );
+			final CompilationUnit result = new CompilationUnit( newResource , symbolTable );
             
-            final AST ast = ParseSourcePhase.parseSource( newResource , config );
-            result.setAst( ast );
-            compilationUnit.addDependency( result );
-            
-            return ast;
+            ParseSourcePhase.parseSource( result , config );
+            return result;
         }
 
         @Override
@@ -97,7 +143,7 @@ public class Assembler
 
         @Override
         public SymbolTable currentSymbolTable() {
-            return compilationUnit.getSymbolTable();
+            return currentCompilationUnit().getSymbolTable();
         }
 
         @Override
@@ -146,7 +192,7 @@ public class Assembler
 
         @Override
         public void message(CompilationMessage msg) {
-            currentCompilationUnit().getAST().addMessage( msg );
+            currentCompilationUnit().addMessage( msg );
         }
 
         @Override
@@ -182,15 +228,17 @@ public class Assembler
         Validate.notNull(codeWriter, "codeWriter must not be NULL");
         Validate.notNull(rf, "resourceFactory must not be NULL");
         Validate.notNull(config, "provider must not be NULL");
-
+        
         this.globalSymbolTable = new SymbolTable(SymbolTable.GLOBAL);
+        
+        unit.beforeCompilationStarts(globalSymbolTable);
+
         this.compilationContext = new CompilationContext( unit , codeWriter );
         this.config = config.getConfig();
         this.resourceFactory = rf;
         
         final List<Phase> phases = new ArrayList<>();
         phases.add( new ParseSourcePhase(config) );
-        phases.add( new PreprocessPhase() );
         phases.add( new SyntaxCheckPhase() );
         phases.add( new GatherSymbolsPhase() );
         phases.add( new PrepareGenerateCodePhase() );
@@ -206,13 +254,15 @@ public class Assembler
                 LOG.debug("Assembler phase: "+p);
                 compilationContext.beforePhase();
 
+                boolean hasErrors;
                 try 
                 {
                     p.beforeRun( compilationContext );
 
                     p.run( compilationContext );
 
-                    if ( ! unit.getAST().hasErrors() ) {
+                    hasErrors = unit.hasErrors(true);
+                    if ( ! hasErrors ) {
                         p.afterSuccessfulRun( compilationContext );
                     } 
                 } 
@@ -225,7 +275,7 @@ public class Assembler
                     throw new RuntimeException(e);
                 }
 
-                if ( unit.getAST().hasErrors() ) 
+                if ( hasErrors ) 
                 {
                     LOG.error("compile(): Compilation failed with errors in phase "+p);
                     return false;

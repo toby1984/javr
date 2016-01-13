@@ -2,8 +2,10 @@ package de.codesourcery.javr.assembler.parser.ast;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Predicate;
 
 import de.codesourcery.javr.assembler.Address;
+import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.parser.ast.AbstractASTNode.IterationContext;
 
@@ -29,9 +31,20 @@ public interface ASTNode {
 
     public List<ASTNode> children();
     
+    public boolean anyMatchingParent(Predicate<ASTNode> predicate);
+    
+    public ASTNode findMatchingParent(Predicate<ASTNode> predicate);
+    
     public void replaceWith(ASTNode other);
     
     public void replaceChild(ASTNode child,  ASTNode newNode);
+    
+    /**
+     * Returns the compilation unit this node belongs to.
+     *  
+     * @return
+     */
+    public CompilationUnit getCompilationUnit();
 
     /**
      * Check whether conditional compilation marked this subtree as to be skipped

@@ -19,7 +19,6 @@ import java.io.IOException;
 
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
-import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
@@ -31,7 +30,13 @@ public interface ICompilationContext
         public ICompilationSettings setFailOnAddressOutOfRange(boolean failOnAddressOutOfRange);
     }
     
-    public AST parseInclude(String file) throws IOException;
+    public void pushCompilationUnit(CompilationUnit unit);
+    
+    public void popCompilationUnit();
+
+    public ResourceFactory getResourceFactory();
+    
+    public CompilationUnit parseInclude(String file) throws IOException;
     
     public ICompilationSettings getCompilationSettings();
     

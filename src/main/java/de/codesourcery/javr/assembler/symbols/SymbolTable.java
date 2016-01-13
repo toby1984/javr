@@ -56,6 +56,10 @@ public class SymbolTable
         this.parent = parent;
     }
     
+    public void clear() {
+    	this.symbols.clear();
+    }
+    
     public Symbol get(Identifier name,Symbol.Type type) 
     {
         Validate.notNull(type, "type must not be NULL");
@@ -83,8 +87,15 @@ public class SymbolTable
     {
         final List<Symbol> result = new ArrayList<>();
         result.addAll( symbols.values() );
-        if ( parent != null ) {
-            result.addAll( parent.getAllSymbolsUnsorted() );
+        if ( parent != null ) 
+        {
+            final List<Symbol> parentSymbols = parent.getAllSymbolsUnsorted();
+            for ( Symbol p : parentSymbols ) 
+            {
+            	if ( ! symbols.keySet().contains( p.name() ) ) {
+            		result.add( p );
+            	}
+            }
         }
         return result;
     }    
@@ -201,4 +212,9 @@ public class SymbolTable
     {
         return name+" ["+super.toString()+","+this.symbols.size()+" symbols]";
     }
+
+	public void setParent(SymbolTable symbolTable) {
+		Validate.notNull(symbolTable, "symbolTable must not be NULL");
+		this.parent = symbolTable;
+	}
 }

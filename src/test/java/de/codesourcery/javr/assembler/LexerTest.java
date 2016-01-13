@@ -15,8 +15,7 @@
  */
 package de.codesourcery.javr.assembler;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -26,6 +25,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import de.codesourcery.javr.assembler.parser.Lexer;
+import de.codesourcery.javr.assembler.parser.LexerImpl;
 import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.parser.Token;
 import de.codesourcery.javr.assembler.parser.TokenType;
@@ -201,7 +201,7 @@ public class LexerTest {
     
     private List<Token> lexAll(String s,boolean ignoreWhitespace) 
     {
-        this.lexer = new Lexer(new Scanner(s ) );
+        this.lexer = new LexerImpl(new Scanner(s ) );
         lexer.setIgnoreWhitespace( ignoreWhitespace );
         final List<Token> result = new ArrayList<>();
         while ( ! lexer.eof() ) {

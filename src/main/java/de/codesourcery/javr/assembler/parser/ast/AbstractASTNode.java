@@ -18,10 +18,12 @@ package de.codesourcery.javr.assembler.parser.ast;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Predicate;
 
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.Address;
+import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 
 public abstract class AbstractASTNode implements ASTNode 
@@ -59,6 +61,29 @@ public abstract class AbstractASTNode implements ASTNode
             throw new IllegalStateException("Cannot replace node "+this+" that has no parent");
         }
         parent.replaceChild( this , other );
+    }
+    
+    @Override
+    public CompilationUnit getCompilationUnit() 
+    {
+    	return parent == null ? null : parent.getCompilationUnit();
+    }
+    
+    @Override
+    public final boolean anyMatchingParent(Predicate<ASTNode> predicate) 
+    {
+    	return findMatchingParent(predicate) != null;
+    }
+    
+    public final ASTNode findMatchingParent(Predicate<ASTNode> predicate) {
+    	ASTNode current = getParent();
+    	while ( current != null ) {
+    		if ( predicate.test( current ) ) {
+    			return current;
+    		}
+    		current = current.getParent();
+    	}
+    	return null;
     }
     
     public final void replaceChild(ASTNode child,  ASTNode newNode) 

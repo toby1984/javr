@@ -19,7 +19,7 @@ import org.apache.commons.lang3.Validate;
 
 public final class Token {
 
-    public final int offset;
+    public int offset;
     public final String value;
     public final TokenType type;
     
@@ -38,6 +38,10 @@ public final class Token {
         this.offset = offset;
         this.value = value;
         this.type = type;
+    }
+    
+    public Token copyWithOffset(int newOffset) {
+    	return new Token(this.type , this.value , newOffset );
     }
     
     public int endOffset() {

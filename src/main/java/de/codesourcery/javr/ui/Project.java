@@ -28,6 +28,7 @@ import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.parser.Lexer;
+import de.codesourcery.javr.assembler.parser.LexerImpl;
 import de.codesourcery.javr.assembler.parser.Parser;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.Scanner;
@@ -105,7 +106,7 @@ public class Project implements IProject
                     final float percentage = 100.0f*(bytesWritten/(float) segSize);
                     final DecimalFormat DF = new DecimalFormat("#####0.00");
                     final String msg = s+": Wrote "+bytesWritten+" bytes ("+DF.format(percentage)+" %) to "+spec.resource;
-                    getCompileRoot().getAST().addMessage( CompilationMessage.info( msg ) );                    
+                    getCompileRoot().addMessage( CompilationMessage.info( msg ) );                    
                 }
                 LOG.info("finish(): Wrote "+bytesWritten+" bytes to "+spec.resource+" in format "+spec.format);
             } 
@@ -258,7 +259,7 @@ public class Project implements IProject
 
             @Override
             public Lexer createLexer(Scanner s) {
-                return new Lexer(s);
+                return new LexerImpl(s);
             }
 
             @Override

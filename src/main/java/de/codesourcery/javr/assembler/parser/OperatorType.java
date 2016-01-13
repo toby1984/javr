@@ -309,8 +309,8 @@ public enum OperatorType
             final String name = fn.functionName.value;
             if ( FunctionCallNode.BUILDIN_FUNCTION_DEFINED.equals( fn.functionName ) )
             {
-                if ( !(child instanceof IdentifierNode )) {
-                    context.error("Expected an identifier", child);
+                if ( ! (child instanceof IdentifierNode ) ) {
+                    context.error("Expected an identifier but got "+child, child);
                     return false;
                 }
                 final Identifier identifier = ((IdentifierNode) child).name;

@@ -66,6 +66,10 @@ public class PreprocessorNode extends AbstractASTNode implements Resolvable {
     public String toString() {
         return this.type+" ("+this.arguments+")";
     }
+    
+    public List<String> getArguments() {
+		return arguments;
+	}
 
     @Override
     public boolean resolve(ICompilationContext context) 

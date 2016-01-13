@@ -22,7 +22,7 @@ import org.junit.Test;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.parser.Identifier;
-import de.codesourcery.javr.assembler.parser.Lexer;
+import de.codesourcery.javr.assembler.parser.LexerImpl;
 import de.codesourcery.javr.assembler.parser.OperatorType;
 import de.codesourcery.javr.assembler.parser.Parser;
 import de.codesourcery.javr.assembler.parser.Scanner;
@@ -35,7 +35,6 @@ import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.EquLabelNode;
 import de.codesourcery.javr.assembler.parser.ast.FunctionCallNode;
 import de.codesourcery.javr.assembler.parser.ast.FunctionDefinitionNode;
-import de.codesourcery.javr.assembler.parser.ast.IdentifierDefNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
@@ -47,6 +46,7 @@ import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode.Preprocessor;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
 import de.codesourcery.javr.assembler.parser.ast.StringLiteral;
+import de.codesourcery.javr.assembler.util.StringResource;
 
 public class ParserTest 
 {
@@ -1072,8 +1072,7 @@ public class ParserTest
             final CommentNode comment = (CommentNode) stmt.child(0);
             assertNotNull(comment);
             assertEquals("; test comment2" , comment.value );            
-        }
-        
+        }        
     }     
     
     // multi-line tests
@@ -1092,6 +1091,7 @@ public class ParserTest
     {
         final Parser p = new Parser();
         p.setArchitecture( arch );
-        return p.parse( new Lexer(new Scanner(s) ) );
+        CompilationUnit unit = new CompilationUnit( new StringResource("dummy", s) );
+        return p.parse( unit , new LexerImpl(new Scanner(s) ) );
     }
 }
