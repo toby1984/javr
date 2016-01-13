@@ -196,7 +196,9 @@ public class SymbolTable
     public void defineSymbol(Symbol symbol) 
     {
         Validate.notNull(symbol, "symbol must not be NULL");
-        Validate.notNull(symbol.getNode(), "symbol must not have a NULL node");
+        if ( ! symbol.hasType(Type.PREPROCESSOR_MACRO ) ) {
+            Validate.notNull(symbol.getNode(), "symbol must not have a NULL node");
+        }
         Symbol existing = internalGet( symbol.name() );
         if ( existing != null && ! existing.hasType( Type.UNDEFINED ) ) {
             throw new DuplicateSymbolException( symbol , existing );

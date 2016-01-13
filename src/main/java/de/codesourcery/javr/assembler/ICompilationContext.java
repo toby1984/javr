@@ -22,7 +22,7 @@ import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
-public interface ICompilationContext 
+public interface ICompilationContext
 {
     public interface ICompilationSettings 
     {

@@ -1089,8 +1089,7 @@ public class ParserTest
     // helper functions
     private AST parse(String s) 
     {
-        final Parser p = new Parser();
-        p.setArchitecture( arch );
+        final Parser p = new Parser(arch);
         CompilationUnit unit = new CompilationUnit( new StringResource("dummy", s) );
         return p.parse( unit , new LexerImpl(new Scanner(s) ) );
     }

@@ -46,7 +46,7 @@ public final class Symbol
          */
         EQU,
         /**
-         * Symbol was defined through an <code>#define xxxxx()</code> directive.
+         * Symbol was defined through an <code>#define xxxxx &lt;expr&gt;</code> directive.
          */
         PREPROCESSOR_MACRO,
         /**

@@ -181,9 +181,7 @@ public class DisassembleTest  {
             
             @Override
             public Parser createParser() {
-                Parser p = new Parser();
-                p.setArchitecture( arch );
-                return p;
+                return new Parser(arch);
             }
             
             @Override

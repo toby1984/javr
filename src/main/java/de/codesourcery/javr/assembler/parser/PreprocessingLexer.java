@@ -1,25 +1,36 @@
 package de.codesourcery.javr.assembler.parser;
 
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 
 import org.apache.commons.lang3.Validate;
 
+import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.CompilationUnit;
+import de.codesourcery.javr.assembler.ICompilationContext;
+import de.codesourcery.javr.assembler.ResourceFactory;
+import de.codesourcery.javr.assembler.Segment;
+import de.codesourcery.javr.assembler.arch.IArchitecture;
+import de.codesourcery.javr.assembler.exceptions.ParseException;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
+import de.codesourcery.javr.assembler.parser.ast.ASTNode;
+import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 public class PreprocessingLexer implements Lexer 
 {
 	private final CompilationUnit unit;
 	private final Lexer lexer;
 	
+	private final IArchitecture architecture;
 	private boolean isIgnoreWhitespace=true;
-	private final Map<String,List<Token>> macros = new HashMap<>();
+	private final SymbolTable symbols = new SymbolTable("preproc");
 	private final List<Token> tokens = new ArrayList<>();
 	private final List<Token> unprocessedTokens = new ArrayList<>();
 	
@@ -29,11 +40,43 @@ public class PreprocessingLexer implements Lexer
 	// each time some expression/identifier gets macro-expanded 
 	private int expansionOffset = 0;
 	
-	public PreprocessingLexer(Lexer delegate,CompilationUnit unit) 
+	protected final class MacroDefinition 
+	{
+	    public final List<Token> parameterNames;
+	    public final List<Token> tokens;
+	    
+	    public MacroDefinition(List<Token> parameterNames,List<Token> tokens) 
+	    {
+	        final Set<String> names = new HashSet<>();
+	        for ( Token t : parameterNames ) 
+	        {
+	            if ( names.contains( t.value ) ) {
+	                throw new ParseException("Macro definition has duplicate parameter name '"+t.value+"'",t);
+	            }
+	            names.add( t.value );
+	        }
+	        this.parameterNames = parameterNames;
+	        this.tokens = tokens;
+	    }
+	    
+	    public int getIndexForParameterName(String name) {
+	        for ( int i = 0 , len=parameterNames.size() ; i < len ; i++ ) {
+	            if ( parameterNames.get(i).value.equals(name) ) {
+	                return i;
+	            }
+	        }
+	        return -1;
+	    }
+	}
+	
+	public PreprocessingLexer(Lexer delegate,CompilationUnit unit,IArchitecture arch) 
 	{
 		Validate.notNull(delegate, "delegate must not be NULL");
+        Validate.notNull(unit, "unit must not be NULL");
+        Validate.notNull(arch, "arch must not be NULL");
 		this.unit = unit;
 		this.lexer = delegate;
+		this.architecture = arch;
 		delegate.setIgnoreWhitespace( false );
 	}
 	
@@ -126,7 +169,8 @@ public class PreprocessingLexer implements Lexer
 			// preprocessor directive
 			if ( next.hasType(TokenType.HASH ) ) 
 			{
-				if ( lexer.peek().value.equalsIgnoreCase("define" ) ) // #define 
+				final String directive = lexer.peek().value;
+                if ( directive.equalsIgnoreCase("define" ) ) // #define 
 				{
 					skipWhitespace( unprocessedTokens );
 					expandTokens();
@@ -136,11 +180,37 @@ public class PreprocessingLexer implements Lexer
 					if ( isValidIdentifier( lexer.peek() ) ) 
 					{
 						final Token macroName = consume();
+						final Identifier macroId = new Identifier( macroName.value );
 						tokens.add( macroName );
 						
 						skipWhitespace( tokens );
 						
 						// parse body
+                        final List<Token> argumentNames = new ArrayList<>();						
+						if ( lexer.peek( TokenType.PARENS_OPEN ) ) { // #define func(a,b,c)
+						    
+						    tokens.add( consume() );
+						    
+						    skipWhitespace( tokens );
+						    while ( ! ( isEOL( lexer.peek() ) || lexer.peek(TokenType.PARENS_CLOSE ) ) ) 
+						    {
+						        if ( ! isValidIdentifier( lexer.peek() ) ) {
+			                          throw new ParseException("Expected an identifier", lexer.peek() );
+						        }
+						        argumentNames.add( consume() );
+						        skipWhitespace( tokens );
+						        if ( ! lexer.peek( TokenType.COMMA ) ) {
+						            break;
+						        }
+						        tokens.add( consume() ); // consume comma
+						        skipWhitespace( tokens );
+						    }
+						    skipWhitespace( tokens );
+						    if ( ! lexer.peek(TokenType.PARENS_CLOSE ) ) 
+						    {
+						        throw new ParseException("Unclosed macro definition", lexer.peek() );
+						    }
+						}
 						final List<Token> macroBody = new ArrayList<>();
 						processTokensUntilEndOfLine( t -> {
 							macroBody.add(t);
@@ -149,11 +219,15 @@ public class PreprocessingLexer implements Lexer
 						if ( macroBody.isEmpty() ) {
 							macroBody.add( new Token(TokenType.DIGITS,"1" , macroName.offset ) );
 						}
-						if ( macros.containsKey( macroName.value ) ) 
+						if ( symbols.isDeclared(macroId) ) 
 						{
 							error("Duplicate identifier: '"+macroName.value+"'", macroName );
-						} else {
-							macros.put( macroName.value , macroBody );
+						} 
+						else 
+						{
+						    final Symbol symbol = new Symbol(macroId,Symbol.Type.PREPROCESSOR_MACRO,unit,null);
+						    symbol.setValue( new MacroDefinition( argumentNames , macroBody ) );
+                            symbols.defineSymbol( symbol );
 						}
 						return;
 					} else {
@@ -161,6 +235,13 @@ public class PreprocessingLexer implements Lexer
 					}
 					return;
 				} 
+                if ( directive.equalsIgnoreCase("ifdef" ) || directive.equals("ifndef" ) ) {
+                    skipWhitespace( unprocessedTokens );
+                    expandTokens();
+                    tokens.add( next ); // '#'
+                    tokens.add( consume() ); // skip 'define'      
+                    skipWhitespace( tokens );                    
+				}
 			}
 			unprocessedTokens.add( next );
 		}
@@ -187,6 +268,15 @@ public class PreprocessingLexer implements Lexer
 		unprocessedTokens.clear();
 	}
 	
+	private static boolean isWhitespace(Token tok) {
+	    return tok.type == TokenType.WHITESPACE; 
+	}
+	
+	private static boolean isNoWhitespace(Token tok) 
+	{
+	        return tok.type != TokenType.WHITESPACE;
+	}
+	
 	private void expand(List<Token> tokens,Set<String> alreadyExpandedMacros) 
 	{
 		final Set<String> expanded = new HashSet<>();
@@ -196,13 +286,75 @@ public class PreprocessingLexer implements Lexer
 		for (int i = 0,len=tokens.size(); i < len ; i++) 
 		{
 			final Token tok = tokens.get(i);
-			if ( isValidIdentifier( tok ) ) 
+			if ( isValidIdentifier( tok ) ) // check whether the identifier refers to a macro definition
 			{
-				final List<Token> body = macros.get( tok.value );
-				if ( body == null || alreadyExpandedMacros.contains( tok.value ) ) 
+			    final Optional<Symbol> optSymbol = symbols.maybeGet( new Identifier( tok.value ) );
+				if ( ! optSymbol.isPresent() || alreadyExpandedMacros.contains( tok.value ) ) // prevent infinite expansion
 				{
 					continue;
 				}
+                final Symbol symbol = optSymbol.get();
+                final MacroDefinition macroDef = (MacroDefinition) symbol.getValue();		
+                
+				// check whether first non-whitespace token is opening parenthesis (=start of argument list) 
+				boolean hasParameters=false;
+				int openingParensIdx = i+1;
+				for ( ; openingParensIdx < len ; openingParensIdx++) 
+				{
+				    if ( ! isWhitespace( tokens.get(openingParensIdx) ) ) {
+				        hasParameters = tokens.get(openingParensIdx).hasType( TokenType.PARENS_OPEN );
+				        break;
+				    }
+				}
+				
+				// parse argument list (if any)
+				final List<List<Token>> macroParameters;
+				if ( hasParameters ) 
+				{
+				    macroParameters = new ArrayList<>();
+				    List<Token> currentArg = new ArrayList<>();
+				    int k = openingParensIdx+1;
+				    boolean commaExpected = false;
+				    for ( ; k < len ; k++ ) 
+				    {
+				        final Token arg = tokens.get(k);
+				        if ( isWhitespace(arg ) ) {
+				            continue;
+				        }
+				        if ( arg.hasType( TokenType.PARENS_CLOSE ) ) {
+				            break;
+				        }
+				        if ( arg.hasType( TokenType.COMMA ) ) 
+				        {
+				            if ( ! commaExpected ) {
+				                throw new ParseException("Stray comma" , arg );
+				            }
+				            macroParameters.add( currentArg );
+				            currentArg = new ArrayList<>();
+				            commaExpected = false;
+				            continue;
+				        }
+				        currentArg.add( arg );
+				        commaExpected = true;
+				    }
+				    
+				    if ( ! currentArg.isEmpty() ) {
+				        macroParameters.add( currentArg );
+				    }
+				    if ( k >= len || ! tokens.get(k).hasType( TokenType.PARENS_CLOSE ) ) 
+				    {
+				        throw new ParseException("Unterminated macro argument list", tokens.get(k-1) );
+				    }
+				} else {
+				    macroParameters = Collections.emptyList();
+				}
+                if( macroParameters.size() != macroDef.parameterNames.size() ) 
+                {
+                    throw new ParseException("Expected "+macroDef.parameterNames.size()+" arguments but got "+macroParameters.size(),tok);
+                }				
+
+				final List<Token> body = macroDef.tokens;
+				
 				expanded.add( tok.value );
 				anyIdentifiersExpanded = true;
 				final int expandedLength;
@@ -215,19 +367,37 @@ public class PreprocessingLexer implements Lexer
 				{
 					tokens.remove( i );
 					int offset = tok.offset;
+					int ptr = i;
 					for ( int j = 0 ; j < body.size() ; j++ ) 
 					{
-						final Token exp = body.get(j ).copyWithOffset( offset );
-						offset += exp.value.length();
-						
-						tokens.add( i+j , exp );
+						final Token bodyToken = body.get(j );
+						final int paramIdx = isValidIdentifier( bodyToken ) ? macroDef.getIndexForParameterName( bodyToken.value ) : -1;
+						if ( paramIdx == -1 ) {
+						    final Token exp = bodyToken.copyWithOffset( offset );
+						    offset += exp.value.length();
+						    tokens.add( ptr , exp );
+						    ptr += 1;
+						    i++;
+						} 
+						else 
+						{
+						    final List<Token> paramValues = macroParameters.get(paramIdx );
+                            for ( Token paramValue: paramValues ) 
+						    {
+				                  final Token expr = paramValue.copyWithOffset( offset );
+		                          offset += expr.value.length();
+		                          tokens.add( ptr , expr );
+		                          ptr += 1;
+						    }
+                            i += paramValues.size();
+						}
 					}
 					expandedLength = offset-tok.offset;
 				}
 				// calculate delta between size of expanded identifier and expansion
 				final int delta = expandedLength - tok.value.length();
 				// adjust any tokens remaining in our queue
-				for (int j = i+1 ; j < len ; j++ ) {
+				for (int j = i ; j < tokens.size() ; j++ ) {
 					tokens.get(j).offset += delta;
 				}
 				totalOffset += delta;
@@ -348,5 +518,156 @@ public class PreprocessingLexer implements Lexer
 	{
 		Validate.notNull(tok, "tok must not be NULL");
 		tokens.add( 0, tok );
+	}
+	
+//	private Object evaluateExpression(Resolvable expr) {
+//	    
+//	    expr.resolve( context );
+//	}
+	
+	private ASTNode parseExpression(List<Token> tokens) 
+	{
+	    return Parser.parseExpression( new WrappingLexer(tokens ) );
+	}
+	
+	protected final class WrappingContext implements ICompilationContext {
+
+        @Override
+        public void pushCompilationUnit(CompilationUnit unit) { throw new UnsupportedOperationException(); }
+
+        @Override
+        public void popCompilationUnit() { throw new UnsupportedOperationException(); }
+
+        @Override
+        public ResourceFactory getResourceFactory() { throw new UnsupportedOperationException(); }
+
+        @Override
+        public CompilationUnit parseInclude(String file) throws IOException { throw new UnsupportedOperationException(); }
+
+        @Override
+        public ICompilationSettings getCompilationSettings() { throw new UnsupportedOperationException(); }
+
+        @Override
+        public SymbolTable globalSymbolTable() { throw new UnsupportedOperationException(); }
+
+        @Override
+        public SymbolTable currentSymbolTable() { return symbols; }
+
+        @Override
+        public CompilationUnit currentCompilationUnit() { throw new UnsupportedOperationException(); }
+
+        @Override
+        public int currentOffset() { throw new UnsupportedOperationException(); }
+
+        @Override
+        public Address currentAddress() { throw new UnsupportedOperationException(); }
+
+        @Override
+        public Segment currentSegment() { throw new UnsupportedOperationException(); }
+
+        @Override
+        public void setSegment(Segment s) { throw new UnsupportedOperationException(); }
+
+        @Override
+        public void writeByte(int value) { throw new UnsupportedOperationException(); }
+
+        @Override
+        public void writeWord(int value) { throw new UnsupportedOperationException(); }
+
+        @Override
+        public void allocateByte() { throw new UnsupportedOperationException(); }
+
+        @Override
+        public void allocateWord() { throw new UnsupportedOperationException(); }
+
+        @Override
+        public void allocateBytes(int numberOfBytes) { throw new UnsupportedOperationException(); }
+
+        @Override
+        public void error(String message, ASTNode node) { throw new UnsupportedOperationException(); }
+
+        @Override
+        public void message(CompilationMessage msg) { throw new UnsupportedOperationException(); }
+
+        @Override
+        public IArchitecture getArchitecture() { return architecture; }
+	    
+	}
+	
+	protected static final class WrappingLexer implements Lexer {
+
+	    private final List<Token> tokens;
+	    private final int lastOffset;
+	    
+	    private boolean ignoreWhitespace = true;
+	    
+	    public WrappingLexer(List<Token> tokens) {
+	        this.tokens = tokens;
+	        if ( tokens.isEmpty() ) {
+	            throw new IllegalArgumentException("At least one token needs to be present"); // ...otherwise we cannot get the offset at EOF
+	        }
+	        final Token lastToken = tokens.get(tokens.size()-1);
+	        this.lastOffset = lastToken.offset+lastToken.value.length();
+	    }
+	    
+        @Override
+        public boolean eof() {
+            return ! tokens.isEmpty();
+        }
+
+        @Override
+        public Token next() 
+        {
+            while ( ignoreWhitespace && ! tokens.isEmpty() && tokens.get(0).hasType(TokenType.WHITESPACE ) ) {
+                tokens.remove(0);
+            }
+            if ( tokens.isEmpty() ) {
+                return new Token(TokenType.EOF,"",lastOffset);
+            }
+            return tokens.remove(0);
+        }
+
+        @Override
+        public Token peek() 
+        {
+            if ( ignoreWhitespace ) 
+            {
+                for ( int i = 0,len=tokens.size() ; i < len ; i++ ) 
+                {
+                    final Token tok = tokens.get(i);
+                    if ( ! tok.hasType( TokenType.WHITESPACE ) ) {
+                        return tok;
+                    }
+                }
+                return new Token(TokenType.EOF,"",lastOffset);
+            }
+            if ( tokens.isEmpty() ) {
+                return new Token(TokenType.EOF,"",lastOffset);
+            }
+            return tokens.get(0);
+        }
+
+        @Override
+        public boolean peek(TokenType t) {
+            return peek().hasType( t );
+        }
+
+        @Override
+        public void setIgnoreWhitespace(boolean ignoreWhitespace) 
+        {
+            this.ignoreWhitespace = ignoreWhitespace;
+        }
+
+        @Override
+        public boolean isIgnoreWhitespace() {
+            return ignoreWhitespace;
+        }
+
+        @Override
+        public void pushBack(Token tok) 
+        {
+            Validate.notNull(tok, "tok must not be NULL");
+            tokens.add(0,tok);
+        }	    
 	}
 }

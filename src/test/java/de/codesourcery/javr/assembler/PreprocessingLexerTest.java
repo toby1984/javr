@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.LexerImpl;
 import de.codesourcery.javr.assembler.parser.PreprocessingLexer;
@@ -122,6 +123,24 @@ public class PreprocessingLexerTest extends TestCase
 		assertFalse( tokens.hasNext() );
 	}	
 	
+    public void testExpandMacroWithOneArg() 
+    {
+        final Iterator<Token> tokens = lex("#define func(x) x+x\n"
+                + "func(2)").iterator();
+        assertToken(TokenType.HASH,"#",0,tokens);
+        assertToken(TokenType.TEXT,"define",1,tokens);
+        assertToken(TokenType.TEXT,"TEST",8,tokens);
+        assertToken(TokenType.TEXT,"y",13,tokens);
+        assertToken(TokenType.OPERATOR,"+",14,tokens);
+        assertToken(TokenType.TEXT,"y",15,tokens);
+        assertToken(TokenType.EOL,"\n",16,tokens);
+        assertToken(TokenType.TEXT,"y",17,tokens);
+        assertToken(TokenType.OPERATOR,"+",18,tokens);
+        assertToken(TokenType.TEXT,"y",19,tokens);
+        assertToken(TokenType.EOF,"",20,tokens);
+        assertFalse( tokens.hasNext() );
+    }	
+	
 	private void assertToken(TokenType t,String value,int offset,Iterator<Token> it) 
 	{
 		final Token tok = it.next();
@@ -133,7 +152,7 @@ public class PreprocessingLexerTest extends TestCase
 	private List<Token> lex(String s) 
 	{
 		CompilationUnit unit = new CompilationUnit( new StringResource("dummy",s) );
-		final Lexer lexer = new PreprocessingLexer( new LexerImpl( new Scanner(s) ) , unit );
+		final Lexer lexer = new PreprocessingLexer( new LexerImpl( new Scanner(s) ) , unit , new ATMega88() );
 		final List<Token> result = new ArrayList<>();
 		while(true) 
 		{

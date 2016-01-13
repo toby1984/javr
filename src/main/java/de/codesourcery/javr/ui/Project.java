@@ -265,9 +265,7 @@ public class Project implements IProject
             @Override
             public Parser createParser() 
             {
-                final Parser p = new Parser();
-                p.setArchitecture( Project.this.getArchitecture() );
-                return p;
+                return new Parser(Project.this.getArchitecture() );
             }
 
             @Override

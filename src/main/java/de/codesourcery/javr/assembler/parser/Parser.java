@@ -48,16 +48,16 @@ import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
 import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
 import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode.Preprocessor;
-import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
 import de.codesourcery.javr.assembler.parser.ast.StringLiteral;
+import de.codesourcery.javr.assembler.symbols.Symbol;
 
 public class Parser 
 {
     private Lexer lexer;
-    private IArchitecture arch; 
-    private AST ast = new AST();
+    private final IArchitecture arch; 
+    private AST ast;
 
     public static enum Severity 
     {
@@ -143,15 +143,12 @@ public class Parser
         }         
     }
 
-    public Parser() {
-    }
-
-    public void setArchitecture(IArchitecture arch) {
-
+    public Parser(IArchitecture arch) 
+    {
         Validate.notNull(arch, "arch must not be NULL");
         this.arch = arch;
     }
-
+    
     public AST parse(CompilationUnit unit,Lexer lexer) 
     {
         Validate.notNull(lexer, "lexer must not be NULL");
@@ -246,7 +243,7 @@ public class Parser
                 if ( proc == Preprocessor.IF_DEFINE || proc == Preprocessor.IF_NDEFINE ) 
                 {
                     final TextRegion r = new TextRegion( offset , lexer.peek().offset - offset );
-                    ASTNode expr = parseExpression();
+                    ASTNode expr = parseExpression(lexer);
                     if ( expr == null ) {
                         throw new ParseException("Expected an identifier/expression", lexer.peek() );
                     }
@@ -303,7 +300,7 @@ public class Parser
                         funcDef.addChild( new ArgumentNamesNode() );
                     }
 
-                    final ASTNode macroBody = parseExpression();
+                    final ASTNode macroBody = parseExpression(lexer);
                     if ( macroBody != null ) 
                     {
                         funcDef.addChild( macroBody );
@@ -366,10 +363,10 @@ public class Parser
         while ( ! lexer.peek().hasType( TokenType.SEMICOLON, TokenType.EOF, TokenType.EOL) ) 
         {
             if ( lexer.peek( TokenType.SINGLE_QUOTE ) ) {
-                final CharacterLiteralNode n = parseCharLiteral();
+                final CharacterLiteralNode n = parseCharLiteral(lexer);
                 result.add("'"+n.value+"'");
             } else if ( lexer.peek( TokenType.DOUBLE_QUOTE ) ) {
-                final StringLiteral n = parseStringLiteral();
+                final StringLiteral n = parseStringLiteral(lexer);
                 result.add("\""+n.value+"\"");
             } else {
                 result.add( lexer.next().value );
@@ -418,7 +415,7 @@ public class Parser
                 dResult.addChild( new StringLiteral( device , new TextRegion(start, lexer.peek().offset - start ) ) ); 
                 return dResult;
             case "byte":
-                final ASTNode expr = parseExpression();
+                final ASTNode expr = parseExpression(lexer);
                 if ( expr != null ) 
                 {
                     final DirectiveNode result = new DirectiveNode( Directive.RESERVE , tok2.region() );
@@ -448,7 +445,7 @@ public class Parser
                     if ( lexer.peek( TokenType.EQUALS ) ) 
                     {
                         lexer.next();
-                        final ASTNode expr2 = parseExpression();
+                        final ASTNode expr2 = parseExpression(lexer);
                         if ( expr2 != null ) {
                             final DirectiveNode result2 = new DirectiveNode(Directive.EQU , tok2.region() );
                             result2.addChild( new EquLabelNode( name , tok.region() ) );
@@ -471,7 +468,7 @@ public class Parser
         final List<ASTNode> result = new ArrayList<>();
         while(true)
         {
-            ASTNode expr = parseExpression();
+            ASTNode expr = parseExpression(lexer);
             if ( expr == null ) {
                 return result;
             }
@@ -541,10 +538,10 @@ public class Parser
         if ( result != null ) {
             return result;
         } 
-        return parseExpression();
+        return parseExpression(lexer);
     }    
 
-    private CharacterLiteralNode parseCharLiteral() 
+    private static CharacterLiteralNode parseCharLiteral(Lexer lexer) 
     {
         final Token tok = lexer.peek();
         if ( tok.hasType( TokenType.SINGLE_QUOTE ) ) 
@@ -570,7 +567,7 @@ public class Parser
         return null;
     }
 
-    private StringLiteral parseStringLiteral() 
+    private static StringLiteral parseStringLiteral(Lexer lexer) 
     {
         final Token tok = lexer.peek();
         if ( tok.hasType( TokenType.DOUBLE_QUOTE ) ) 
@@ -633,7 +630,7 @@ public class Parser
                     throw new ParseException("Either pre-decrement or post-increment are possible but not both",lexer.peek());
                 }
                 region.merge( lexer.next() );
-                displacement = parseExpression();
+                displacement = parseExpression(lexer);
             }            
             final Register reg = new Register( name , postIncrement && displacement == null , preDecrement );
             final RegisterNode result = new RegisterNode( reg , region );
@@ -648,7 +645,7 @@ public class Parser
         return null;
     }
 
-    private ASTNode parseExpression() 
+    public static ASTNode parseExpression(Lexer lexer) 
     {
         final ShuntingYard yard = new ShuntingYard();
         while ( ! lexer.eof() ) 
@@ -682,7 +679,7 @@ public class Parser
                 if ( lexer.peek(TokenType.DOT ) ) {
                     node = new CurrentAddressNode( lexer.next().region() );
                 } else {
-                    node = parseAtom();
+                    node = parseAtom(lexer);
                 }
                 if ( node != null ) 
                 {
@@ -704,28 +701,28 @@ public class Parser
         return yard.getResult( lexer.peek().region() );
     }
 
-    private ASTNode parseAtom() 
+    private static ASTNode parseAtom(Lexer lexer) 
     {
         // character literal
-        ASTNode result = parseCharLiteral();
+        ASTNode result = parseCharLiteral(lexer);
         if ( result != null ) {
             return result;
         }
 
         // string literal
-        result = parseStringLiteral();
+        result = parseStringLiteral(lexer);
         if ( result != null ) {
             return result;
         }
 
         // number literal
-        result = parseNumber();
+        result = parseNumber(lexer);
         if ( result != null ) {
             return result;
         }
 
         // identifier
-        return parseIdentifier();         
+        return parseIdentifier(lexer);         
     }
 
     private boolean isCompoundRegister(String name) {
@@ -780,7 +777,7 @@ public class Parser
         return true;
     }
 
-    private NumberLiteralNode parseNumber() 
+    private static NumberLiteralNode parseNumber(Lexer lexer) 
     {
         Token tok = lexer.peek();
         if ( tok.hasType( TokenType.DIGITS ) || tok.hasType( TokenType.TEXT ) && NumberLiteralNode.isValidNumberLiteral( tok.value ) ) 
@@ -791,7 +788,7 @@ public class Parser
         return null;
     }
 
-    private IdentifierNode parseIdentifier() 
+    private static IdentifierNode parseIdentifier(Lexer lexer) 
     {
         Token tok = lexer.peek();
         if ( Identifier.isValidIdentifier( tok.value ) ) 

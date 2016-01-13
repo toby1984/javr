@@ -48,7 +48,7 @@ public class ParseSourcePhase implements Phase {
         }
         final Scanner scanner = new Scanner( input );
         
-        final Lexer lexer = new PreprocessingLexer(config.createLexer( scanner ) , unit);
+        final Lexer lexer = new PreprocessingLexer(config.createLexer( scanner ) , unit , config.getArchitecture() );
         final Parser parser = config.createParser();
         
         parser.parse( unit , lexer ); // assigns AST to unit as well
