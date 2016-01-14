@@ -110,6 +110,8 @@ public class PreprocessingLexer implements Lexer
 	private void parse() 
 	{
 		unprocessedTokens.clear();
+		
+		// process tokens up to the next EOL or EOF (=full line)
 		while ( true ) 
 		{ 
 			final Token next = consume();
@@ -197,7 +199,9 @@ public class PreprocessingLexer implements Lexer
 						        if ( ! isValidIdentifier( lexer.peek() ) ) {
 			                          throw new ParseException("Expected an identifier", lexer.peek() );
 						        }
-						        argumentNames.add( consume() );
+						        final Token argName = consume();
+						        tokens.add( argName );
+                                argumentNames.add( argName );
 						        skipWhitespace( tokens );
 						        if ( ! lexer.peek( TokenType.COMMA ) ) {
 						            break;
@@ -210,7 +214,9 @@ public class PreprocessingLexer implements Lexer
 						    {
 						        throw new ParseException("Unclosed macro definition", lexer.peek() );
 						    }
+						    tokens.add( consume() );
 						}
+	                    skipWhitespace( tokens );						
 						final List<Token> macroBody = new ArrayList<>();
 						processTokensUntilEndOfLine( t -> {
 							macroBody.add(t);
@@ -283,23 +289,26 @@ public class PreprocessingLexer implements Lexer
 		boolean anyIdentifiersExpanded = false;
 		
 		int totalOffset = 0;
-		for (int i = 0,len=tokens.size(); i < len ; i++) 
+		for (int tokenIdx = 0 ; tokenIdx < tokens.size() ; tokenIdx++) 
 		{
-			final Token tok = tokens.get(i);
-			if ( isValidIdentifier( tok ) ) // check whether the identifier refers to a macro definition
+			final Token macroName = tokens.get(tokenIdx);
+			if ( isValidIdentifier( macroName ) ) // check whether the identifier refers to a macro definition
 			{
-			    final Optional<Symbol> optSymbol = symbols.maybeGet( new Identifier( tok.value ) );
-				if ( ! optSymbol.isPresent() || alreadyExpandedMacros.contains( tok.value ) ) // prevent infinite expansion
+			    final Optional<Symbol> optSymbol = symbols.maybeGet( new Identifier( macroName.value ) );
+				if ( ! optSymbol.isPresent() || alreadyExpandedMacros.contains( macroName.value ) ) // prevent infinite expansion
 				{
 					continue;
 				}
+                expanded.add( macroName.value );
+                anyIdentifiersExpanded = true;
+                
                 final Symbol symbol = optSymbol.get();
                 final MacroDefinition macroDef = (MacroDefinition) symbol.getValue();		
                 
 				// check whether first non-whitespace token is opening parenthesis (=start of argument list) 
 				boolean hasParameters=false;
-				int openingParensIdx = i+1;
-				for ( ; openingParensIdx < len ; openingParensIdx++) 
+				int openingParensIdx = tokenIdx+1;
+				for ( final int len = tokens.size() ; openingParensIdx < len ; openingParensIdx++) 
 				{
 				    if ( ! isWhitespace( tokens.get(openingParensIdx) ) ) {
 				        hasParameters = tokens.get(openingParensIdx).hasType( TokenType.PARENS_OPEN );
@@ -309,15 +318,15 @@ public class PreprocessingLexer implements Lexer
 				
 				// parse argument list (if any)
 				final List<List<Token>> macroParameters;
+                int lastArgIdx = hasParameters ? openingParensIdx+1 : tokenIdx;
 				if ( hasParameters ) 
 				{
 				    macroParameters = new ArrayList<>();
 				    List<Token> currentArg = new ArrayList<>();
-				    int k = openingParensIdx+1;
 				    boolean commaExpected = false;
-				    for ( ; k < len ; k++ ) 
+				    for ( final int len = tokens.size() ; lastArgIdx < len ; lastArgIdx++ ) 
 				    {
-				        final Token arg = tokens.get(k);
+				        final Token arg = tokens.get(lastArgIdx);
 				        if ( isWhitespace(arg ) ) {
 				            continue;
 				        }
@@ -341,63 +350,58 @@ public class PreprocessingLexer implements Lexer
 				    if ( ! currentArg.isEmpty() ) {
 				        macroParameters.add( currentArg );
 				    }
-				    if ( k >= len || ! tokens.get(k).hasType( TokenType.PARENS_CLOSE ) ) 
+				    if ( lastArgIdx >= tokens.size() || ! tokens.get(lastArgIdx).hasType( TokenType.PARENS_CLOSE ) ) 
 				    {
-				        throw new ParseException("Unterminated macro argument list", tokens.get(k-1) );
+				        throw new ParseException("Unterminated macro argument list", tokens.get(lastArgIdx-1) );
 				    }
 				} else {
 				    macroParameters = Collections.emptyList();
 				}
+				
                 if( macroParameters.size() != macroDef.parameterNames.size() ) 
                 {
-                    throw new ParseException("Expected "+macroDef.parameterNames.size()+" arguments but got "+macroParameters.size(),tok);
+                    throw new ParseException("Expected "+macroDef.parameterNames.size()+" arguments but got "+macroParameters.size(),macroName);
                 }				
 
-				final List<Token> body = macroDef.tokens;
+				final List<Token> macroBody = macroDef.tokens;
 				
-				expanded.add( tok.value );
-				anyIdentifiersExpanded = true;
 				final int expandedLength;
-				if ( body.isEmpty() ) 
+				int replacedTokensLen = 0;
+				if ( macroBody.isEmpty() ) // expand #define IDENTIFIER
 				{
-					expandedLength= 1;
-					tokens.set( i , new Token( TokenType.DIGITS , "1" , tok.offset ) );
+					expandedLength= 1; // just replace the identifier with '1'
+					replacedTokensLen = macroName.value.length();
+					tokens.set( tokenIdx , new Token( TokenType.DIGITS , "1" , macroName.offset ) );
 				} 
 				else 
 				{
-					tokens.remove( i );
-					int offset = tok.offset;
-					int ptr = i;
-					for ( int j = 0 ; j < body.size() ; j++ ) 
+				    // expand #define IDENTIFIER(a,b,...) EXPRESSION
+				    for ( int count = lastArgIdx ; count >= tokenIdx ; count-- ) {
+				        replacedTokensLen += tokens.remove( tokenIdx ).value.length();
+				    }
+					int offset = macroName.offset;
+					int ptr = tokenIdx;
+					for ( int j = 0 ; j < macroBody.size() ; j++ ) 
 					{
-						final Token bodyToken = body.get(j );
+						final Token bodyToken = macroBody.get(j );
+						// check whether a token from the macro body needs to replaced with a parameter from the invocation
 						final int paramIdx = isValidIdentifier( bodyToken ) ? macroDef.getIndexForParameterName( bodyToken.value ) : -1;
-						if ( paramIdx == -1 ) {
-						    final Token exp = bodyToken.copyWithOffset( offset );
-						    offset += exp.value.length();
-						    tokens.add( ptr , exp );
-						    ptr += 1;
-						    i++;
-						} 
-						else 
-						{
-						    final List<Token> paramValues = macroParameters.get(paramIdx );
-                            for ( Token paramValue: paramValues ) 
-						    {
-				                  final Token expr = paramValue.copyWithOffset( offset );
-		                          offset += expr.value.length();
-		                          tokens.add( ptr , expr );
-		                          ptr += 1;
-						    }
-                            i += paramValues.size();
-						}
+						final List<Token> paramValues = paramIdx == -1 ? Collections.singletonList( bodyToken ) : macroParameters.get(paramIdx );
+                        for (int i = paramValues.size()-1 ; i >= 0 ; i--) { // iterate in reverse order , tokens.add(index,tok ) will reverse the order again
+                            Token paramValue = paramValues.get(i);
+                            final Token expr = paramValue.copyWithOffset( offset );
+	                          offset += expr.value.length();
+	                          tokens.add( ptr , expr );
+	                          ptr += 1;
+                        }
+                        tokenIdx += paramValues.size();
 					}
-					expandedLength = offset-tok.offset;
+					expandedLength = offset-macroName.offset;
 				}
 				// calculate delta between size of expanded identifier and expansion
-				final int delta = expandedLength - tok.value.length();
+				final int delta = expandedLength - replacedTokensLen;
 				// adjust any tokens remaining in our queue
-				for (int j = i ; j < tokens.size() ; j++ ) {
+				for (int j = tokenIdx ; j < tokens.size() ; j++ ) {
 					tokens.get(j).offset += delta;
 				}
 				totalOffset += delta;
@@ -405,7 +409,7 @@ public class PreprocessingLexer implements Lexer
 		}
 		expansionOffset += totalOffset;
 		alreadyExpandedMacros.addAll( expanded );
-		if ( anyIdentifiersExpanded ) 
+		if ( anyIdentifiersExpanded ) // recursively try to expand more
 		{
 			expand( tokens , alreadyExpandedMacros );
 		}

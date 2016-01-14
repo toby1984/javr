@@ -77,6 +77,42 @@ public class PreprocessingLexerTest extends TestCase
 		assertFalse( tokens.hasNext() );
 	}	
 	
+    public void testMacroBodyIsExpandedOnlyOnce() 
+    {
+        final Iterator<Token> tokens = lex("#define a a\n"
+                + "a").iterator();
+        assertToken(TokenType.HASH,"#",0,tokens);
+        assertToken(TokenType.TEXT,"define",1,tokens);
+        assertToken(TokenType.TEXT,"a",8,tokens);
+        assertToken(TokenType.TEXT,"a",10,tokens);
+        assertToken(TokenType.EOL,"\n",11,tokens);
+        assertToken(TokenType.TEXT,"a",12,tokens);
+        assertToken(TokenType.EOF,"",13,tokens);
+        assertFalse( tokens.hasNext() );
+    }	
+    
+    public void testMacroBodyIsExpandedRecursively() 
+    {
+        final Iterator<Token> tokens = lex("#define b c\n"
+                + "#define a b\n"
+                + "a").iterator();
+        assertToken(TokenType.HASH,"#",0,tokens);
+        assertToken(TokenType.TEXT,"define",1,tokens);
+        assertToken(TokenType.TEXT,"b",8,tokens);
+        assertToken(TokenType.TEXT,"c",10,tokens);
+        assertToken(TokenType.EOL,"\n",11,tokens);
+        //
+        assertToken(TokenType.HASH,"#",12,tokens);
+        assertToken(TokenType.TEXT,"define",13,tokens);
+        assertToken(TokenType.TEXT,"a",20,tokens);
+        assertToken(TokenType.TEXT,"b",22,tokens);
+        assertToken(TokenType.EOL,"\n",23,tokens);        
+        //
+        assertToken(TokenType.TEXT,"c",24,tokens);
+        assertToken(TokenType.EOF,"",25,tokens);
+        assertFalse( tokens.hasNext() );
+    }    
+	
 	public void testExpandDefineWithLongValue() 
 	{
 		final Iterator<Token> tokens = lex("#define a xxxxx\n"
@@ -129,17 +165,66 @@ public class PreprocessingLexerTest extends TestCase
                 + "func(2)").iterator();
         assertToken(TokenType.HASH,"#",0,tokens);
         assertToken(TokenType.TEXT,"define",1,tokens);
-        assertToken(TokenType.TEXT,"TEST",8,tokens);
-        assertToken(TokenType.TEXT,"y",13,tokens);
-        assertToken(TokenType.OPERATOR,"+",14,tokens);
-        assertToken(TokenType.TEXT,"y",15,tokens);
-        assertToken(TokenType.EOL,"\n",16,tokens);
-        assertToken(TokenType.TEXT,"y",17,tokens);
-        assertToken(TokenType.OPERATOR,"+",18,tokens);
-        assertToken(TokenType.TEXT,"y",19,tokens);
-        assertToken(TokenType.EOF,"",20,tokens);
+        assertToken(TokenType.TEXT,"func",8,tokens);
+        assertToken(TokenType.PARENS_OPEN,"(",12,tokens);
+        assertToken(TokenType.TEXT,"x",13,tokens);
+        assertToken(TokenType.PARENS_CLOSE,")",14,tokens);
+        assertToken(TokenType.TEXT,"x",16,tokens);
+        assertToken(TokenType.OPERATOR,"+",17,tokens);
+        assertToken(TokenType.TEXT,"x",18,tokens);
+        assertToken(TokenType.EOL,"\n",19,tokens);
+        assertToken(TokenType.DIGITS,"2",20,tokens);
+        assertToken(TokenType.OPERATOR,"+",21,tokens);
+        assertToken(TokenType.DIGITS,"2",22,tokens);
+        assertToken(TokenType.EOF,"",23,tokens);
         assertFalse( tokens.hasNext() );
     }	
+    
+    public void testExpandMacroWithTwoArgs() 
+    {
+        final Iterator<Token> tokens = lex("#define func(a,b) a+b\n"
+                + "func(1,2)").iterator();
+        assertToken(TokenType.HASH,"#",0,tokens);
+        assertToken(TokenType.TEXT,"define",1,tokens);
+        assertToken(TokenType.TEXT,"func",8,tokens);
+        assertToken(TokenType.PARENS_OPEN,"(",12,tokens);
+        assertToken(TokenType.TEXT,"a",13,tokens);
+        assertToken(TokenType.COMMA,",",14,tokens);
+        assertToken(TokenType.TEXT,"b",15,tokens);
+        assertToken(TokenType.PARENS_CLOSE,")",16,tokens);
+        assertToken(TokenType.TEXT,"a",18,tokens);
+        assertToken(TokenType.OPERATOR,"+",19,tokens);
+        assertToken(TokenType.TEXT,"b",20,tokens);
+        assertToken(TokenType.EOL,"\n",21,tokens);
+        assertToken(TokenType.DIGITS,"1",22,tokens);
+        assertToken(TokenType.OPERATOR,"+",23,tokens);
+        assertToken(TokenType.DIGITS,"2",24,tokens);
+        assertToken(TokenType.EOF,"",25,tokens);
+        assertFalse( tokens.hasNext() );
+    }   
+    
+    public void testExpandMacroWithTwoArgsAndWhiteSpace() 
+    {
+        final Iterator<Token> tokens = lex("#define func(a,b) a + b\n"
+                + "func(1,2)").iterator();
+        assertToken(TokenType.HASH,"#",0,tokens);
+        assertToken(TokenType.TEXT,"define",1,tokens);
+        assertToken(TokenType.TEXT,"func",8,tokens);
+        assertToken(TokenType.PARENS_OPEN,"(",12,tokens);
+        assertToken(TokenType.TEXT,"a",13,tokens);
+        assertToken(TokenType.COMMA,",",14,tokens);
+        assertToken(TokenType.TEXT,"b",15,tokens);
+        assertToken(TokenType.PARENS_CLOSE,")",16,tokens);
+        assertToken(TokenType.TEXT,"a",18,tokens);
+        assertToken(TokenType.OPERATOR,"+",20,tokens);
+        assertToken(TokenType.TEXT,"b",22,tokens);
+        assertToken(TokenType.EOL,"\n",23,tokens);
+        assertToken(TokenType.DIGITS,"1",24,tokens);
+        assertToken(TokenType.OPERATOR,"+",26,tokens);
+        assertToken(TokenType.DIGITS,"2",28,tokens);
+        assertToken(TokenType.EOF,"",29,tokens);
+        assertFalse( tokens.hasNext() );
+    }    
 	
 	private void assertToken(TokenType t,String value,int offset,Iterator<Token> it) 
 	{
@@ -151,8 +236,9 @@ public class PreprocessingLexerTest extends TestCase
 	
 	private List<Token> lex(String s) 
 	{
-		CompilationUnit unit = new CompilationUnit( new StringResource("dummy",s) );
-		final Lexer lexer = new PreprocessingLexer( new LexerImpl( new Scanner(s) ) , unit , new ATMega88() );
+		final StringResource resource = new StringResource("dummy",s);
+        CompilationUnit unit = new CompilationUnit( resource );
+		final Lexer lexer = new PreprocessingLexer( new LexerImpl( new Scanner(resource ) ) , unit , new ATMega88() );
 		final List<Token> result = new ArrayList<>();
 		while(true) 
 		{

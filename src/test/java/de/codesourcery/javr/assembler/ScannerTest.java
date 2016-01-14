@@ -16,10 +16,12 @@
 package de.codesourcery.javr.assembler;
 
 import static org.junit.Assert.*;
+
 import org.junit.Test;
 
 import de.codesourcery.javr.assembler.exceptions.ParseException;
 import de.codesourcery.javr.assembler.parser.Scanner;
+import de.codesourcery.javr.assembler.util.StringResource;
 
 public class ScannerTest
 {
@@ -34,14 +36,14 @@ public class ScannerTest
     @Test
     public void testEmptyStringWorks()
     {
-        this.s = new Scanner( "" );
+        this.s = new Scanner( new StringResource("dummy","") , 3 );
         assertEOF();
     }
 
     @Test
     public void testPeekAndNext()
     {
-        this.s = new Scanner( "abc" );
+        this.s = new Scanner( new StringResource("dummy","abc") , 3 );
         assertFalse( this.s.eof() );
         assertEquals( 'a' , this.s.peek() );
         assertEquals( 'a' , this.s.next() );
@@ -55,7 +57,7 @@ public class ScannerTest
     @Test
     public void testPushback()
     {
-        this.s = new Scanner( "a" );
+        this.s = new Scanner( new StringResource("dummy","a" ) , 3 );
         assertFalse( this.s.eof() );
         assertEquals( 'a' , this.s.next() );
         assertEquals( 1 , this.s.offset() );
@@ -64,6 +66,54 @@ public class ScannerTest
         assertFalse(this.s.eof() );
         assertEquals( 0 , this.s.offset() );
         assertEquals( 'a' , this.s.peek() );
+    }
+    
+    @Test
+    public void testReadSmallBuffer()
+    {
+        this.s = new Scanner( new StringResource("dummy","abc" ) , 3 );
+        assertFalse( this.s.eof() );
+        assertEquals( 'a' , this.s.next() );
+        assertEquals( 1 , this.s.offset() );
+        assertEquals( 'b' , this.s.next() );
+        assertEquals( 2 , this.s.offset() );
+        assertEquals( 'c' , this.s.next() );
+        assertEquals( 3 , this.s.offset() );        
+        assertEOF();
+    }    
+    
+    @Test
+    public void testSetOffsetWithBackTrack()
+    {
+        this.s = new Scanner( new StringResource("dummy","0123456789abcdefgh" ) , 4 );
+        assertFalse( this.s.eof() );
+        assertEquals( '0' , this.s.next() );
+        assertEquals( 1 , this.s.offset() );
+        assertEquals( '1' , this.s.next() );
+        assertEquals( 2 , this.s.offset() );
+        assertEquals( '2' , this.s.next() );
+        assertEquals( 3 , this.s.offset() );    
+        assertEquals( '3' , this.s.next() );
+        assertEquals( 4 , this.s.offset() );
+        assertEquals( '4' , this.s.next() );
+        assertEquals( 5 , this.s.offset() );
+        
+        s.setOffset( 3 );
+        
+        assertEquals( 3 , this.s.offset() );
+        assertEquals( '3' , this.s.next() );
+    } 
+    
+    private void assertEquals(int expected,int actual) {
+        if ( expected != actual ) {
+            fail("Expected "+expected+" but got "+actual);
+        }
+    }    
+    
+    private void assertEquals(char expected,char actual) {
+        if ( expected != actual ) {
+            fail("Expected '"+expected+"' but got '"+actual+"'");
+        }
     }
 
     private void assertEOF()

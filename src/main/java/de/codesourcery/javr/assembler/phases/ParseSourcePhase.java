@@ -1,10 +1,7 @@
 package de.codesourcery.javr.assembler.phases;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.CompilationUnit;
@@ -13,7 +10,6 @@ import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.Parser;
 import de.codesourcery.javr.assembler.parser.PreprocessingLexer;
 import de.codesourcery.javr.assembler.parser.Scanner;
-import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.ui.IConfig;
 import de.codesourcery.javr.ui.IConfigProvider;
 
@@ -40,13 +36,7 @@ public class ParseSourcePhase implements Phase {
 
     public static void parseSource(CompilationUnit unit,IConfig config) throws IOException 
     {
-        final String input;
-        try ( ByteArrayOutputStream out = new ByteArrayOutputStream() ; InputStream in = unit.getResource().createInputStream() ) 
-        {
-            IOUtils.copy( in , out );
-            input = new String( out.toByteArray() );
-        }
-        final Scanner scanner = new Scanner( input );
+        final Scanner scanner = new Scanner( unit.getResource() );
         
         final Lexer lexer = new PreprocessingLexer(config.createLexer( scanner ) , unit , config.getArchitecture() );
         final Parser parser = config.createParser();

@@ -15,37 +15,137 @@
  */
 package de.codesourcery.javr.assembler.parser;
 
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.exceptions.ParseException;
+import de.codesourcery.javr.assembler.util.Resource;
 
 public class Scanner {
 
-    private final String input;
+    private int bufferSize = 1024;
+    private int backTrackSize = bufferSize/2; // how many bytes one may go back via setOffset(int)
+    
+    private final char[] buffer;
+    
+    private int readPtr;
+    private int writePtr;
+    private int bytesAvailable;    
+    
+    private int totalBytesRead;
+    
+    private final Resource resource;
+    private final Reader input;
     private int offset;
+    private boolean eofReached = false;
     
-    public Scanner(String input) 
+    public Scanner(Resource res) 
     {
-        Validate.notNull(input, "input must not be NULL");
-        this.input=input;
+        this(res,1024);
     }
-    
-    public boolean eof() {
-        return offset >= input.length();
-    }
-    
-    public void pushBack() {
-        if ( offset == 0 ) {
-            throw new IllegalStateException("Cannot push back at offset 0");
+    public Scanner(Resource res,int bufferSize) 
+    {
+        Validate.notNull(res, "res must not be NULL");
+        if ( bufferSize < 3 ) {
+            throw new RuntimeException("Buffer size needs to be at least 3 bytes");
         }
-        offset--;
+        this.resource = res;
+        this.bufferSize = bufferSize;
+        this.buffer = new char[bufferSize];
+        this.backTrackSize = this.bufferSize/2;
+        try {
+            this.input = new InputStreamReader( res.createInputStream() , res.getEncoding() );
+            fillBuffer();
+        } catch(IOException e) {
+            throw new ParseException("Failed to read input stream",0,e);
+        }
     }
     
-    public char peek() {
+    public Resource getResource() {
+        return resource;
+    }
+    
+    private void fillBuffer() 
+    {
+        if ( eofReached ) 
+        {
+            return;
+        }
+        
+        try 
+        {
+            final int spaceInBuffer = bufferSize - bytesAvailable;
+            // don't fill the whole remaining space as this would make backtracking past the current
+            // readPtr location impossible (because it would overwrite old data) 
+            final int bytesToRead = Math.min( spaceInBuffer , backTrackSize );
+            System.out.println("Going to fetch "+bytesToRead+" bytes at write offset "+writePtr);
+            
+            if ( (writePtr+bytesToRead) < bufferSize ) {
+                final int bytesRead = input.read( buffer , writePtr , bytesToRead );
+                if ( bytesRead <= 0 ) 
+                {
+                    closeQuietly();
+                    return;
+                }
+                totalBytesRead += bytesRead;
+                bytesAvailable += bytesRead;  
+                writePtr += bytesRead;
+                return;
+            } 
+            final int firstSliceLen = bufferSize - writePtr;
+            int bytesRead = input.read( buffer , writePtr , firstSliceLen );
+            if ( bytesRead <= 0 ) 
+            {
+                closeQuietly();
+                return;
+            }
+            final int secondSliceLen = bytesToRead - firstSliceLen;
+            final int len = input.read( buffer , 0 , secondSliceLen );
+            if ( len > 0 ) {
+                bytesRead += len;
+            } else {
+                closeQuietly();
+            }
+            totalBytesRead += bytesRead;            
+            bytesAvailable += bytesRead;                
+            writePtr = (writePtr+bytesRead)%bufferSize;
+        } 
+        catch(IOException e) 
+        {
+            bytesAvailable = 0;
+            closeQuietly();
+            throw new ParseException("Failed to read input stream @ "+offset,offset,e);
+        }
+    }
+    
+    private void closeQuietly() 
+    {
+        eofReached = true;
+        try { input.close(); } catch(IOException e) { /* can't help it */ }
+    }
+    
+    public boolean eof() 
+    {
+        if ( bytesAvailable == 0 ) 
+        {
+            if ( eofReached ) {
+                return true;
+            }
+            fillBuffer();
+            return bytesAvailable == 0 && eofReached;
+        }
+        return false;
+    }
+    
+    public char peek() 
+    {
         if ( eof() ) {
             throw new ParseException("Already at end of input",offset);
         }        
-        return input.charAt( offset );
+        return buffer[ readPtr ];
     }
     
     public char next() 
@@ -53,17 +153,59 @@ public class Scanner {
         if ( eof() ) {
             throw new ParseException("Already at end of input",offset);
         }
-        return input.charAt( offset++ );
+        final char result = buffer[readPtr];
+        offset++;
+        readPtr = ( readPtr +1 ) % bufferSize;
+        bytesAvailable--;
+        return result;
     }
     
     public int offset() {
         return offset;
     }
+
+    public void pushBack() 
+    {
+        setOffset(this.offset-1);
+    }    
     
-    public void setOffset(int offset) {
-        if ( offset < 0 ) {
-            throw new IllegalArgumentException("Invalid offset: "+offset);
+    public void setOffset(int offset) 
+    {
+        if ( offset > this.offset ) {
+            throw new IllegalArgumentException("Cannot jump forward");
         }
-        this.offset = offset;
+        if ( offset < 0 ) {
+            throw new IllegalStateException("Cannot go back to past start of buffer, offset: "+offset);
+        }        
+        final int delta = this.offset - offset;
+        if ( this.offset - delta < 0 ) {
+            throw new IllegalStateException("Cannot go back to offset "+delta+" characters,would be past start of buffer");            
+        }
+        final int writeEnd;
+        if (totalBytesRead > bufferSize) 
+        {
+            writeEnd = totalBytesRead % bufferSize;
+        } else {
+            writeEnd = 0;
+        }
+        
+        int newPtr = readPtr;
+        for( int toSkip = delta; toSkip > 0 ; toSkip-- ) 
+        {
+            if ( newPtr == writeEnd-1 ) {
+                throw new IllegalStateException("Cannot go back to offset "+delta+" characters,would be past start of buffer");
+            }
+            if ( delta > 0 ) {
+                newPtr--;
+                if ( newPtr < 0 ) {
+                    newPtr += bufferSize;
+                }
+            } else {
+                newPtr = (newPtr+1) % bufferSize;
+            }
+        }
+        readPtr = newPtr;
+        bytesAvailable += delta;
+        this.offset -= delta;
     }
 }

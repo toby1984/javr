@@ -1090,7 +1090,8 @@ public class ParserTest
     private AST parse(String s) 
     {
         final Parser p = new Parser(arch);
-        CompilationUnit unit = new CompilationUnit( new StringResource("dummy", s) );
-        return p.parse( unit , new LexerImpl(new Scanner(s) ) );
+        final StringResource resource = new StringResource("dummy", s);
+        CompilationUnit unit = new CompilationUnit( resource );
+        return p.parse( unit , new LexerImpl(new Scanner(resource) ) );
     }
 }

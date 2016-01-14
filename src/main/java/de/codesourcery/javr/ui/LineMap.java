@@ -26,6 +26,7 @@ import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.parser.Token;
 import de.codesourcery.javr.assembler.parser.TokenType;
+import de.codesourcery.javr.assembler.util.StringResource;
 
 public class LineMap 
 {
@@ -74,7 +75,7 @@ public class LineMap
         
         if ( source != null ) 
         {
-            final Scanner scanner = new Scanner( source );
+            final Scanner scanner = new Scanner( new StringResource( "dummy" , source ) );
             final Lexer lexer = provider.getConfig().createLexer( scanner );
             int offset = 0;
             int line = 1;
