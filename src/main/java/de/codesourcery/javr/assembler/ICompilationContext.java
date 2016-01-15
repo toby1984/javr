@@ -72,7 +72,15 @@ public interface ICompilationContext
     
     public void popCompilationUnit();
     
-    public CompilationUnit getOrCreateCompilationUnit(Resource res);
+    /**
+     * 
+     * @param res
+     * 
+     * @return always a new <code>CompilationUnit</code> instance (important for #include processing
+     * since the same compilation unit may be expanded differently depending on which macros
+     * are #define'd or #undef'ined
+     */
+    public CompilationUnit newCompilationUnit(Resource res);
     
     // misc
     public ResourceFactory getResourceFactory();

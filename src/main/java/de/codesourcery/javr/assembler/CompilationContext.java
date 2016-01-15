@@ -58,22 +58,9 @@ public final class CompilationContext implements ICompilationContext
     }
     
     @Override
-    public CompilationUnit getOrCreateCompilationUnit(Resource res) 
+    public CompilationUnit newCompilationUnit(Resource res) 
     {
-        if ( currentCompilationUnit().getResource().equals( res ) ) {
-            return currentCompilationUnit();
-        }
-        final Stack<CompilationUnit> units = new Stack<>();
-        units.push( currentCompilationUnit() );
-        while ( ! units.isEmpty() ) 
-        {
-            CompilationUnit u = units.pop();
-            if ( res.equals( u.getResource() ) ) {
-                return u;
-            }
-            units.addAll( u.getDependencies() );
-        }
-        return new CompilationUnit( res );
+        return new CompilationUnit( res , currentCompilationUnit().getSymbolTable() );
     }
     
     @Override

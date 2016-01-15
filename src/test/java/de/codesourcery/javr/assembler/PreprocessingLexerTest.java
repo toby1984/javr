@@ -55,7 +55,7 @@ public class PreprocessingLexerTest extends TestCase
     
     private final ICompilationContext fakeContext = new ICompilationContext() {
 
-        public CompilationUnit getOrCreateCompilationUnit(de.codesourcery.javr.assembler.util.Resource res) 
+        public CompilationUnit newCompilationUnit(de.codesourcery.javr.assembler.util.Resource res) 
         {
             return unitFactory.apply( res );
         };
