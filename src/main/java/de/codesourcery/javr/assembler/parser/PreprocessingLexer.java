@@ -673,7 +673,7 @@ public class PreprocessingLexer implements Lexer
                         // check whether a token from the macro body needs to replaced with a parameter from the invocation
                         final int paramIdx = bodyToken.isValidIdentifier() ? macroDef.getIndexForParameterName( bodyToken.value ) : -1;
                         final List<Token> paramValues = paramIdx == -1 ? Collections.singletonList( bodyToken ) : macroParameters.get(paramIdx );
-                        for (int i = paramValues.size()-1 ; i >= 0 ; i--) { // iterate in reverse order , tokens.add(index,tok ) will reverse the order again
+                        for (int i = paramValues.size()-1 ; i >= 0 ; i--) { // iterate in reverse order , tokens.add(ptr,expr) will reverse the order again
                             Token paramValue = paramValues.get(i);
                             final Token expr = paramValue.copyWithOffset( offset );
                             offset += expr.value.length();
