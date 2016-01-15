@@ -25,7 +25,6 @@ import de.codesourcery.javr.assembler.util.StringResource;
 
 public class ScannerTest
 {
-
     private Scanner s;
 
     @Test(expected=NullPointerException.class)
@@ -103,6 +102,52 @@ public class ScannerTest
         assertEquals( 3 , this.s.offset() );
         assertEquals( '3' , this.s.next() );
     } 
+    
+    @Test
+    public void testBackTrackingToMuchFails()
+    {
+    	// buffer size is 2
+    	// backtracking is possible -2 bytes (bufferSize/2) past start of current region
+        this.s = new Scanner( new StringResource("dummy","0123456" ) , 4 );
+        assertFalse( this.s.eof() );
+        assertEquals( '0' , this.s.next() );
+        assertEquals( 1 , this.s.offset() );
+        assertEquals( '1' , this.s.next() );
+        assertEquals( 2 , this.s.offset() );
+        assertEquals( '2' , this.s.next() );
+        assertEquals( 3 , this.s.offset() );    
+        assertEquals( '3' , this.s.next() );
+        assertEquals( 4 , this.s.offset() );
+        
+        assertEquals( '4' , this.s.next() );
+        assertEquals( 5 , this.s.offset() );
+        
+        assertEquals( '5' , this.s.next() );
+        assertEquals( 6 , this.s.offset() );
+        
+        s.setOffset( 2 ); 
+        assertEquals( '2' , this.s.peek() ); 
+
+        try {
+        	s.setOffset( 1 );
+        	fail("Should've failed");
+        } catch(IllegalStateException e) {
+        	// ok
+        }
+        
+        s.setOffset( 5 );
+        assertEquals( '5' , this.s.peek() );         
+        
+        try {
+        	s.setOffset( 7 );
+        	fail("Should've failed");
+        } catch(IllegalStateException e) {
+        	// ok
+        }      
+        assertEquals( '5' , this.s.next() );
+        assertEquals( '6' , this.s.next() );   
+        assertEOF();
+    }    
     
     private void assertEquals(int expected,int actual) {
         if ( expected != actual ) {

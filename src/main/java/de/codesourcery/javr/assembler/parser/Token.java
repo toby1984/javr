@@ -40,6 +40,36 @@ public final class Token {
         this.type = type;
     }
     
+    public boolean isValidIdentifier() 
+    {
+    	return type == TokenType.TEXT && Identifier.isValidIdentifier( this.value );
+    }
+    
+    public boolean isWhitespace() {
+    	return type == TokenType.WHITESPACE;
+    }
+    
+    public boolean isNoWhitespace() {
+    	return type != TokenType.WHITESPACE;
+    }    
+    
+    public boolean isEOL() {
+    	return type == TokenType.EOL;
+    }    
+    
+    public boolean isOperator() {
+    	return type == TokenType.OPERATOR;
+    }
+    
+    public boolean isEOF() {
+    	return type == TokenType.EOF;
+    }    
+    
+    public boolean isEOLorEOF() 
+    {
+    	return type == TokenType.EOL || type == TokenType.EOF;
+    }     
+    
     public Token copyWithOffset(int newOffset) {
     	return new Token(this.type , this.value , newOffset );
     }
@@ -68,17 +98,20 @@ public final class Token {
         return 31*result;
     }
     
-    public boolean hasType(TokenType t) {
+    public boolean is(TokenType t) {
         return t.equals( this.type );
     }
     
+    public boolean isNot(TokenType t) {
+        return ! t.equals( this.type );
+    }    
+    
     public boolean isOperator(String op) 
     {
-        Validate.notBlank(op, "op must not be NULL or blank");
-        return hasType( TokenType.OPERATOR ) && value.equals( op );
+        return is( TokenType.OPERATOR ) && op.equals( value );
     }
     
-    public boolean hasType(TokenType t1,TokenType... t2) 
+    public boolean is(TokenType t1,TokenType... t2) 
     {
         if ( t1.equals( this.type ) ) {
             return true;

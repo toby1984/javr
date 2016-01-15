@@ -1,16 +1,21 @@
 package de.codesourcery.javr.assembler;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.junit.Test;
+
 import de.codesourcery.javr.assembler.arch.impl.ATMega88;
+import de.codesourcery.javr.assembler.exceptions.ParseException;
 import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.LexerImpl;
 import de.codesourcery.javr.assembler.parser.PreprocessingLexer;
 import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.parser.Token;
 import de.codesourcery.javr.assembler.parser.TokenType;
+import de.codesourcery.javr.assembler.util.FileResourceFactory;
 import de.codesourcery.javr.assembler.util.StringResource;
 import junit.framework.TestCase;
 
@@ -18,14 +23,82 @@ public class PreprocessingLexerTest extends TestCase
 {
 	public void testEmptyString() 
 	{
-		final Iterator<Token> tokens = lex("").iterator();
+		final Iterator<Token> tokens = lex("");
 		assertEquals(  TokenType.EOF  , tokens.next().type );
 		assertFalse( tokens.hasNext() );
 	}
 	
+    @Test
+    public void testLexConditionalCompilationNotMatched() 
+    {
+		final Iterator<Token> tokens = lex("#if 1 > 2\nZ+\n#endif");
+		assertToken( TokenType.EOF, "" , 19 , tokens ); 
+		if ( tokens.hasNext() ) {
+			fail( "Expected EOF but got "+tokens.next() );
+		}
+    }   
+    
+    @Test
+    public void testLexConditionalCompilationNotMatchedIfDef() 
+    {
+		final Iterator<Token> tokens = lex("#ifdef test\nZ+\n#endif");
+		assertToken( TokenType.EOF, "" , 21 , tokens ); 
+		if ( tokens.hasNext() ) {
+			fail( "Expected EOF but got "+tokens.next() );
+		}
+    }     
+    
+    @Test
+    public void testLexConditionalCompilationMatchedIfDef() 
+    {
+		final Iterator<Token> tokens = lex("#define test\n#ifdef test\nZ+\n#endif");
+		assertToken( TokenType.TEXT , "Z" , 25 , tokens ); 
+		assertToken( TokenType.OPERATOR , "+" , 26 , tokens ); 
+		assertToken( TokenType.EOL , "\n" , 27 , tokens ); 
+		assertToken( TokenType.EOF, "" , 34 , tokens ); 
+		if ( tokens.hasNext() ) {
+			fail( "Expected EOF but got "+tokens.next() );
+		}
+    }     
+    
+    @Test
+    public void testLexConditionalCompilationMatched() 
+    {
+		final Iterator<Token> tokens = lex("#if 2 > 1\nZ+\n#endif");
+		assertToken( TokenType.TEXT , "Z" , 10 , tokens ); 
+		assertToken( TokenType.OPERATOR , "+" , 11 , tokens ); 
+		assertToken( TokenType.EOL , "\n" , 12 , tokens ); 
+		assertToken( TokenType.EOF, "" , 19 , tokens ); 
+		if ( tokens.hasNext() ) {
+			fail( "Expected EOF but got "+tokens.next() );
+		}
+    }     
+    
+    @Test
+    public void testLexMismatchEndif() 
+    {
+    	try {
+    		lex("#if 2 > 1\nZ+\n#endif\n#endif");
+    		fail("Should've failed");
+    	} catch(ParseException e) {
+    		assertTrue("Got: "+e.getMessage() , e.getMessage().contains( "#endif without matching #if" ) );
+    	}
+    } 
+    
+    @Test
+    public void testLexMismatchIf() 
+    {
+    	try {
+    		lex("#if 2 > 1\n#if 3 > 4\n#endif");
+    		fail("Should've failed");
+    	} catch(ParseException e) {
+    		assertTrue("Got: "+e.getMessage() , e.getMessage().contains( "Expected 1 more #endif" ) );
+    	}
+    }     
+	
 	public void testOnlineNewlines() 
 	{
-		final Iterator<Token> tokens = lex("\n\n\n").iterator();
+		final Iterator<Token> tokens = lex("\n\n\n");
 		assertEquals(  TokenType.EOL, tokens.next().type );
 		assertEquals(  TokenType.EOL, tokens.next().type );
 		assertEquals(  TokenType.EOL, tokens.next().type );
@@ -35,7 +108,7 @@ public class PreprocessingLexerTest extends TestCase
 	
 	public void testWhitespaceIsIgnored() 
 	{
-		final Iterator<Token> tokens = lex("a   b").iterator();
+		final Iterator<Token> tokens = lex("a   b");
 		assertToken(TokenType.TEXT,"a",0,tokens);
 		assertToken(TokenType.TEXT,"b",4,tokens);
 		assertToken(TokenType.EOF,"",5,tokens);
@@ -44,21 +117,14 @@ public class PreprocessingLexerTest extends TestCase
 	
 	public void testParseDefineWithNoValue() 
 	{
-		final Iterator<Token> tokens = lex("#define a").iterator();
-		assertToken(TokenType.HASH,"#",0,tokens);
-		assertToken(TokenType.TEXT,"define",1,tokens);
-		assertToken(TokenType.TEXT,"a",8,tokens);
+		final Iterator<Token> tokens = lex("#define a");
 		assertToken(TokenType.EOF,"",9,tokens);
 		assertFalse( tokens.hasNext() );
 	}	
 	
 	public void testParseDefineWithOneValue() 
 	{
-		final Iterator<Token> tokens = lex("#define a 42").iterator();
-		assertToken(TokenType.HASH,"#",0,tokens);
-		assertToken(TokenType.TEXT,"define",1,tokens);
-		assertToken(TokenType.TEXT,"a",8,tokens);
-		assertToken(TokenType.DIGITS,"42",10,tokens);
+		final Iterator<Token> tokens = lex("#define a 42");
 		assertToken(TokenType.EOF,"",12,tokens);
 		assertFalse( tokens.hasNext() );
 	}	
@@ -66,12 +132,7 @@ public class PreprocessingLexerTest extends TestCase
 	public void testExpandDefineWithOneValue() 
 	{
 		final Iterator<Token> tokens = lex("#define a 42\n"
-				+ "a").iterator();
-		assertToken(TokenType.HASH,"#",0,tokens);
-		assertToken(TokenType.TEXT,"define",1,tokens);
-		assertToken(TokenType.TEXT,"a",8,tokens);
-		assertToken(TokenType.DIGITS,"42",10,tokens);
-		assertToken(TokenType.EOL,"\n",12,tokens);
+				+ "a");
 		assertToken(TokenType.DIGITS,"42",13,tokens);
 		assertToken(TokenType.EOF,"",15,tokens);
 		assertFalse( tokens.hasNext() );
@@ -80,12 +141,7 @@ public class PreprocessingLexerTest extends TestCase
     public void testMacroBodyIsExpandedOnlyOnce() 
     {
         final Iterator<Token> tokens = lex("#define a a\n"
-                + "a").iterator();
-        assertToken(TokenType.HASH,"#",0,tokens);
-        assertToken(TokenType.TEXT,"define",1,tokens);
-        assertToken(TokenType.TEXT,"a",8,tokens);
-        assertToken(TokenType.TEXT,"a",10,tokens);
-        assertToken(TokenType.EOL,"\n",11,tokens);
+                + "a");
         assertToken(TokenType.TEXT,"a",12,tokens);
         assertToken(TokenType.EOF,"",13,tokens);
         assertFalse( tokens.hasNext() );
@@ -95,19 +151,7 @@ public class PreprocessingLexerTest extends TestCase
     {
         final Iterator<Token> tokens = lex("#define b c\n"
                 + "#define a b\n"
-                + "a").iterator();
-        assertToken(TokenType.HASH,"#",0,tokens);
-        assertToken(TokenType.TEXT,"define",1,tokens);
-        assertToken(TokenType.TEXT,"b",8,tokens);
-        assertToken(TokenType.TEXT,"c",10,tokens);
-        assertToken(TokenType.EOL,"\n",11,tokens);
-        //
-        assertToken(TokenType.HASH,"#",12,tokens);
-        assertToken(TokenType.TEXT,"define",13,tokens);
-        assertToken(TokenType.TEXT,"a",20,tokens);
-        assertToken(TokenType.TEXT,"b",22,tokens);
-        assertToken(TokenType.EOL,"\n",23,tokens);        
-        //
+                + "a");
         assertToken(TokenType.TEXT,"c",24,tokens);
         assertToken(TokenType.EOF,"",25,tokens);
         assertFalse( tokens.hasNext() );
@@ -116,12 +160,7 @@ public class PreprocessingLexerTest extends TestCase
 	public void testExpandDefineWithLongValue() 
 	{
 		final Iterator<Token> tokens = lex("#define a xxxxx\n"
-				+ "a").iterator();
-		assertToken(TokenType.HASH,"#",0,tokens);
-		assertToken(TokenType.TEXT,"define",1,tokens);
-		assertToken(TokenType.TEXT,"a",8,tokens);
-		assertToken(TokenType.TEXT,"xxxxx",10,tokens);
-		assertToken(TokenType.EOL,"\n",15,tokens);
+				+ "a");
 		assertToken(TokenType.TEXT,"xxxxx",16,tokens);
 		assertToken(TokenType.EOF,"",21,tokens);
 		assertFalse( tokens.hasNext() );
@@ -130,12 +169,7 @@ public class PreprocessingLexerTest extends TestCase
 	public void testExpandDefineWithShortValue() 
 	{
 		final Iterator<Token> tokens = lex("#define TEST X\n"
-				+ "TEST").iterator();
-		assertToken(TokenType.HASH,"#",0,tokens);
-		assertToken(TokenType.TEXT,"define",1,tokens);
-		assertToken(TokenType.TEXT,"TEST",8,tokens);
-		assertToken(TokenType.TEXT,"X",13,tokens);
-		assertToken(TokenType.EOL,"\n",14,tokens);
+				+ "TEST");
 		assertToken(TokenType.TEXT,"X",15,tokens);
 		assertToken(TokenType.EOF,"",16,tokens);
 		assertFalse( tokens.hasNext() );
@@ -144,14 +178,7 @@ public class PreprocessingLexerTest extends TestCase
 	public void testExpandDefineWithExpression() 
 	{
 		final Iterator<Token> tokens = lex("#define TEST y+y\n"
-				+ "TEST").iterator();
-		assertToken(TokenType.HASH,"#",0,tokens);
-		assertToken(TokenType.TEXT,"define",1,tokens);
-		assertToken(TokenType.TEXT,"TEST",8,tokens);
-		assertToken(TokenType.TEXT,"y",13,tokens);
-		assertToken(TokenType.OPERATOR,"+",14,tokens);
-		assertToken(TokenType.TEXT,"y",15,tokens);
-		assertToken(TokenType.EOL,"\n",16,tokens);
+				+ "TEST");
 		assertToken(TokenType.TEXT,"y",17,tokens);
 		assertToken(TokenType.OPERATOR,"+",18,tokens);
 		assertToken(TokenType.TEXT,"y",19,tokens);
@@ -162,17 +189,7 @@ public class PreprocessingLexerTest extends TestCase
     public void testExpandMacroWithOneArg() 
     {
         final Iterator<Token> tokens = lex("#define func(x) x+x\n"
-                + "func(2)").iterator();
-        assertToken(TokenType.HASH,"#",0,tokens);
-        assertToken(TokenType.TEXT,"define",1,tokens);
-        assertToken(TokenType.TEXT,"func",8,tokens);
-        assertToken(TokenType.PARENS_OPEN,"(",12,tokens);
-        assertToken(TokenType.TEXT,"x",13,tokens);
-        assertToken(TokenType.PARENS_CLOSE,")",14,tokens);
-        assertToken(TokenType.TEXT,"x",16,tokens);
-        assertToken(TokenType.OPERATOR,"+",17,tokens);
-        assertToken(TokenType.TEXT,"x",18,tokens);
-        assertToken(TokenType.EOL,"\n",19,tokens);
+                + "func(2)");
         assertToken(TokenType.DIGITS,"2",20,tokens);
         assertToken(TokenType.OPERATOR,"+",21,tokens);
         assertToken(TokenType.DIGITS,"2",22,tokens);
@@ -183,19 +200,7 @@ public class PreprocessingLexerTest extends TestCase
     public void testExpandMacroWithTwoArgs() 
     {
         final Iterator<Token> tokens = lex("#define func(a,b) a+b\n"
-                + "func(1,2)").iterator();
-        assertToken(TokenType.HASH,"#",0,tokens);
-        assertToken(TokenType.TEXT,"define",1,tokens);
-        assertToken(TokenType.TEXT,"func",8,tokens);
-        assertToken(TokenType.PARENS_OPEN,"(",12,tokens);
-        assertToken(TokenType.TEXT,"a",13,tokens);
-        assertToken(TokenType.COMMA,",",14,tokens);
-        assertToken(TokenType.TEXT,"b",15,tokens);
-        assertToken(TokenType.PARENS_CLOSE,")",16,tokens);
-        assertToken(TokenType.TEXT,"a",18,tokens);
-        assertToken(TokenType.OPERATOR,"+",19,tokens);
-        assertToken(TokenType.TEXT,"b",20,tokens);
-        assertToken(TokenType.EOL,"\n",21,tokens);
+                + "func(1,2)");
         assertToken(TokenType.DIGITS,"1",22,tokens);
         assertToken(TokenType.OPERATOR,"+",23,tokens);
         assertToken(TokenType.DIGITS,"2",24,tokens);
@@ -206,19 +211,7 @@ public class PreprocessingLexerTest extends TestCase
     public void testExpandMacroWithTwoArgsAndWhiteSpace() 
     {
         final Iterator<Token> tokens = lex("#define func(a,b) a + b\n"
-                + "func(1,2)").iterator();
-        assertToken(TokenType.HASH,"#",0,tokens);
-        assertToken(TokenType.TEXT,"define",1,tokens);
-        assertToken(TokenType.TEXT,"func",8,tokens);
-        assertToken(TokenType.PARENS_OPEN,"(",12,tokens);
-        assertToken(TokenType.TEXT,"a",13,tokens);
-        assertToken(TokenType.COMMA,",",14,tokens);
-        assertToken(TokenType.TEXT,"b",15,tokens);
-        assertToken(TokenType.PARENS_CLOSE,")",16,tokens);
-        assertToken(TokenType.TEXT,"a",18,tokens);
-        assertToken(TokenType.OPERATOR,"+",20,tokens);
-        assertToken(TokenType.TEXT,"b",22,tokens);
-        assertToken(TokenType.EOL,"\n",23,tokens);
+                + "func(1,2)");
         assertToken(TokenType.DIGITS,"1",24,tokens);
         assertToken(TokenType.OPERATOR,"+",26,tokens);
         assertToken(TokenType.DIGITS,"2",28,tokens);
@@ -234,18 +227,36 @@ public class PreprocessingLexerTest extends TestCase
 		assertEquals( offset , tok.offset);
 	}
 	
-	private List<Token> lex(String s) 
+	private Iterator<Token> lex(String s) 
 	{
 		final StringResource resource = new StringResource("dummy",s);
         CompilationUnit unit = new CompilationUnit( resource );
-		final Lexer lexer = new PreprocessingLexer( new LexerImpl( new Scanner(resource ) ) , unit , new ATMega88() );
+        final ResourceFactory resFactory = FileResourceFactory.createInstance(new File("/"));
+        final LexerImpl delegate = new LexerImpl( new Scanner(resource ) );
+		final Lexer lexer = new PreprocessingLexer( delegate , unit , new ATMega88() , resFactory );
 		final List<Token> result = new ArrayList<>();
 		while(true) 
 		{
 			Token tok = lexer.next();
 			result.add( tok );
-			if ( tok.hasType(TokenType.EOF ) ) {
-				return result;
+			if ( tok.is(TokenType.EOF ) ) 
+			{
+				return new Iterator<Token>() {
+
+					private final Iterator<Token> wrapped = result.iterator();
+					
+					@Override
+					public boolean hasNext() {
+						return wrapped.hasNext();
+					}
+
+					@Override
+					public Token next() {
+						final Token result = wrapped.next();
+						System.out.println( result );
+						return result;
+					}
+				};
 			}
 		}
 	}

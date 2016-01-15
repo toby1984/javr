@@ -192,8 +192,8 @@ public class LexerTest {
     private void assertEOF() 
     {
         assertTrue( lexer.eof() );
-        lexer.peek().hasType(TokenType.EOF);
-        lexer.next().hasType(TokenType.EOF);
+        lexer.peek().is(TokenType.EOF);
+        lexer.next().is(TokenType.EOF);
     }
     
     private List<Token> lexAll(String s) 

@@ -22,7 +22,7 @@ import org.apache.commons.lang3.Validate;
 
 public class LexerImpl implements Lexer 
 {
-    public static final boolean DEBUG = false;
+    public static final boolean DEBUG = true;
     
     private final Scanner scanner;
     
@@ -43,7 +43,7 @@ public class LexerImpl implements Lexer
     public boolean eof() 
     {
         parseTokens();
-        return tokens.get(0).hasType( TokenType.EOF );
+        return tokens.get(0).is( TokenType.EOF );
     }
     
     /* (non-Javadoc)
@@ -68,7 +68,7 @@ public class LexerImpl implements Lexer
 	 * @see de.codesourcery.javr.assembler.parser.LexerIf#peek(de.codesourcery.javr.assembler.parser.TokenType)
 	 */
     public boolean peek(TokenType t) {
-        return peek().hasType( t ); 
+        return peek().is( t ); 
     }
     
     private static boolean isWhitespace(char c) 
@@ -226,16 +226,31 @@ outer:
     public void setIgnoreWhitespace(boolean ignoreWhitespace) 
     {
         if ( DEBUG ) {
-            System.out.println("setIgnoreWhitespace( "+ignoreWhitespace+" )");
+            System.out.println("setIgnoreWhitespace(): ignore="+this.ignoreWhitespace+" => ignore="+ignoreWhitespace);
+        }
+        if ( this.ignoreWhitespace == ignoreWhitespace ) {
+        	return;
+        }
+        if ( this.ignoreWhitespace && ! ignoreWhitespace ) 
+        {
+        	// change: ignore whitespace -> do not ignore
+            if ( ! tokens.isEmpty() ) 
+            {
+                int offset = tokens.get(0).offset;
+                if ( DEBUG ) {
+                    System.out.println("current token: "+tokens.get(0));
+                }            
+                tokens.clear();
+                scanner.setOffset( offset );
+                parseTokens();
+            }        	
+        } 
+        else 
+        {
+        	// change: do not ignore whitespace -> ignore whitespace
+        	tokens.removeIf( tok -> tok.is(TokenType.WHITESPACE ) );
         }
         this.ignoreWhitespace = ignoreWhitespace;
-        if ( ! tokens.isEmpty() ) 
-        {
-            int offset = tokens.get(0).offset;
-            tokens.clear();
-            scanner.setOffset( offset );
-            parseTokens();
-        }
     }
     
     /* (non-Javadoc)

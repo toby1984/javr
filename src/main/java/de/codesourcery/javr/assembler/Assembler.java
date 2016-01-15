@@ -112,24 +112,6 @@ public class Assembler
         	this.compilationUnit = compilationUnits.pop();
         }        
         
-        public CompilationUnit parseInclude(String path) throws IOException
-        {
-            final Resource newResource = resourceFactory.resolveResource( currentCompilationUnit().getResource() , path );
-            for ( CompilationUnit existing : currentCompilationUnit().getDependencies() ) 
-            {
-                if ( existing.getResource().pointsToSameData( newResource ) ) 
-                {
-                    return currentCompilationUnit();
-                }
-            }
-            
-            final SymbolTable symbolTable = new SymbolTable( path , currentSymbolTable() );
-			final CompilationUnit result = new CompilationUnit( newResource , symbolTable );
-            
-            ParseSourcePhase.parseSource( result , config );
-            return result;
-        }
-
         @Override
         public ICompilationSettings getCompilationSettings() {
             return compilerSettings;

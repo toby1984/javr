@@ -36,8 +36,6 @@ public interface ICompilationContext
 
     public ResourceFactory getResourceFactory();
     
-    public CompilationUnit parseInclude(String file) throws IOException;
-    
     public ICompilationSettings getCompilationSettings();
     
     public SymbolTable globalSymbolTable();

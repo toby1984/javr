@@ -26,13 +26,17 @@ import de.codesourcery.javr.assembler.util.Resource;
 
 public class Scanner {
 
-    private int bufferSize = 1024;
-    private int backTrackSize = bufferSize/2; // how many bytes one may go back via setOffset(int)
+    private int bufferSize;
+    private int fetchSize;
     
     private final char[] buffer;
     
+    private int minOffset;
+    private int maxOffset;
+    
     private int readPtr;
     private int writePtr;
+    
     private int bytesAvailable;    
     
     private int totalBytesRead;
@@ -46,6 +50,7 @@ public class Scanner {
     {
         this(res,1024);
     }
+    
     public Scanner(Resource res,int bufferSize) 
     {
         Validate.notNull(res, "res must not be NULL");
@@ -55,7 +60,7 @@ public class Scanner {
         this.resource = res;
         this.bufferSize = bufferSize;
         this.buffer = new char[bufferSize];
-        this.backTrackSize = this.bufferSize/2;
+        this.fetchSize = this.bufferSize/2;
         try {
             this.input = new InputStreamReader( res.createInputStream() , res.getEncoding() );
             fillBuffer();
@@ -80,38 +85,51 @@ public class Scanner {
             final int spaceInBuffer = bufferSize - bytesAvailable;
             // don't fill the whole remaining space as this would make backtracking past the current
             // readPtr location impossible (because it would overwrite old data) 
-            final int bytesToRead = Math.min( spaceInBuffer , backTrackSize );
-            System.out.println("Going to fetch "+bytesToRead+" bytes at write offset "+writePtr);
-            
-            if ( (writePtr+bytesToRead) < bufferSize ) {
-                final int bytesRead = input.read( buffer , writePtr , bytesToRead );
-                if ( bytesRead <= 0 ) 
-                {
-                    closeQuietly();
-                    return;
-                }
-                totalBytesRead += bytesRead;
-                bytesAvailable += bytesRead;  
-                writePtr += bytesRead;
-                return;
-            } 
-            final int firstSliceLen = bufferSize - writePtr;
-            int bytesRead = input.read( buffer , writePtr , firstSliceLen );
-            if ( bytesRead <= 0 ) 
+            final int bytesToRead = Math.min( spaceInBuffer , fetchSize );
+
+            int bytesRead;
+            if ( (writePtr+bytesToRead) <= bufferSize ) 
             {
-                closeQuietly();
-                return;
+                bytesRead = input.read( buffer , writePtr , bytesToRead );
+            }  
+            else 
+            {
+	            final int firstSliceLen = bufferSize - writePtr;
+	            bytesRead = input.read( buffer , writePtr , firstSliceLen );
+	            if ( bytesRead <= 0 ) 
+	            {
+	                closeQuietly();
+	                return;
+	            }
+	            final int secondSliceLen = bytesToRead - firstSliceLen;
+	            final int len = input.read( buffer , 0 , secondSliceLen );
+	            if ( len > 0 ) {
+	                bytesRead += len;
+	            } else {
+	            	closeQuietly();
+	            }
             }
-            final int secondSliceLen = bytesToRead - firstSliceLen;
-            final int len = input.read( buffer , 0 , secondSliceLen );
-            if ( len > 0 ) {
-                bytesRead += len;
-            } else {
-                closeQuietly();
+            if ( bytesRead <= 0 ) {
+            	closeQuietly();
+            	return;
             }
+
             totalBytesRead += bytesRead;            
             bytesAvailable += bytesRead;                
             writePtr = (writePtr+bytesRead)%bufferSize;
+         
+            if ( maxOffset >= bufferSize ) 
+            {
+                maxOffset += bytesRead;
+            	minOffset += bytesRead;
+            } 
+            else if ( maxOffset < bufferSize && (maxOffset+bytesRead) >= bufferSize ) {
+            	maxOffset += bytesRead;
+            	minOffset += (maxOffset-bufferSize);            	
+            } else {
+                maxOffset += bytesRead;
+            }
+            System.out.println("fillBuffer(): min="+minOffset+",max="+maxOffset+",readPtr: "+readPtr+",writePtr: "+writePtr);
         } 
         catch(IOException e) 
         {
@@ -171,41 +189,29 @@ public class Scanner {
     
     public void setOffset(int offset) 
     {
-        if ( offset > this.offset ) {
-            throw new IllegalArgumentException("Cannot jump forward");
-        }
-        if ( offset < 0 ) {
-            throw new IllegalStateException("Cannot go back to past start of buffer, offset: "+offset);
+    	System.out.println("setOffset("+offset+"): current="+offset+",min="+minOffset+",max="+maxOffset+",readPtr: "+readPtr+",writePtr: "+writePtr);        	
+        if ( offset < minOffset || offset > maxOffset ) 
+        {
+            throw new IllegalStateException("Cannot go to offset "+offset+", buffer contents either lost or not available yet");
         }        
-        final int delta = this.offset - offset;
-        if ( this.offset - delta < 0 ) {
-            throw new IllegalStateException("Cannot go back to offset "+delta+" characters,would be past start of buffer");            
-        }
-        final int writeEnd;
-        if (totalBytesRead > bufferSize) 
-        {
-            writeEnd = totalBytesRead % bufferSize;
-        } else {
-            writeEnd = 0;
-        }
-        
+        final int delta = offset - this.offset;
         int newPtr = readPtr;
-        for( int toSkip = delta; toSkip > 0 ; toSkip-- ) 
+        for ( int toSkip = Math.abs( delta ); toSkip > 0 ; toSkip-- ) 
         {
-            if ( newPtr == writeEnd-1 ) {
-                throw new IllegalStateException("Cannot go back to offset "+delta+" characters,would be past start of buffer");
-            }
-            if ( delta > 0 ) {
+            if ( delta < 0 )
+            {
                 newPtr--;
                 if ( newPtr < 0 ) {
                     newPtr += bufferSize;
                 }
-            } else {
+            } 
+            else 
+            {
                 newPtr = (newPtr+1) % bufferSize;
             }
         }
         readPtr = newPtr;
-        bytesAvailable += delta;
-        this.offset -= delta;
+        bytesAvailable -= delta;
+        this.offset=offset;
     }
 }

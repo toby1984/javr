@@ -6,6 +6,7 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.ICompilationContext;
+import de.codesourcery.javr.assembler.ResourceFactory;
 import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.Parser;
 import de.codesourcery.javr.assembler.parser.PreprocessingLexer;
@@ -31,14 +32,14 @@ public class ParseSourcePhase implements Phase {
     @Override
     public void run(ICompilationContext context) throws IOException 
     {
-        parseSource(context.currentCompilationUnit() , provider.getConfig() );
+        parseSource( context.currentCompilationUnit() , provider.getConfig() , context.getResourceFactory() );
     }
 
-    public static void parseSource(CompilationUnit unit,IConfig config) throws IOException 
+    public static void parseSource(CompilationUnit unit,IConfig config, ResourceFactory resourceFactory) throws IOException 
     {
         final Scanner scanner = new Scanner( unit.getResource() );
         
-        final Lexer lexer = new PreprocessingLexer(config.createLexer( scanner ) , unit , config.getArchitecture() );
+        final Lexer lexer = new PreprocessingLexer( config.createLexer( scanner ) , unit , config.getArchitecture() , resourceFactory );
         final Parser parser = config.createParser();
         
         parser.parse( unit , lexer ); // assigns AST to unit as well

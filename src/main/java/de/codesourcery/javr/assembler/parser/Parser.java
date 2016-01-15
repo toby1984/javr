@@ -360,7 +360,7 @@ public class Parser
     private List<String> parseText() 
     {
         final List<String> result = new ArrayList<>();
-        while ( ! lexer.peek().hasType( TokenType.SEMICOLON, TokenType.EOF, TokenType.EOL) ) 
+        while ( ! lexer.peek().is( TokenType.SEMICOLON, TokenType.EOF, TokenType.EOL) ) 
         {
             if ( lexer.peek( TokenType.SINGLE_QUOTE ) ) {
                 final CharacterLiteralNode n = parseCharLiteral(lexer);
@@ -378,12 +378,12 @@ public class Parser
     private ASTNode parseDirective() // parse .XXXX commands
     {
         Token tok = lexer.peek();
-        if ( tok.hasType( TokenType.DOT ) ) 
+        if ( tok.is( TokenType.DOT ) ) 
         {
             final TextRegion region = lexer.next().region();
 
             final Token tok2 = lexer.peek();
-            if ( tok2.hasType(TokenType.TEXT ) ) 
+            if ( tok2.is(TokenType.TEXT ) ) 
             {
                 lexer.next();
                 final ASTNode result = parseDirective2( tok2 );
@@ -487,7 +487,7 @@ public class Parser
     private LabelNode parseLabel() 
     {
         final Token tok = lexer.peek();
-        if ( tok.hasType(TokenType.TEXT ) && Identifier.isValidIdentifier( tok.value ) ) 
+        if ( tok.is(TokenType.TEXT ) && Identifier.isValidIdentifier( tok.value ) ) 
         {
             final Identifier id = new Identifier( lexer.next().value );
             if ( lexer.peek( TokenType.COLON ) ) 
@@ -503,7 +503,7 @@ public class Parser
     private InstructionNode parseInstruction() 
     {
         Token tok = lexer.peek();
-        if ( tok.hasType( TokenType.TEXT ) && arch.isValidMnemonic( tok.value ) ) 
+        if ( tok.is( TokenType.TEXT ) && arch.isValidMnemonic( tok.value ) ) 
         {
             lexer.next();
             final Instruction instruction = new Instruction( tok.value );
@@ -544,7 +544,7 @@ public class Parser
     private static CharacterLiteralNode parseCharLiteral(Lexer lexer) 
     {
         final Token tok = lexer.peek();
-        if ( tok.hasType( TokenType.SINGLE_QUOTE ) ) 
+        if ( tok.is( TokenType.SINGLE_QUOTE ) ) 
         {
             lexer.setIgnoreWhitespace( false );
             try 
@@ -556,7 +556,7 @@ public class Parser
                     throw new ParseException("Expected a single character", tok2.offset);
                 }
                 final Token tok3 = lexer.next();
-                if ( ! tok3.hasType( TokenType.SINGLE_QUOTE ) ) {
+                if ( ! tok3.is( TokenType.SINGLE_QUOTE ) ) {
                     throw new ParseException("Expected closing single-quote" , tok3.offset);
                 }
                 return new CharacterLiteralNode( tok2.value.charAt(0) , tok.region().merge( tok2 ).merge( tok3 ) );
@@ -570,7 +570,7 @@ public class Parser
     private static StringLiteral parseStringLiteral(Lexer lexer) 
     {
         final Token tok = lexer.peek();
-        if ( tok.hasType( TokenType.DOUBLE_QUOTE ) ) 
+        if ( tok.is( TokenType.DOUBLE_QUOTE ) ) 
         {
             lexer.setIgnoreWhitespace( false );
             try 
@@ -580,7 +580,7 @@ public class Parser
                 do 
                 {
                     final Token tok2 = lexer.peek();
-                    if ( tok2.hasType( TokenType.EOL ,TokenType.EOF , TokenType.DOUBLE_QUOTE ) ) 
+                    if ( tok2.is( TokenType.EOL ,TokenType.EOF , TokenType.DOUBLE_QUOTE ) ) 
                     {
                         break;
                     }
@@ -604,7 +604,7 @@ public class Parser
     {
         final Token tok = lexer.peek();
         TextRegion region = tok.region();
-        boolean preDecrement = tok.hasType( TokenType.OPERATOR ) && tok.value.equals("-");
+        boolean preDecrement = tok.is( TokenType.OPERATOR ) && tok.value.equals("-");
         if ( preDecrement) {
             lexer.next();
         }
@@ -651,18 +651,18 @@ public class Parser
         while ( ! lexer.eof() ) 
         {
             final Token tok = lexer.peek();
-            if ( tok.hasType(TokenType.PARENS_OPEN ) ) {
+            if ( tok.is(TokenType.PARENS_OPEN ) ) {
                 yard.pushOperator( new ExpressionToken(ExpressionTokenType.PARENS_OPEN , lexer.next() ) );
             } 
-            else if ( tok.hasType(TokenType.PARENS_CLOSE ) ) {
+            else if ( tok.is(TokenType.PARENS_CLOSE ) ) {
                 yard.pushOperator( new ExpressionToken(ExpressionTokenType.PARENS_CLOSE , lexer.next() ) );
             }
-            else if ( tok.hasType(TokenType.OPERATOR) ) 
+            else if ( tok.is(TokenType.OPERATOR) ) 
             {
                 lexer.next();
                 final OperatorType type;
                 if ( tok.value.equals("-" ) ) {
-                    type = OperatorType.BINARY_MINUS;
+                    type = OperatorType.BINARY_MINUS; // will be turned into UNARY_MINUS by pushOperator() call
                 } else {
                     type = OperatorType.getExactMatch( tok.value );
                 }
@@ -670,7 +670,7 @@ public class Parser
 
                 yard.pushOperator( new ExpressionToken(ExpressionTokenType.OPERATOR , op ) );
             }
-            else if ( yard.isFunctionOnStack() && tok.hasType(TokenType.COMMA ) ) {
+            else if ( yard.isFunctionOnStack() && tok.is(TokenType.COMMA ) ) {
                 yard.pushOperator( new ExpressionToken(ExpressionTokenType.ARGUMENT_DELIMITER, lexer.next() ) );
             } 
             else 
@@ -739,7 +739,7 @@ public class Parser
     private String parseRegisterName(TextRegion region) 
     {
         final Token tok = lexer.peek();
-        if ( tok.hasType(TokenType.TEXT) )
+        if ( tok.is(TokenType.TEXT) )
         {
             lexer.next();
             final String lower = tok.value.toLowerCase();
@@ -780,7 +780,7 @@ public class Parser
     private static NumberLiteralNode parseNumber(Lexer lexer) 
     {
         Token tok = lexer.peek();
-        if ( tok.hasType( TokenType.DIGITS ) || tok.hasType( TokenType.TEXT ) && NumberLiteralNode.isValidNumberLiteral( tok.value ) ) 
+        if ( tok.is( TokenType.DIGITS ) || tok.is( TokenType.TEXT ) && NumberLiteralNode.isValidNumberLiteral( tok.value ) ) 
         {
             lexer.next();
             return new NumberLiteralNode( tok.value , tok.region() );
@@ -802,7 +802,7 @@ public class Parser
     private CommentNode parseComment() 
     {
         final Token tok = lexer.peek();
-        if ( tok.hasType( TokenType.SEMICOLON ) || tok.isOperator("/" ) ) 
+        if ( tok.is( TokenType.SEMICOLON ) || tok.isOperator("/" ) ) 
         {
             final StringBuilder buffer = new StringBuilder();
 
