@@ -37,33 +37,47 @@ public class PreprocessingLexer implements Lexer
 {
     private static final boolean DEBUG = false;
     
+    // stack of lexers with the current lexer being TOS,
+    // used when processing #include 
     private final Stack<Lexer> lexerStack = new Stack<>();
+    
+    // performance optimization to avoid having to call lexerStack.peek() all the time, always holds the lexer that is at TOS
     private Lexer currentLexer;
 
     private boolean isIgnoreWhitespace=true;
 
+    // queue of preprocessed tokens that next() and peek() draw their data from 
     private final List<Token> tokens = new ArrayList<>();
-    private final List<Token> unprocessedTokens = new ArrayList<>();
+    
+    // populated by parse() method, holds tokens that still need to be expand()ed
+    private final List<Token> unexpandedTokens = new ArrayList<>();
 
+    // set of compilation units that were included,parsed and EOF was handled for
     private final Set<CompilationUnit> unitsPopped = new HashSet<>();
     
-    private final ICompilationContext context;
-
     private int currentIfNestingDepth; // current #if nesting level
 
     private int stoppedAtNestingDepth=-1; // #if nesting level where we started to skip tokens because of an unsatisfied conditional expression
 
     private final ICompilationContext compilationContext;
 
-    private final Set<String> expanded = new HashSet<>();
-
     // offset to the actual scanner position that is adjusted 
+    // by the delta ( initial string len - expanded string len )
     // each time some expression/identifier gets macro-expanded 
     private int expansionOffset = 0;
     
+    // used to remember the EOF offset from the initial lexer ;
+    // since lexers get popped from the stack whenever they reach EOF
+    // and are thus inaccessible afterwards, the offset needs to be stored somewhere
+    // else
     private int eofOffset = -1;
 
-    protected final class MacroDefinition 
+    /**
+     * Holds a macro definition (parameter names and macro body).
+     *
+     * @author tobias.gierke@code-sourcery.de
+     */
+    private static final class MacroDefinition 
     {
         public final List<Token> parameterNames;
         public final List<Token> tokens;
@@ -80,6 +94,14 @@ public class PreprocessingLexer implements Lexer
             }
             this.parameterNames = parameterNames;
             this.tokens = tokens;
+        }
+        
+        public int parameterCount() {
+            return parameterNames.size();
+        }
+        
+        public boolean takesParameters() {
+            return ! parameterNames.isEmpty();
         }
 
         public int getIndexForParameterName(String name) 
@@ -106,7 +128,6 @@ public class PreprocessingLexer implements Lexer
         Validate.notNull(context, "context must not be NULL");
 
         this.compilationContext = context;
-        this.context = context;
         pushLexer( delegate );
     }	
 
@@ -117,7 +138,8 @@ public class PreprocessingLexer implements Lexer
         currentLexer = l;
     }
     
-    private Lexer popLexer() {
+    private Lexer popLexer() 
+    {
         final Lexer result = lexerStack.pop();
         currentLexer = lexerStack.isEmpty() ? null : lexerStack.peek();
         return result;
@@ -152,9 +174,9 @@ public class PreprocessingLexer implements Lexer
             tokens.add( new Token(TokenType.EOF , "" , eofOffset ) );
             return;
         }
-        unprocessedTokens.clear();
+        unexpandedTokens.clear();
 
-        // process tokens up to the next EOL or EOF (=full line)
+        // processes tokens up to the next EOL or EOF (=full line)
         while ( true ) 
         { 
             final Token next = consume();
@@ -163,7 +185,7 @@ public class PreprocessingLexer implements Lexer
 
             if ( next.isEOF() ) 
             {
-                unprocessedTokens.add( next );
+                unexpandedTokens.add( next );
 
                 try {
                     expandTokens();
@@ -181,7 +203,6 @@ public class PreprocessingLexer implements Lexer
                             }
                             eofOffset = popped.peek().offset;
                         }
-                        
                         compilationContext.popCompilationUnit();
                     }			
                 }
@@ -193,7 +214,7 @@ public class PreprocessingLexer implements Lexer
 
             if ( next.isEOL() && compilationEnabled ) 
             {
-                unprocessedTokens.add( next );
+                unexpandedTokens.add( next );
                 expandTokens();
                 return;
             }
@@ -201,7 +222,8 @@ public class PreprocessingLexer implements Lexer
             // parse single-line comments			
             if ( isSingleLineComment(next , lexer().peek() ) && compilationEnabled ) 
             {
-                expandTokens();				
+                expandTokens();			
+                // directly added to tokens since comments must never be expanded
                 tokens.add( next );
                 processTokensUntilEndOfLine( tokens::add );
                 return;
@@ -212,6 +234,7 @@ public class PreprocessingLexer implements Lexer
             {
                 expandTokens();
 
+                // directly added to tokens since comments must never be expanded
                 tokens.add( next );
                 tokens.add( consume() );
                 while ( true ) 
@@ -230,8 +253,9 @@ public class PreprocessingLexer implements Lexer
             {
                 expandTokens();
 
+                // directly added to tokens since stuff in string literals never gets expanded 
                 tokens.add( next );
-                TokenType endType = next.type;
+                final TokenType endType = next.type;
                 while ( true ) 
                 {
                     Token tok = consume();
@@ -246,15 +270,12 @@ public class PreprocessingLexer implements Lexer
             if ( ! next.is(TokenType.HASH ) ) 
             {
                 if ( compilationEnabled ) {
-                    unprocessedTokens.add( next );
+                    unexpandedTokens.add( next );
                 }
                 continue;
             }
 
-
-            /*
-             * Preprocessor directive.
-             */
+            // We found a Preprocessor directive.
             final String directive = lexer().peek().value;
             consume();
             if ( directive.equalsIgnoreCase( "include" ) ) // #include "file"
@@ -301,9 +322,9 @@ public class PreprocessingLexer implements Lexer
                 final String path = tokens.stream().map( tok -> tok.value ).collect( Collectors.joining() );
                 try 
                 {
-                    final Resource res = context.getResourceFactory().resolveResource(context.currentCompilationUnit().getResource(), path );
-                    final CompilationUnit newUnit = context.getOrCreateCompilationUnit(res);
-                    if ( ! context.pushCompilationUnit( newUnit ) ) {
+                    final Resource res = compilationContext.getResourceFactory().resolveResource(compilationContext.currentCompilationUnit().getResource(), path );
+                    final CompilationUnit newUnit = compilationContext.getOrCreateCompilationUnit(res);
+                    if ( ! compilationContext.pushCompilationUnit( newUnit ) ) {
                         throw new ParseException( "Aborting compilation due to circular dependency", tokens.get(0) );
                     }
                     boolean success = false;
@@ -317,7 +338,7 @@ public class PreprocessingLexer implements Lexer
                     {
                         if ( ! success ) 
                         {
-                            context.popCompilationUnit();
+                            compilationContext.popCompilationUnit();
                         }
                     }
                 } catch (IOException e) {
@@ -325,7 +346,9 @@ public class PreprocessingLexer implements Lexer
                 }
                 continue;
             } 
-            else if ( directive.equalsIgnoreCase("message" ) || directive.equalsIgnoreCase("warning" ) || directive.equalsIgnoreCase("error" ) ) 
+            
+            // #message / #warning / #error
+            if ( directive.equalsIgnoreCase("message" ) || directive.equalsIgnoreCase("warning" ) || directive.equalsIgnoreCase("error" ) ) 
             {
                 if ( compilationEnabled ) 
                 {
@@ -349,13 +372,14 @@ public class PreprocessingLexer implements Lexer
                         throw new RuntimeException("Internal error,unhandled severity level: #"+directive);
                     }
                     final CompilationMessage compMsg = new CompilationMessage( severity ,  buffer.toString(), next.region() ); 
-                    context.message( compMsg );
+                    compilationContext.message( compMsg );
                 } else {
                     skipToNextLine();
                 }
                 continue;
             } 
-            else if ( directive.equalsIgnoreCase("endif" ) ) 
+           
+            if ( directive.equalsIgnoreCase("endif" ) ) // #endif
             {
                 if ( currentIfNestingDepth == 0 ) 
                 {
@@ -369,7 +393,8 @@ public class PreprocessingLexer implements Lexer
                 skipToNextLine();
                 continue;					
             } 
-            else if ( directive.equalsIgnoreCase("if") || directive.equalsIgnoreCase("ifdef" ) || directive.equalsIgnoreCase("ifndef" ) ) // #if
+            
+            if ( directive.equalsIgnoreCase("if") || directive.equalsIgnoreCase("ifdef" ) || directive.equalsIgnoreCase("ifndef" ) ) // #if
             {
                 currentIfNestingDepth++;
 
@@ -442,7 +467,8 @@ public class PreprocessingLexer implements Lexer
                 skipToNextLine();
                 continue;
             } 
-            else if ( directive.equalsIgnoreCase("define" ) ) // #define 
+            
+            if ( directive.equalsIgnoreCase("define" ) ) // #define 
             {
                 expandTokens();
                 skipWhitespace();
@@ -506,9 +532,8 @@ public class PreprocessingLexer implements Lexer
                 }
                 skipToNextLine();
                 continue;
-            } else {
-                throw new ParseException("Unknown preprocessor directive: "+directive,next);
-            }
+            } 
+            throw new ParseException("Unknown preprocessor directive: "+directive,next);
         }
     }
 
@@ -536,10 +561,9 @@ public class PreprocessingLexer implements Lexer
 
     private void expandTokens() 
     {
-        expanded.clear();
-        expand( unprocessedTokens, expanded );
-        tokens.addAll( unprocessedTokens );
-        unprocessedTokens.clear();
+        expand( unexpandedTokens, new HashSet<>() );
+        tokens.addAll( unexpandedTokens );
+        unexpandedTokens.clear();
     }
 
     private void expand(List<Token> tokens,Set<String> alreadyExpandedMacros) 
@@ -567,11 +591,14 @@ public class PreprocessingLexer implements Lexer
                 // check whether first non-whitespace token is opening parenthesis (=start of argument list) 
                 boolean hasParameters=false;
                 int openingParensIdx = tokenIdx+1;
-                for ( final int len = tokens.size() ; openingParensIdx < len ; openingParensIdx++) 
+                if ( macroDef.takesParameters() ) 
                 {
-                    if ( tokens.get(openingParensIdx).isNoWhitespace() ) {
-                        hasParameters = tokens.get(openingParensIdx).is( TokenType.PARENS_OPEN );
-                        break;
+                    for ( final int len = tokens.size() ; openingParensIdx < len ; openingParensIdx++) 
+                    {
+                        if ( tokens.get(openingParensIdx).isNoWhitespace() ) {
+                            hasParameters = tokens.get(openingParensIdx).is( TokenType.PARENS_OPEN );
+                            break;
+                        }
                     }
                 }
 
@@ -617,9 +644,9 @@ public class PreprocessingLexer implements Lexer
                     macroParameters = Collections.emptyList();
                 }
 
-                if( macroParameters.size() != macroDef.parameterNames.size() ) 
+                if( macroParameters.size() != macroDef.parameterCount() ) 
                 {
-                    throw new ParseException("Expected "+macroDef.parameterNames.size()+" arguments but got "+macroParameters.size(),macroName);
+                    throw new ParseException("Expected "+macroDef.parameterCount()+" macro arguments but got "+macroParameters.size(),macroName);
                 }				
 
                 final List<Token> macroBody = macroDef.tokens;
