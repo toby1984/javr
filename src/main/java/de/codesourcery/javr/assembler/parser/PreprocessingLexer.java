@@ -35,6 +35,8 @@ import de.codesourcery.javr.assembler.util.Resource;
  */
 public class PreprocessingLexer implements Lexer 
 {
+    private static final boolean DEBUG = false;
+    
     private final Stack<Lexer> lexerStack = new Stack<>();
     private Lexer currentLexer;
 
@@ -58,6 +60,8 @@ public class PreprocessingLexer implements Lexer
     // offset to the actual scanner position that is adjusted 
     // each time some expression/identifier gets macro-expanded 
     private int expansionOffset = 0;
+    
+    private int eofOffset = -1;
 
     protected final class MacroDefinition 
     {
@@ -113,9 +117,10 @@ public class PreprocessingLexer implements Lexer
         currentLexer = l;
     }
     
-    private void popLexer() {
-        lexerStack.pop();
+    private Lexer popLexer() {
+        final Lexer result = lexerStack.pop();
         currentLexer = lexerStack.isEmpty() ? null : lexerStack.peek();
+        return result;
     }
 
     @Override
@@ -123,7 +128,7 @@ public class PreprocessingLexer implements Lexer
         if ( tokens.isEmpty() ) {
             parse();
         }
-        return tokens.isEmpty();
+        return tokens.get(0).isEOF();
     }
 
     private Token adjustOffset(Token token) 
@@ -139,6 +144,14 @@ public class PreprocessingLexer implements Lexer
 
     private void parse() 
     {
+        if ( lexerStack.isEmpty() ) 
+        {
+            if ( eofOffset == -1 ) {
+                throw new RuntimeException("Internal error, no more lexers but EOF offset not set ?");
+            }
+            tokens.add( new Token(TokenType.EOF , "" , eofOffset ) );
+            return;
+        }
         unprocessedTokens.clear();
 
         // process tokens up to the next EOL or EOF (=full line)
@@ -160,7 +173,15 @@ public class PreprocessingLexer implements Lexer
                     if ( ! unitsPopped.contains( compilationContext.currentCompilationUnit() ) ) 
                     {
                         unitsPopped.add( compilationContext.currentCompilationUnit() );
-                        popLexer();
+                        final Lexer popped = popLexer();
+                        if ( lexerStack.isEmpty() ) 
+                        {
+                            if ( ! popped.peek(TokenType.EOF ) ) {
+                                throw new RuntimeException("Internal error, expected lexer to be at EOF");
+                            }
+                            eofOffset = popped.peek().offset;
+                        }
+                        
                         compilationContext.popCompilationUnit();
                     }			
                 }
@@ -286,7 +307,8 @@ public class PreprocessingLexer implements Lexer
                     boolean success = false;
                     try 
                     {
-                        final Lexer delegate = new LexerImpl( new Scanner( res ) );
+                         final Lexer delegate = new LexerImpl( new Scanner( res ) );
+//                        final Lexer delegate = new LexerImpl( new SimpleScanner( res ) );
                         pushLexer( delegate );
                     }
                     finally 
@@ -673,6 +695,9 @@ public class PreprocessingLexer implements Lexer
             }
             final boolean isWhitespace = tokens.get(0).isWhitespace();
             if ( ! isWhitespace || ! isIgnoreWhitespace )  {
+                if ( DEBUG ) {
+                    System.out.println("NEXT: "+tokens.get(0));
+                }
                 return tokens.remove(0);
             }
             // advance to next non-whitespace token
@@ -681,9 +706,12 @@ public class PreprocessingLexer implements Lexer
                 final Token tok = tokens.get(i );
                 if ( ! tok.isWhitespace() ) 
                 {
-                    for ( ; i > 0 ; i-- ) { // discard all tokens we skipped
-                        tokens.remove(i);
+                    for (  int j = i; j >= 0 ; j-- ) { // discard all tokens we skipped
+                        tokens.remove(0);
                     }
+                    if ( DEBUG ) {
+                        System.out.println("NEXT: "+tok);
+                    }                    
                     return tok;
                 }
             }
@@ -727,14 +755,17 @@ public class PreprocessingLexer implements Lexer
         {
             final boolean isWhitespace = tokens.get(i).isWhitespace();
             if ( ! isWhitespace || ! isIgnoreWhitespace )  {
-                return tokens.remove(i);
+                return tokens.get(i);
             }
             // advance to next non-whitespace token
             for ( int len = tokens.size() ; i < len ; i++ ) 
             {
-                final Token tok = tokens.get(i );
+                final Token tok = tokens.get(i);
                 if ( ! tok.isWhitespace() ) 
                 {
+                    if ( DEBUG ) {
+                        System.out.println("PEEK: "+tok);
+                    }
                     return tok;
                 }
             }
@@ -862,5 +893,10 @@ public class PreprocessingLexer implements Lexer
             Validate.notNull(tok, "tok must not be NULL");
             tokens.add(0,tok);
         }	    
+    }
+    
+    @Override
+    public String toString() {
+        return tokens.isEmpty() ? "<no tokens>" : tokens.get(0).toString();
     }
 }

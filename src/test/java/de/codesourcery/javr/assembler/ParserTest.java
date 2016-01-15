@@ -61,7 +61,7 @@ public class ParserTest
         assertFalse( ast.hasChildren() );
         assertEquals( 0 ,  ast.childCount() );        
     }
-
+    
     @Test
     public void testParseBlankLine() 
     {

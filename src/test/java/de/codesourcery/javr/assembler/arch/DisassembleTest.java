@@ -53,7 +53,7 @@ public class DisassembleTest  {
     @Test public void testDisassemble8() throws IOException 
     {
         final byte[] bytes = new byte[] { (byte) 0x8d ,(byte) 0x93 };
-        roundTrip( bytes );
+        roundTrip( bytes , true );
     }
     
     //    f12a: f8 95           spm Z+
@@ -143,12 +143,19 @@ public class DisassembleTest  {
     
     private void roundTrip(byte[] expected) throws IOException 
     {
+        roundTrip(expected,false);
+    }
+    private void roundTrip(byte[] expected,boolean printSource) throws IOException 
+    {
         final DisassemblerSettings settings = new DisassemblerSettings();
         settings.printBytes = true;
         settings.printAddresses = true;
         settings.resolveRelativeAddresses=true;
         
         final String source = arch.disassemble( expected , expected.length , settings );
+        if ( printSource ) {
+            System.out.println("\n===== SOURCE =====\n"+source);
+        }
      
         final Assembler asm = new Assembler();
         asm.getCompilerSettings().setFailOnAddressOutOfRange( false );

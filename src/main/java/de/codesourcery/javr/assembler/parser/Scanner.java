@@ -48,6 +48,8 @@ import de.codesourcery.javr.assembler.util.Resource;
  */
 public class Scanner 
 {
+    public static final boolean DEBUG = false;
+    
     // size of char buffer
     private int bufferSize;
     private final char[] buffer;
@@ -183,7 +185,9 @@ public class Scanner
             } else {
                 maxOffset += bytesRead;
             }
-            System.out.println("fillBuffer(): min="+minOffset+",max="+maxOffset+",readPtr: "+readPtr+",writePtr: "+writePtr);
+            if ( DEBUG ) {
+                System.out.println("fillBuffer(): min="+minOffset+",max="+maxOffset+",readPtr: "+readPtr+",writePtr: "+writePtr);
+            }
         } 
         catch(IOException e) 
         {
@@ -286,7 +290,9 @@ public class Scanner
      */
     public void setOffset(int offset) 
     {
-    	System.out.println("setOffset("+offset+"): current="+offset+",min="+minOffset+",max="+maxOffset+",readPtr: "+readPtr+",writePtr: "+writePtr);        	
+        if ( DEBUG ) {
+            System.out.println("setOffset("+offset+"): current="+offset+",min="+minOffset+",max="+maxOffset+",readPtr: "+readPtr+",writePtr: "+writePtr);
+        }
         if ( offset < minOffset || offset > maxOffset ) 
         {
             throw new IllegalStateException("Cannot go to offset "+offset+", buffer contents either lost or not available yet");

@@ -27,7 +27,7 @@ public class CompilationUnit
     private String contentHash;
     
     private AST ast = new AST();
-    private List<CompilationUnit> dependencies = new ArrayList<>();
+    private final List<CompilationUnit> dependencies = new ArrayList<>();
     private SymbolTable symbolTable;
 
    private final List<CompilationMessage> messages = new ArrayList<>();

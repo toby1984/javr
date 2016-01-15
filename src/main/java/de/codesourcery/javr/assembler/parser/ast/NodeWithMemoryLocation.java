@@ -9,7 +9,6 @@ public abstract class NodeWithMemoryLocation extends AbstractASTNode
 {
     private Address memoryLocation;
     
-    
     public NodeWithMemoryLocation() {
         super();
     }

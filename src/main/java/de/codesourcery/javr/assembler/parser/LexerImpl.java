@@ -27,7 +27,7 @@ import org.apache.commons.lang3.Validate;
  */
 public class LexerImpl implements Lexer 
 {
-    public static final boolean DEBUG = true;
+    public static final boolean DEBUG = false;
     
     private final Scanner scanner;
     

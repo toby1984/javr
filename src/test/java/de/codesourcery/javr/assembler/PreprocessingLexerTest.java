@@ -1,5 +1,8 @@
 package de.codesourcery.javr.assembler;
 
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -23,6 +26,7 @@ import de.codesourcery.javr.assembler.parser.PreprocessingLexer;
 import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.parser.Token;
 import de.codesourcery.javr.assembler.parser.TokenType;
+import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.FileResourceFactory;
@@ -437,6 +441,23 @@ public class PreprocessingLexerTest extends TestCase
             assertEquals("test" , e.getMessage() );
         }
     }     
+    
+    @Test
+    public void testBug() {
+        // st x+,r24; 0000:    8d 93
+        final Iterator<Token> tokens = lex("st x+,r24; 0000:    8d 93");
+        assertToken(TokenType.TEXT,"st",0,tokens);
+        assertToken(TokenType.TEXT,"x",3,tokens);
+        assertToken(TokenType.OPERATOR,"+",4,tokens);
+        assertToken(TokenType.COMMA,",",5,tokens);
+        assertToken(TokenType.TEXT,"r24",6,tokens);
+        assertToken(TokenType.SEMICOLON,";",9,tokens);
+        assertToken(TokenType.DIGITS,"0000",11,tokens);
+        assertToken(TokenType.COLON,":",15,tokens);
+        assertToken(TokenType.TEXT,"8d",20,tokens);
+        assertToken(TokenType.DIGITS,"93",23,tokens);
+        assertToken(TokenType.EOF,"",25,tokens);         
+    }    
 
     public void testExpandMacroWithTwoArgs() 
     {

@@ -54,7 +54,7 @@ public class Assembler
     {
         private final Stack<CompilationUnit> compilationUnits = new Stack<>();
         private final CompilationUnit rootCompilationUnit;
-        private CompilationUnit compilationUnit;
+        private CompilationUnit currentCompilationUnit;
         
         private final IObjectCodeWriter objectCodeWriter;
 
@@ -63,8 +63,8 @@ public class Assembler
             Validate.notNull(unit, "unit must not be NULL");
             Validate.notNull(objectCodeWriter, "objectCodeWriter must not be NULL");
             this.rootCompilationUnit = unit;
-            this.compilationUnit = unit;
             this.objectCodeWriter = objectCodeWriter;
+            pushCompilationUnit( unit );
         }
         
         @Override
@@ -94,7 +94,9 @@ public class Assembler
         		throw new IllegalArgumentException("Cannot push current compilation unit");
         	}
         	final Stack<CompilationUnit> stack = new Stack<>();
-        	stack.push( currentCompilationUnit() );
+        	if ( currentCompilationUnit != null ) { // NULL when this method is called by the constructor
+        	    stack.push( currentCompilationUnit() );
+        	}
         	
         	final IdentityHashMap<CompilationUnit, Boolean> unique = new IdentityHashMap<>();
         	
@@ -115,9 +117,11 @@ public class Assembler
         		}
         	}
         	
-        	currentCompilationUnit().addDependency( newUnit );
+        	if ( currentCompilationUnit != null ) { // NULL when this method is called by the constructor
+        	    currentCompilationUnit().addDependency( newUnit );
+        	}
         	compilationUnits.add( newUnit );
-        	this.compilationUnit = newUnit;
+        	this.currentCompilationUnit = newUnit;
         }
         
         @Override
@@ -129,7 +133,7 @@ public class Assembler
         public void popCompilationUnit() 
         {
             compilationUnits.pop();
-            this.compilationUnit = compilationUnits.peek();
+            this.currentCompilationUnit = compilationUnits.isEmpty() ? null : compilationUnits.peek();
         }        
         
         @Override
@@ -139,6 +143,9 @@ public class Assembler
 
         public void beforePhase() throws IOException
         {
+            compilationUnits.clear();
+            currentCompilationUnit = null;
+            pushCompilationUnit( rootCompilationUnit );
             objectCodeWriter.reset();
             objectCodeWriter.setCurrentSegment( Segment.FLASH );
         }
@@ -220,7 +227,7 @@ public class Assembler
 
         @Override
         public CompilationUnit currentCompilationUnit() {
-            return compilationUnit;
+            return currentCompilationUnit;
         }
     }
 
