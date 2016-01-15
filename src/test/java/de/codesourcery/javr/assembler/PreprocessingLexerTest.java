@@ -1,143 +1,345 @@
 package de.codesourcery.javr.assembler;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Stack;
+import java.util.function.Function;
 
+import org.apache.commons.lang3.Validate;
+import org.junit.Before;
 import org.junit.Test;
 
+import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
 import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.LexerImpl;
+import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
+import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.parser.PreprocessingLexer;
 import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.parser.Token;
 import de.codesourcery.javr.assembler.parser.TokenType;
+import de.codesourcery.javr.assembler.parser.ast.ASTNode;
+import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.FileResourceFactory;
+import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
 import junit.framework.TestCase;
 
 public class PreprocessingLexerTest extends TestCase 
 {
-	public void testEmptyString() 
-	{
-		final Iterator<Token> tokens = lex("");
-		assertEquals(  TokenType.EOF  , tokens.next().type );
-		assertFalse( tokens.hasNext() );
-	}
-	
+    private final IArchitecture arch = new ATMega88();
+    
+    private ResourceFactory resFactory = FileResourceFactory.createInstance(new File("/"));
+    private final List<CompilationMessage> messages = new ArrayList<>();
+    private final Stack<CompilationUnit> unitStack = new Stack<>();
+
+    private Function<Resource,CompilationUnit> unitFactory = res -> {
+        throw new RuntimeException("method not implemented: getOrCreateCompilationUnit()");
+    };
+    
+    @Before
+    public void setup() 
+    {
+        resFactory = FileResourceFactory.createInstance(new File("/"));
+        messages.clear();
+        unitStack.clear();
+        unitFactory = res -> {
+            throw new RuntimeException("method not implemented: getOrCreateCompilationUnit()");
+        };
+    }
+    
+    private final ICompilationContext fakeContext = new ICompilationContext() {
+
+        public CompilationUnit getOrCreateCompilationUnit(de.codesourcery.javr.assembler.util.Resource res) 
+        {
+            return unitFactory.apply( res );
+        };
+        
+        @Override
+        public void pushCompilationUnit(CompilationUnit unit) 
+        {
+            Validate.notNull(unit, "unit must not be NULL");
+            unitStack.push(unit);
+        }
+
+        @Override
+        public void popCompilationUnit() 
+        {
+            unitStack.pop();
+        }
+
+        @Override
+        public ResourceFactory getResourceFactory() {
+            return resFactory;
+        }
+
+        @Override
+        public ICompilationSettings getCompilationSettings() {
+            throw new RuntimeException("method not implemented: getCompilationSettings");
+        }
+
+        @Override
+        public SymbolTable globalSymbolTable() {
+            throw new RuntimeException("method not implemented: globalSymbolTable");
+        }
+
+        @Override
+        public SymbolTable currentSymbolTable() {
+            return currentCompilationUnit().getSymbolTable();
+        }
+
+        @Override
+        public CompilationUnit currentCompilationUnit() {
+            return unitStack.peek();
+        }
+
+        @Override
+        public int currentOffset() {
+            throw new RuntimeException("method not implemented: currentOffset");
+        }
+
+        @Override
+        public Address currentAddress() {
+            throw new RuntimeException("method not implemented: currentAddress");
+        }
+
+        @Override
+        public Segment currentSegment() {
+            throw new RuntimeException("method not implemented: currentSegment");
+        }
+
+        @Override
+        public void setSegment(Segment s) {
+            throw new RuntimeException("method not implemented: currentSegment");
+        }
+
+        @Override
+        public void writeByte(int value) {
+            throw new RuntimeException("method not implemented: writeByte");
+        }
+
+        @Override
+        public void writeWord(int value) {
+            throw new RuntimeException("method not implemented: writeWord");
+        }
+
+        @Override
+        public void allocateByte() {
+            throw new RuntimeException("method not implemented: allocateByte");
+        }
+
+        @Override
+        public void allocateWord() {
+            throw new RuntimeException("method not implemented: allocateWord");
+        }
+
+        @Override
+        public void allocateBytes(int numberOfBytes) {
+            throw new RuntimeException("method not implemented: allocateBytes");
+        }
+
+        @Override
+        public void error(String message, ASTNode node) 
+        {
+            message( CompilationMessage.error( message , node ) );
+        }
+
+        @Override
+        public void message(CompilationMessage msg) {
+            messages.add( msg );
+        }
+
+        @Override
+        public IArchitecture getArchitecture() {
+            return arch;
+        }
+    };
+    
+    @Test
+    public void testEmptyString() 
+    {
+        final Iterator<Token> tokens = lex("");
+        assertEquals(  TokenType.EOF  , tokens.next().type );
+        assertFalse( tokens.hasNext() );
+    }
+
     @Test
     public void testLexConditionalCompilationNotMatched() 
     {
-		final Iterator<Token> tokens = lex("#if 1 > 2\nZ+\n#endif");
-		assertToken( TokenType.EOF, "" , 19 , tokens ); 
-		if ( tokens.hasNext() ) {
-			fail( "Expected EOF but got "+tokens.next() );
-		}
+        final Iterator<Token> tokens = lex("#if 1 > 2\nZ+\n#endif");
+        assertToken( TokenType.EOF, "" , 19 , tokens ); 
+        if ( tokens.hasNext() ) {
+            fail( "Expected EOF but got "+tokens.next() );
+        }
     }   
-    
+
     @Test
     public void testLexConditionalCompilationNotMatchedIfDef() 
     {
-		final Iterator<Token> tokens = lex("#ifdef test\nZ+\n#endif");
-		assertToken( TokenType.EOF, "" , 21 , tokens ); 
-		if ( tokens.hasNext() ) {
-			fail( "Expected EOF but got "+tokens.next() );
-		}
+        final Iterator<Token> tokens = lex("#ifdef test\nZ+\n#endif");
+        assertToken( TokenType.EOF, "" , 21 , tokens ); 
+        if ( tokens.hasNext() ) {
+            fail( "Expected EOF but got "+tokens.next() );
+        }
     }     
     
+    @Test public void testInclude1() 
+    {
+        resFactory = new ResourceFactory() {
+
+            @Override
+            public Resource resolveResource(String child) throws IOException {
+                throw new RuntimeException("method not implemented: resolveResource");
+            }
+
+            @Override
+            public Resource resolveResource(Resource parent, String child) throws IOException 
+            {
+                assertEquals("funky",child);
+                return new StringResource("funky", "#message test");
+            }
+        };
+        unitFactory = res -> 
+        {
+            assertTrue( res instanceof StringResource);
+            final String resName = ((StringResource) res).getName();
+            assertTrue( "Expected ://funky but got "+resName , resName.endsWith("://funky") );
+            return new CompilationUnit( res , fakeContext.currentSymbolTable() );
+        };
+        
+        final Iterator<Token> tokens = lex("#include \"funky\"");
+        assertToken( TokenType.EOF, "" , 29 , tokens ); 
+        assertEquals(1,messages.size());
+        assertEquals("test", messages.get(0).message );
+        assertEquals( Severity.INFO , messages.get(0).severity );        
+    }
+    
+    @Test public void testIncludeWithSymbolFromParentScope() 
+    {
+        resFactory = new ResourceFactory() 
+        {
+            @Override
+            public Resource resolveResource(String child) throws IOException {
+                throw new RuntimeException("method not implemented: resolveResource");
+            }
+
+            @Override
+            public Resource resolveResource(Resource parent, String child) throws IOException 
+            {
+                assertEquals("funky",child);
+                return new StringResource("funky", "#message test");
+            }
+        };
+        unitFactory = res -> 
+        {
+            assertTrue( res instanceof StringResource);
+            final String resName = ((StringResource) res).getName();
+            assertTrue( "Expected ://funky but got "+resName , resName.endsWith("://funky") );
+            return new CompilationUnit( res , fakeContext.currentSymbolTable() );
+        };
+        
+        final Iterator<Token> tokens = lex("#define test blubb\n#include \"funky\"");
+        assertToken( TokenType.EOF, "" , 30 , tokens ); 
+        assertEquals(1,messages.size());
+        assertEquals("blubb", messages.get(0).message );
+        assertEquals( Severity.INFO , messages.get(0).severity );        
+    }    
+
     @Test
     public void testLexConditionalCompilationMatchedIfDef() 
     {
-		final Iterator<Token> tokens = lex("#define test\n#ifdef test\nZ+\n#endif");
-		assertToken( TokenType.TEXT , "Z" , 25 , tokens ); 
-		assertToken( TokenType.OPERATOR , "+" , 26 , tokens ); 
-		assertToken( TokenType.EOL , "\n" , 27 , tokens ); 
-		assertToken( TokenType.EOF, "" , 34 , tokens ); 
-		if ( tokens.hasNext() ) {
-			fail( "Expected EOF but got "+tokens.next() );
-		}
+        final Iterator<Token> tokens = lex("#define test\n#ifdef test\nZ+\n#endif");
+        assertToken( TokenType.TEXT , "Z" , 25 , tokens ); 
+        assertToken( TokenType.OPERATOR , "+" , 26 , tokens ); 
+        assertToken( TokenType.EOL , "\n" , 27 , tokens ); 
+        assertToken( TokenType.EOF, "" , 34 , tokens ); 
+        if ( tokens.hasNext() ) {
+            fail( "Expected EOF but got "+tokens.next() );
+        }
     }     
-    
+
     @Test
     public void testLexConditionalCompilationMatched() 
     {
-		final Iterator<Token> tokens = lex("#if 2 > 1\nZ+\n#endif");
-		assertToken( TokenType.TEXT , "Z" , 10 , tokens ); 
-		assertToken( TokenType.OPERATOR , "+" , 11 , tokens ); 
-		assertToken( TokenType.EOL , "\n" , 12 , tokens ); 
-		assertToken( TokenType.EOF, "" , 19 , tokens ); 
-		if ( tokens.hasNext() ) {
-			fail( "Expected EOF but got "+tokens.next() );
-		}
+        final Iterator<Token> tokens = lex("#if 2 > 1\nZ+\n#endif");
+        assertToken( TokenType.TEXT , "Z" , 10 , tokens ); 
+        assertToken( TokenType.OPERATOR , "+" , 11 , tokens ); 
+        assertToken( TokenType.EOL , "\n" , 12 , tokens ); 
+        assertToken( TokenType.EOF, "" , 19 , tokens ); 
+        if ( tokens.hasNext() ) {
+            fail( "Expected EOF but got "+tokens.next() );
+        }
     }     
-    
+
     @Test
     public void testLexMismatchEndif() 
     {
-    	try {
-    		lex("#if 2 > 1\nZ+\n#endif\n#endif");
-    		fail("Should've failed");
-    	} catch(ParseException e) {
-    		assertTrue("Got: "+e.getMessage() , e.getMessage().contains( "#endif without matching #if" ) );
-    	}
+        try {
+            lex("#if 2 > 1\nZ+\n#endif\n#endif");
+            fail("Should've failed");
+        } catch(ParseException e) {
+            assertTrue("Got: "+e.getMessage() , e.getMessage().contains( "#endif without matching #if" ) );
+        }
     } 
-    
+
     @Test
     public void testLexMismatchIf() 
     {
-    	try {
-    		lex("#if 2 > 1\n#if 3 > 4\n#endif");
-    		fail("Should've failed");
-    	} catch(ParseException e) {
-    		assertTrue("Got: "+e.getMessage() , e.getMessage().contains( "Expected 1 more #endif" ) );
-    	}
+        try {
+            lex("#if 2 > 1\n#if 3 > 4\n#endif");
+            fail("Should've failed");
+        } catch(ParseException e) {
+            assertTrue("Got: "+e.getMessage() , e.getMessage().contains( "Expected 1 more #endif" ) );
+        }
     }     
-	
-	public void testOnlineNewlines() 
-	{
-		final Iterator<Token> tokens = lex("\n\n\n");
-		assertEquals(  TokenType.EOL, tokens.next().type );
-		assertEquals(  TokenType.EOL, tokens.next().type );
-		assertEquals(  TokenType.EOL, tokens.next().type );
-		assertEquals(  TokenType.EOF  , tokens.next().type );
-		assertFalse( tokens.hasNext() );
-	}	
-	
-	public void testWhitespaceIsIgnored() 
-	{
-		final Iterator<Token> tokens = lex("a   b");
-		assertToken(TokenType.TEXT,"a",0,tokens);
-		assertToken(TokenType.TEXT,"b",4,tokens);
-		assertToken(TokenType.EOF,"",5,tokens);
-		assertFalse( tokens.hasNext() );
-	}	
-	
-	public void testParseDefineWithNoValue() 
-	{
-		final Iterator<Token> tokens = lex("#define a");
-		assertToken(TokenType.EOF,"",9,tokens);
-		assertFalse( tokens.hasNext() );
-	}	
-	
-	public void testParseDefineWithOneValue() 
-	{
-		final Iterator<Token> tokens = lex("#define a 42");
-		assertToken(TokenType.EOF,"",12,tokens);
-		assertFalse( tokens.hasNext() );
-	}	
-	
-	public void testExpandDefineWithOneValue() 
-	{
-		final Iterator<Token> tokens = lex("#define a 42\n"
-				+ "a");
-		assertToken(TokenType.DIGITS,"42",13,tokens);
-		assertToken(TokenType.EOF,"",15,tokens);
-		assertFalse( tokens.hasNext() );
-	}	
-	
+
+    public void testOnlineNewlines() 
+    {
+        final Iterator<Token> tokens = lex("\n\n\n");
+        assertEquals(  TokenType.EOL, tokens.next().type );
+        assertEquals(  TokenType.EOL, tokens.next().type );
+        assertEquals(  TokenType.EOL, tokens.next().type );
+        assertEquals(  TokenType.EOF  , tokens.next().type );
+        assertFalse( tokens.hasNext() );
+    }	
+
+    public void testWhitespaceIsIgnored() 
+    {
+        final Iterator<Token> tokens = lex("a   b");
+        assertToken(TokenType.TEXT,"a",0,tokens);
+        assertToken(TokenType.TEXT,"b",4,tokens);
+        assertToken(TokenType.EOF,"",5,tokens);
+        assertFalse( tokens.hasNext() );
+    }	
+
+    public void testParseDefineWithNoValue() 
+    {
+        final Iterator<Token> tokens = lex("#define a");
+        assertToken(TokenType.EOF,"",9,tokens);
+        assertFalse( tokens.hasNext() );
+    }	
+
+    public void testParseDefineWithOneValue() 
+    {
+        final Iterator<Token> tokens = lex("#define a 42");
+        assertToken(TokenType.EOF,"",12,tokens);
+        assertFalse( tokens.hasNext() );
+    }	
+
+    public void testExpandDefineWithOneValue() 
+    {
+        final Iterator<Token> tokens = lex("#define a 42\n"
+                + "a");
+        assertToken(TokenType.DIGITS,"42",13,tokens);
+        assertToken(TokenType.EOF,"",15,tokens);
+        assertFalse( tokens.hasNext() );
+    }	
+
     public void testMacroBodyIsExpandedOnlyOnce() 
     {
         final Iterator<Token> tokens = lex("#define a a\n"
@@ -146,7 +348,7 @@ public class PreprocessingLexerTest extends TestCase
         assertToken(TokenType.EOF,"",13,tokens);
         assertFalse( tokens.hasNext() );
     }	
-    
+
     public void testMacroBodyIsExpandedRecursively() 
     {
         final Iterator<Token> tokens = lex("#define b c\n"
@@ -156,36 +358,36 @@ public class PreprocessingLexerTest extends TestCase
         assertToken(TokenType.EOF,"",25,tokens);
         assertFalse( tokens.hasNext() );
     }    
-	
-	public void testExpandDefineWithLongValue() 
-	{
-		final Iterator<Token> tokens = lex("#define a xxxxx\n"
-				+ "a");
-		assertToken(TokenType.TEXT,"xxxxx",16,tokens);
-		assertToken(TokenType.EOF,"",21,tokens);
-		assertFalse( tokens.hasNext() );
-	}	
-	
-	public void testExpandDefineWithShortValue() 
-	{
-		final Iterator<Token> tokens = lex("#define TEST X\n"
-				+ "TEST");
-		assertToken(TokenType.TEXT,"X",15,tokens);
-		assertToken(TokenType.EOF,"",16,tokens);
-		assertFalse( tokens.hasNext() );
-	}	
-	
-	public void testExpandDefineWithExpression() 
-	{
-		final Iterator<Token> tokens = lex("#define TEST y+y\n"
-				+ "TEST");
-		assertToken(TokenType.TEXT,"y",17,tokens);
-		assertToken(TokenType.OPERATOR,"+",18,tokens);
-		assertToken(TokenType.TEXT,"y",19,tokens);
-		assertToken(TokenType.EOF,"",20,tokens);
-		assertFalse( tokens.hasNext() );
-	}	
-	
+
+    public void testExpandDefineWithLongValue() 
+    {
+        final Iterator<Token> tokens = lex("#define a xxxxx\n"
+                + "a");
+        assertToken(TokenType.TEXT,"xxxxx",16,tokens);
+        assertToken(TokenType.EOF,"",21,tokens);
+        assertFalse( tokens.hasNext() );
+    }	
+
+    public void testExpandDefineWithShortValue() 
+    {
+        final Iterator<Token> tokens = lex("#define TEST X\n"
+                + "TEST");
+        assertToken(TokenType.TEXT,"X",15,tokens);
+        assertToken(TokenType.EOF,"",16,tokens);
+        assertFalse( tokens.hasNext() );
+    }	
+
+    public void testExpandDefineWithExpression() 
+    {
+        final Iterator<Token> tokens = lex("#define TEST y+y\n"
+                + "TEST");
+        assertToken(TokenType.TEXT,"y",17,tokens);
+        assertToken(TokenType.OPERATOR,"+",18,tokens);
+        assertToken(TokenType.TEXT,"y",19,tokens);
+        assertToken(TokenType.EOF,"",20,tokens);
+        assertFalse( tokens.hasNext() );
+    }	
+
     public void testExpandMacroWithOneArg() 
     {
         final Iterator<Token> tokens = lex("#define func(x) x+x\n"
@@ -197,6 +399,45 @@ public class PreprocessingLexerTest extends TestCase
         assertFalse( tokens.hasNext() );
     }	
     
+    public void testSymbolGetsExpandedInMessage() 
+    {
+        final Iterator<Token> tokens = lex("#define test blubb\n#message test");
+        assertToken(TokenType.EOF,"",33,tokens);        
+        assertEquals(1,messages.size());
+        assertEquals("blubb", messages.get(0).message );
+        assertEquals( Severity.INFO , messages.get(0).severity );
+    }      
+    
+    public void testMessage() 
+    {
+        final Iterator<Token> tokens = lex("#message test");
+        assertToken(TokenType.EOF,"",13,tokens);        
+        assertEquals(1,messages.size());
+        assertEquals("test", messages.get(0).message );
+        assertEquals( Severity.INFO , messages.get(0).severity );
+    }    
+    
+    public void testWarning() 
+    {
+        final Iterator<Token> tokens = lex("#warning test");
+        assertToken(TokenType.EOF,"",13,tokens);        
+        assertEquals(1,messages.size());
+        assertEquals("test", messages.get(0).message );
+        assertEquals( Severity.WARNING , messages.get(0).severity );
+    }  
+    
+    public void testError() 
+    {
+        try {
+            lex("#error test");
+            fail("Should've failed");
+        }
+        catch(ParseException e) 
+        {
+            assertEquals("test" , e.getMessage() );
+        }
+    }     
+
     public void testExpandMacroWithTwoArgs() 
     {
         final Iterator<Token> tokens = lex("#define func(a,b) a+b\n"
@@ -207,7 +448,7 @@ public class PreprocessingLexerTest extends TestCase
         assertToken(TokenType.EOF,"",25,tokens);
         assertFalse( tokens.hasNext() );
     }   
-    
+
     public void testExpandMacroWithTwoArgsAndWhiteSpace() 
     {
         final Iterator<Token> tokens = lex("#define func(a,b) a + b\n"
@@ -218,46 +459,48 @@ public class PreprocessingLexerTest extends TestCase
         assertToken(TokenType.EOF,"",29,tokens);
         assertFalse( tokens.hasNext() );
     }    
-	
-	private void assertToken(TokenType t,String value,int offset,Iterator<Token> it) 
-	{
-		final Token tok = it.next();
-		assertEquals( t , tok.type );
-		assertEquals( value , tok.value );
-		assertEquals( offset , tok.offset);
-	}
-	
-	private Iterator<Token> lex(String s) 
-	{
-		final StringResource resource = new StringResource("dummy",s);
-        CompilationUnit unit = new CompilationUnit( resource );
-        final ResourceFactory resFactory = FileResourceFactory.createInstance(new File("/"));
+
+    private void assertToken(TokenType t,String value,int offset,Iterator<Token> it) 
+    {
+        final Token tok = it.next();
+        if ( tok.type != t || ! tok.value.equals(value) || tok.offset != offset ) {
+            final Token expected=new Token(t,value,offset);
+            fail("expected: "+expected+" but got: "+tok);
+        }
+    }
+
+    private Iterator<Token> lex(String s) 
+    {
+        final StringResource resource = new StringResource("dummy",s);
+        final CompilationUnit unit = new CompilationUnit( resource );
+        unitStack.push(unit);
+        
         final LexerImpl delegate = new LexerImpl( new Scanner(resource ) );
-		final Lexer lexer = new PreprocessingLexer( delegate , unit , new ATMega88() , resFactory );
-		final List<Token> result = new ArrayList<>();
-		while(true) 
-		{
-			Token tok = lexer.next();
-			result.add( tok );
-			if ( tok.is(TokenType.EOF ) ) 
-			{
-				return new Iterator<Token>() {
+        final Lexer lexer = new PreprocessingLexer( delegate , fakeContext );
+        final List<Token> result = new ArrayList<>();
+        while(true) 
+        {
+            Token tok = lexer.next();
+            result.add( tok );
+            if ( tok.is(TokenType.EOF ) ) 
+            {
+                return new Iterator<Token>() {
 
-					private final Iterator<Token> wrapped = result.iterator();
-					
-					@Override
-					public boolean hasNext() {
-						return wrapped.hasNext();
-					}
+                    private final Iterator<Token> wrapped = result.iterator();
 
-					@Override
-					public Token next() {
-						final Token result = wrapped.next();
-						System.out.println( result );
-						return result;
-					}
-				};
-			}
-		}
-	}
+                    @Override
+                    public boolean hasNext() {
+                        return wrapped.hasNext();
+                    }
+
+                    @Override
+                    public Token next() {
+                        final Token result = wrapped.next();
+                        System.out.println( result );
+                        return result;
+                    }
+                };
+            }
+        }
+    }
 }

@@ -1,16 +1,19 @@
 package de.codesourcery.javr.assembler.util;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.exceptions.ParseException;
 
+/**
+ * Contains various utility methods.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public class Misc 
 {
     private static final String CHARS = "0123456789abcdef";

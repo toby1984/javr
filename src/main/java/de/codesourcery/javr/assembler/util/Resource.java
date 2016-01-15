@@ -5,9 +5,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * 
- * <p>
- * </p>
+ * Abstract resource.
+ *
  * @author tobias.gierke@code-sourcery.de
  */
 public interface Resource 
@@ -36,4 +35,6 @@ public interface Resource
     public String getEncoding();
     
     public void delete() throws IOException;
+    
+    public String getName();
 }

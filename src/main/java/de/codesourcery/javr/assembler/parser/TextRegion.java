@@ -15,8 +15,13 @@
  */
 package de.codesourcery.javr.assembler.parser;
 
-public class TextRegion {
-
+/**
+ * A region within a source file, given by offset and region length in characters.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
+public class TextRegion 
+{
     private int start;
     private int len;
     

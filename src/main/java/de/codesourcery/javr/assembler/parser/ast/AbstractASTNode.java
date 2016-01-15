@@ -26,11 +26,15 @@ import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 
+/**
+ * Abstract base class for implementing AST nodes.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public abstract class AbstractASTNode implements ASTNode 
 {
     private final List<ASTNode> children=new ArrayList<>();
     
-    private boolean skip;
     private TextRegion region;
     private ASTNode parent;
     
@@ -100,16 +104,6 @@ public abstract class AbstractASTNode implements ASTNode
     }
     
     @Override
-    public final void markAsSkip() 
-    {
-        this.skip = true;
-        for ( ASTNode child : children ) 
-        {
-            child.markAsSkip();
-        }
-    }
-    
-    @Override
     public final StatementNode getStatement() 
     {
         if ( this instanceof StatementNode) {
@@ -125,11 +119,6 @@ public abstract class AbstractASTNode implements ASTNode
     @Override
     public final List<ASTNode> children() {
         return children;
-    }
-    
-    @Override
-    public final boolean isSkip() {
-        return skip;
     }
     
     @Override

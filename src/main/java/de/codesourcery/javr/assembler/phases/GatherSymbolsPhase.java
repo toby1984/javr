@@ -16,6 +16,12 @@ import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
 import de.codesourcery.javr.assembler.symbols.Symbol;
 
+/**
+ * Compiler phase that is responsible for gathering all the symbols from the source code
+ * so that forward references work properly.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public class GatherSymbolsPhase extends AbstractPhase
 {
     public GatherSymbolsPhase() {

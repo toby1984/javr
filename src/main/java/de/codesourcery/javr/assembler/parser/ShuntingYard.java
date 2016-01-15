@@ -8,6 +8,12 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.ExpressionNode;
 import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
 
+/**
+ * Shunting yard algorithm with an extension for handling function calls with
+ * an arbitrary number of arguments.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public final class ShuntingYard
 {
     private final Stack<ExpressionToken> valueQueue = new Stack<>();

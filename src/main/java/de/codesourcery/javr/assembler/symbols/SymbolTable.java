@@ -33,6 +33,13 @@ import de.codesourcery.javr.assembler.exceptions.UnknownSymbolException;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 
+/**
+ * Symbol table that may be chained with another one through a parent-child relationship. 
+ *
+ * <p>Any symbols added to a child symbol table are recursively added to all parents as well.</p>
+ * 
+ * @author tobias.gierke@code-sourcery.de
+ */
 public class SymbolTable 
 {
     private static final Logger LOG = Logger.getLogger(SymbolTable.class);

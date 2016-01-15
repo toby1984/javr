@@ -15,20 +15,48 @@
  */
 package de.codesourcery.javr.assembler.parser;
 
+/**
+ * Enumeration of all {@link Token} types the lexer can produce.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public enum TokenType 
 {
-// multiple characters   
+    // multiple characters
+    /**
+     * Tokens with this type hold an adjacent region of whitespaces
+     * found in the input stream.
+     */
     WHITESPACE,
-    EOL, 
+    /**
+     * Tokens with this type contain any data that was found
+     * between other recognized tokens and does not match
+     * any of the over token types.
+     */
     TEXT,
+    /**
+     * A token that consists of one or more digits.
+     */
     DIGITS,
+    /**
+     * An operator token.
+     */
     OPERATOR,
-// single character     
+    // single character     
+    /**
+     * Special token that is always returned by lexers once they
+     * reached the end of the underlying character stream.
+     */    
+    EOF,
+    /**
+     * An end-of-line sequence was recognized in the input stream.
+     * Supports UNIX and Windows end-of-line sequences. 
+     */
+    EOL, 
     PARENS_OPEN,
     PARENS_CLOSE,
     HASH,
-    EOF, 
-    EQUALS,
+    EQUALS, // note: currently not treated as an operator
     COLON,
     SEMICOLON,
     DOT,

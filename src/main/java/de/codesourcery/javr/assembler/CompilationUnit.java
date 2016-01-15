@@ -12,6 +12,13 @@ import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Resource;
 
+/**
+ * Value object that holds a resource returning the source got compiled, the source's AST (if available) along
+ * with any symbols that got discovered during parsing, other compilation units this unit depends on
+ * and any compiler messages that occurred during processing of this unit.  
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public class CompilationUnit 
 {
     private static final Logger LOG = Logger.getLogger(CompilationUnit.class);

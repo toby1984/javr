@@ -68,6 +68,25 @@ public class Assembler
         }
         
         @Override
+        public CompilationUnit getOrCreateCompilationUnit(Resource res) 
+        {
+            if ( currentCompilationUnit().getResource().equals( res ) ) {
+                return currentCompilationUnit();
+            }
+            final Stack<CompilationUnit> units = new Stack<>();
+            units.push( currentCompilationUnit() );
+            while ( ! units.isEmpty() ) 
+            {
+                CompilationUnit u = units.pop();
+                if ( res.equals( u.getResource() ) ) {
+                    return u;
+                }
+                units.addAll( u.getDependencies() );
+            }
+            return new CompilationUnit( res );
+        }
+        
+        @Override
         public void pushCompilationUnit(CompilationUnit newUnit) 
         {
 			Validate.notNull(newUnit, "unit must not be NULL");
@@ -109,7 +128,8 @@ public class Assembler
         @Override
         public void popCompilationUnit() 
         {
-        	this.compilationUnit = compilationUnits.pop();
+            compilationUnits.pop();
+            this.compilationUnit = compilationUnits.peek();
         }        
         
         @Override

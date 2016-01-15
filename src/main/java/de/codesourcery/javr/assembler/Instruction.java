@@ -17,8 +17,15 @@ package de.codesourcery.javr.assembler;
 
 import org.apache.commons.lang3.Validate;
 
-public class Instruction {
-
+/**
+ * Wraps the string representation of a CPU instruction/mnemonic.
+ *
+ * TODO: Maybe remove this class, doesn't seem to have any useful value right now ??
+ * 
+ * @author tobias.gierke@code-sourcery.de
+ */
+public class Instruction 
+{
     private final String name;
     
     public Instruction(String name) 

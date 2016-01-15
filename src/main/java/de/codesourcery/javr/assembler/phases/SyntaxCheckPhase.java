@@ -11,6 +11,11 @@ import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 
+/**
+ * Performs semantic checks on the AST.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public class SyntaxCheckPhase implements Phase 
 {
     @Override

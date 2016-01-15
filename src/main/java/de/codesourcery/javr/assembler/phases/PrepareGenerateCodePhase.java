@@ -10,6 +10,11 @@ import de.codesourcery.javr.assembler.parser.ast.StatementNode;
 import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 
+/**
+ * Performs any necessary preparations so that the code generation phase can be executed.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public class PrepareGenerateCodePhase extends GenerateCodePhase
 {
     @SuppressWarnings("unused")

@@ -10,8 +10,15 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.arch.AbstractAchitecture.InstructionEncoding;
 
-public class PrefixTree {
-
+/**
+ * A binary prefix tree used to look up instructions my bit patterns.
+ * 
+ *  TODO: Currently not used anymore...
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
+public class PrefixTree 
+{
     private final Node root = new Node("");
     
     private static final class Node 

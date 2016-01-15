@@ -23,6 +23,11 @@ public class StringResource implements Resource {
     }
     
     @Override
+    public String getName() {
+        return res.getName();
+    }
+    
+    @Override
     public boolean pointsToSameData(Resource other) {
         return other == this;
     }

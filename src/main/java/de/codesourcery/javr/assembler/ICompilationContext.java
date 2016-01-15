@@ -15,35 +15,35 @@
  */
 package de.codesourcery.javr.assembler;
 
-import java.io.IOException;
-
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
+import de.codesourcery.javr.assembler.util.Resource;
 
+/**
+ * Provides access to the state of the current compilation process.
+ * 
+ * This interface is used by all compilation phases to perform the
+ * actual compilation process.
+ * 
+ * @author tobias.gierke@code-sourcery.de
+ */
 public interface ICompilationContext
 {
     public interface ICompilationSettings 
     {
         public boolean isFailOnAddressOutOfRange();
+        
         public ICompilationSettings setFailOnAddressOutOfRange(boolean failOnAddressOutOfRange);
     }
     
-    public void pushCompilationUnit(CompilationUnit unit);
-    
-    public void popCompilationUnit();
-
-    public ResourceFactory getResourceFactory();
-    
-    public ICompilationSettings getCompilationSettings();
-    
+    // symbol tables
     public SymbolTable globalSymbolTable();
     
     public SymbolTable currentSymbolTable();
     
-    public CompilationUnit currentCompilationUnit();
-    
+    // code generation
     public int currentOffset();
     
     public Address currentAddress();
@@ -62,9 +62,24 @@ public interface ICompilationContext
     
     public void allocateBytes(int numberOfBytes);    
     
+    // error handling
     public void error(String message,ASTNode node);
     
     public void message(CompilationMessage msg);
     
-    public IArchitecture getArchitecture();
+    // #include handling
+    public void pushCompilationUnit(CompilationUnit unit);
+    
+    public void popCompilationUnit();
+    
+    public CompilationUnit getOrCreateCompilationUnit(Resource res);
+    
+    // misc
+    public ResourceFactory getResourceFactory();
+    
+    public ICompilationSettings getCompilationSettings();
+    
+    public CompilationUnit currentCompilationUnit();
+    
+    public IArchitecture getArchitecture();    
 }

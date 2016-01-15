@@ -48,7 +48,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Stack;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -1303,11 +1302,7 @@ public class EditorFrame extends JInternalFrame {
 						text = "reg: "+((RegisterNode) node).register.toString();
 					}
 
-					if ( node.isSkip() ) {
-						setText( text+" [ SKIPPED ]" );
-					} else {
-						setText( text );
-					}
+					setText( text );
 				}
 				return result;
 			}

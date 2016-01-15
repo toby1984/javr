@@ -33,6 +33,12 @@ public class FileResource implements Resource
         updateContentHash();
     }
     
+    @Override
+    public String getName() 
+    {
+        return "file://"+file.getAbsolutePath();
+    }
+    
     public File getFile() {
         return file;
     }

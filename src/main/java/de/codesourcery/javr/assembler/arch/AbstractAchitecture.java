@@ -377,6 +377,8 @@ public abstract class AbstractAchitecture implements IArchitecture
     private final Map<String,String> alternativeMnemonics = new HashMap<>();
     
     // holds instruction prefixes in big-endian order
+    
+    // TODO: Currently not used as I had trouble decoding the instructions reliably...might improve disassembler performance though
     protected final PrefixTree prefixTree = new PrefixTree();
     
     public AbstractAchitecture() 

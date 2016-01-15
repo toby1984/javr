@@ -17,9 +17,15 @@ package de.codesourcery.javr.assembler;
 
 import org.apache.commons.lang3.Validate;
 
-public class Register 
+/**
+ * Value class that identifies a CPU register,also providing hints about the context (post-increment,pre-decrement) 
+ * in which this register was mentioned.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
+public final class Register 
 {
-    //  X/Y/Z (r27:r26/r29:r28/r31:r30
+    //  X/Y/Z (r27:r26/r29:r28/r31:r30)
     public static final int REG_X = 26;
     public static final int REG_Y = 28;
     public static final int REG_Z = 30;

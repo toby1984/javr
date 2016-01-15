@@ -9,6 +9,11 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 
+/**
+ * Abstract base-class for compiler phases that handles common AST nodes.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public abstract class AbstractPhase implements Phase 
 {
     private final String name;
@@ -21,23 +26,16 @@ public abstract class AbstractPhase implements Phase
     
     protected boolean visitNode(ICompilationContext context, ASTNode node,IIterationContext ctx) 
     {
-        if ( node.isSkip() ) {
-            return false;
-        }
-
         if ( node instanceof DirectiveNode )
         {
-            if ( ! node.isSkip() ) 
+            final Directive directive = ((DirectiveNode) node).directive;
+            switch( directive ) 
             {
-                final Directive directive = ((DirectiveNode) node).directive;
-                switch( directive ) 
-                {
-                    case CSEG: context.setSegment( Segment.FLASH ); break;
-                    case DSEG: context.setSegment( Segment.SRAM ) ; break;
-                    case ESEG: context.setSegment( Segment.EEPROM ); break;
-                    default:
-                        // $$FALL-THROUGH$$
-                }
+                case CSEG: context.setSegment( Segment.FLASH ); break;
+                case DSEG: context.setSegment( Segment.SRAM ) ; break;
+                case ESEG: context.setSegment( Segment.EEPROM ); break;
+                default:
+                    // $$FALL-THROUGH$$
             }
         }
         return true;

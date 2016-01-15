@@ -4,6 +4,14 @@ import java.io.IOException;
 
 import org.apache.commons.lang3.Validate;
 
+/**
+ * Adapter class to make implementing delegating {@link IObjectCodeWriter} 
+ * implementations easier.
+ * 
+ * All methods just invoke the delegate. 
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public class ObjectCodeWriterWrapper implements IObjectCodeWriter {
 
     protected final IObjectCodeWriter delegate;

@@ -17,34 +17,94 @@ package de.codesourcery.javr.assembler.arch;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Segment;
+import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 
+/**
+ * Microcontroller architecture.
+ *
+ * <p>Implementations of this interface know about the features
+ * of a specific uC architecture and most importantly, know how to turn
+ * {@link InstructionNode}s into actual object code.</p>
+ * 
+ * @author tobias.gierke@code-sourcery.de
+ */
 public interface IArchitecture 
 {
+    /**
+     * Disassembler settings.
+     *
+     * @author tobias.gierke@code-sourcery.de
+     */
     public static final class DisassemblerSettings 
     {
+        /**
+         * Whether to include instruction addresses 
+         * into the disassembly output. 
+         */
         public boolean printAddresses;
+        /**
+         * The start address that should be assumed.
+         */
         public int startAddress;
+        
+        /**
+         * Whether to write the raw bytes as hex numbers
+         * to the disassembly output. 
+         */        
         public boolean printBytes;
+        
+        /**
+         * Whether references to compound registers should
+         * be printed using only the lower register number.
+         */
         public boolean printCompoundRegistersAsLower;
+        
+        /**
+         * Whether relative branch/jump offsets should
+         * be resolved to their true destination address
+         * relative to the disassembly start address.
+         */
         public boolean resolveRelativeAddresses=true;
     }
     
+    /**
+     * Returns the type of this architecture.
+     * 
+     * @return
+     */
     public Architecture getType();
     
+    /**
+     * Check whether this architecture matches a given type.
+     * 
+     * @param t
+     * @return
+     */
     public boolean hasType(Architecture t);
     
     /**
-     * Returns total segment size in bytes.
+     * Returns the size of a given memory segment size in bytes.
      * 
      * @param seg
      * @return
      */
     public int getSegmentSize(Segment seg);
-    // --
-    
+
+    /**
+     * Returns whether a string resembles a valid mnemonic for this architecture.
+     * @param s
+     * @return
+     */
     public boolean isValidMnemonic(String s);
     
+    /**
+     * Checks that code generation is possible for a given {@link ASTNode}.
+     * 
+     * @param node
+     * @param context
+     * @return
+     */
     public boolean validate(InstructionNode node,ICompilationContext context);
     
     /**
@@ -61,7 +121,24 @@ public interface IArchitecture
      */
     public int getInstructionLengthInBytes(InstructionNode node,ICompilationContext context,boolean estimate);    
     
+    /**
+     * Turns a given {@link InstructionNode} into object code.
+     * 
+     * @param node
+     * @param context
+     * 
+     * @see ICompilationContext#writeByte(int)
+     * @see ICompilationContext#writeWord(int)
+     */
     public void compile(InstructionNode node,ICompilationContext context);
-    
+ 
+    /**
+     * Disassembles a raw object file.
+     * 
+     * @param data
+     * @param len
+     * @param settings
+     * @return
+     */
     public String disassemble(byte[] data,int len,DisassemblerSettings settings);
 }

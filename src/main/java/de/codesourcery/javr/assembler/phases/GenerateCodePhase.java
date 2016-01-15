@@ -13,6 +13,11 @@ import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 
+/**
+ * Performs the actual code generation.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public class GenerateCodePhase extends AbstractPhase 
 {
     private static final Logger LOG = Logger.getLogger(GenerateCodePhase.class);

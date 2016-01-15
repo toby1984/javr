@@ -21,6 +21,11 @@ import de.codesourcery.javr.assembler.parser.ast.StringLiteral;
 import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 
+/**
+ * Enumeration of operators understood by the expression parser.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public enum OperatorType
 {
     UNARY_MINUS("-",1,11),

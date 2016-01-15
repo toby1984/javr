@@ -27,6 +27,11 @@ import de.codesourcery.javr.assembler.arch.InstructionEncoder;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 
+/**
+ * Implements assembly/disassembly of code for the ATmega88 uC by Atmel.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public class ATMega88 extends AbstractAchitecture 
 {
     protected void initInstructions()

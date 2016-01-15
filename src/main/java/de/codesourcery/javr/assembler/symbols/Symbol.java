@@ -22,7 +22,13 @@ import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
+import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 
+/**
+ * An entry in the {@link SymbolTable}.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public final class Symbol 
 {
     private static final Logger LOG = Logger.getLogger(Symbol.class);
@@ -43,10 +49,12 @@ public final class Symbol
         ADDRESS_LABEL,
         /**
          * Symbol was defined through an <code>.equ</code> directive.
+         * Value is the result of {@link IValueNode#getValue()} if the
+         * symbol could be resolved.
          */
         EQU,
         /**
-         * Symbol was defined through an <code>#define xxxxx &lt;expr&gt;</code> directive.
+         * Symbol was defined through a <code>#define xxxxx &lt;expr&gt;</code> directive.
          */
         PREPROCESSOR_MACRO,
         /**

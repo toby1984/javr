@@ -16,6 +16,7 @@
 package de.codesourcery.javr.assembler.parser;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 
@@ -24,40 +25,98 @@ import org.apache.commons.lang3.Validate;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
 import de.codesourcery.javr.assembler.util.Resource;
 
-public class Scanner {
-
+/**
+ * Reads single characters from a {@link Resource}.
+ * 
+ * <p>Because of the fact that lexing ignores whitespace by default
+ * and that the lexer reads/buffers tokens in advance , this class
+ * needs to support the {@link #setOffset(int)} method to jump to
+ * a specific offset in the input stream (but usually only a few characters 
+ * forwards/backwards from the current read position).</p>
+ * 
+ * <p>This requirement is not met by the {@link InputStream#mark(int)}
+ * functionality of the JDK since a.) the position that should be marked needs
+ * to be known in advance which the parser doesn't and the <code>mark()</code>
+ * method is an optional feature that is not implemented on all input streams.</p>
+ * 
+ * <p>This class uses a ring buffer and two special min/max pointers to keep
+ * track of the region inside the buffer that may be jumped around in using
+ * {@link #setOffset(int)} with no special support required by the <code>InputStream</code>
+ * this scanner operates on.</p> 
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
+public class Scanner 
+{
+    // size of char buffer
     private int bufferSize;
-    private int fetchSize;
-    
     private final char[] buffer;
     
+    // how many bytes to read from the underlying
+    // input stream when the buffer runs empty.
+    // This value is always half of the actual buffer size
+    // so that back-tracking from the current read offset
+    // by at least half a buffer is always possible.
+    private int fetchSize;
+
+    // valid offset range for setOffset(int) calls
     private int minOffset;
     private int maxOffset;
     
+    // where to read the next character in the buffer
     private int readPtr;
+    // where to write the next character in the buffer
     private int writePtr;
     
+    // the number of bytes are in the buffer
+    // before new data needs to be fetched from the underlying
+    // input steam
     private int bytesAvailable;    
     
-    private int totalBytesRead;
-    
-    private final Resource resource;
+    // underlying input stream
     private final Reader input;
-    private int offset;
+    
+    // marker so we know that reading from the underlying input stream
+    // is pointless (and it's in fact already closed)
     private boolean eofReached = false;
     
+    // the current offset from the underlying InputStream
+    // where the next character returned by next() / peek()
+    // is read from
+    private int offset;
+    
+    /**
+     * Creates a scanner with a default buffer size of 1024 characters
+     * and a backtracking window of 512 bytes.
+     * 
+     * Given that more than 1024 bytes have been consumed from this scanner,
+     * it's always valid to backtrack at most <code>bufferSize+512</code> bytes from the largest 
+     * valid read offset in the buffer (or less if one already moved the read pointer to an earlier offset).
+     * 
+     * @param res
+     */
     public Scanner(Resource res) 
     {
         this(res,1024);
     }
     
+    /**
+     * Creates a scanner.
+     * 
+     * The size of the backtracking window is always set to <code>bufferSize/2</code> bytes.
+     * 
+     * Given that more than <code>bufferSize</code> bytes have been consumed from this scanner,
+     * it's always valid to backtrack at most <code>bufferSize+bufferSize/2</code> bytes from the largest 
+     * valid read offset in the buffer (or less if one already moved the read pointer to an earlier offset).
+     * 
+     * @param res
+     */    
     public Scanner(Resource res,int bufferSize) 
     {
         Validate.notNull(res, "res must not be NULL");
         if ( bufferSize < 3 ) {
             throw new RuntimeException("Buffer size needs to be at least 3 bytes");
         }
-        this.resource = res;
         this.bufferSize = bufferSize;
         this.buffer = new char[bufferSize];
         this.fetchSize = this.bufferSize/2;
@@ -67,10 +126,6 @@ public class Scanner {
         } catch(IOException e) {
             throw new ParseException("Failed to read input stream",0,e);
         }
-    }
-    
-    public Resource getResource() {
-        return resource;
     }
     
     private void fillBuffer() 
@@ -114,7 +169,6 @@ public class Scanner {
             	return;
             }
 
-            totalBytesRead += bytesRead;            
             bytesAvailable += bytesRead;                
             writePtr = (writePtr+bytesRead)%bufferSize;
          
@@ -145,6 +199,15 @@ public class Scanner {
         try { input.close(); } catch(IOException e) { /* can't help it */ }
     }
     
+    /**
+     * Returns whether this scanner reached eof.
+     * 
+     * Trying to {@link peek()} or {@link #next()} on a scanner
+     * whose <code>eof()</code> method returned false
+     * will throw an {@link ParseException}.
+     * 
+     * @return
+     */
     public boolean eof() 
     {
         if ( bytesAvailable == 0 ) 
@@ -158,6 +221,13 @@ public class Scanner {
         return false;
     }
     
+    /**
+     * Get the character at the current read offset without advancing the
+     * read pointer.
+     *  
+     * @return
+     * @throws ParseException if this scanner is already at {@link #eof()}.
+     */
     public char peek() 
     {
         if ( eof() ) {
@@ -166,6 +236,13 @@ public class Scanner {
         return buffer[ readPtr ];
     }
     
+    /**
+     * Reads the next character at the current read offset and advances the
+     * read pointer by one.
+     *  
+     * @return
+     * @throws ParseException if this scanner is already at {@link #eof()}.
+     */    
     public char next() 
     {
         if ( eof() ) {
@@ -178,15 +255,35 @@ public class Scanner {
         return result;
     }
     
+    /**
+     * Returns the offset from the underlying input stream where the next character would be
+     * read from.
+     * 
+     * @return
+     */
     public int offset() {
         return offset;
     }
 
+    /**
+     * Moves the read pointer backwards by one character.
+     * @throws IllegalStateException if the read pointer cannot be moved back any further (either because it's at the
+     * start of the input stream or any characters in the ring buffer <b>before</b> the current read position have already
+     * been overwritten with data from later in the input stream. 
+     */
     public void pushBack() 
     {
         setOffset(this.offset-1);
     }    
     
+    /**
+     * Sets the read pointer to a specific offset within the underlying input stream.
+     * 
+     * @param offset
+     * @throws IllegalStateException if the read pointer cannot be moved back any further (either because it's at the
+     * start of the input stream or any characters in the ring buffer <b>before</b> the current read position have already
+     * been overwritten with data from later in the input stream.      
+     */
     public void setOffset(int offset) 
     {
     	System.out.println("setOffset("+offset+"): current="+offset+",min="+minOffset+",max="+maxOffset+",readPtr: "+readPtr+",writePtr: "+writePtr);        	

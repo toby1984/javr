@@ -6,6 +6,11 @@ import java.io.InputStream;
 
 import org.apache.commons.lang3.Validate;
 
+/**
+ * Default object code writer.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public class ObjectCodeWriter implements IObjectCodeWriter 
 {
     private Buffer codeBuffer;

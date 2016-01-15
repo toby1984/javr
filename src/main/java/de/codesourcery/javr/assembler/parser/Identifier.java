@@ -19,8 +19,13 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
 
-public final class Identifier {
-
+/**
+ * A valid identifier.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
+public final class Identifier 
+{
     private static final Pattern ID_PATTERN = Pattern.compile("^[_]*[a-zA-Z]+[_a-zA-Z0-9]*$");
     
     public final String value;

@@ -5,8 +5,13 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.FunctionCallNode;
 import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
 
-public final class ExpressionToken {
-
+/**
+ * Helper class used by the {@link ShuntingYard} implementation.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
+public final class ExpressionToken 
+{
     private final TextRegion textRegion;
     private final ExpressionTokenType type;
     private final ASTNode token;

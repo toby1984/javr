@@ -20,6 +20,11 @@ import java.util.List;
 
 import org.apache.commons.lang3.Validate;
 
+/**
+ * Default lexer implementation, <b>ignores whitespace tokens by default</b>.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public class LexerImpl implements Lexer 
 {
     public static final boolean DEBUG = true;
@@ -37,36 +42,24 @@ public class LexerImpl implements Lexer
         this.scanner = s;
     }
     
-    /* (non-Javadoc)
-	 * @see de.codesourcery.javr.assembler.parser.LexerIf#eof()
-	 */
     public boolean eof() 
     {
         parseTokens();
         return tokens.get(0).is( TokenType.EOF );
     }
     
-    /* (non-Javadoc)
-	 * @see de.codesourcery.javr.assembler.parser.LexerIf#next()
-	 */
     public Token next() 
     {
         parseTokens();
         return tokens.remove(0);
     }
     
-    /* (non-Javadoc)
-	 * @see de.codesourcery.javr.assembler.parser.LexerIf#peek()
-	 */
     public Token peek() 
     {
         parseTokens();
         return tokens.get(0);
     }
     
-    /* (non-Javadoc)
-	 * @see de.codesourcery.javr.assembler.parser.LexerIf#peek(de.codesourcery.javr.assembler.parser.TokenType)
-	 */
     public boolean peek(TokenType t) {
         return peek().is( t ); 
     }
@@ -253,16 +246,10 @@ outer:
         this.ignoreWhitespace = ignoreWhitespace;
     }
     
-    /* (non-Javadoc)
-	 * @see de.codesourcery.javr.assembler.parser.LexerIf#isIgnoreWhitespace()
-	 */
     public boolean isIgnoreWhitespace() {
         return ignoreWhitespace;
     }
     
-    /* (non-Javadoc)
-	 * @see de.codesourcery.javr.assembler.parser.LexerIf#pushBack(de.codesourcery.javr.assembler.parser.Token)
-	 */
     public void pushBack(Token tok) 
     {
         Validate.notNull(tok, "token must not be NULL");

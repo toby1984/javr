@@ -53,6 +53,11 @@ import de.codesourcery.javr.assembler.parser.ast.StatementNode;
 import de.codesourcery.javr.assembler.parser.ast.StringLiteral;
 import de.codesourcery.javr.assembler.symbols.Symbol;
 
+/**
+ * Using a given lexer, turns a token stream into an AST.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public class Parser 
 {
     private Lexer lexer;
@@ -380,21 +385,20 @@ public class Parser
         Token tok = lexer.peek();
         if ( tok.is( TokenType.DOT ) ) 
         {
-            final TextRegion region = lexer.next().region();
+            final TextRegion region = lexer.next().region(); // consume ','
 
             final Token tok2 = lexer.peek();
-            if ( tok2.is(TokenType.TEXT ) ) 
-            {
-                lexer.next();
-                final ASTNode result = parseDirective2( tok2 );
-                if ( result != null ) 
-                {
-                    region.merge( tok2 );
-                    result.setRegion( region );
-                    return result;                    
-                }
+            if ( ! tok2.is(TokenType.TEXT ) ) {
+                throw new ParseException("Expected a keyword", tok2 );
             }
-            lexer.pushBack( tok );
+            lexer.next(); // consume keyword
+            final ASTNode result = parseDirective2( tok2 );
+            if ( result != null ) 
+            {
+                region.merge( tok2 );
+                result.setRegion( region );
+                return result;                    
+            }
         }
         return null;
     }
@@ -487,7 +491,7 @@ public class Parser
     private LabelNode parseLabel() 
     {
         final Token tok = lexer.peek();
-        if ( tok.is(TokenType.TEXT ) && Identifier.isValidIdentifier( tok.value ) ) 
+        if ( tok.isValidIdentifier() )
         {
             final Identifier id = new Identifier( lexer.next().value );
             if ( lexer.peek( TokenType.COLON ) ) 

@@ -23,6 +23,7 @@ import de.codesourcery.javr.assembler.ICompilationContext;
 
 public class AST extends AbstractASTNode implements Resolvable
 {
+    @SuppressWarnings("unused")
     private static final Logger LOG = Logger.getLogger(AST.class);
     
     private CompilationUnit compilationUnit;

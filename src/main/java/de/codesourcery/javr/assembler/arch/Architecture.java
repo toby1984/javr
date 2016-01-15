@@ -15,12 +15,17 @@
  */
 package de.codesourcery.javr.assembler.arch;
 
+/**
+ * Enumeration of all supported architectures.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ * @see IArchitecture
+ */
 public enum Architecture 
 {
     ATMEGA88("atmega88");
     
     private final String id;
-    
     
     private Architecture(String id) {
         this.id = id;

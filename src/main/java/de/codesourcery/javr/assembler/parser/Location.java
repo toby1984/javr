@@ -15,8 +15,13 @@
  */
 package de.codesourcery.javr.assembler.parser;
 
-public class Location {
-
+/**
+ * A location within a source file (line number and column).
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
+public class Location 
+{
     public final int line;
     public final int column;
     

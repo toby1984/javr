@@ -25,6 +25,51 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
+/**
+ * Helper class that takes a string pattern describing a processor opcode and
+ * the layout of any parameters that may need to be encoded into it.
+ *
+ * <p>
+ * All patterns are treated as MSB so the most significant bit maps to the first valid (see below) character in the 
+ * input pattern.</p>
+ * <p>This class accepts a string that must contain at least one of the following special characters:
+ * 
+ * <ul>
+ *   <li>'1' - a 1-bit</li>
+ *   <li>'0' - a 0-bit</li>
+ *   <li>'s' - a bit from the instruction's source operand</li>
+ *   <li>'k' - alias for 's'</li>
+ *   <li>'r' - alias for 's'</li>
+ *   <li>'d' - a bit from the instruction's destination operand</li>
+ * </ul>
+ * 
+ * Note that a pattern that contains only placeholders for one operand will always {@link #encode(int, int)} the bits of the
+ * <b>destination</b> operand into these positions. 
+ * </p>
+ * 
+ * <b>All other characters are stripped from the input pattern.</p>
+ * <p>The length of the stripped input pattern must be a multiple of eight (bits)</p>.
+ * <p>
+ * This class will try to provide implementations for the {@link #encode(int, int)} and {@link #decode(int)} methods
+ * that operate as fast as possible, using as little shift/bitwise operations as possible to do the encoding/decoding.</p> 
+ * </p> 
+ * </p>Optimized encodings only exist for the following simple patterns (where 's' and 'd' are placeholder for one
+ * or more bits from the source or destination operand)</p>
+ *  <ul>
+ *   <li>'xxxxxx' where x e {'0','1'}</li>
+ *   <li>'xxxxdxx' where x e {'0','1'}</li>
+ *   <li>'xxxxsxx' where x e {'0','1'}</li>
+ *   <li>'xxxxsxs' where x e {'0','1'}</li>
+ *   <li>'xxxxxxd' where x e {'0','1'}</li>
+ *   <li>'xxxxxxs' where x e {'0','1'}</li>
+ * </ul>
+ * 
+ * </p><p>Any other patterns will be encoded/decoded using a bit-by-bit algorithm that obviously is way slower than
+ * the bulk AND/OR/shift operations used by the optimized encoders. 
+ * </p>
+ * 
+ * @author tobias.gierke@code-sourcery.de
+ */
 public class InstructionEncoder 
 {
     private static final Encoding NOP = new NOPEncoding();
@@ -100,7 +145,6 @@ public class InstructionEncoder
         final int shiftedMask    = andMask << (4-getInstructionLengthInBytes())*8;
         final int shiftedPattern = binaryPattern << (4-getInstructionLengthInBytes())*8;
         return (value & shiftedMask) == shiftedPattern;
-//        return (value & andMask) == binaryPattern;
     }
     
     public InstructionEncoder(String pat) 
@@ -301,6 +345,12 @@ public class InstructionEncoder
         return binaryPattern | dstEncoding.encode( dstTransform.transform( dstArgument ) ) | srcEncoding.encode( srcTransform.transform( srcArgument ) );
     }    
     
+    /**
+     * Decode an instruction.
+     * 
+     * @param value
+     * @return Operand values, values for missing operands are returned as <code>null</code> values.
+     */
     public List<Integer> decode(int value) 
     {
         final List<Integer> result = new ArrayList<>();

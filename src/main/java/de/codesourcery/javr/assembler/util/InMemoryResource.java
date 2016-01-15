@@ -29,6 +29,11 @@ public class InMemoryResource implements Resource
     }
     
     @Override
+    public String getName() {
+        return "inmemory://"+name;
+    }
+    
+    @Override
     public boolean pointsToSameData(Resource other) 
     {
         return other == this;

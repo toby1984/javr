@@ -3,6 +3,11 @@ package de.codesourcery.javr.assembler;
 import java.io.IOException;
 import java.io.InputStream;
 
+/**
+ * A buffer for a specific {@link Segment} used by the {@link IObjectCodeWriter}.
+ * 
+ * @author tobias.gierke@code-sourcery.de
+ */
 public interface Buffer 
 {
     public boolean isEmpty();
