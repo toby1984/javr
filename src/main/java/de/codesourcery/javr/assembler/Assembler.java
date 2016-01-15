@@ -52,12 +52,18 @@ public class Assembler
 
     private final class CompilationContext implements ICompilationContext 
     {
+        private final IObjectCodeWriter objectCodeWriter;
+        
+        // stack to keep track of the current compilation unit while processing #include directives
         private final Stack<CompilationUnit> compilationUnits = new Stack<>();
+        
+        // the compilation unit that was passed to start the compilation process
         private final CompilationUnit rootCompilationUnit;
+        
+        // performance optimization to avoid calling Stack#peek() all the time,
+        // updated each time a compilation unit is pushed to the stack/popped from the stack
         private CompilationUnit currentCompilationUnit;
         
-        private final IObjectCodeWriter objectCodeWriter;
-
         public CompilationContext(CompilationUnit unit,IObjectCodeWriter objectCodeWriter) 
         {
             Validate.notNull(unit, "unit must not be NULL");
@@ -87,12 +93,16 @@ public class Assembler
         }
         
         @Override
-        public void pushCompilationUnit(CompilationUnit newUnit) 
+        public boolean pushCompilationUnit(CompilationUnit newUnit) 
         {
 			Validate.notNull(newUnit, "unit must not be NULL");
         	if ( newUnit == currentCompilationUnit() ) {
         		throw new IllegalArgumentException("Cannot push current compilation unit");
         	}
+        	
+        	/*
+        	 * Check for circular dependencies BEFORE pushing the new unit to the stack
+        	 */
         	final Stack<CompilationUnit> stack = new Stack<>();
         	if ( currentCompilationUnit != null ) { // NULL when this method is called by the constructor
         	    stack.push( currentCompilationUnit() );
@@ -107,7 +117,7 @@ public class Assembler
         		if ( unique.containsKey( current ) ) 
         		{
         			error("Circular includes detected: "+unique.keySet(),newUnit.getAST());
-        			return;
+        			return false;
         		}
         		unique.put( current, Boolean.TRUE );
         		stack.addAll( current.getDependencies() );
@@ -122,6 +132,7 @@ public class Assembler
         	}
         	compilationUnits.add( newUnit );
         	this.currentCompilationUnit = newUnit;
+        	return true;
         }
         
         @Override

@@ -68,7 +68,7 @@ public interface ICompilationContext
     public void message(CompilationMessage msg);
     
     // #include handling
-    public void pushCompilationUnit(CompilationUnit unit);
+    public boolean pushCompilationUnit(CompilationUnit unit);
     
     public void popCompilationUnit();
     

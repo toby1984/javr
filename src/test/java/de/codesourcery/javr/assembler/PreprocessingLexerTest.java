@@ -65,10 +65,11 @@ public class PreprocessingLexerTest extends TestCase
         };
         
         @Override
-        public void pushCompilationUnit(CompilationUnit unit) 
+        public boolean pushCompilationUnit(CompilationUnit unit) 
         {
             Validate.notNull(unit, "unit must not be NULL");
             unitStack.push(unit);
+            return true;
         }
 
         @Override

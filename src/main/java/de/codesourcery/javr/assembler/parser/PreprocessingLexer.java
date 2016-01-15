@@ -303,7 +303,9 @@ public class PreprocessingLexer implements Lexer
                 {
                     final Resource res = context.getResourceFactory().resolveResource(context.currentCompilationUnit().getResource(), path );
                     final CompilationUnit newUnit = context.getOrCreateCompilationUnit(res);
-                    context.pushCompilationUnit( newUnit );
+                    if ( ! context.pushCompilationUnit( newUnit ) ) {
+                        throw new ParseException( "Aborting compilation due to circular dependency", tokens.get(0) );
+                    }
                     boolean success = false;
                     try 
                     {
