@@ -47,9 +47,9 @@ import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.util.FileResource;
 import de.codesourcery.javr.assembler.util.FileResourceFactory;
 import de.codesourcery.javr.assembler.util.Resource;
-import de.codesourcery.javr.ui.IConfig;
-import de.codesourcery.javr.ui.ProjectConfiguration.OutputFormat;
-import de.codesourcery.javr.ui.ProjectConfiguration.OutputSpec;
+import de.codesourcery.javr.ui.config.IConfig;
+import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputFormat;
+import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputSpec;
 
 public class CmdLine 
 {

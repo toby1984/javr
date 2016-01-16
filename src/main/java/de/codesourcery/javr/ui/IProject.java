@@ -21,6 +21,8 @@ import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.IObjectCodeWriter;
 import de.codesourcery.javr.assembler.ResourceFactory;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
+import de.codesourcery.javr.ui.config.IConfigProvider;
+import de.codesourcery.javr.ui.config.ProjectConfiguration;
 
 public interface IProject extends ResourceFactory,IConfigProvider
 {

@@ -27,6 +27,7 @@ import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.parser.Token;
 import de.codesourcery.javr.assembler.parser.TokenType;
 import de.codesourcery.javr.assembler.util.StringResource;
+import de.codesourcery.javr.ui.config.IConfigProvider;
 
 public class LineMap 
 {

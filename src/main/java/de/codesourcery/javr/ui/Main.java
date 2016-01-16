@@ -53,6 +53,10 @@ import de.codesourcery.javr.assembler.arch.IArchitecture.DisassemblerSettings;
 import de.codesourcery.javr.assembler.util.FileResource;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
+import de.codesourcery.javr.ui.config.ApplicationConfigProvider;
+import de.codesourcery.javr.ui.config.IApplicationConfig;
+import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
+import de.codesourcery.javr.ui.config.ProjectConfiguration;
 
 public class Main 
 {
@@ -62,7 +66,9 @@ public class Main
 
 	private final List<IProject> projects = new ArrayList<>();
 
+	private IApplicationConfigProvider applicationConfigProvider;
 	private IProject project;
+	
 	private EditorFrame editorFrame;
 	private File lastOpenedProject = new File("/home/tobi/atmel/asm/testproject.properties");
 	private File lastDisassembledFile = new File("/home/tobi/atmel/asm/random.raw");
@@ -88,6 +94,38 @@ public class Main
 	private static File getWorkspaceFile() 
 	{
 		return new File( getWorkingDir() , WORKSPACE_FILE );
+	}
+	
+	private static IApplicationConfigProvider getApplicationConfigProvider(File workspaceDir) 
+	{
+	    final File configFile = new File( workspaceDir , ".javrconfig.json");
+	    final IApplicationConfigProvider result = new ApplicationConfigProvider();
+	    
+	    boolean gotConfigFromFile = false;
+	    if ( configFile.exists() ) 
+	    {
+	        try 
+	        {
+                final IApplicationConfig loaded = ApplicationConfigProvider.load( new FileInputStream( configFile ) );
+                result.setApplicationConfig( loaded );
+                gotConfigFromFile = true;
+            } 
+	        catch (IOException e) 
+	        {
+                LOG.error("getApplicationConfigProvider(): Failed to load config from "+configFile.getAbsolutePath()+", using defaults",e);
+            }
+	    }
+	    
+	    if ( ! gotConfigFromFile ) 
+	    {
+	        LOG.info("getApplicationConfigProvider(): Configuration inaccessible or missing, trying to save defaults to "+configFile.getAbsolutePath());
+            try {
+                ApplicationConfigProvider.save( result.getApplicationConfig() , new FileOutputStream( configFile ) );
+            } catch (IOException e) {
+                LOG.error("getApplicationConfigProvider(): Failed to save config to "+configFile.getAbsolutePath(),e);
+            }	        
+	    }
+	    return result;
 	}
 
 	private static List<IProject> findProjects(File workspaceDir) throws IOException {
@@ -220,6 +258,8 @@ public class Main
 	private void run() throws Exception 
 	{
 		final File workspaceDir = getWorkspaceDir();
+		
+		applicationConfigProvider = getApplicationConfigProvider( workspaceDir );
 
 		projects.addAll( findProjects( workspaceDir ) );
 
@@ -446,7 +486,7 @@ public class Main
 
 	private void addWindows(JDesktopPane pane) throws IOException 
 	{
-		editorFrame = new EditorFrame( project , project.getCompileRoot() );
+		editorFrame = new EditorFrame( project , project.getCompileRoot() , applicationConfigProvider );
 		editorFrame.setResizable(true);
 		editorFrame.setMaximizable(true);
 		editorFrame.pack();

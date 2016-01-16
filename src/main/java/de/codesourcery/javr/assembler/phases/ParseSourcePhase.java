@@ -25,8 +25,8 @@ import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.Parser;
 import de.codesourcery.javr.assembler.parser.PreprocessingLexer;
 import de.codesourcery.javr.assembler.parser.Scanner;
-import de.codesourcery.javr.ui.IConfig;
-import de.codesourcery.javr.ui.IConfigProvider;
+import de.codesourcery.javr.ui.config.IConfig;
+import de.codesourcery.javr.ui.config.IConfigProvider;
 
 /**
  * Uses the preprocessor lexer to turn the source file(s) into an abstract syntax tree (AST).

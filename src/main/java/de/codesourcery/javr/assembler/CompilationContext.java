@@ -27,7 +27,7 @@ import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Resource;
-import de.codesourcery.javr.ui.IConfig;
+import de.codesourcery.javr.ui.config.IConfig;
 
 public final class CompilationContext implements ICompilationContext 
 {

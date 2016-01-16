@@ -32,7 +32,8 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.CompilerSettings;
 import de.codesourcery.javr.assembler.arch.Architecture;
-import de.codesourcery.javr.ui.ProjectConfiguration.OutputFormat;
+import de.codesourcery.javr.ui.config.ProjectConfiguration;
+import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputFormat;
 
 public abstract class ProjectConfigWindow extends JPanel 
 {

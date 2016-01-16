@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package de.codesourcery.javr.ui;
+package de.codesourcery.javr.ui.config;
 
 import java.io.File;
 import java.io.IOException;
@@ -36,6 +36,7 @@ import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.util.FileResource;
 import de.codesourcery.javr.assembler.util.FileResourceFactory;
 import de.codesourcery.javr.assembler.util.Resource;
+import de.codesourcery.javr.ui.Project;
 
 public class ProjectConfiguration implements ResourceFactory
 {

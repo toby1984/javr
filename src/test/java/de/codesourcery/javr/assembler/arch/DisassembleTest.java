@@ -42,8 +42,8 @@ import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
-import de.codesourcery.javr.ui.IConfig;
-import de.codesourcery.javr.ui.IConfigProvider;
+import de.codesourcery.javr.ui.config.IConfig;
+import de.codesourcery.javr.ui.config.IConfigProvider;
 
 public class DisassembleTest  {
 

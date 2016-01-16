@@ -67,13 +67,16 @@ public class CompilationUnit
 
     public void beforeCompilationStarts(SymbolTable parentSymbolTable) 
     {
-        this.messages.clear();
+        clearMessages();
         this.symbolTable.clear();
         this.symbolTable.setParent( parentSymbolTable );
         this.dependencies.clear();
-        this.messages.clear();
     }
 
+    public void clearMessages() {
+        messages.clear();
+    }
+    
     public boolean hasSameResourceAs(CompilationUnit other) 
     {
         return this.resource.pointsToSameData( other.resource );

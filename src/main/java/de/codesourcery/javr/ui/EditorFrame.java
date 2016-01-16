@@ -22,10 +22,7 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
-import java.awt.GridLayout;
 import java.awt.event.ActionListener;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
@@ -50,10 +47,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import javax.swing.JButton;
-import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JInternalFrame;
 import javax.swing.JLabel;
@@ -62,13 +59,14 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
-import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.JToolBar;
 import javax.swing.JTree;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
+import javax.swing.event.AncestorEvent;
+import javax.swing.event.AncestorListener;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.event.TableModelEvent;
@@ -123,15 +121,25 @@ import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
+import de.codesourcery.javr.ui.EditorSettings.SourceElement;
+import de.codesourcery.javr.ui.config.IApplicationConfig;
+import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
 
-public class EditorFrame extends JInternalFrame {
-
+public class EditorFrame extends JInternalFrame 
+{
 	private static final Logger LOG = Logger.getLogger(EditorFrame.class);
 
 	public static final Duration RECOMPILATION_DELAY = Duration.ofMillis( 150 );
 
 	private final JTextPane editor = new JTextPane();
 
+	private final IApplicationConfigProvider appConfigProvider;
+	
+	private final Consumer<IApplicationConfig> configListener = config -> 
+	{
+	    setupStyles();
+	};
+	
 	private boolean ignoreEditEvents;
 	
 	private final List<UndoableEdit> undoStack = new ArrayList<>();
@@ -146,17 +154,16 @@ public class EditorFrame extends JInternalFrame {
 	private JFrame symbolWindow = null;
 
 	private final SymbolTableModel symbolModel = new SymbolTableModel();
-	private final MessageTableModel messageModel = new MessageTableModel();
 
 	private final RecompilationThread recompilationThread = new RecompilationThread();
 
-	protected final Style STYLE_TOPLEVEL;
-	protected final Style STYLE_LABEL;
-	protected final Style STYLE_NUMBER;
-	protected final Style STYLE_REGISTER;
-	protected final Style STYLE_PREPROCESSOR;
-	protected final Style STYLE_MNEMONIC;
-	protected final Style STYLE_COMMENT;
+	protected Style STYLE_TOPLEVEL;
+	protected Style STYLE_LABEL;
+	protected Style STYLE_NUMBER;
+	protected Style STYLE_REGISTER;
+	protected Style STYLE_PREPROCESSOR;
+	protected Style STYLE_MNEMONIC;
+	protected Style STYLE_COMMENT;
 
 	private CompilationUnit currentUnit = new CompilationUnit( new StringResource("dummy",  "" ) );
 
@@ -571,121 +578,6 @@ public class EditorFrame extends JInternalFrame {
 		}
 	}
 
-	private final class MessageTableModel implements TableModel {
-
-		private final List<CompilationMessage> errors = new ArrayList<>();
-
-		private final List<TableModelListener> listeners = new ArrayList<>();
-
-		public void add(CompilationMessage msg) 
-		{
-			Validate.notNull(msg,"msg must not be NULL");
-			this.errors.add(msg);
-			int idx = this.errors.size();
-			final TableModelEvent ev = new TableModelEvent( this , idx ,idx );
-			listeners.forEach( l -> l.tableChanged( ev ) );
-		}
-
-		public void addAll(Collection<CompilationMessage> msg) 
-		{
-			Validate.notNull(msg,"msg must not be NULL");
-			final int start = errors.size();
-			this.errors.addAll(msg);
-			final int end = this.errors.size();
-			final TableModelEvent ev = new TableModelEvent( this , start,end );
-			listeners.forEach( l -> l.tableChanged( ev ) );
-		}        
-
-		public void clear() 
-		{
-			errors.clear();
-			final TableModelEvent ev = new TableModelEvent( this );
-			listeners.forEach( l -> l.tableChanged( ev ) );
-		}
-
-		@Override
-		public int getRowCount() {
-			return errors.size();
-		}
-
-		@Override
-		public int getColumnCount() {
-			return 3;
-		}
-
-		private void assertValidColumn(int columnIndex) {
-			if ( columnIndex < 0 || columnIndex > 3 ) {
-				throw new RuntimeException("Invalid column: "+columnIndex);
-			}
-		}
-		@Override
-		public String getColumnName(int columnIndex) 
-		{
-			switch(columnIndex) {
-				case 0:
-					return "Location";
-				case 1:
-					return "Severity";
-				case 2:
-					return "Message";
-				default:
-					throw new RuntimeException("Invalid column: "+columnIndex);
-			}
-		}
-
-		@Override
-		public Class<?> getColumnClass(int columnIndex) 
-		{
-			assertValidColumn(columnIndex);
-			return String.class;
-		}
-
-		@Override
-		public boolean isCellEditable(int rowIndex, int columnIndex) {
-			return false;
-		}
-
-		@Override
-		public Object getValueAt(int rowIndex, int columnIndex) 
-		{
-			final CompilationMessage msg = errors.get(rowIndex);
-			switch( columnIndex ) {
-				case 0:
-
-					if ( msg.region == null ) {
-						return "<unknown>";
-					}
-					final Location loc = lineMap.getLocationFor( msg.region );
-					return loc == null ? "<unknown>" : loc.toString();
-				case 1:
-					return msg.severity.toString();
-				case 2:
-					return msg.message;
-				default:
-					throw new RuntimeException("Invalid column: "+columnIndex);                 
-			}
-		}
-
-		@Override
-		public void setValueAt(Object aValue, int rowIndex, int columnIndex) {
-			throw new UnsupportedOperationException();
-		}
-
-		@Override
-		public void addTableModelListener(TableModelListener l) {
-			listeners.add(l);
-		}
-
-		@Override
-		public void removeTableModelListener(TableModelListener l) {
-			listeners.remove(l);
-		}
-
-		public CompilationMessage getRow(int row) {
-			return errors.get( row );
-		}
-	}
-
 	private final class ASTTreeModel implements TreeModel 
 	{
 		private final List<TreeModelListener> listeners = new ArrayList<>();
@@ -749,12 +641,13 @@ public class EditorFrame extends JInternalFrame {
 		}
 	}
 
-	public EditorFrame(IProject project, CompilationUnit unit) throws IOException 
+	public EditorFrame(IProject project, CompilationUnit unit,IApplicationConfigProvider appConfigProvider) throws IOException 
 	{
 		super("Editor");
 		Validate.notNull(project, "project must not be NULL");
 		Validate.notNull(unit, "unit must not be NULL");
-
+        Validate.notNull(appConfigProvider, "appConfigProvider must not be NULL");
+        this.appConfigProvider = appConfigProvider;
 		this.project = project;
 		this.currentUnit = unit;
 
@@ -822,106 +715,66 @@ public class EditorFrame extends JInternalFrame {
 		// editor        
 		JScrollPane editorPane = new JScrollPane( editor );
 
-		// error messages table
-		final JTable errorTable = new JTable( messageModel );
-
-		errorTable.setDefaultRenderer( String.class , new DefaultTableCellRenderer() 
-		{
-			public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) 
-			{
-				final Component result = super.getTableCellRendererComponent(errorTable, value, isSelected, hasFocus, row, column);
-				if ( column == 1 ) {
-					final CompilationMessage msg = messageModel.getRow( row );
-					switch ( msg.severity ) 
-					{
-						case ERROR:
-							result.setBackground( Color.RED );
-							break;
-						case WARNING:
-							result.setBackground( Color.YELLOW );
-							break;
-						default:
-							result.setBackground( Color.WHITE );
-					}
-				} else {
-					result.setBackground( Color.WHITE );
-				}
-				return result;
-			}
-		} );
-		errorTable.addMouseListener( new MouseAdapter() {
-			@Override
-			public void mouseClicked(MouseEvent e) 
-			{
-				if ( e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1 ) 
-				{
-					int row = errorTable.rowAtPoint( e.getPoint() );
-					if ( row != -1 ) {
-						CompilationMessage msg = messageModel.getRow( row );
-						if ( msg.region != null ) 
-						{
-							editor.setCaretPosition( msg.region.start() );
-							editor.requestFocus();
-						}
-					}
-				}
-			}
-		});
-
-		final JScrollPane errorTablePane = new JScrollPane( errorTable );
-		final JSplitPane splitPane = new JSplitPane( JSplitPane.VERTICAL_SPLIT , editorPane, errorTablePane );
-
 		// ugly hack to adjust splitpane size after it has become visible
-		addComponentListener( new ComponentAdapter() 
-		{
-			private boolean sizeAdjusted = false;
-
-			@Override
-			public void componentShown(ComponentEvent e) 
-			{
-				if ( ! sizeAdjusted ) 
-				{
-					sizeAdjusted = true;
-					final AtomicReference<Timer> timer = new AtomicReference<Timer>();
-					final ActionListener listener = ev -> 
-					{
-						timer.get().stop();
-						splitPane.setDividerLocation(0.9d);
-					};
-					timer.set( new Timer( 250 , listener) );
-					timer.get().start();
-				}
-			}
-		});
+		addAncestorListener( new AncestorListener() {
+            
+            @Override
+            public void ancestorRemoved(AncestorEvent event) { 
+                appConfigProvider.removeChangeListener( configListener );
+            }
+            
+            @Override
+            public void ancestorMoved(AncestorEvent event) { }
+            
+            @Override
+            public void ancestorAdded(AncestorEvent event) 
+            {
+                appConfigProvider.addChangeListener( configListener );
+            }
+        });
+		
 		cnstrs = new GridBagConstraints();
 		cnstrs.fill = GridBagConstraints.BOTH;
 		cnstrs.weightx = 1.0; cnstrs.weighty=1;
 		cnstrs.gridwidth=1; cnstrs.gridheight = 1 ;
 		cnstrs.gridx = 0; cnstrs.gridy = 1;
 
-		panel.add( splitPane , cnstrs );
+		panel.add( editorPane , cnstrs );
 
 		getContentPane().add( panel );
 
 		this.lineMap = new LineMap("",project);
 
 		// setup styles
-		final StyleContext ctx = new StyleContext();
-
-		final Style topLevelStyle = ctx.addStyle( "topLevelStyle" , null);
-		STYLE_TOPLEVEL = topLevelStyle;
-
-		STYLE_LABEL    = createStyle( "labelStyle" , Color.GREEN , topLevelStyle , ctx );
-		STYLE_NUMBER   = createStyle( "numberStyle" , Color.BLUE , topLevelStyle , ctx );
-		STYLE_REGISTER = createStyle( "registerStyle" , Color.MAGENTA, topLevelStyle , ctx );
-		STYLE_MNEMONIC = createStyle( "mnemonicStyle" , Color.BLACK , topLevelStyle , ctx );
-		STYLE_COMMENT  = createStyle( "commentStyle" , Color.GRAY , topLevelStyle , ctx );     
-		STYLE_PREPROCESSOR = createStyle( "preprocStyle" , Color.RED , topLevelStyle , ctx );     
+		setupStyles();
 
 		// setup recompilation
 		recompilationThread.start();
 
 		setProject( project , currentUnit );
+	}
+	
+	private void setupStyles() 
+	{
+        final StyleContext ctx = new StyleContext();
+
+        final Style topLevelStyle = ctx.addStyle( "topLevelStyle" , null);
+        STYLE_TOPLEVEL = topLevelStyle;
+
+        STYLE_LABEL    = createStyle( "labelStyle" , SourceElement.LABEL, ctx );
+        STYLE_NUMBER   = createStyle( "numberStyle" , SourceElement.NUMBER, ctx );
+        STYLE_REGISTER = createStyle( "registerStyle" , SourceElement.REGISTER , ctx );
+        STYLE_MNEMONIC = createStyle( "mnemonicStyle" , SourceElement.MNEMONIC, ctx );
+        STYLE_COMMENT  = createStyle( "commentStyle" , SourceElement.COMMENT , ctx );     
+        STYLE_PREPROCESSOR = createStyle( "preprocStyle" , SourceElement.PREPROCESSOR , ctx );   	    
+	}
+	
+	private Style createStyle(String name,SourceElement sourceElement,StyleContext ctx) 
+	{
+	    final Color col = appConfigProvider.getApplicationConfig().getEditorSettings().getColor( sourceElement , Color.BLACK );
+	    final Style style = ctx.addStyle( name , STYLE_TOPLEVEL );
+	    style.addAttribute(StyleConstants.Foreground, col );
+	    return style;
 	}
 
 	private Document createDocument() 
@@ -1024,7 +877,7 @@ public class EditorFrame extends JInternalFrame {
 
 	public void compile() 
 	{
-		messageModel.clear();
+	    currentUnit.clearMessages();
 		symbolModel.clear();
 
 		String text = editor.getText();
@@ -1039,7 +892,7 @@ public class EditorFrame extends JInternalFrame {
 		catch(IOException e) 
 		{
 			LOG.error("compile(): Failed to save changes",e);
-			messageModel.add( CompilationMessage.error( "Failed to save changes: "+e.getMessage()) );
+			currentUnit.addMessage( CompilationMessage.error( "Failed to save changes: "+e.getMessage()) );
 			return;
 		}
 
@@ -1060,7 +913,7 @@ public class EditorFrame extends JInternalFrame {
 			root.addMessage( toCompilationMessage( e ) );
 		}
 		symbolModel.setSymbolTable( currentUnit.getSymbolTable() );        
-		messageModel.addAll( root.getMessages(true) );        
+//		messageModel.addAll( root.getMessages(true) );        
 		astTreeModel.setAST( root.getAST() );
 
 		doSyntaxHighlighting();
@@ -1070,11 +923,11 @@ public class EditorFrame extends JInternalFrame {
 		final float linesPerSeconds = lineMap.getLineCount()/seconds;
 		final String time = "Time: "+ assembleTime +" ms , "+DF.format( linesPerSeconds )+" lines/s";
 
-		messageModel.add( new CompilationMessage(Severity.INFO, time) );
+		currentUnit.addMessage( CompilationMessage.info(time) );
 
 		final String success = compilationSuccessful ? "successful" : "failed"; 
 		final DateTimeFormatter df = DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss");
-		messageModel.add( new CompilationMessage(Severity.INFO, "Compilation "+success+" ("+assembleTime+" millis) on "+df.format( ZonedDateTime.now() ) ) );
+		currentUnit.addMessage( CompilationMessage.info("Compilation "+success+" ("+assembleTime+" millis) on "+df.format( ZonedDateTime.now() ) ) );
 	}
 
 	private static CompilationMessage toCompilationMessage(Exception e)
@@ -1408,13 +1261,6 @@ public class EditorFrame extends JInternalFrame {
 		}
 	}
 
-	private static Style createStyle(String name,Color col,Style parent,StyleContext ctx) 
-	{
-		final Style style = ctx.addStyle( name , parent );
-		style.addAttribute(StyleConstants.Foreground, col );
-		return style;
-	}
-
 	public void setProject(IProject project,CompilationUnit unit) throws IOException 
 	{
 		Validate.notNull(project, "project must not be NULL");
@@ -1443,7 +1289,7 @@ public class EditorFrame extends JInternalFrame {
 			if ( editor.getText() != null )  {
 				w.write( editor.getText() );
 			}
-			messageModel.add( new CompilationMessage(Severity.INFO , "Source saved to "+file.getAbsolutePath() ) );
+			currentUnit.addMessage( CompilationMessage.info("Source saved to "+file.getAbsolutePath() ) );
 		}
 	}    
 }
