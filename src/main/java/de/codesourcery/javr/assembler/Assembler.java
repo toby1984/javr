@@ -92,7 +92,7 @@ public class Assembler
 
                 if ( hasErrors ) 
                 {
-                    LOG.error("compile(): Compilation failed with errors in phase "+p);
+                    LOG.error("compile(): Compilation failed with errors in phase '"+p.getName()+"'");
                     return false;
                 }
             }

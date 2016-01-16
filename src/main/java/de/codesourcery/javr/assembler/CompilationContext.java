@@ -23,6 +23,7 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
+import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Resource;
@@ -50,6 +51,11 @@ public final class CompilationContext implements ICompilationContext
     // updated each time a compilation unit is pushed to the stack/popped from the stack
     private CompilationUnit currentCompilationUnit;
     
+    // limit at which compilation is aborted
+    private final int maxErrorsLimit;
+    
+    private int errorCount; // total error count
+    
     public CompilationContext(CompilationUnit unit,
             IObjectCodeWriter objectCodeWriter, 
             ResourceFactory resourceFactory,
@@ -69,6 +75,7 @@ public final class CompilationContext implements ICompilationContext
         this.globalSymbolTable = globalSymbolTable;
         this.compilerSettings = compilerSettings;
         this.config = config;
+        this.maxErrorsLimit = compilerSettings.getMaxErrors();
         pushCompilationUnit( unit );
     }
     
@@ -76,6 +83,12 @@ public final class CompilationContext implements ICompilationContext
     public CompilationUnit newCompilationUnit(Resource res) 
     {
         return new CompilationUnit( res , currentCompilationUnit().getSymbolTable() );
+    }
+    
+    @Override
+    public boolean hasReachedMaxErrors() 
+    {
+        return errorCount >= maxErrorsLimit;
     }
     
     @Override
@@ -192,13 +205,22 @@ public final class CompilationContext implements ICompilationContext
     }
 
     @Override
-    public void error(String message, ASTNode node) {
-        message( CompilationMessage.error(message,node ) );
+    public boolean error(String message, ASTNode node) {
+        return message( CompilationMessage.error(message,node ) );
     }
 
     @Override
-    public void message(CompilationMessage msg) {
+    public boolean message(CompilationMessage msg) 
+    {
+        if ( msg.severity.equalOrGreater( Severity.ERROR ) ) 
+        {
+            if ( errorCount >= maxErrorsLimit ) {
+                return false;
+            }
+            errorCount++;
+        }
         currentCompilationUnit().addMessage( msg );
+        return true;
     }
 
     @Override

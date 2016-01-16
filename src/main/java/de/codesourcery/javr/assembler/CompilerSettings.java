@@ -19,6 +19,8 @@ import de.codesourcery.javr.assembler.ICompilationContext.ICompilationSettings;
 
 public class CompilerSettings implements ICompilationSettings {
 
+    private int maxErrors = 100;
+    
     private boolean failOnAddressOutOfRange=true;
 
     public CompilerSettings() {
@@ -37,6 +39,7 @@ public class CompilerSettings implements ICompilationSettings {
      * into the memory of the target architecture.
      * 
      * @param failOnAddressOutOfRange
+     * @return this instance (for chaining)
      */
     public CompilerSettings setFailOnAddressOutOfRange(boolean failOnAddressOutOfRange) {
         this.failOnAddressOutOfRange = failOnAddressOutOfRange;
@@ -51,5 +54,25 @@ public class CompilerSettings implements ICompilationSettings {
     @Override
     public boolean isFailOnAddressOutOfRange() {
         return failOnAddressOutOfRange;
+    }
+    
+    /**
+     * Returns the max. number of error messages permitted before compilation is aborted.
+     * 
+     * @return
+     */
+    public int getMaxErrors() {
+        return maxErrors;
+    }
+    
+    /**
+     * Sets the max. number of error messages permitted before compilation is aborted.
+     *      
+     * @param maxErrors
+     * @return this instance (for chaining)     
+     */
+    public CompilerSettings setMaxErrors(int maxErrors) {
+        this.maxErrors = maxErrors;
+        return this;
     }
 }

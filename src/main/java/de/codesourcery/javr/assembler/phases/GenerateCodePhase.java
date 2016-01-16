@@ -66,9 +66,7 @@ public class GenerateCodePhase extends AbstractPhase
     
     protected boolean generateCode(ICompilationContext context, ASTNode node,IIterationContext ctx) 
     {
-        if ( ! super.visitNode( context , node , ctx ) ) {
-            return false;
-        }
+        visitNode( context , node , ctx );
 
         if ( node instanceof InstructionNode ) 
         {

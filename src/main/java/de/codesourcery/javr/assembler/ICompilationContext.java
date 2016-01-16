@@ -63,9 +63,23 @@ public interface ICompilationContext
     public void allocateBytes(int numberOfBytes);    
     
     // error handling
-    public void error(String message,ASTNode node);
+    /**
+     * 
+     * @param message
+     * @param node
+     * @return <code>false</code> if the maximum number of compilation errors has already been reached, and compilation should be aborted, otherwise <code>false</code>.
+     */
+    public boolean error(String message,ASTNode node);
     
-    public void message(CompilationMessage msg);
+    public boolean hasReachedMaxErrors();
+    
+    /**
+     * 
+     * @param msg
+     * @return <code>false</code> if the message has <code>Severity.ERROR</code> and the maximum number of compilation errors has already been reached
+     * and compilation should be aborted, otherwise <code>true</code>
+     */
+    public boolean message(CompilationMessage msg);
     
     // #include handling
     public boolean pushCompilationUnit(CompilationUnit unit);

@@ -17,7 +17,6 @@ package de.codesourcery.javr.assembler.phases;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Segment;
-import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode.IASTVisitor;
@@ -52,7 +51,9 @@ public class SyntaxCheckPhase implements Phase
                 {
                     if ( context.currentSegment() != Segment.FLASH ) 
                     {
-                        context.error("Instructions need to be placed in CODE segment",node);
+                        if ( ! context.error("Instructions need to be placed in CODE segment",node) ) {
+                            ctx.stop();
+                        }
                     }
                 }
                else if ( node instanceof DirectiveNode ) 
@@ -63,7 +64,9 @@ public class SyntaxCheckPhase implements Phase
                        operandCount = operandCount > 0 ? operandCount-1 : operandCount;
                    } 
                    if ( ! directive.isValidOperandCount( operandCount ) ) {
-                       context.error( directive.name().toUpperCase()+" directive has invalid operand count "+node.childCount()+" , (expected at least "+directive.minOperandCount+" and at most "+directive.maxOperandCount, node );
+                       if ( ! context.error( directive.name().toUpperCase()+" directive has invalid operand count "+node.childCount()+" , (expected at least "+directive.minOperandCount+" and at most "+directive.maxOperandCount, node ) ) {
+                           ctx.stop();
+                       }
                    }
                    
                    switch( directive ) 
@@ -77,7 +80,9 @@ public class SyntaxCheckPhase implements Phase
                        case RESERVE:
                            if( context.currentSegment() != Segment.SRAM && context.currentSegment() != Segment.EEPROM ) 
                            {
-                               context.message( CompilationMessage.error("Cannot reserve bytes in "+context.currentSegment()+" segment, only SRAM and EEPROM are supported",node ) );
+                               if ( ! context.error( "Cannot reserve bytes in "+context.currentSegment()+" segment, only SRAM and EEPROM are supported",node ) ) {
+                                   ctx.stop();
+                               }
                            }
                            break;
                        case EQU: // currently ignored

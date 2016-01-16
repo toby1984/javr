@@ -273,9 +273,6 @@ public class ProjectConfiguration implements ResourceFactory
     
     public void setProjectName(String projectName) {
         Validate.notBlank(projectName, "projectName must not be NULL or blank");
-        if ( "true".equals( projectName ) ) {
-            System.out.println("out");
-        }
         this.projectName = projectName;
     }
     

@@ -39,7 +39,7 @@ public abstract class AbstractPhase implements Phase
         this.name = name;
     }
     
-    protected boolean visitNode(ICompilationContext context, ASTNode node,IIterationContext ctx) 
+    protected void visitNode(ICompilationContext context, ASTNode node,IIterationContext ctx) 
     {
         if ( node instanceof DirectiveNode )
         {
@@ -53,7 +53,6 @@ public abstract class AbstractPhase implements Phase
                     // $$FALL-THROUGH$$
             }
         }
-        return true;
     }
 
     @Override

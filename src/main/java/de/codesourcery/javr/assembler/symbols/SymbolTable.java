@@ -200,7 +200,7 @@ public class SymbolTable
         return internalGet( name ) != null;
     }    
     
-    public void defineSymbol(Symbol symbol) 
+    public void defineSymbol(Symbol symbol) throws DuplicateSymbolException
     {
         Validate.notNull(symbol, "symbol must not be NULL");
         if ( ! symbol.hasType(Type.PREPROCESSOR_MACRO ) ) {

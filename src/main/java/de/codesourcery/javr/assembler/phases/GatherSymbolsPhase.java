@@ -53,9 +53,7 @@ public class GatherSymbolsPhase extends AbstractPhase
             @Override
             public void visit(ASTNode node, IIterationContext ctx) 
             {
-                if ( ! visitNode( context , node , ctx ) ) {
-                    return;
-                }
+                visitNode( context , node , ctx );
                 
                 if ( node instanceof DirectiveNode ) 
                 {
@@ -69,7 +67,9 @@ public class GatherSymbolsPhase extends AbstractPhase
                 else if ( node instanceof FunctionDefinitionNode ) 
                 {
                     final FunctionDefinitionNode func =(FunctionDefinitionNode) node;
-                    defineSymbol( func , new Symbol(func.name,Symbol.Type.PREPROCESSOR_MACRO , context.currentCompilationUnit() , func ) ); 
+                    if ( ! defineSymbol( func , new Symbol(func.name,Symbol.Type.PREPROCESSOR_MACRO , context.currentCompilationUnit() , func ) ) ) {
+                        ctx.stop();
+                    }
                 } 
                 else if ( node instanceof IdentifierNode) 
                 {
@@ -81,7 +81,10 @@ public class GatherSymbolsPhase extends AbstractPhase
                     final LabelNode label = (LabelNode) node;
                     final Symbol symbol = new Symbol( label.identifier , Symbol.Type.ADDRESS_LABEL , context.currentCompilationUnit() , label );
                     label.setSymbol( symbol );
-                    defineSymbol( label , symbol );
+                    if ( ! defineSymbol( label , symbol ) ) 
+                    {
+                        ctx.stop();
+                    }
                 } 
             }
 
@@ -90,15 +93,16 @@ public class GatherSymbolsPhase extends AbstractPhase
                 context.currentSymbolTable().declareSymbol( identifier , context.currentCompilationUnit() );
             }
 
-            private void defineSymbol(ASTNode node,final Symbol symbol) 
+            private boolean defineSymbol(ASTNode node,final Symbol symbol) throws DuplicateSymbolException 
             {
                 try {
                     context.currentSymbolTable().defineSymbol( symbol );
                 } 
                 catch(DuplicateSymbolException e) 
                 {
-                    context.message( CompilationMessage.error("Duplicate symbol: "+symbol.name() ,node) );
+                    return context.message( CompilationMessage.error("Duplicate symbol: "+symbol.name() ,node) );
                 }
+                return true;
             }
         };
         

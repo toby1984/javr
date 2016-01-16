@@ -29,7 +29,12 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.ConsoleAppender;
+import org.apache.log4j.FileAppender;
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.log4j.PatternLayout;
 
 import de.codesourcery.hex2raw.IntelHex;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
@@ -54,24 +59,115 @@ public class CmdLine
     {
         System.exit( run(args) );
     }
+    
+    private static int printHelp() 
+    {
+        System.out.println();
+        System.out.println("Usage:\n [-v] [-h] <source file>\n\n");
+        System.out.println("Assembles the source file for an ATMega88.\n");
+        System.out.println("-h/--help          => show help");
+        System.out.println("-v                 => verbose output");
+        System.out.println("--max-errors <num> => sets the maximum number of errors that is permitted before compilation is aborted");
+        System.out.println("-f <intel|raw>     => output format (intel hex or raw binary)");
+        return 1;
+    }
 
+    private static void setupConsoleAppender() 
+    {
+        final ConsoleAppender console = new ConsoleAppender(); 
+        
+        console.setLayout(new PatternLayout("%d{ISO8601} %p [%t] %c:%L - %m%n")); 
+        console.setThreshold(Level.FATAL);
+        console.activateOptions();
+        
+        Logger.getRootLogger().removeAllAppenders();
+        Logger.getRootLogger().addAppender(console);
+    }
+    
     public static int run(String[] arguments) 
     {
-        final Set<String> switches = new HashSet<>( Arrays.asList( new String[] {"-v"} ) );
+        setupConsoleAppender();
+        
+        final Assembler asm = new Assembler();    
+        
+        final Set<String> switches = new HashSet<>( Arrays.asList( new String[] {"-v","-h", "--help" , "--verbose"} ) );
 
         final List<String> args = new ArrayList<>( Arrays.asList( arguments ) );
+        final boolean help = args.stream().anyMatch( a -> "-h".equals( a ) || "--help".equals( a ) );
+
+        if ( help ) 
+        {
+            return printHelp();
+        }
+        
         final boolean verbose = args.stream().anyMatch( a -> "-v".equals( a ) );
+        
+        final Set<String> argsSeen = new HashSet<>();
+        OutputFormat outputFormat = null;
+        for ( int i = 0 ; i < args.size() ; i++ ) 
+        {
+            final String arg = args.get(i);
+            final String nextArg = (i+1) < args.size() ? args.get(i+1) : null;
+            final boolean hasMoreArgs = StringUtils.isNotBlank( nextArg );
+            int argsToRemove = 0;
+            if ( "-f".equals( arg ) ) 
+            {
+                if ( ! hasMoreArgs ) {
+                    return error("-f option needs an argument");
+                }
+                if ( argsSeen.contains( arg ) ) 
+                {
+                    return error("Duplicate command-line argument '"+arg+"'");
+                }
+                argsSeen.add( arg );
+                switch( nextArg ) {
+                    case "intel": outputFormat = OutputFormat.INTEL_HEX; break;
+                    case "raw": outputFormat = OutputFormat.RAW; break;
+                    default:
+                        return error("Unknown output format '"+nextArg+"'");
+                }
+                argsToRemove = 2;
+            } else if ( "--max-errors".equals(arg ) )
+            {
+                if ( ! hasMoreArgs ) {
+                    return error("-f option needs an argument");
+                }
+                if ( argsSeen.contains( arg ) ) 
+                {
+                    return error("Duplicate command-line argument '"+arg+"'");
+                }
+                argsSeen.add( arg );
+                try {
+                    asm.getCompilerSettings().setMaxErrors( Integer.parseInt( nextArg.trim() ) );
+                } catch(NumberFormatException e) {
+                    return error("Invalid command-line, expected a number but got '"+nextArg.trim()+"'");
+                }
+                argsToRemove = 2;                
+            }
+             
+            if ( argsToRemove != 0 ) 
+            {
+                for ( int j = argsToRemove ; j > 0 ; j--) {
+                    args.remove(i);
+                }
+                i--;                
+            }
+        }
+        
+        if ( outputFormat == null ) {
+            outputFormat = OutputFormat.INTEL_HEX;
+        }
 
         args.removeIf( arg -> switches.contains( arg ) );
 
         if ( args.size() != 1 ) {
-            return error("Invalid command line, you need to provide exactly one file to compile");
+            return error("Invalid command line, you need to provide exactly one file to compile (got "+args.size()+")");
         }
 
-        final File srcFile = new File(args.get(0) ); 
+        final File srcFile;
         final CompilationUnit unit; 
         try {
-
+            srcFile = new File(args.get(0) ).getCanonicalFile();
             unit = new CompilationUnit( new FileResource( srcFile , Resource.ENCODING_UTF ) );
         } catch (IOException e) {
             return error( "Failed to open file",e );
@@ -81,13 +177,14 @@ public class CmdLine
 
         final ObjectCodeWriter writer;
         try {
-            writer = createOutputWriter(srcFile, OutputFormat.INTEL_HEX , unit, arch);
+            writer = createOutputWriter(srcFile, outputFormat, unit, arch);
         } 
         catch (IOException e1) 
         {
             return error("Failed to create output files",e1);
         }
 
+        System.out.println("Compiling "+srcFile.getAbsolutePath() );
         final ResourceFactory rf = FileResourceFactory.createInstance( srcFile.getParentFile() );
 
         final IConfig config  = new IConfig() 
@@ -113,7 +210,6 @@ public class CmdLine
 
         try 
         {
-            final Assembler asm = new Assembler();            
             asm.compile( unit , writer , rf , ()-> config );
             printMessages(unit);
         } 
@@ -127,8 +223,10 @@ public class CmdLine
     
     private static void printMessages(CompilationUnit unit) 
     {
-        unit.getMessages( true ).forEach( msg -> 
-        {
+        final List<CompilationMessage> messages = unit.getMessages( true );
+        messages.sort(  CompilationMessage.compareSeverityDescending() );
+        
+        for ( final CompilationMessage msg : messages ) {
             final String prefix;
             boolean severe = true;
             switch( msg.severity ) 
@@ -146,7 +244,7 @@ public class CmdLine
             } else {
                 System.out.println( text );
             }
-        });
+        }
     }
     
     private static ObjectCodeWriter createOutputWriter(final File srcFile,OutputFormat format,final CompilationUnit unit, final IArchitecture arch)throws IOException 

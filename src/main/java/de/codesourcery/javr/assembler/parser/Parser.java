@@ -18,6 +18,7 @@ package de.codesourcery.javr.assembler.parser;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -66,7 +67,17 @@ public class Parser
 
     public static enum Severity 
     {
-        INFO,WARNING,ERROR;
+        INFO(0),WARNING(1),ERROR(2);
+        public final int level;
+        
+        private Severity(int level) {
+            this.level = level;
+        }
+        
+        public boolean equalOrGreater(Severity other) 
+        {
+            return this.level >= other.level;
+        }
     }
 
     public static final class CompilationMessage 
@@ -75,6 +86,11 @@ public class Parser
         public final String message;
         public final TextRegion region;
         public final ASTNode node;
+        
+        public static Comparator<CompilationMessage> compareSeverityDescending() 
+        {
+            return (a,b) -> Integer.compare(b.severity.level,a.severity.level);
+        }
         
         @Override
         public String toString() 

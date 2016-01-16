@@ -160,14 +160,19 @@ public class PreprocessingLexerTest extends TestCase
         }
 
         @Override
-        public void error(String message, ASTNode node) 
+        public boolean error(String message, ASTNode node) 
         {
-            message( CompilationMessage.error( message , node ) );
+            return message( CompilationMessage.error( message , node ) );
+        }
+        
+        public boolean hasReachedMaxErrors() {
+            return false;
         }
 
         @Override
-        public void message(CompilationMessage msg) {
+        public boolean message(CompilationMessage msg) {
             messages.add( msg );
+            return true;
         }
 
         @Override

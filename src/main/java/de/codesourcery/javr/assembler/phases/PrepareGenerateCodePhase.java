@@ -57,11 +57,13 @@ public class PrepareGenerateCodePhase extends GenerateCodePhase
         for ( ASTNode child : ast.children() ) 
         {
             final StatementNode stmt = (StatementNode) child;
-            if ( visitNode( context , stmt, fakeCtx ) ) 
-            {
-                stmt.resolve( context ); 
-                stmt.children().forEach( c -> generateCode( context , c, fakeCtx ) ); 
-            }
+            visitNode( context , stmt, fakeCtx ); 
+            stmt.resolve( context ); 
+            stmt.children().forEach( c -> generateCode( context , c, fakeCtx ) ); 
+        }
+        
+        if ( context.hasReachedMaxErrors() ) {
+            return;
         }
         
         // sanity check
