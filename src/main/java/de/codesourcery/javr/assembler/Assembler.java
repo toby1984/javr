@@ -36,7 +36,7 @@ public class Assembler
     private static final Logger LOG = Logger.getLogger(Assembler.class);
 
     private final CompilerSettings compilerSettings = new CompilerSettings();
-    
+
     private CompilationContext compilationContext;
 
     public boolean compile(CompilationUnit unit,IObjectCodeWriter codeWriter,ResourceFactory rf, IConfigProvider config) throws IOException 
@@ -45,13 +45,13 @@ public class Assembler
         Validate.notNull(codeWriter, "codeWriter must not be NULL");
         Validate.notNull(rf, "resourceFactory must not be NULL");
         Validate.notNull(config, "provider must not be NULL");
-        
+
         final SymbolTable globalSymbolTable = new SymbolTable(SymbolTable.GLOBAL);
-        
+
         unit.beforeCompilationStarts(globalSymbolTable);
 
         this.compilationContext = new CompilationContext( unit , codeWriter , rf , globalSymbolTable , compilerSettings , config.getConfig() );
-        
+
         final List<Phase> phases = new ArrayList<>();
         phases.add( new ParseSourcePhase(config) );
         phases.add( new SyntaxCheckPhase() );
@@ -96,7 +96,7 @@ public class Assembler
                     return false;
                 }
             }
-            
+
             success = true;
         } 
         finally 
