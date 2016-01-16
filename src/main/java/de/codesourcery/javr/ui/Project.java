@@ -170,7 +170,7 @@ public class Project implements IProject
     }
 
     @Override
-    public void uploadToController(OutputStream stdOut,OutputStream stdErr) throws IOException 
+    public void uploadToController() throws IOException 
     {
         if ( ! canUploadToController() ) {
             throw new IllegalStateException("No upload command configured on this project");
@@ -212,28 +212,14 @@ public class Project implements IProject
             throw new RuntimeException("Internal error, no parameters ?");
         }
 
-        final List<String> command = Misc.expand( projectConfig.getUploadCommand() , params );
+        final List<String> arguments = Misc.expand( projectConfig.getUploadCommand() , params );
 
         // invoke command
-        LOG.info("uploadToController(): "+command.stream().collect(Collectors.joining()));
+        final String cmd = arguments.stream().collect(Collectors.joining(" "));
+        LOG.info("uploadToController(): "+cmd);
 
-        final ProcessBuilder builder = new ProcessBuilder( command );
-        final Process process = builder.start();
-        int exitCode = -1;
-        try {
-            exitCode = process.waitFor();
-        } 
-        catch (InterruptedException e) 
-        {
-            Thread.currentThread().interrupt();
-        }
-        IOUtils.copy( process.getInputStream() , stdOut );
-        IOUtils.copy( process.getErrorStream() , stdErr );
-        
-        if ( exitCode != 0 ) 
-        {
-            throw new IOException("Upload to microcontroller failed");
-        }
+        final ProcessWindow window = new ProcessWindow("Upload to uC" , "Upload using \n\n"+cmd , true );
+        window.execute( arguments );
     }
 
     @Override

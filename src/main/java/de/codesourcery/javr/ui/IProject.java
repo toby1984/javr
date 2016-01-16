@@ -1,7 +1,6 @@
 package de.codesourcery.javr.ui;
 
 import java.io.IOException;
-import java.io.OutputStream;
 
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.IObjectCodeWriter;
@@ -24,7 +23,7 @@ public interface IProject extends ResourceFactory,IConfigProvider
     
     public boolean canUploadToController();
     
-    public void uploadToController(OutputStream stdOut,OutputStream stdErr) throws IOException; 
+    public void uploadToController() throws IOException; 
     
     public boolean compile() throws IOException;
 }

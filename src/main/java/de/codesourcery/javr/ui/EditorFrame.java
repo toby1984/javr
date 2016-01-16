@@ -993,66 +993,22 @@ public class EditorFrame extends JInternalFrame {
 	{
 		if ( project.canUploadToController() ) 
 		{
-			final ByteArrayOutputStream stdOut = new ByteArrayOutputStream();
-			final ByteArrayOutputStream stdErr = new ByteArrayOutputStream();
-			boolean success = false;
 			try 
 			{
-				project.uploadToController( stdOut , stdErr );
-
-				success = true;
-
-				if ( LOG.isDebugEnabled() ) {
-					LOG.debug("UPLOAD - Std out: "+new String( stdOut.toByteArray() ) );
-					LOG.debug("UPLOAD - Std err: "+new String( stdErr.toByteArray() ) );
-				}
+				project.uploadToController();
 			} 
 			catch(Exception e) 
 			{
-				LOG.error("UPLOAD failed - Std out: "+new String( stdOut.toByteArray() ) );
-				LOG.error("UPLOAD failed - Std err: "+new String( stdErr.toByteArray() ) );                
-				LOG.error("uploadToController(): Upload failed",e);
-			} finally {
-				showUploadResult( stdOut , stdErr, success );
-			}
-		} else 
+				LOG.error("UPLOAD failed",e);
+				Main.fail("Upload failed",e);
+			} 
+		}
+		else 
 		{
 			JOptionPane.showMessageDialog(null, "Upload not possible", "Program upload", JOptionPane.INFORMATION_MESSAGE );
 		}
 	}
-
-	private void showUploadResult(ByteArrayOutputStream stdOut,ByteArrayOutputStream stdErr,boolean success) {
-
-		final  JTextArea stdOutList = new JTextArea();
-		stdOutList.setColumns( 40 );
-		stdOutList.setText( new String(stdOut.toByteArray()) );
-
-		final JTextArea stdErrList = new JTextArea();
-		stdErrList.setColumns( 40 );
-		stdErrList.setText( new String( stdErr.toByteArray() ) );
-
-		final JPanel panel = new JPanel();
-		panel.setLayout( new GridLayout(5,1) );
-
-		panel.add( new JLabel( "Standard output") );
-		panel.add( new JScrollPane( stdOutList ) );
-
-		panel.add( new JLabel( "Standard error") );
-		panel.add( new JScrollPane( stdErrList ) );
-
-		final JButton close = new JButton("Close");
-		panel.add( close );
-
-		final JDialog dialog = new JDialog( (java.awt.Frame) null , "Upload result" , true );
-		dialog.getContentPane().add( panel );
-
-		close.addActionListener( ev -> dialog.dispose() );
-
-		dialog.pack();
-		dialog.setVisible( true );
-		dialog.setLocationRelativeTo( null );
-	}
-
+	
 	private void saveSource() throws IOException 
 	{
 		String text = editor.getText();

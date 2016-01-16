@@ -375,13 +375,18 @@ public class Main
 
 	public static void fail(Exception e) 
 	{
+	    fail("Error",e);
+	}
+	
+	public static void fail(String msg,Exception e) 
+	{
 		LOG.error("fail(): "+e.getMessage(),e);
 
 		final ByteArrayOutputStream out = new ByteArrayOutputStream();
 		final PrintWriter writer = new PrintWriter( out );
 		e.printStackTrace( writer );
 
-		final String body = "Error: "+e.getMessage()+"\n\n"+new String( out.toByteArray() );
+		final String body = msg+"\n\nError: "+e.getMessage()+"\n\n"+new String( out.toByteArray() );
 		JOptionPane.showMessageDialog(null, body , "Error", JOptionPane.ERROR_MESSAGE);
 	}
 
