@@ -50,6 +50,11 @@ public class EditorFrame extends JInternalFrame implements IWindow
 		
 		messageFrame.setDoubleClickListener( msg -> 
 		{
+		    final Optional<EditorPanel> match = editors.stream().filter( ed -> ed.getCompilationUnit() == msg.unit ).findFirst();
+		    if ( match.isPresent() ) 
+		    {
+		        match.get().
+		    }
 		});
 		
         final GridBagConstraints cnstrs = new GridBagConstraints();

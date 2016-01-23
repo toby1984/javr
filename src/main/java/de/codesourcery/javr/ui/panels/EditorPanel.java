@@ -1291,4 +1291,9 @@ public class EditorPanel extends JPanel
 	public CompilationUnit getCompilationUnit() {
         return currentUnit;
     }
+	
+	public void setCursorPosition(int position) 
+	{
+	    editor.setCaretPosition( position );
+	}
 }
