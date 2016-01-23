@@ -13,10 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package de.codesourcery.javr.ui;
+package de.codesourcery.javr.ui.frames;
 
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.ArrayList;
@@ -25,6 +28,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 import javax.swing.JInternalFrame;
+import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
@@ -35,11 +39,13 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 
-public class MessageWindow extends JInternalFrame {
+public class MessageFrame extends JInternalFrame implements IWindow 
+{
+    public static final String WINDOW_ID = "messagewindow";
 
     private final MessageTableModel messageModel = new MessageTableModel();
     private Consumer<CompilationMessage> doubleClickListener = msg -> {};
-    
+
     protected final class MessageTableModel implements TableModel 
     {
         private final List<CompilationMessage> errors = new ArrayList<>();
@@ -153,11 +159,11 @@ public class MessageWindow extends JInternalFrame {
             return errors.get( row );
         }
     }
-    
-    public MessageWindow(String title) 
+
+    public MessageFrame(String title) 
     {
         super(title,true,true,true);
-        
+
         final JTable errorTable = new JTable( messageModel );
 
         errorTable.setDefaultRenderer( String.class , new DefaultTableCellRenderer() 
@@ -198,20 +204,40 @@ public class MessageWindow extends JInternalFrame {
                     }
                 }
             }
-        });        
+        });       
+
+        errorTable.setPreferredSize( new Dimension(800,200 ) );
+        getContentPane().setLayout( new GridBagLayout() );
+        final GridBagConstraints cnstrs = new GridBagConstraints();
+        cnstrs.gridheight = 1; cnstrs.gridwidth = 1;
+        cnstrs.fill = GridBagConstraints.BOTH;
+        cnstrs.gridx = 0 ; cnstrs.gridy = 0;
+        cnstrs.weightx = 1; cnstrs.weighty = 1;
+        final JScrollPane pane = new JScrollPane( errorTable , JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED , JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS  );
+        getContentPane().add( pane , cnstrs );
     }
-    
+
     public void setDoubleClickListener(Consumer<CompilationMessage> doubleClickListener) 
     {
         Validate.notNull(doubleClickListener, "doubleClickListener must not be NULL");
         this.doubleClickListener = doubleClickListener;
     }
-    
+
+    public void clearMessages() 
+    {
+        messageModel.clear();
+    }
+
     public void add(CompilationMessage msg) {
         messageModel.add( msg );
     }
-    
+
     public void addAll(Collection<CompilationMessage> msgs) {
         messageModel.addAll( msgs );
+    }
+
+    @Override
+    public String getWindowId() {
+        return WINDOW_ID;
     }    
 }

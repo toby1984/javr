@@ -86,6 +86,7 @@ public class Parser
         public final String message;
         public final TextRegion region;
         public final ASTNode node;
+        public final CompilationUnit unit;
         
         public static Comparator<CompilationMessage> compareSeverityDescending() 
         {
@@ -106,61 +107,65 @@ public class Parser
             return severity+" - "+offset+" - "+message;
         }
 
-        public CompilationMessage(Severity severity, String message,TextRegion region) 
+        public CompilationMessage(CompilationUnit unit,Severity severity, String message,TextRegion region) 
         {
+            Validate.notNull(unit, "compilation unit must not be NULL");
+            this.unit = unit;
             this.severity = severity;
             this.message = message;
             this.region = region;
             this.node = null;
         }
 
-        public CompilationMessage(Severity severity, String message,ASTNode node) 
+        public CompilationMessage(CompilationUnit unit,Severity severity, String message,ASTNode node) 
         {
+            Validate.notNull(unit, "compilation unit must not be NULL");
+            this.unit = unit;
             this.severity = severity;
             this.message = message;
             this.node = node;
             this.region = node == null ? null : node.getTextRegion();
         }        
 
-        public CompilationMessage(Severity severity, String message) 
+        public CompilationMessage(CompilationUnit unit,Severity severity, String message) 
         {
-            this( severity , message , (TextRegion) null );
+            this( unit,severity , message , (TextRegion) null );
         }        
 
-        public static CompilationMessage error(String msg) {
-            return new CompilationMessage(Severity.ERROR , msg , (TextRegion) null ); 
+        public static CompilationMessage error(CompilationUnit unit,String msg) {
+            return new CompilationMessage(unit,Severity.ERROR , msg , (TextRegion) null ); 
         }        
 
-        public static CompilationMessage error(String msg,ASTNode node) {
-            return new CompilationMessage(Severity.ERROR , msg , node ); 
+        public static CompilationMessage error(CompilationUnit unit,String msg,ASTNode node) {
+            return new CompilationMessage(unit,Severity.ERROR , msg , node ); 
         }
 
-        public static CompilationMessage error(String msg,TextRegion region) {
-            return new CompilationMessage(Severity.ERROR , msg , region ); 
+        public static CompilationMessage error(CompilationUnit unit,String msg,TextRegion region) {
+            return new CompilationMessage(unit,Severity.ERROR , msg , region ); 
         }        
 
-        public static CompilationMessage info(String msg) {
-            return new CompilationMessage(Severity.INFO , msg , (ASTNode) null ); 
+        public static CompilationMessage info(CompilationUnit unit,String msg) {
+            return new CompilationMessage(unit,Severity.INFO , msg , (ASTNode) null ); 
         }
         
-        public static CompilationMessage info(String msg,ASTNode node) {
-            return new CompilationMessage(Severity.INFO , msg , node ); 
+        public static CompilationMessage info(CompilationUnit unit,String msg,ASTNode node) {
+            return new CompilationMessage(unit,Severity.INFO , msg , node ); 
         }
 
-        public static CompilationMessage info(String msg,TextRegion region) {
-            return new CompilationMessage(Severity.INFO, msg , region ); 
+        public static CompilationMessage info(CompilationUnit unit,String msg,TextRegion region) {
+            return new CompilationMessage(unit,Severity.INFO, msg , region ); 
         }    
         
-        public static CompilationMessage warning(String msg,ASTNode node) {
-            return new CompilationMessage(Severity.WARNING , msg , node ); 
+        public static CompilationMessage warning(CompilationUnit unit,String msg,ASTNode node) {
+            return new CompilationMessage(unit,Severity.WARNING , msg , node ); 
         }        
 
-        public static CompilationMessage warning(String msg,TextRegion region) {
-            return new CompilationMessage(Severity.WARNING, msg , region ); 
+        public static CompilationMessage warning(CompilationUnit unit,String msg,TextRegion region) {
+            return new CompilationMessage(unit,Severity.WARNING, msg , region ); 
         }
         
-        public static CompilationMessage warning(String msg) {
-            return new CompilationMessage(Severity.WARNING, msg , (ASTNode) null ); 
+        public static CompilationMessage warning(CompilationUnit unit,String msg) {
+            return new CompilationMessage(unit,Severity.WARNING, msg , (ASTNode) null ); 
         }         
     }
 
@@ -192,7 +197,7 @@ public class Parser
             catch(Exception e) 
             {
                 e.printStackTrace();
-                unit.addMessage( new CompilationMessage(Severity.ERROR,e.getMessage(),lexer.peek().region() ) );
+                unit.addMessage( new CompilationMessage(unit,Severity.ERROR,e.getMessage(),lexer.peek().region() ) );
                 break; // TODO: Implement parse recovery
             }
         }

@@ -97,7 +97,7 @@ public interface IObjectCodeWriter
      * if code generation got aborted for some reason
      * @throws IOException
      */
-    public void finish(boolean success) throws IOException;
+    public void finish(ICompilationContext context,boolean success) throws IOException;
     
     /**
      * Returns the start address for a given segment.

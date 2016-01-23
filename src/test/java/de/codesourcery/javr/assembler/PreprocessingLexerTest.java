@@ -162,7 +162,7 @@ public class PreprocessingLexerTest extends TestCase
         @Override
         public boolean error(String message, ASTNode node) 
         {
-            return message( CompilationMessage.error( message , node ) );
+            return message( CompilationMessage.error( currentCompilationUnit() , message , node ) );
         }
         
         public boolean hasReachedMaxErrors() {

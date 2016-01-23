@@ -53,7 +53,8 @@ public class TopLevelWindow implements IWindow
     private EditorFrame editorFrame;
     
     private final JDesktopPane desktopPane = new JDesktopPane();
-    private final JFrame frame = new JFrame();
+    private final JFrame topLevelFrame = new JFrame();
+    private final MessageFrame messageFrame = new MessageFrame("Messages");
     
     private File lastOpenedProject = new File("/home/tobi/atmel/asm/testproject.properties");
     private File lastDisassembledFile = new File("/home/tobi/atmel/asm/random.raw");
@@ -67,10 +68,10 @@ public class TopLevelWindow implements IWindow
         
         addWindows( desktopPane );
         
-        frame.setJMenuBar( createMenu(frame) );
-        frame.setDefaultCloseOperation( JFrame.DISPOSE_ON_CLOSE );
+        topLevelFrame.setJMenuBar( createMenu(topLevelFrame) );
+        topLevelFrame.setDefaultCloseOperation( JFrame.DISPOSE_ON_CLOSE );
         
-        frame.addWindowListener( new WindowAdapter() 
+        topLevelFrame.addWindowListener( new WindowAdapter() 
         {
             
             @Override
@@ -80,13 +81,13 @@ public class TopLevelWindow implements IWindow
             }
         });
 
-        frame.setPreferredSize( new Dimension(640,480));
-        frame.setMinimumSize( new Dimension(640,480));
-        frame.setContentPane( desktopPane );
-        frame.pack();
-        frame.setLocationRelativeTo( null );
-        frame.setVisible( true );
-        frame.setExtendedState(frame.getExtendedState() | JFrame.MAXIMIZED_BOTH);
+        topLevelFrame.setPreferredSize( new Dimension(640,480));
+        topLevelFrame.setMinimumSize( new Dimension(640,480));
+        topLevelFrame.setContentPane( desktopPane );
+        topLevelFrame.pack();
+        topLevelFrame.setLocationRelativeTo( null );
+        topLevelFrame.setVisible( true );
+        topLevelFrame.setExtendedState(topLevelFrame.getExtendedState() | JFrame.MAXIMIZED_BOTH);
 
 //        Stream.of( desktopPane.getAllFrames() ).forEach( internalFrame -> 
 //        {
@@ -99,16 +100,19 @@ public class TopLevelWindow implements IWindow
         
         applicationConfigProvider.getApplicationConfig().apply( this );
         applicationConfigProvider.getApplicationConfig().apply( editorFrame );
+        applicationConfigProvider.getApplicationConfig().apply( messageFrame );
         applicationConfigProvider.getApplicationConfig().apply( navigator );           
     }
     
-    public void quit() {
+    public void quit() 
+    {
         LOG.info("quit(): Shutting down...");
         try 
         {
             final IApplicationConfig config = applicationConfigProvider.getApplicationConfig();
             config.save( editorFrame );
             config.save( navigator );
+            config.save( messageFrame );
             config.save( TopLevelWindow.this );
             applicationConfigProvider.setApplicationConfig( config );
             try {
@@ -157,7 +161,8 @@ public class TopLevelWindow implements IWindow
 
     private void addWindows(JDesktopPane pane) throws IOException 
     {
-        editorFrame = new EditorFrame( project , project.getCompileRoot() , applicationConfigProvider );
+        editorFrame = new EditorFrame( project , project.getCompileRoot() , applicationConfigProvider, messageFrame );
+        addWindow(pane,messageFrame);
         addWindow(pane,editorFrame);
         navigator = new NavigatorFrame( project.getConfiguration().getBaseDir() );
         
@@ -397,21 +402,21 @@ public class TopLevelWindow implements IWindow
 
     @Override
     public Point getLocation() {
-        return frame.getLocation();
+        return topLevelFrame.getLocation();
     }
 
     @Override
     public void setLocation(Point p) {
-        frame.setLocation( p );
+        topLevelFrame.setLocation( p );
     }
 
     @Override
     public Dimension getSize() {
-        return frame.getSize();
+        return topLevelFrame.getSize();
     }
 
     @Override
     public void setSize(Dimension size) {
-        frame.setSize( size );
+        topLevelFrame.setSize( size );
     }    
 }

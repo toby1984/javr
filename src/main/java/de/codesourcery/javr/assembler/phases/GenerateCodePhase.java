@@ -135,7 +135,7 @@ public class GenerateCodePhase extends AbstractPhase
                             context.allocateBytes( value.intValue() );
                             break;
                         default:
-                            context.message( CompilationMessage.error("Cannot reserve bytes in "+context.currentSegment()+" segment, only SRAM and EEPROM are supported",node ) );
+                            context.message( CompilationMessage.error( context.currentCompilationUnit() , "Cannot reserve bytes in "+context.currentSegment()+" segment, only SRAM and EEPROM are supported",node ) );
                     }
                     ctx.dontGoDeeper();                            
                     break;

@@ -386,7 +386,7 @@ public class PreprocessingLexer implements Lexer
                     } else {
                         throw new RuntimeException("Internal error,unhandled severity level: #"+directive);
                     }
-                    final CompilationMessage compMsg = new CompilationMessage( severity ,  buffer.toString(), next.region() ); 
+                    final CompilationMessage compMsg = new CompilationMessage( compilationContext.currentCompilationUnit() , severity ,  buffer.toString(), next.region() ); 
                     compilationContext.message( compMsg );
                 } else {
                     skipToNextLine();
@@ -571,7 +571,7 @@ public class PreprocessingLexer implements Lexer
 
     private void error(String message,Token tok) 
     {
-        compilationContext.message( CompilationMessage.error( message , tok.region() ) );
+        compilationContext.message( CompilationMessage.error( compilationContext.currentCompilationUnit() , message , tok.region() ) );
     }
 
     private void expandTokens() 

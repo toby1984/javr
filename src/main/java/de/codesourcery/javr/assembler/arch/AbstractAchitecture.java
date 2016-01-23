@@ -552,7 +552,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         
         if ( argCount != expectedArgumentCount ) 
         {
-            context.message( CompilationMessage.error( encoding.mnemonic.toUpperCase()+" expects "+encoding.getArgumentCountFromPattern()+" arguments but got "+argCount,node ) );
+            context.message( CompilationMessage.error( context.currentCompilationUnit() , encoding.mnemonic.toUpperCase()+" expects "+encoding.getArgumentCountFromPattern()+" arguments but got "+argCount,node ) );
             return false;
         }        
         
@@ -688,13 +688,13 @@ public abstract class AbstractAchitecture implements IArchitecture
     
     private long fail(String msg,ASTNode node,ICompilationContext context) 
     {
-        context.message( CompilationMessage.error( msg , node ) );
+        context.message( CompilationMessage.error( context.currentCompilationUnit() , msg , node ) );
         return VALUE_UNAVAILABLE;
     }
     
     private void warn(String msg,ASTNode node,ICompilationContext context) 
     {
-        context.message( CompilationMessage.warning( msg , node ) );
+        context.message( CompilationMessage.warning( context.currentCompilationUnit() , msg , node ) );
     }
     
     private static boolean isSingleRegister(ASTNode node) {

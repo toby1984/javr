@@ -105,6 +105,7 @@ import de.codesourcery.javr.ui.Main;
 import de.codesourcery.javr.ui.config.IApplicationConfig;
 import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
 import de.codesourcery.javr.ui.frames.EditorFrame;
+import de.codesourcery.javr.ui.frames.MessageFrame;
 
 public class EditorPanel extends JPanel
 {
@@ -150,6 +151,8 @@ public class EditorPanel extends JPanel
 
 	private LineMap lineMap;
 
+	private final MessageFrame messageFrame;
+	
 	private final SearchHelper searchHelper=new SearchHelper();
 
 	protected class SearchHelper {
@@ -622,11 +625,13 @@ public class EditorPanel extends JPanel
 		}
 	}
 
-	public EditorPanel(IProject project, CompilationUnit unit,IApplicationConfigProvider appConfigProvider) throws IOException 
+	public EditorPanel(IProject project, CompilationUnit unit,IApplicationConfigProvider appConfigProvider,MessageFrame messageFrame) throws IOException 
 	{
 		Validate.notNull(project, "project must not be NULL");
 		Validate.notNull(unit, "unit must not be NULL");
         Validate.notNull(appConfigProvider, "appConfigProvider must not be NULL");
+        Validate.notNull(messageFrame, "messageFrame must not be NULL");
+        this.messageFrame = messageFrame;
         this.appConfigProvider = appConfigProvider;
 		this.project = project;
 		this.currentUnit = unit;
@@ -862,6 +867,7 @@ public class EditorPanel extends JPanel
 
 	public void compile() 
 	{
+	    messageFrame.clearMessages();
 	    currentUnit.clearMessages();
 		symbolModel.clear();
 
@@ -877,7 +883,7 @@ public class EditorPanel extends JPanel
 		catch(IOException e) 
 		{
 			LOG.error("compile(): Failed to save changes",e);
-			currentUnit.addMessage( CompilationMessage.error( "Failed to save changes: "+e.getMessage()) );
+			currentUnit.addMessage( CompilationMessage.error( currentUnit, "Failed to save changes: "+e.getMessage()) );
 			return;
 		}
 
@@ -895,10 +901,10 @@ public class EditorPanel extends JPanel
 		catch(Exception e) 
 		{
 			e.printStackTrace();
-			root.addMessage( toCompilationMessage( e ) );
+			root.addMessage( toCompilationMessage( currentUnit, e ) );
 		}
-		symbolModel.setSymbolTable( currentUnit.getSymbolTable() );        
-//		messageModel.addAll( root.getMessages(true) );        
+		symbolModel.setSymbolTable( currentUnit.getSymbolTable() );    
+		messageFrame.addAll( root.getMessages(true) );        
 		astTreeModel.setAST( root.getAST() );
 
 		doSyntaxHighlighting();
@@ -908,19 +914,19 @@ public class EditorPanel extends JPanel
 		final float linesPerSeconds = lineMap.getLineCount()/seconds;
 		final String time = "Time: "+ assembleTime +" ms , "+DF.format( linesPerSeconds )+" lines/s";
 
-		currentUnit.addMessage( CompilationMessage.info(time) );
+		currentUnit.addMessage( CompilationMessage.info(currentUnit,time) );
 
 		final String success = compilationSuccessful ? "successful" : "failed"; 
 		final DateTimeFormatter df = DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss");
-		currentUnit.addMessage( CompilationMessage.info("Compilation "+success+" ("+assembleTime+" millis) on "+df.format( ZonedDateTime.now() ) ) );
+		currentUnit.addMessage( CompilationMessage.info(currentUnit,"Compilation "+success+" ("+assembleTime+" millis) on "+df.format( ZonedDateTime.now() ) ) );
 	}
 
-	private static CompilationMessage toCompilationMessage(Exception e)
+	private static CompilationMessage toCompilationMessage(CompilationUnit unit,Exception e)
 	{
 		if ( e instanceof ParseException ) {
-			return new CompilationMessage(Severity.ERROR , e.getMessage() , new TextRegion( ((ParseException ) e).getOffset() , 0 ) ); 
+			return new CompilationMessage(unit,Severity.ERROR , e.getMessage() , new TextRegion( ((ParseException ) e).getOffset() , 0 ) ); 
 		} 
-		return new CompilationMessage(Severity.ERROR , e.getMessage() );
+		return new CompilationMessage(unit,Severity.ERROR , e.getMessage() );
 	}
 
 	private void doSyntaxHighlighting() 
@@ -1274,7 +1280,7 @@ public class EditorPanel extends JPanel
 			if ( editor.getText() != null )  {
 				w.write( editor.getText() );
 			}
-			currentUnit.addMessage( CompilationMessage.info("Source saved to "+file.getAbsolutePath() ) );
+			currentUnit.addMessage( CompilationMessage.info( currentUnit , "Source saved to "+file.getAbsolutePath() ) );
 		}
 	}
 	

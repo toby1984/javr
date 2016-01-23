@@ -101,7 +101,7 @@ public class Assembler
         } 
         finally 
         {
-            codeWriter.finish( success );
+            codeWriter.finish( compilationContext , success );
         }
         return true;
     }

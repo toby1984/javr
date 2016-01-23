@@ -72,8 +72,8 @@ public class ObjectCodeWriterWrapper implements IObjectCodeWriter {
     }
 
     @Override
-    public void finish(boolean success) throws IOException {
-        delegate.finish(success);
+    public void finish(ICompilationContext context,boolean success) throws IOException {
+        delegate.finish(context,success);
     }
 
     @Override

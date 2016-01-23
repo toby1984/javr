@@ -100,7 +100,7 @@ public class GatherSymbolsPhase extends AbstractPhase
                 } 
                 catch(DuplicateSymbolException e) 
                 {
-                    return context.message( CompilationMessage.error("Duplicate symbol: "+symbol.name() ,node) );
+                    return context.message( CompilationMessage.error( context.currentCompilationUnit() , "Duplicate symbol: "+symbol.name() ,node) );
                 }
                 return true;
             }

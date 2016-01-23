@@ -36,15 +36,21 @@ public class EditorFrame extends JInternalFrame implements IWindow
 {
     private final JTabbedPane tabbedPane; 
     private final IApplicationConfigProvider appConfigProvider;
+    private final MessageFrame messageFrame;
     
 	private final List<EditorPanel> editors = new ArrayList<>();
 	
-	public EditorFrame(IProject project,CompilationUnit compUnit,IApplicationConfigProvider appConfigProvider) throws IOException {
+	public EditorFrame(IProject project,CompilationUnit compUnit,IApplicationConfigProvider appConfigProvider,MessageFrame messageFrame) throws IOException {
 
+	    this.messageFrame = messageFrame;
 	    this.appConfigProvider = appConfigProvider;
 	    
 		tabbedPane = new JTabbedPane();
 		openEditor( project , compUnit );
+		
+		messageFrame.setDoubleClickListener( msg -> 
+		{
+		});
 		
         final GridBagConstraints cnstrs = new GridBagConstraints();
         cnstrs.fill = GridBagConstraints.BOTH;
@@ -78,7 +84,7 @@ public class EditorFrame extends JInternalFrame implements IWindow
  	
 	private EditorPanel createEditor(IProject project,CompilationUnit compUnit) throws IOException
 	{
-	    return new EditorPanel(project, compUnit,appConfigProvider);
+	    return new EditorPanel(project, compUnit,appConfigProvider,messageFrame);
 	}
 	
 	private EditorPanel currentEditor() 

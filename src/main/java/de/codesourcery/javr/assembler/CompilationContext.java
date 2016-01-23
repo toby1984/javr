@@ -206,7 +206,7 @@ public final class CompilationContext implements ICompilationContext
 
     @Override
     public boolean error(String message, ASTNode node) {
-        return message( CompilationMessage.error(message,node ) );
+        return message( CompilationMessage.error(currentCompilationUnit() , message,node ) );
     }
 
     @Override

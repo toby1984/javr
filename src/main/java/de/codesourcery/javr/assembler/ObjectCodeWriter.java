@@ -192,7 +192,7 @@ public class ObjectCodeWriter implements IObjectCodeWriter
     }
     
     @Override
-    public void finish(boolean success) throws IOException 
+    public void finish(ICompilationContext context,boolean success) throws IOException 
     {
     }
 

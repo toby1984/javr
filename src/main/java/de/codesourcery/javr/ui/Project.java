@@ -38,6 +38,7 @@ import de.codesourcery.hex2raw.IntelHex;
 import de.codesourcery.javr.assembler.Assembler;
 import de.codesourcery.javr.assembler.Buffer;
 import de.codesourcery.javr.assembler.CompilationUnit;
+import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.IObjectCodeWriter;
 import de.codesourcery.javr.assembler.ObjectCodeWriter;
 import de.codesourcery.javr.assembler.ObjectCodeWriterWrapper;
@@ -70,6 +71,7 @@ public class Project implements IProject
     private final ObjectCodeWriter writerDelegate = new ObjectCodeWriter();
     private final IObjectCodeWriter objWriter = new ObjectCodeWriterWrapper( writerDelegate ) 
     {
+        @Override
         public void reset() throws IOException 
         {
             super.reset();
@@ -80,9 +82,10 @@ public class Project implements IProject
             }
         }
 
-        public void finish(boolean success) throws IOException 
+        @Override
+        public void finish(ICompilationContext context,boolean success) throws IOException 
         {
-            super.finish(success);
+            super.finish(context,success);
             
             if ( ! success ) 
             {
@@ -126,7 +129,7 @@ public class Project implements IProject
                     final float percentage = 100.0f*(bytesWritten/(float) segSize);
                     final DecimalFormat DF = new DecimalFormat("#####0.00");
                     final String msg = s+": Wrote "+bytesWritten+" bytes ("+DF.format(percentage)+" %) to "+spec.resource;
-                    getCompileRoot().addMessage( CompilationMessage.info( msg ) );                    
+                    getCompileRoot().addMessage( CompilationMessage.info( context.currentCompilationUnit() , msg ) );                    
                 }
                 LOG.info("finish(): Wrote "+bytesWritten+" bytes to "+spec.resource+" in format "+spec.format);
             } 
