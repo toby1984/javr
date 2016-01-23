@@ -35,6 +35,8 @@ import javax.swing.SwingUtilities;
 
 import org.apache.log4j.Logger;
 
+import de.codesourcery.javr.ui.panels.AsyncStreamReaderPanel;
+
 public class ProcessWindow extends JDialog 
 {
     private static final Logger LOG = Logger.getLogger(ProcessWindow.class);

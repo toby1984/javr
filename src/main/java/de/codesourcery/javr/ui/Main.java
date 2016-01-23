@@ -57,6 +57,7 @@ import de.codesourcery.javr.ui.config.ApplicationConfigProvider;
 import de.codesourcery.javr.ui.config.IApplicationConfig;
 import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
 import de.codesourcery.javr.ui.config.ProjectConfiguration;
+import de.codesourcery.javr.ui.frames.EditorFrame;
 
 public class Main 
 {

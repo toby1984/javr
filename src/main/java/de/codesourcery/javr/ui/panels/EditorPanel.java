@@ -1,19 +1,4 @@
-/**
- * Copyright 2015 Tobias Gierke <tobias.gierke@code-sourcery.de>
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-package de.codesourcery.javr.ui;
+package de.codesourcery.javr.ui.panels;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -25,8 +10,6 @@ import java.awt.GridBagLayout;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.ByteArrayOutputStream;
@@ -46,25 +29,21 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 import javax.swing.JButton;
 import javax.swing.JFrame;
-import javax.swing.JInternalFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.JToolBar;
 import javax.swing.JTree;
 import javax.swing.SwingUtilities;
-import javax.swing.Timer;
 import javax.swing.event.AncestorEvent;
 import javax.swing.event.AncestorListener;
 import javax.swing.event.DocumentEvent;
@@ -75,7 +54,6 @@ import javax.swing.event.TreeModelEvent;
 import javax.swing.event.TreeModelListener;
 import javax.swing.event.UndoableEditEvent;
 import javax.swing.event.UndoableEditListener;
-import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableModel;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
@@ -98,7 +76,6 @@ import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
-import de.codesourcery.javr.assembler.parser.Location;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.parser.TextRegion;
@@ -122,10 +99,14 @@ import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
 import de.codesourcery.javr.ui.EditorSettings.SourceElement;
+import de.codesourcery.javr.ui.IProject;
+import de.codesourcery.javr.ui.LineMap;
+import de.codesourcery.javr.ui.Main;
 import de.codesourcery.javr.ui.config.IApplicationConfig;
 import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
+import de.codesourcery.javr.ui.frames.EditorFrame;
 
-public class EditorFrame extends JInternalFrame 
+public class EditorPanel extends JPanel
 {
 	private static final Logger LOG = Logger.getLogger(EditorFrame.class);
 
@@ -641,9 +622,8 @@ public class EditorFrame extends JInternalFrame
 		}
 	}
 
-	public EditorFrame(IProject project, CompilationUnit unit,IApplicationConfigProvider appConfigProvider) throws IOException 
+	public EditorPanel(IProject project, CompilationUnit unit,IApplicationConfigProvider appConfigProvider) throws IOException 
 	{
-		super("Editor");
 		Validate.notNull(project, "project must not be NULL");
 		Validate.notNull(unit, "unit must not be NULL");
         Validate.notNull(appConfigProvider, "appConfigProvider must not be NULL");
@@ -741,7 +721,7 @@ public class EditorFrame extends JInternalFrame
 
 		panel.add( editorPane , cnstrs );
 
-		getContentPane().add( panel );
+		add( panel );
 
 		this.lineMap = new LineMap("",project);
 
@@ -1292,4 +1272,5 @@ public class EditorFrame extends JInternalFrame
 			currentUnit.addMessage( CompilationMessage.info("Source saved to "+file.getAbsolutePath() ) );
 		}
 	}    
+
 }
