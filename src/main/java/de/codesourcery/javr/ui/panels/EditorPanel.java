@@ -678,8 +678,6 @@ public class EditorPanel extends JPanel
 		});
 
 		editor.setFont(new Font("monospaced", Font.PLAIN, 12));
-		editor.setPreferredSize( new Dimension(200,300 ) );
-
 		final JPanel panel = new JPanel();
 		panel.setLayout( new GridBagLayout() );
 
@@ -693,7 +691,6 @@ public class EditorPanel extends JPanel
 		panel.add( createToolbar() , cnstrs );
 
 		// editor        
-		JScrollPane editorPane = new JScrollPane( editor );
 
 		// ugly hack to adjust splitpane size after it has become visible
 		addAncestorListener( new AncestorListener() {
@@ -719,9 +716,17 @@ public class EditorPanel extends JPanel
 		cnstrs.gridwidth=1; cnstrs.gridheight = 1 ;
 		cnstrs.gridx = 0; cnstrs.gridy = 1;
 
+		final JScrollPane editorPane = new JScrollPane( editor );
 		panel.add( editorPane , cnstrs );
 
-		add( panel );
+	    setLayout( new GridBagLayout() );
+        cnstrs = new GridBagConstraints();
+        cnstrs.fill = GridBagConstraints.BOTH;
+        cnstrs.weightx = 1.0; cnstrs.weighty=1;
+        cnstrs.gridwidth=1; cnstrs.gridheight = 1 ;
+        cnstrs.gridx = 0; cnstrs.gridy = 0;
+        
+		add( panel , cnstrs );
 
 		this.lineMap = new LineMap("",project);
 
@@ -1271,6 +1276,13 @@ public class EditorPanel extends JPanel
 			}
 			currentUnit.addMessage( CompilationMessage.info("Source saved to "+file.getAbsolutePath() ) );
 		}
-	}    
-
+	}
+	
+	public IProject getProject() {
+        return project;
+    }
+	
+	public CompilationUnit getCompilationUnit() {
+        return currentUnit;
+    }
 }

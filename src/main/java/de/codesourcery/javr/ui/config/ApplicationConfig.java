@@ -15,11 +15,18 @@
  */
 package de.codesourcery.javr.ui.config;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
 import de.codesourcery.javr.ui.EditorSettings;
+import de.codesourcery.javr.ui.frames.IWindow;
 
 public class ApplicationConfig implements IApplicationConfig 
 {
     private EditorSettings editorSettings = new EditorSettings();
+    private List<WindowProperties> windowProperties = new ArrayList<>();
     
     public ApplicationConfig() {
     }
@@ -27,6 +34,7 @@ public class ApplicationConfig implements IApplicationConfig
     public ApplicationConfig(ApplicationConfig other) 
     {
         this.editorSettings = other.editorSettings.createCopy();
+        this.windowProperties = other.windowProperties.stream().map( WindowProperties::createCopy ).collect( Collectors.toCollection( ArrayList::new ) );
     }
     
     @Override
@@ -42,5 +50,27 @@ public class ApplicationConfig implements IApplicationConfig
     @Override
     public IApplicationConfig createCopy() {
         return new ApplicationConfig(this);
+    }
+
+    @Override
+    public void apply(IWindow window) 
+    {
+        final Optional<WindowProperties> props = windowProperties.stream().filter( w -> w.windowId.equals( window.getWindowId() ) ).findFirst();
+        props.ifPresent( p -> p.apply( window ) );
+    }
+
+    @Override
+    public void save(IWindow window) 
+    {
+        final Optional<WindowProperties> props = windowProperties.stream().filter( w -> w.windowId.equals( window.getWindowId() ) ).findFirst();
+        if ( props.isPresent() ) {
+            props.get().populateFrom( window );
+        } 
+        else 
+        {
+            WindowProperties p = new WindowProperties();
+            p.populateFrom( window );
+            this.windowProperties.add( p );
+        }
     }
 }

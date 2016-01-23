@@ -48,10 +48,14 @@ public class FileResource implements Resource
         updateContentHash();
     }
     
+    public static String nameFor(File file) {
+        return "file://"+file;
+    }
+    
     @Override
     public String getName() 
     {
-        return "file://"+file.getAbsolutePath();
+        return nameFor(this.file);
     }
     
     public File getFile() {

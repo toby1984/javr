@@ -21,10 +21,12 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Paths;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.apache.commons.io.IOUtils;
@@ -60,6 +62,7 @@ public class Project implements IProject
 
     private IArchitecture architecture;
 
+    private final List<CompilationUnit> units = new ArrayList<>();
     private CompilationUnit compileRoot;    
 
     private ProjectConfiguration projectConfig = new ProjectConfiguration();
@@ -167,7 +170,23 @@ public class Project implements IProject
     {
         Validate.notNull(compileRoot, "compileRoot must not be NULL");
 
+        if ( this.compileRoot != null ) {
+            this.units.remove( this.compileRoot );
+        }
         this.compileRoot = compileRoot;
+        this.units.add( compileRoot );
+    }
+    
+    @Override
+    public CompilationUnit getCompilationUnit(Resource resource) 
+    {
+        final Optional<CompilationUnit> existing = units.stream().filter( unit -> unit.getResource().pointsToSameData( resource ) ).findFirst();
+        if ( existing.isPresent() ) {
+            return existing.get();
+        }
+        final CompilationUnit unit = new CompilationUnit(resource);
+        units.add( unit );
+        return unit;
     }
 
     @Override
@@ -184,6 +203,20 @@ public class Project implements IProject
                 StringUtils.isNotBlank( projectConfig.getUploadCommand() ) &&
                ! values.isEmpty() && 
                 values.stream().anyMatch( s -> s != null );
+    }
+    
+    public final boolean equals(Object other) 
+    {
+        if ( other instanceof IProject) {
+            return getConfiguration().getBaseDir().equals( ((IProject) other).getConfiguration().getBaseDir() );
+        }
+        return false;
+    }
+    
+    @Override
+    public final int hashCode() 
+    {
+        return getConfiguration().getBaseDir().hashCode();
     }
 
     @Override

@@ -1,5 +1,6 @@
 package de.codesourcery.javr.ui.panels;
 
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -11,10 +12,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JTree;
 import javax.swing.SwingUtilities;
@@ -22,6 +25,7 @@ import javax.swing.event.TreeExpansionEvent;
 import javax.swing.event.TreeModelEvent;
 import javax.swing.event.TreeModelListener;
 import javax.swing.event.TreeWillExpandListener;
+import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.ExpandVetoException;
 import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreePath;
@@ -38,12 +42,14 @@ public class FileSystemBrowser extends JPanel
 	private final JTree tree = new JTree( treeModel );
 
 	private Predicate<File> fileFilter = f -> true;
+	private Function<DirNode,JPopupMenu> menuSupplier = node -> null;
+	
 	private Consumer<File> selectionHandler = file -> {}; 
 	
-	protected static final class DirNode 
+	public static final class DirNode 
 	{
 		public final File file;
-		private final DirNode parent;
+		public final DirNode parent;
 		private final List<DirNode> children = new ArrayList<>();
 		public boolean dataFetched = false;
 
@@ -59,8 +65,48 @@ public class FileSystemBrowser extends JPanel
 
 		@Override
 		public String toString() {
-			return file.getName();
+			return file.getAbsolutePath();
 		}
+		
+		public DirNode findClosestNode(File file) 
+		{
+		    final String absPath = file.getAbsolutePath();
+		    if ( absPath.equals( this.file.getAbsolutePath() ) ) {
+		        return this;
+		    }
+		    DirNode max = null;
+		    int maxLen = -1;
+		    for ( DirNode child : children) 
+		    {
+		        int len = child.getPathPrefixLen( absPath );
+		        if ( len == absPath.length() ) {
+		            return child;
+		        }
+		        if ( len> 0 && len > maxLen ) {
+		            maxLen = len;
+		            max=child;
+		        }
+		    }
+		    if ( max != null ) 
+		    {
+		        return max.findClosestNode( file );
+		    }
+		    return null;
+		}
+		
+		private int getPathPrefixLen(String path) 
+		{
+		    final String thisPath = this.file.getAbsolutePath();
+		    final int len = Math.min( path.length() , thisPath.length());
+		    int i = 0;
+		    for ( ; i < len ; i++ ) 
+		    {
+		        if ( path.charAt(i) != thisPath.charAt(i) ) {
+		            break;
+		        }
+		    }
+		    return i;
+		} 
 		
 		public List<DirNode> getPathToRoot() 
 		{
@@ -74,9 +120,14 @@ public class FileSystemBrowser extends JPanel
 			Collections.reverse( pathToParent );
 			return pathToParent;
 		}
+		
+		public TreePath getTreePathToRoot() {
+		    
+		    return new TreePath( getPathToRoot().toArray( new DirNode[0] ) );
+		}
 	}
 
-	protected static final class MyTreeModel implements TreeModel {
+	protected final class MyTreeModel implements TreeModel {
 
 		private final List<TreeModelListener> listeners = new ArrayList<>();
 
@@ -87,7 +138,47 @@ public class FileSystemBrowser extends JPanel
 
 			this.root = root;
 		}
+		
+		public void subtreeChanged(DirNode node) 
+		{
+            node.dataFetched = false;
+            node.children.clear();
+            getFiles( node.file ).forEach( file -> 
+            {
+                node.children.add( new DirNode( file , node ) );
+            });
+            node.dataFetched = true;
+            
+            final List<DirNode> nodes = node.getPathToRoot();
+            final TreePath path = new TreePath( nodes.toArray( new DirNode[0] ) );
+            final TreeModelEvent ev = new TreeModelEvent( this , path );
+            
+            notifyListeners( l -> l.treeStructureChanged( ev ) );
+		}
 
+		private List<File> getFiles(File file) 
+		{
+            final File[] contents = file.listFiles();
+            if ( contents != null) 
+            {
+                final List<File> dirs = new ArrayList<>( Arrays.asList( contents ) );
+                dirs.removeIf( f -> f.getName().startsWith("." ) || ! fileFilter.test( f ) );
+                dirs.sort( (a,b) -> 
+                {
+                    if ( a.isDirectory() && b.isDirectory() || a.isFile() && b .isFile() ) 
+                    {
+                        return a.getName().compareTo( b.getName() );
+                    } 
+                    if ( a .isDirectory() ) {
+                        return -1;
+                    }
+                    return 1;
+                });
+                return dirs;
+            }
+            return new ArrayList<>();
+		}
+		
 		public void fetchChildren(DirNode node) 
 		{
 			if (node.dataFetched ) {
@@ -100,32 +191,16 @@ public class FileSystemBrowser extends JPanel
 			try 
 			{
 				System.out.println("Fetching children of "+node.file.getAbsolutePath());
-				final File[] contents = node.file.listFiles();
-				if ( contents != null) 
+				final List<File> dirs = getFiles( node.file );
+				for ( File f : dirs ) 
 				{
-					final List<File> dirs = new ArrayList<>( Arrays.asList( contents ) );
-					dirs.removeIf( f -> f.getName().startsWith("." ) );
-					dirs.sort( (a,b) -> 
-					{
-						if ( a.isDirectory() && b.isDirectory() || a.isFile() && b .isFile() ) 
-						{
-							return a.getName().compareTo( b.getName() );
-						} 
-						if ( a .isDirectory() ) {
-							return -1;
-						}
-						return 1;
-					});
-					for ( File f : dirs ) 
-					{
-						System.out.println("Got "+f.getAbsolutePath());
-						childIndices.add( i++ );
-						final DirNode newChild = new DirNode( f , node );
-						childNodes.add( newChild );
-						node.children.add( newChild  );
-						i++;
-					}
-				} 
+					System.out.println("Got "+f.getAbsolutePath());
+					childIndices.add( i++ );
+					final DirNode newChild = new DirNode( f , node );
+					childNodes.add( newChild );
+					node.children.add( newChild  );
+					i++;
+				}
 			} 
 			finally 
 			{
@@ -138,19 +213,26 @@ public class FileSystemBrowser extends JPanel
 					pathToParent.toArray( new DirNode[0] ) , 
 					childIndices.stream().mapToInt( x -> x.intValue() ).toArray(),
 					childNodes.toArray( new DirNode[0] ) 
-					);  
-			for (TreeModelListener l : listeners ) 
-			{
-				try {
-					l.treeNodesInserted( event );
-				} catch(Exception e) {
-					LOG.error("TreeModelListener( "+l+" ) failed: "+e,e);
-				}
-			}
+					);
+			
+			notifyListeners( l -> l.treeNodesInserted( event ) );
 		}
+		
+		private void notifyListeners(Consumer<TreeModelListener> c ) 
+		{
+	          for (TreeModelListener l : listeners ) 
+	            {
+	                try {
+	                    c.accept( l );
+	                } catch(Exception e) {
+	                    LOG.error("notifyListeners(): TreeModelListener( "+l+" ) failed: "+e,e);
+	                }
+	            }
+		}
+		
 
 		@Override
-		public Object getRoot() {
+		public DirNode getRoot() {
 			return root;
 		}
 
@@ -205,6 +287,20 @@ public class FileSystemBrowser extends JPanel
 
 		tree.setRootVisible(false);
 		
+		tree.setCellRenderer( new DefaultTreeCellRenderer() 
+		{
+		    @Override
+		    public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, boolean expanded, boolean leaf, int row, boolean hasFocus) 
+		    {
+		        Component result = super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
+		        if ( value instanceof DirNode ) 
+		        {
+		            setText( ((DirNode) value).file.getName() );
+		        }
+		        return result;
+		    }
+		    
+		});
 		tree.addMouseListener( new MouseAdapter() 
 		{
 			@Override
@@ -227,17 +323,20 @@ public class FileSystemBrowser extends JPanel
 				}
 			}
 		});
+		tree.addMouseListener( new PopupListener() );
 		
 		final JScrollPane pane = new JScrollPane( tree );
 		setLayout( new GridBagLayout() );
+		
 		GridBagConstraints cnstrs = new GridBagConstraints();
 		cnstrs.weightx=1.0;cnstrs.weighty=1.0f;
 		cnstrs.gridx=1;cnstrs.gridy=1;
 		cnstrs.fill = GridBagConstraints.BOTH;
+		
 		add(pane, cnstrs );
 
-		final TreeWillExpandListener listener = new TreeWillExpandListener() {
-
+		final TreeWillExpandListener listener = new TreeWillExpandListener() 
+		{
 			@Override
 			public void treeWillExpand(TreeExpansionEvent event) throws ExpandVetoException 
 			{
@@ -248,9 +347,7 @@ public class FileSystemBrowser extends JPanel
 				}
 			}
 
-			@Override
-			public void treeWillCollapse(TreeExpansionEvent event) throws ExpandVetoException {
-			}
+			@Override public void treeWillCollapse(TreeExpansionEvent event) throws ExpandVetoException {  }
 		};
 		tree.addTreeWillExpandListener( listener );
 	}
@@ -268,7 +365,7 @@ public class FileSystemBrowser extends JPanel
 			test.setLocationRelativeTo( null );
 			test.setVisible( true );
 
-			final FileSystemBrowser browser = new FileSystemBrowser( new File("/home/tgierke" ) );
+			final FileSystemBrowser browser = new FileSystemBrowser( new File("/home/tobi" ) );
 			test.getContentPane().add( browser );
 		};
 		SwingUtilities.invokeLater(r);
@@ -292,5 +389,66 @@ public class FileSystemBrowser extends JPanel
 	public void setSelectionHandler(Consumer<File> selectionHandler) {
 		Validate.notNull(selectionHandler, "selectionHandler must not be NULL");
 		this.selectionHandler = selectionHandler;
-	}	
+	}
+	
+    private class PopupListener extends MouseAdapter 
+    {
+        public void mousePressed(MouseEvent e) {
+            maybeShowPopup(e);
+        }
+
+        public void mouseReleased(MouseEvent e) {
+            maybeShowPopup(e);
+        }
+
+        private void maybeShowPopup(MouseEvent e) 
+        {
+            if (e.isPopupTrigger()) 
+            {
+                final TreePath path = tree.getClosestPathForLocation( e.getX() , e.getY() );
+                final DirNode node = (DirNode) ( path != null && path.getPathCount() > 0 ? path.getLastPathComponent() : null );
+                final JPopupMenu popup = menuSupplier.apply( node );
+                if ( popup != null ) 
+                {
+                    popup.show(e.getComponent(),e.getX(), e.getY());
+                }
+            }
+        }
+    }
+    
+    public void setMenuSupplier(Function<DirNode, JPopupMenu> menuSupplier) 
+    {
+        Validate.notNull(menuSupplier, "menuSupplier must not be NULL");
+        this.menuSupplier = menuSupplier;
+    }
+    
+    public void fileRemoved(File file) 
+    {
+        final DirNode current = treeModel.getRoot().findClosestNode( file );
+        if ( current != null ) 
+        {
+            if ( current.file.equals( file ) ) 
+            {
+                final int idx = treeModel.getIndexOfChild(  current.parent , current );
+                final TreePath path = current.parent.getTreePathToRoot();
+                
+                final TreeModelEvent ev = new TreeModelEvent( this , path , new int[] {idx} , new DirNode[] { current } );
+                treeModel.notifyListeners( l -> l.treeNodesRemoved( ev ) );
+            } 
+            else 
+            {
+                pathChanged( current.file );
+            }
+        }
+    }
+
+    public void pathChanged(File topLevelDir) 
+    {
+        final DirNode current = treeModel.getRoot().findClosestNode( topLevelDir );
+        if ( current != null ) 
+        {
+            System.out.println("TopLevelDir: "+topLevelDir.getAbsolutePath()+" -> node: "+current.file.getAbsolutePath());
+            treeModel.subtreeChanged( current );
+        }
+    }
 }
