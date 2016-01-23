@@ -31,7 +31,6 @@ import java.util.Set;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.FileAppender;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
@@ -47,6 +46,7 @@ import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.util.FileResource;
 import de.codesourcery.javr.assembler.util.FileResourceFactory;
 import de.codesourcery.javr.assembler.util.Resource;
+import de.codesourcery.javr.ui.Project;
 import de.codesourcery.javr.ui.config.IConfig;
 import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputFormat;
 import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputSpec;
@@ -208,9 +208,11 @@ public class CmdLine
             }
         };
 
+        final Project project = new Project( unit );
+        
         try 
         {
-            asm.compile( unit , writer , rf , ()-> config );
+            asm.compile( project , writer , rf , ()-> config );
             printMessages(unit);
         } 
         catch (IOException e) 

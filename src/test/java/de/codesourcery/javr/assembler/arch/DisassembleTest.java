@@ -42,6 +42,7 @@ import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
+import de.codesourcery.javr.ui.Project;
 import de.codesourcery.javr.ui.config.IConfig;
 import de.codesourcery.javr.ui.config.IConfigProvider;
 
@@ -211,7 +212,8 @@ public class DisassembleTest  {
                 return new LexerImpl( s );
             }
         };
-        IConfigProvider configProvider = new IConfigProvider() {
+        
+        final IConfigProvider configProvider = new IConfigProvider() {
             
             @Override
             public IConfig getConfig() {
@@ -221,7 +223,9 @@ public class DisassembleTest  {
         System.err.println("Compiling ...");
         System.err.flush();
         final ObjectCodeWriter objectCodeWriter = new ObjectCodeWriter();
-        final boolean success = asm.compile(unit , objectCodeWriter, factory , configProvider );
+        
+        final Project project = new Project(unit);
+        final boolean success = asm.compile(project, objectCodeWriter, factory , configProvider );
         System.err.println("Compilation finished");
         System.err.flush();
         if ( ! success ) {

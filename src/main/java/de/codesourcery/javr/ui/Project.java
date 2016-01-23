@@ -50,6 +50,7 @@ import de.codesourcery.javr.assembler.parser.LexerImpl;
 import de.codesourcery.javr.assembler.parser.Parser;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.Scanner;
+import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Misc;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.ui.config.IConfig;
@@ -65,6 +66,8 @@ public class Project implements IProject
 
     private final List<CompilationUnit> units = new ArrayList<>();
     private CompilationUnit compileRoot;    
+    
+    private final SymbolTable globalSymbolTable = new SymbolTable( SymbolTable.GLOBAL );
 
     private ProjectConfiguration projectConfig = new ProjectConfiguration();
 
@@ -187,7 +190,7 @@ public class Project implements IProject
         if ( existing.isPresent() ) {
             return existing.get();
         }
-        final CompilationUnit unit = new CompilationUnit(resource);
+        final CompilationUnit unit = new CompilationUnit(resource,globalSymbolTable);
         units.add( unit );
         return unit;
     }
@@ -282,7 +285,7 @@ public class Project implements IProject
         artifactsGenerated = false;
         
         final Assembler asm = new Assembler();
-        compilationSuccess = asm.compile( getCompileRoot() , getObjectCodeWriter() , projectConfig , this );
+        compilationSuccess = asm.compile( this , getObjectCodeWriter() , projectConfig , this );
         return compilationSuccess;
     }
 
@@ -340,5 +343,10 @@ public class Project implements IProject
     @Override
     public Resource resolveResource(Resource parent, String child) throws IOException {
         return projectConfig.resolveResource(parent,child);
+    }
+
+    @Override
+    public SymbolTable getGlobalSymbolTable() {
+        return globalSymbolTable;
     }
 }

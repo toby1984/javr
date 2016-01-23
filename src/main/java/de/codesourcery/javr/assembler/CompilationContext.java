@@ -27,6 +27,7 @@ import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Resource;
+import de.codesourcery.javr.ui.IProject;
 import de.codesourcery.javr.ui.config.IConfig;
 
 public final class CompilationContext implements ICompilationContext 
@@ -38,6 +39,8 @@ public final class CompilationContext implements ICompilationContext
     private final IObjectCodeWriter objectCodeWriter;
     
     private final ResourceFactory resourceFactory;
+    
+    private final IProject project;
     
     private final IConfig config;        
     
@@ -56,32 +59,32 @@ public final class CompilationContext implements ICompilationContext
     
     private int errorCount; // total error count
     
-    public CompilationContext(CompilationUnit unit,
+    public CompilationContext(IProject project,
             IObjectCodeWriter objectCodeWriter, 
             ResourceFactory resourceFactory,
-            SymbolTable globalSymbolTable,
             CompilerSettings compilerSettings,
             IConfig config) 
     {
-        Validate.notNull(unit, "unit must not be NULL");
+        Validate.notNull(project, "project must not be NULL");
         Validate.notNull(objectCodeWriter, "objectCodeWriter must not be NULL");
         Validate.notNull(resourceFactory, "resourceFactory must not be NULL");
-        Validate.notNull(globalSymbolTable , "globalSymbolTable must not be NULL");
         Validate.notNull(compilerSettings,"compilerSettings must not be NULL");
         Validate.notNull(config,"config must not be NULL");
+        this.project = project;
         this.resourceFactory = resourceFactory;
-        this.rootCompilationUnit = unit;
+        this.rootCompilationUnit = project.getCompileRoot();
         this.objectCodeWriter = objectCodeWriter;
-        this.globalSymbolTable = globalSymbolTable;
+        this.globalSymbolTable = project.getGlobalSymbolTable();
         this.compilerSettings = compilerSettings;
         this.config = config;
         this.maxErrorsLimit = compilerSettings.getMaxErrors();
-        pushCompilationUnit( unit );
+        pushCompilationUnit( rootCompilationUnit );
     }
     
     @Override
     public CompilationUnit newCompilationUnit(Resource res) 
     {
+        final CompilationUnit result = project.getCompilationUnit( res );
         return new CompilationUnit( res , currentCompilationUnit().getSymbolTable() );
     }
     

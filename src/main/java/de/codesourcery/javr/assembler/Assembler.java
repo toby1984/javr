@@ -29,6 +29,7 @@ import de.codesourcery.javr.assembler.phases.Phase;
 import de.codesourcery.javr.assembler.phases.PrepareGenerateCodePhase;
 import de.codesourcery.javr.assembler.phases.SyntaxCheckPhase;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
+import de.codesourcery.javr.ui.IProject;
 import de.codesourcery.javr.ui.config.IConfigProvider;
 
 public class Assembler 
@@ -39,18 +40,18 @@ public class Assembler
 
     private CompilationContext compilationContext;
 
-    public boolean compile(CompilationUnit unit,IObjectCodeWriter codeWriter,ResourceFactory rf, IConfigProvider config) throws IOException 
+    public boolean compile(IProject project,IObjectCodeWriter codeWriter,ResourceFactory rf, IConfigProvider config) throws IOException 
     {
-        Validate.notNull(unit, "compilation unit must not be NULL");
+        Validate.notNull(project, "project must not be NULL");
         Validate.notNull(codeWriter, "codeWriter must not be NULL");
         Validate.notNull(rf, "resourceFactory must not be NULL");
         Validate.notNull(config, "provider must not be NULL");
 
-        final SymbolTable globalSymbolTable = new SymbolTable(SymbolTable.GLOBAL);
+        final CompilationUnit unit = project.getCompileRoot();
+        project.getGlobalSymbolTable().clear();
+        unit.beforeCompilationStarts( project.getGlobalSymbolTable() );
 
-        unit.beforeCompilationStarts(globalSymbolTable);
-
-        this.compilationContext = new CompilationContext( unit , codeWriter , rf , globalSymbolTable , compilerSettings , config.getConfig() );
+        this.compilationContext = new CompilationContext( project , codeWriter , rf , compilerSettings , config.getConfig() );
 
         final List<Phase> phases = new ArrayList<>();
         phases.add( new ParseSourcePhase(config) );
