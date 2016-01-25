@@ -1296,4 +1296,13 @@ public class EditorPanel extends JPanel
 	{
 	    editor.setCaretPosition( position );
 	}
+	
+	public void gotoMessage(CompilationMessage message) 
+	{
+		final int len = editor.getText().length();
+		if ( message.region != null && 0 <= message.region.start() && message.region.start() < len ) 
+		{
+			editor.setCaretPosition( message.region.start() );
+		}
+	}
 }

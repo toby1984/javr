@@ -155,6 +155,7 @@ public class Project implements IProject
         this.architecture = new ATMega88();
         this.compileRoot = compilationRoot;
         this.projectConfig = config;
+        units.add( compilationRoot );
     }
     
     @Override

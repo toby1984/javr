@@ -35,6 +35,7 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
         CSEG("cseg",0,0),
         DSEG("dseg",0,0),
         ESEG("eseg",0,0),
+        DEF("DEF",1,1), // register alias
         DEVICE("device",1,1),
         RESERVE("byte",1,1),
         INIT_BYTES("db",1,Integer.MAX_VALUE),

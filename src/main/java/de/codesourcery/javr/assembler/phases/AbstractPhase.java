@@ -23,6 +23,7 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
+import de.codesourcery.javr.assembler.parser.ast.IdentifierDefNode;
 
 /**
  * Abstract base-class for compiler phases that handles common AST nodes.
@@ -43,12 +44,22 @@ public abstract class AbstractPhase implements Phase
     {
         if ( node instanceof DirectiveNode )
         {
-            final Directive directive = ((DirectiveNode) node).directive;
+            final DirectiveNode dnNode = (DirectiveNode) node;
+			final Directive directive = dnNode.directive;
             switch( directive ) 
             {
-                case CSEG: context.setSegment( Segment.FLASH ); break;
-                case DSEG: context.setSegment( Segment.SRAM ) ; break;
-                case ESEG: context.setSegment( Segment.EEPROM ); break;
+            	case DEF:
+            		IdentifierDefNode identifier = (IdentifierDefNode) dnNode.child(0);
+            		break;
+                case CSEG: 
+                	context.setSegment( Segment.FLASH ); 
+                	break;
+                case DSEG: 
+                	context.setSegment( Segment.SRAM ) ; 
+                	break;
+                case ESEG: 
+                	context.setSegment( Segment.EEPROM ); 
+                	break;
                 default:
                     // $$FALL-THROUGH$$
             }

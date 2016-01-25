@@ -16,9 +16,12 @@
 package de.codesourcery.javr.assembler;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.Stack;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.arch.IArchitecture;
@@ -43,6 +46,8 @@ public final class CompilationContext implements ICompilationContext
     private final IProject project;
     
     private final IConfig config;        
+    
+    private final Map<String,Register> registerAliases = new HashMap<>();
     
     // stack to keep track of the current compilation unit while processing #include directives
     private final Stack<CompilationUnit> compilationUnits = new Stack<>();
@@ -82,10 +87,25 @@ public final class CompilationContext implements ICompilationContext
     }
     
     @Override
+    public void setRegisterAlias(String alias, Register register) 
+    {
+		if (StringUtils.isBlank(alias)) {
+			throw new IllegalArgumentException("alias must not be NULL/blank");
+		}
+		Validate.notNull(register, "register must not be NULL");
+    	this.registerAliases.put(alias.toLowerCase(),register);
+    }
+    
+    @Override
+    public Register getRegisterByAlias(String alias) 
+    {
+    	return registerAliases.get(alias.toLowerCase());
+    }
+    
+    @Override
     public CompilationUnit newCompilationUnit(Resource res) 
     {
-        final CompilationUnit result = project.getCompilationUnit( res );
-        return new CompilationUnit( res , currentCompilationUnit().getSymbolTable() );
+    	return new CompilationUnit( res , globalSymbolTable );
     }
     
     @Override

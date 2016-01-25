@@ -38,6 +38,10 @@ public interface ICompilationContext
         public ICompilationSettings setFailOnAddressOutOfRange(boolean failOnAddressOutOfRange);
     }
     
+    public void setRegisterAlias(String alias,Register register);
+    
+    public Register getRegisterByAlias(String alias);
+    
     // symbol tables
     public SymbolTable globalSymbolTable();
     

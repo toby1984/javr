@@ -341,7 +341,7 @@ public class TopLevelWindow implements IWindow
         addItem( menu , "Save source" , eventHandler);  
         addItem( menu , "Load source" , () -> doWithFile( "Load source" , true , lastSourceFile, file -> 
         {
-            final CompilationUnit unit = new CompilationUnit( new FileResource(file , Resource.ENCODING_UTF ) );
+            final CompilationUnit unit = project.getCompilationUnit( new FileResource(file , Resource.ENCODING_UTF ) );
             editorFrame.setProject( project , unit );
             lastSourceFile = file;
         })); 

@@ -59,13 +59,11 @@ public class ParseSourcePhase implements Phase
     {
         final CompilationUnit unit = context.currentCompilationUnit();
         final Scanner scanner = new Scanner( unit.getResource() );
-//        final Scanner scanner = new SimpleScanner( unit.getResource() );
         
         final IConfig config = provider.getConfig();
         final Lexer lexer = new PreprocessingLexer( config.createLexer( scanner ) , context );
-//        final Lexer lexer = config.createLexer( scanner );
         final Parser parser = config.createParser();
         
-        parser.parse( unit , lexer ); // assigns AST to unit as well
+        parser.parse( unit , lexer ); // assigns AST to unit as well!
     }
 }

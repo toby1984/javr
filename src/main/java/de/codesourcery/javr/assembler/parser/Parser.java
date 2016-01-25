@@ -448,6 +448,24 @@ public class Parser
                     return result;
                 }
                 break;
+            case "def":
+	            {
+	            	if ( lexer.peek().isValidIdentifier() ) 
+	            	{
+	            		final Token tok = lexer.next();
+	            		final IdentifierDefNode dn = new IdentifierDefNode( Identifier.of( tok.value ) , tok.region() );
+	            		final DirectiveNode result = new DirectiveNode(Directive.DEF , tok2.region());
+	            		result.addChild( dn );
+	            		final TextRegion regRegion = lexer.peek().region();
+	            		String registerName = parseRegisterName( regRegion );
+	            		if ( registerName == null ) {
+	                		throw new ParseException("Expected a valid register name",lexer.peek());
+	            		}
+	            		result.addChild( new RegisterNode( new Register( registerName , false ,false ) , regRegion ) );
+	            		return result;
+	            	} 
+            		throw new ParseException("Expected an identifier",lexer.peek());
+	            }
             case "dseg": return new DirectiveNode(Directive.DSEG , tok2.region() );
             case "eseg": return new DirectiveNode(Directive.ESEG , tok2.region() );
             case "cseg": return new DirectiveNode(Directive.CSEG , tok2.region() );
