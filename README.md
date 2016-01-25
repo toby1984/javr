@@ -66,7 +66,8 @@ Note that for reasons unknown to me the AVR assembler duplicates a lot of prepro
 
 ## To do
 
+- Add support for .org directive
 - Add parse error recovery
-- Testing...
-- Add support for #xxx directives
-- Add #include directive 
+- Still lots of testing needed...
+- Add support for #else / #elseif
+- Find a way for meaningful error reporting when expanding macros...
