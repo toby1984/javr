@@ -132,7 +132,7 @@ public class Project implements IProject
                     final float percentage = 100.0f*(bytesWritten/(float) segSize);
                     final DecimalFormat DF = new DecimalFormat("#####0.00");
                     final String msg = s+": Wrote "+bytesWritten+" bytes ("+DF.format(percentage)+" %) to "+spec.resource;
-                    getCompileRoot().addMessage( CompilationMessage.info( context.currentCompilationUnit() , msg ) );                    
+                    context.message( CompilationMessage.info( context.currentCompilationUnit() , msg ) );                    
                 }
                 LOG.info("finish(): Wrote "+bytesWritten+" bytes to "+spec.resource+" in format "+spec.format);
             } 

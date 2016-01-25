@@ -24,6 +24,7 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierDefNode;
+import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 
 /**
  * Abstract base-class for compiler phases that handles common AST nodes.
@@ -49,7 +50,9 @@ public abstract class AbstractPhase implements Phase
             switch( directive ) 
             {
             	case DEF:
-            		IdentifierDefNode identifier = (IdentifierDefNode) dnNode.child(0);
+            		final IdentifierDefNode identifier = (IdentifierDefNode) dnNode.child(0);
+            		final RegisterNode register = (RegisterNode) dnNode.child(1);
+            		context.setRegisterAlias( identifier.name , register.register ); 
             		break;
                 case CSEG: 
                 	context.setSegment( Segment.FLASH ); 

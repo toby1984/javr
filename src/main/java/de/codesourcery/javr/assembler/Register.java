@@ -68,6 +68,10 @@ public final class Register
         }
     }
     
+    public String getRegisterName() {
+        return this.expression;
+    }
+    
     public int getRegisterNumber() 
     {
         return getRegisterNumber( this.expression );

@@ -30,6 +30,7 @@ import org.junit.Test;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
+import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.LexerImpl;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
@@ -178,6 +179,16 @@ public class PreprocessingLexerTest extends TestCase
         @Override
         public IArchitecture getArchitecture() {
             return arch;
+        }
+
+        @Override
+        public void setRegisterAlias(Identifier alias, Register register) {
+            throw new RuntimeException("method not implemented: setRegisterAlias()");
+        }
+
+        @Override
+        public Register getRegisterByAlias(Identifier alias) {
+            throw new RuntimeException("method not implemented: getRegisterByAlias()");
         }
     };
     

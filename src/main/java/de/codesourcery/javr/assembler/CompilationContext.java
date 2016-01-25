@@ -25,6 +25,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.arch.IArchitecture;
+import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
@@ -47,7 +48,7 @@ public final class CompilationContext implements ICompilationContext
     
     private final IConfig config;        
     
-    private final Map<String,Register> registerAliases = new HashMap<>();
+    private final Map<Identifier,Register> registerAliases = new HashMap<>();
     
     // stack to keep track of the current compilation unit while processing #include directives
     private final Stack<CompilationUnit> compilationUnits = new Stack<>();
@@ -87,19 +88,17 @@ public final class CompilationContext implements ICompilationContext
     }
     
     @Override
-    public void setRegisterAlias(String alias, Register register) 
+    public void setRegisterAlias(Identifier alias, Register register) 
     {
-		if (StringUtils.isBlank(alias)) {
-			throw new IllegalArgumentException("alias must not be NULL/blank");
-		}
+        Validate.notNull(alias, "alias must not be NULL");
 		Validate.notNull(register, "register must not be NULL");
-    	this.registerAliases.put(alias.toLowerCase(),register);
+    	this.registerAliases.put( Identifier.of( alias.getValue().toLowerCase() ) ,register);
     }
     
     @Override
-    public Register getRegisterByAlias(String alias) 
+    public Register getRegisterByAlias(Identifier alias) 
     {
-    	return registerAliases.get(alias.toLowerCase());
+    	return registerAliases.get( Identifier.of( alias.getValue().toLowerCase() ) );
     }
     
     @Override

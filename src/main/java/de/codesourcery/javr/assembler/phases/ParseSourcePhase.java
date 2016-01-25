@@ -64,6 +64,6 @@ public class ParseSourcePhase implements Phase
         final Lexer lexer = new PreprocessingLexer( config.createLexer( scanner ) , context );
         final Parser parser = config.createParser();
         
-        parser.parse( unit , lexer ); // assigns AST to unit as well!
+        parser.parse( context , unit , lexer ); // assigns AST to unit as well!
     }
 }

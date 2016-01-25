@@ -28,6 +28,7 @@ import javax.swing.JInternalFrame;
 import javax.swing.JTabbedPane;
 
 import de.codesourcery.javr.assembler.CompilationUnit;
+import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.ui.IProject;
 import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
 import de.codesourcery.javr.ui.panels.EditorPanel;
@@ -48,10 +49,7 @@ public class EditorFrame extends JInternalFrame implements IWindow
 		tabbedPane = new JTabbedPane();
 		openEditor( project , compUnit );
 		
-		messageFrame.setDoubleClickListener( msg -> 
-		{
-		    editors.stream().filter( ed -> ed.getCompilationUnit() == msg.unit ).forEach( ed -> ed.gotoMessage( msg ) );
-		});
+		messageFrame.setDoubleClickListener( this::gotoMessage );
 		
         final GridBagConstraints cnstrs = new GridBagConstraints();
         cnstrs.fill = GridBagConstraints.BOTH;
@@ -61,6 +59,16 @@ public class EditorFrame extends JInternalFrame implements IWindow
         
         getContentPane().setLayout( new GridBagLayout() );
 		getContentPane().add( tabbedPane , cnstrs );
+	}
+	
+	public void gotoMessage(CompilationMessage msg) 
+	{
+        final Optional<EditorPanel> editor = editors.stream().filter( ed -> ed.getCompilationUnit().hasSameResourceAs( msg.unit ) ).findFirst();
+        editor.ifPresent( panel -> 
+        {
+            tabbedPane.setSelectedComponent( panel );
+            panel.gotoMessage( msg );
+        });
 	}
 	
 	public EditorPanel openEditor(IProject project,CompilationUnit unit) throws IOException 
@@ -79,6 +87,7 @@ public class EditorFrame extends JInternalFrame implements IWindow
 	private EditorPanel addEditor(IProject project,CompilationUnit unit) throws IOException 
 	{
 	    final EditorPanel result = createEditor(project,unit);
+	    this.editors.add( result );
 	    tabbedPane.addTab( unit.getResource().getName() , result );
 	    return result;
 	}

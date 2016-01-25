@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.CompilationUnit;
+import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Instruction;
 import de.codesourcery.javr.assembler.Register;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
@@ -61,8 +62,10 @@ import de.codesourcery.javr.assembler.symbols.Symbol;
  */
 public class Parser 
 {
+    private final IArchitecture arch;
+    
+    private ICompilationContext context;
     private Lexer lexer;
-    private final IArchitecture arch; 
     private AST ast;
 
     public static enum Severity 
@@ -175,13 +178,15 @@ public class Parser
         this.arch = arch;
     }
     
-    public AST parse(CompilationUnit unit,Lexer lexer) 
+    public AST parse(ICompilationContext context,CompilationUnit unit,Lexer lexer) 
     {
+        Validate.notNull(context, "context must not be NULL");
         Validate.notNull(lexer, "lexer must not be NULL");
         if ( arch == null ) {
             throw new IllegalStateException("architecture must be set");
         }
 
+        this.context = context;
         this.lexer = lexer;
         this.ast = new AST();
 
@@ -427,7 +432,7 @@ public class Parser
     private ASTNode parseDirective2(Token tok2) 
     {
         final String value = tok2.value;
-        switch( value.toLowerCase() ) 
+        switch( value.toLowerCase() ) // AVR documentation states that directives are matched ignoring case
         {
             case "device":
                 final int start = lexer.peek().offset;
@@ -453,7 +458,14 @@ public class Parser
 	            	if ( lexer.peek().isValidIdentifier() ) 
 	            	{
 	            		final Token tok = lexer.next();
-	            		final IdentifierDefNode dn = new IdentifierDefNode( Identifier.of( tok.value ) , tok.region() );
+	            		final IdentifierDefNode dn = new IdentifierDefNode( Identifier.of( tok.value.toLowerCase() ) , tok.region() );
+	            		
+	            		if ( ! lexer.peek(TokenType.EQUALS ) ) {
+	            		    throw new ParseException("Expected an equals sign", lexer.peek() );
+	            		}
+	            		// consume '=' equals
+	            		lexer.next();
+	                     
 	            		final DirectiveNode result = new DirectiveNode(Directive.DEF , tok2.region());
 	            		result.addChild( dn );
 	            		final TextRegion regRegion = lexer.peek().region();
@@ -801,6 +813,14 @@ public class Parser
                 case "z":
                     region.merge( tok );
                     return tok.value;
+            }
+            if ( tok.isValidIdentifier() ) 
+            { 
+                final Register aliasedRegister = context.getRegisterByAlias( Identifier.of( tok.value ) );
+                if ( aliasedRegister != null ) 
+                {
+                    return aliasedRegister.getRegisterName();
+                }
             }
             lexer.pushBack( tok );
         }

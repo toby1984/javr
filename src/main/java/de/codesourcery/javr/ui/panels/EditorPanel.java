@@ -1303,6 +1303,7 @@ public class EditorPanel extends JPanel
 		if ( message.region != null && 0 <= message.region.start() && message.region.start() < len ) 
 		{
 			editor.setCaretPosition( message.region.start() );
+			editor.requestFocus();
 		}
 	}
 }

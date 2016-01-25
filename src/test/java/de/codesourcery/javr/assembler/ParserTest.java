@@ -22,6 +22,7 @@ import org.junit.Test;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.parser.Identifier;
+import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.LexerImpl;
 import de.codesourcery.javr.assembler.parser.OperatorType;
 import de.codesourcery.javr.assembler.parser.Parser;
@@ -35,6 +36,7 @@ import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.EquLabelNode;
 import de.codesourcery.javr.assembler.parser.ast.FunctionCallNode;
 import de.codesourcery.javr.assembler.parser.ast.FunctionDefinitionNode;
+import de.codesourcery.javr.assembler.parser.ast.IdentifierDefNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
@@ -47,6 +49,9 @@ import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
 import de.codesourcery.javr.assembler.parser.ast.StringLiteral;
 import de.codesourcery.javr.assembler.util.StringResource;
+import de.codesourcery.javr.ui.IProject;
+import de.codesourcery.javr.ui.Project;
+import de.codesourcery.javr.ui.config.IConfig;
 
 public class ParserTest 
 {
@@ -70,6 +75,30 @@ public class ParserTest
         assertFalse( ast.hasChildren() );
         assertEquals( 0 ,  ast.childCount() );
     } 
+    
+    @Test
+    public void testParseRegisterAlias() 
+    {
+        AST ast = parse(".def TEST = r16");
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() );
+        
+        final StatementNode stmt = (StatementNode) ast.child(0);
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
+        
+        final DirectiveNode ins = (DirectiveNode) stmt.child(0);
+        assertNotNull(ins);
+        assertEquals( Directive.DEF , ins.directive );
+        assertEquals( 2 , ins.childCount() );
+        
+        final IdentifierDefNode name = (IdentifierDefNode) ins.child(0);
+        final RegisterNode register = (RegisterNode) ins.child(1);
+        
+        assertEquals( Identifier.of("test") , name.name );
+        assertEquals( new Register("r16",false,false), register.register );
+    }
     
     @Test
     public void testParseIfDef() 
@@ -1092,6 +1121,24 @@ public class ParserTest
         final Parser p = new Parser(arch);
         final StringResource resource = new StringResource("dummy", s);
         CompilationUnit unit = new CompilationUnit( resource );
-        return p.parse( unit , new LexerImpl(new Scanner(resource) ) );
+        
+        final IProject project = new Project(unit);
+        final ObjectCodeWriter writer = new ObjectCodeWriter();
+        final IConfig config = new IConfig() {
+            
+            @Override
+            public String getEditorIndentString() { return "  "; }
+            
+            @Override
+            public IArchitecture getArchitecture() { return arch; }
+
+            @Override
+            public Parser createParser() { return new Parser( arch ); }
+            
+            @Override
+            public Lexer createLexer(Scanner s) { return new LexerImpl(s); }
+        };
+        final CompilationContext ctx = new CompilationContext( project , writer , project ,new CompilerSettings(), config ); 
+        return p.parse( ctx, unit , new LexerImpl(new Scanner(resource) ) );
     }
 }

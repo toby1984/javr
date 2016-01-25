@@ -16,6 +16,7 @@
 package de.codesourcery.javr.assembler;
 
 import de.codesourcery.javr.assembler.arch.IArchitecture;
+import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
@@ -38,9 +39,9 @@ public interface ICompilationContext
         public ICompilationSettings setFailOnAddressOutOfRange(boolean failOnAddressOutOfRange);
     }
     
-    public void setRegisterAlias(String alias,Register register);
+    public void setRegisterAlias(Identifier alias,Register register);
     
-    public Register getRegisterByAlias(String alias);
+    public Register getRegisterByAlias(Identifier alias);
     
     // symbol tables
     public SymbolTable globalSymbolTable();
