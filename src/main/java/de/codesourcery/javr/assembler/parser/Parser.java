@@ -189,6 +189,8 @@ public class Parser
         this.context = context;
         this.lexer = lexer;
         this.ast = new AST();
+        unit.setAst( ast );
+        ast.setCompilationUnit( unit );
 
         // skip leading newlines since parseStatement()
         // only consumes trailing newlines
@@ -203,11 +205,20 @@ public class Parser
             {
                 e.printStackTrace();
                 unit.addMessage( new CompilationMessage(unit,Severity.ERROR,e.getMessage(),lexer.peek().region() ) );
-                break; // TODO: Implement parse recovery
+
+                // advance to next line
+                // TODO: implement proper parse error recovery
+                while ( ! lexer.eof() ) 
+                {
+                    if ( lexer.peek().isEOL() ) 
+                    {
+                        lexer.next();
+                        break;
+                    }
+                    lexer.next();
+                }
             }
         }
-        unit.setAst( ast );
-        ast.setCompilationUnit( unit );
         return ast;
     }
 
@@ -271,6 +282,17 @@ public class Parser
                     throw new ParseException("Unknown preprocessor instruction ",keywordToken);
                 }
                 
+                if ( proc == Preprocessor.PRAGMA ) // #pragma is currently ignored 
+                {
+                    final TextRegion r = new TextRegion( offset , lexer.peek().offset - offset );
+                    final List<String> values = new ArrayList<>();
+                    while ( ! lexer.peek().isEOLorEOF() ) 
+                    {
+                        values.add( lexer.peek().value );
+                        r.merge( lexer.next().region() );
+                    }
+                    return new PreprocessorNode( proc , values , r );
+                }
                 if ( proc == Preprocessor.IF_DEFINE || proc == Preprocessor.IF_NDEFINE ) 
                 {
                     final TextRegion r = new TextRegion( offset , lexer.peek().offset - offset );
@@ -476,8 +498,18 @@ public class Parser
 	            		result.addChild( new RegisterNode( new Register( registerName , false ,false ) , regRegion ) );
 	            		return result;
 	            	} 
-            		throw new ParseException("Expected an identifier",lexer.peek());
 	            }
+	            throw new ParseException("Expected an identifier",lexer.peek());
+            case "undef":
+                if ( lexer.peek().isValidIdentifier() ) 
+                {
+                    final Token tok = lexer.next();
+                    final IdentifierDefNode dn = new IdentifierDefNode( Identifier.of( tok.value.toLowerCase() ) , tok.region() );     
+                    final DirectiveNode result = new DirectiveNode(Directive.UNDEF , tok2.region());
+                    result.addChild(dn);
+                    return result;
+                }
+                throw new ParseException("Expected an identifier",lexer.peek());
             case "dseg": return new DirectiveNode(Directive.DSEG , tok2.region() );
             case "eseg": return new DirectiveNode(Directive.ESEG , tok2.region() );
             case "cseg": return new DirectiveNode(Directive.CSEG , tok2.region() );

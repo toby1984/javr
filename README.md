@@ -26,6 +26,44 @@ mvn clean package
 java -jar target/javr.jar
 ``` 
 
+## What's implemented
+
+Note that for reasons unknown to me the AVR assembler duplicates a lot of preprocessor instructions as assembler directives ... I'm currently only implementing the preprocessor instructions
+
+- full ATmega88 instruction set
+- Expression correctly handles nested expressions and operator precedence for the following operators: 
+  - arithmetic operators: -(unary+binary),+,/,*
+  - bitwise operators: ~,<<,>>,|,&
+  - logical operators: !,&&,||,>, <, >= , <= , == , !=
+- built-in functions: HIGH(x), LOW(x) that yield the upper/lower 8 bits of a 16-bit word
+- Assembler understands X / Y / Z as shorthand notation for r27:r26 / r29:r28 / r31:r30
+- Assembler currently will NOT accept just specifying the lower register when an instruction expects a combined / 'compound' register 
+  - use the syntax as given in the official Atmel ISA documentation instead
+- Preprocessor instructions
+  - #include
+  - #if
+  - #ifdef / #ifndef / #endif
+  - #define
+  - #message / #info / #warning
+  - #pragma [ parsed but ignored ]
+- Assembler directives
+  - .byte
+  - .cseg
+  - .db
+  - .def
+  - .dw / .word
+  - .dseg
+  - .eseg
+  - .equ
+  
+
+## What's not implemented
+
+
+## Known issues
+
+- Syntax coloring is off when using MSDOS-style line endings (won't fix this since it is related to the fact that Swing text components internally convert all EOL sequences to '\n' but my parser uses the 'true' text offsets)
+
 ## To do
 
 - Add parse error recovery

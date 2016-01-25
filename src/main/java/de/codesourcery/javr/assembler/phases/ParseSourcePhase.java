@@ -22,6 +22,7 @@ import org.apache.commons.lang3.Validate;
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.parser.Lexer;
+import de.codesourcery.javr.assembler.parser.LexerImpl;
 import de.codesourcery.javr.assembler.parser.Parser;
 import de.codesourcery.javr.assembler.parser.PreprocessingLexer;
 import de.codesourcery.javr.assembler.parser.Scanner;
@@ -57,7 +58,11 @@ public class ParseSourcePhase implements Phase
     @Override
     public void run(ICompilationContext context) throws IOException 
     {
-        final CompilationUnit unit = context.currentCompilationUnit();
+        parse(context,context.currentCompilationUnit(),provider);
+    }
+
+    public static void parse(ICompilationContext context,CompilationUnit unit,IConfigProvider provider) 
+    {
         final Scanner scanner = new Scanner( unit.getResource() );
         
         final IConfig config = provider.getConfig();
@@ -66,4 +71,15 @@ public class ParseSourcePhase implements Phase
         
         parser.parse( context , unit , lexer ); // assigns AST to unit as well!
     }
+    
+    public static void parseWithoutIncludes(ICompilationContext context,CompilationUnit unit,IConfigProvider provider) 
+    {
+        final Scanner scanner = new Scanner( unit.getResource() );
+        
+        final IConfig config = provider.getConfig();
+        final Lexer lexer = new LexerImpl( scanner );
+        final Parser parser = config.createParser();
+        
+        parser.parse( context , unit , lexer ); // assigns AST to unit as well!
+    }    
 }

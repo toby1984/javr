@@ -44,7 +44,7 @@ public class GenerateCodePhase extends AbstractPhase
     }
     
     protected GenerateCodePhase(String name,boolean onlyAllocation) {
-        super(name);
+        super(name,false);
         this.isInResolvePhase = onlyAllocation;
     }
     

@@ -63,6 +63,7 @@ public class SyntaxCheckPhase implements Phase
                    if ( directive == Directive.EQU ) { // .equ is special since the first child node is the label, not an operand
                        operandCount = operandCount > 0 ? operandCount-1 : operandCount;
                    } 
+                   
                    if ( ! directive.isValidOperandCount( operandCount ) ) {
                        if ( ! context.error( directive.name().toUpperCase()+" directive has invalid operand count "+node.childCount()+" , (expected at least "+directive.minOperandCount+" and at most "+directive.maxOperandCount, node ) ) {
                            ctx.stop();
@@ -71,6 +72,8 @@ public class SyntaxCheckPhase implements Phase
                    
                    switch( directive ) 
                    {
+                       case DEF: break;
+                       case UNDEF: break;
                        case CSEG: context.setSegment( Segment.FLASH ); break;
                        case DSEG: context.setSegment( Segment.SRAM ) ; break;
                        case ESEG: context.setSegment( Segment.EEPROM ); break;                       

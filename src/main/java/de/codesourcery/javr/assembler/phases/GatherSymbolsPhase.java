@@ -40,7 +40,7 @@ import de.codesourcery.javr.assembler.symbols.Symbol;
 public class GatherSymbolsPhase extends AbstractPhase
 {
     public GatherSymbolsPhase() {
-        super("gather_symbols");
+        super("gather_symbols",true);
     }
     
     @Override

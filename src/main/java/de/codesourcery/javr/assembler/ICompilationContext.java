@@ -39,7 +39,15 @@ public interface ICompilationContext
         public ICompilationSettings setFailOnAddressOutOfRange(boolean failOnAddressOutOfRange);
     }
     
-    public void setRegisterAlias(Identifier alias,Register register);
+    /**
+     * 
+     * @param alias
+     * @param register
+     * @return <code>false</code> if there already was a different alias registered for this alias that has now been replaced with the new one
+     */
+    public boolean setRegisterAlias(Identifier alias,Register register);
+    
+    public void clearRegisterAlias(Identifier alias);
     
     public Register getRegisterByAlias(Identifier alias);
     

@@ -46,6 +46,8 @@ import javax.swing.JTree;
 import javax.swing.SwingUtilities;
 import javax.swing.event.AncestorEvent;
 import javax.swing.event.AncestorListener;
+import javax.swing.event.CaretEvent;
+import javax.swing.event.CaretListener;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.event.TableModelEvent;
@@ -64,6 +66,7 @@ import javax.swing.text.Style;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyleContext;
 import javax.swing.text.StyledDocument;
+import javax.swing.text.Utilities;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreePath;
@@ -74,7 +77,12 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
+import de.codesourcery.javr.assembler.CompilationContext;
 import de.codesourcery.javr.assembler.CompilationUnit;
+import de.codesourcery.javr.assembler.CompilerSettings;
+import de.codesourcery.javr.assembler.ICompilationContext;
+import de.codesourcery.javr.assembler.IObjectCodeWriter;
+import de.codesourcery.javr.assembler.ObjectCodeWriter;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.Parser.Severity;
@@ -94,6 +102,7 @@ import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
 import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
+import de.codesourcery.javr.assembler.phases.ParseSourcePhase;
 import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Resource;
@@ -129,6 +138,8 @@ public class EditorPanel extends JPanel
 
 	private IProject project;
 
+	private final JLabel cursorPositionLabel = new JLabel("0");
+	
 	private final ASTTreeModel astTreeModel = new ASTTreeModel();
 	private JFrame astWindow = null;
 	private JFrame searchWindow = null;
@@ -636,6 +647,14 @@ public class EditorPanel extends JPanel
 		this.project = project;
 		this.currentUnit = unit;
 
+		editor.addCaretListener( new CaretListener() 
+		{
+            @Override
+            public void caretUpdate(CaretEvent e) 
+            {
+                cursorPositionLabel.setText( Integer.toString( e.getDot()  ) );
+            }
+		});
 		editor.addKeyListener( new KeyAdapter() {
 
 			@Override
@@ -762,6 +781,7 @@ public class EditorPanel extends JPanel
 	private Style createStyle(String name,SourceElement sourceElement,StyleContext ctx) 
 	{
 	    final Color col = appConfigProvider.getApplicationConfig().getEditorSettings().getColor( sourceElement , Color.BLACK );
+	    System.out.println("Element "+sourceElement+" has color "+col);
 	    final Style style = ctx.addStyle( name , STYLE_TOPLEVEL );
 	    style.addAttribute(StyleConstants.Foreground, col );
 	    return style;
@@ -828,7 +848,8 @@ public class EditorPanel extends JPanel
 		result.add( button("AST" , ev -> this.toggleASTWindow() ) );
 		result.add( button("Symbols" , ev -> this.toggleSymbolTableWindow() ) );
 		result.add( button("Upload to uC" , ev -> this.uploadToController() ) );
-
+		result.add( new JLabel("Cursor pos:" ) );
+		result.add( cursorPositionLabel );
 		return result;
 	}
 
@@ -886,6 +907,23 @@ public class EditorPanel extends JPanel
 			currentUnit.addMessage( CompilationMessage.error( currentUnit, "Failed to save changes: "+e.getMessage()) );
 			return;
 		}
+		
+		// try to parse only this compilation unit
+		// to get an AST suitable for syntax highlighting
+        astTreeModel.setAST( new AST() );
+		try 
+		{
+		    final CompilerSettings compilerSettings = new CompilerSettings();
+		    final IObjectCodeWriter writer = new ObjectCodeWriter();
+            final ICompilationContext context = new CompilationContext( project , writer , project , compilerSettings , project.getConfig() );
+            ParseSourcePhase.parseWithoutIncludes( context, currentUnit , project );
+		} 
+		catch(Exception e) {
+		    LOG.error("Parsing source failed",e);
+		}
+        astTreeModel.setAST( currentUnit.getAST() );
+		
+        doSyntaxHighlighting();		
 
 		// assemble
 		final CompilationUnit root = project.getCompileRoot();
@@ -905,9 +943,6 @@ public class EditorPanel extends JPanel
 		}
 		symbolModel.setSymbolTable( currentUnit.getSymbolTable() );    
 		messageFrame.addAll( root.getMessages(true) );        
-		astTreeModel.setAST( root.getAST() );
-
-		doSyntaxHighlighting();
 
 		final float seconds = assembleTime/1000f;
 		final DecimalFormat DF = new DecimalFormat("#######0.0#");
@@ -932,10 +967,10 @@ public class EditorPanel extends JPanel
 	private void doSyntaxHighlighting() 
 	{
 		ignoreEditEvents = true;
+		final String text = editor.getText();
 		try 
 		{
 			final StyledDocument doc = editor.getStyledDocument();
-
 			final IASTVisitor visitor = new IASTVisitor() 
 			{
 				@Override
@@ -959,7 +994,7 @@ public class EditorPanel extends JPanel
 						{
 							style = STYLE_COMMENT;
 						}     
-						else if ( node instanceof LabelNode ) 
+						else if ( node instanceof LabelNode || node instanceof IdentifierNode) 
 						{
 							style = STYLE_LABEL;
 						}      
@@ -968,7 +1003,8 @@ public class EditorPanel extends JPanel
 							style = STYLE_NUMBER;
 						}                      
 
-						if ( style != null ) {
+						if ( style != null ) 
+						{
 							doc.setCharacterAttributes( region.start(), region.length() , style , true );
 						}
 					}
@@ -1102,7 +1138,7 @@ public class EditorPanel extends JPanel
 						text = "reg: "+((RegisterNode) node).register.toString();
 					}
 
-					setText( text );
+					setText( text + " -" + ((ASTNode) node).getTextRegion() );
 				}
 				return result;
 			}

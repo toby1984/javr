@@ -71,6 +71,7 @@ public class CompilationUnit
         this.symbolTable.clear();
         this.symbolTable.setParent( parentSymbolTable );
         this.dependencies.clear();
+        this.ast = new AST();
     }
 
     public void clearMessages() {

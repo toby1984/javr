@@ -28,7 +28,6 @@ import de.codesourcery.javr.assembler.phases.ParseSourcePhase;
 import de.codesourcery.javr.assembler.phases.Phase;
 import de.codesourcery.javr.assembler.phases.PrepareGenerateCodePhase;
 import de.codesourcery.javr.assembler.phases.SyntaxCheckPhase;
-import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.ui.IProject;
 import de.codesourcery.javr.ui.config.IConfigProvider;
 

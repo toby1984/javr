@@ -26,6 +26,7 @@ import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.LexerImpl;
 import de.codesourcery.javr.assembler.parser.OperatorType;
 import de.codesourcery.javr.assembler.parser.Parser;
+import de.codesourcery.javr.assembler.parser.PreprocessingLexer;
 import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.CharacterLiteralNode;
@@ -68,6 +69,45 @@ public class ParserTest
     }
     
     @Test
+    public void testParseComment() {
+        final String asm = ";***** THIS IS A MACHINE GENERATED FILE - DO NOT EDIT ********************\n" + 
+                           ";***** Created: 2007-09-11 14:24 ******* Source: ATmega88.xml ************\n"+
+                           "ldi r16,32";
+        
+        AST ast = parse( asm );
+        assertNotNull(ast);
+        assertEquals( 3 ,  ast.childCount() );
+        
+        // line no. 1
+        final String line1 = ";***** THIS IS A MACHINE GENERATED FILE - DO NOT EDIT ********************";
+        System.out.println("line1 has length "+line1.length());
+        StatementNode stmt = (StatementNode) ast.child(0);
+        assertEquals(1,stmt.childCount());
+        
+        CommentNode comment = (CommentNode) stmt.child(0);
+        assertEquals(line1 , comment.value);
+        assertEquals( line1.length() , comment.getTextRegion().length() );
+        
+        // line no. 2
+        final String line2 = ";***** Created: 2007-09-11 14:24 ******* Source: ATmega88.xml ************";
+        System.out.println("line2 has length "+line2.length());
+        stmt = (StatementNode) ast.child(1);
+        assertEquals(1,stmt.childCount());
+        
+        comment = (CommentNode) stmt.child(0);
+        assertEquals(";***** Created: 2007-09-11 14:24 ******* Source: ATmega88.xml ************" , comment.value);
+        assertEquals( 75 , comment.getTextRegion().start() );
+        assertEquals( line2.length() , comment.getTextRegion().length() );
+        
+        // line no . 3
+        stmt = (StatementNode) ast.child(2);
+        assertEquals(1,stmt.childCount());
+        
+        final InstructionNode ins = (InstructionNode) stmt.child(0);
+        System.out.println("Instruction covers "+ins.getTextRegion());
+    }
+    
+    @Test
     public void testParseBlankLine() 
     {
         AST ast = parse("\n");
@@ -75,6 +115,26 @@ public class ParserTest
         assertFalse( ast.hasChildren() );
         assertEquals( 0 ,  ast.childCount() );
     } 
+    
+    @Test
+    public void testParsePragma2() 
+    {
+        AST ast = parse("#pragma partinc 0");
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() );
+        
+        final StatementNode stmt = (StatementNode) ast.child(0);
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
+        
+        final PreprocessorNode ins = (PreprocessorNode) stmt.child(0);
+        assertEquals( Preprocessor.PRAGMA , ins.type );
+        assertEquals( 0 , ins.childCount() );
+        assertEquals( 2 , ins.arguments.size() );
+        assertEquals("partinc" , ins.arguments.get(0) );
+        assertEquals("0" , ins.arguments.get(1) );
+    }    
     
     @Test
     public void testParseRegisterAlias() 
@@ -1138,7 +1198,9 @@ public class ParserTest
             @Override
             public Lexer createLexer(Scanner s) { return new LexerImpl(s); }
         };
-        final CompilationContext ctx = new CompilationContext( project , writer , project ,new CompilerSettings(), config ); 
+        final CompilationContext ctx = new CompilationContext( project , writer , project ,new CompilerSettings(), config );
+//        PreprocessingLexer l = new PreprocessingLexer( new LexerImpl(new Scanner(resource) ) , ctx );
+//        return p.parse( ctx, unit , l );
         return p.parse( ctx, unit , new LexerImpl(new Scanner(resource) ) );
     }
 }

@@ -289,10 +289,26 @@ public class PreprocessingLexer implements Lexer
                 }
                 continue;
             }
+            
+            if ( "pragma".equalsIgnoreCase( lexer().peek().value ) )  // TODO: #pragma is currently ignored
+            {
+                expandTokens();
+                
+                tokens.add( next ); // add hash
+                while ( true ) 
+                {
+                    final Token tok = consume();
+                    tokens.add(tok);
+                    if ( tok.isEOLorEOF() )
+                    {
+                        return;
+                    }
+                }                
+            }
 
             // We found a Preprocessor directive.
             final String directive = lexer().peek().value;
-            consume();
+            consume(); // consume keyword
             if ( directive.equalsIgnoreCase( "include" ) ) // #include "file"
             {
                 expandTokens();

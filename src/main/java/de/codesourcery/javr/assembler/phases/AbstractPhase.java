@@ -19,6 +19,7 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Segment;
+import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
@@ -34,11 +35,13 @@ import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 public abstract class AbstractPhase implements Phase 
 {
     private final String name;
+    private final boolean generateMessages;
     
-    public AbstractPhase(String name) 
+    public AbstractPhase(String name,boolean generateMessages) 
     {
         Validate.notBlank(name, "name must not be NULL or blank");
         this.name = name;
+        this.generateMessages = generateMessages;
     }
     
     protected void visitNode(ICompilationContext context, ASTNode node,IIterationContext ctx) 
@@ -50,10 +53,18 @@ public abstract class AbstractPhase implements Phase
             switch( directive ) 
             {
             	case DEF:
-            		final IdentifierDefNode identifier = (IdentifierDefNode) dnNode.child(0);
-            		final RegisterNode register = (RegisterNode) dnNode.child(1);
-            		context.setRegisterAlias( identifier.name , register.register ); 
+            	    {
+            	        final IdentifierDefNode identifier = (IdentifierDefNode) dnNode.child(0);
+            	        final RegisterNode register = (RegisterNode) dnNode.child(1);
+            	        if ( ! context.setRegisterAlias( identifier.name , register.register ) && generateMessages ) {
+            	            context.message( CompilationMessage.warning( context.currentCompilationUnit() , "Redefinition of existing alias" , identifier ) );
+            	        }
+            	    }
             		break;
+                case UNDEF:
+                    final IdentifierDefNode identifier = (IdentifierDefNode) dnNode.child(0);
+                    context.clearRegisterAlias( identifier.name );
+                    break;            		
                 case CSEG: 
                 	context.setSegment( Segment.FLASH ); 
                 	break;

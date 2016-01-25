@@ -88,6 +88,10 @@ public class TextRegion
         return len;
     }
     
+    public boolean contains(int offset) {
+        return start() <= offset && offset < end();
+    }
+    
     public int end() {
         return start+len;
     }
@@ -95,6 +99,6 @@ public class TextRegion
     @Override
     public String toString() 
     {
-        return start()+"-"+end();
+        return start()+"-"+end()+" ["+length()+"]";
     }
 }

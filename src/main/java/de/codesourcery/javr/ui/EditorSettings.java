@@ -20,9 +20,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.commons.lang3.Validate;
+import org.apache.log4j.Logger;
 
 public class EditorSettings 
 {
+    private static final Logger LOG = Logger.getLogger(EditorSettings.class);
+    
     private String indentString;
     
     public static enum SourceElement 
@@ -30,14 +33,14 @@ public class EditorSettings
         LABEL,NUMBER,REGISTER,MNEMONIC,COMMENT,PREPROCESSOR
     }
     
-    private Map<SourceElement,Color> colors = new HashMap<>();
+    private final Map<SourceElement,Color> colors = new HashMap<>();
     
     public EditorSettings() 
     {
         colors.put( SourceElement.LABEL , Color.GREEN );
         colors.put( SourceElement.NUMBER, Color.BLUE);
         colors.put( SourceElement.REGISTER, Color.BLUE);
-        colors.put( SourceElement.MNEMONIC, Color.BLACK );
+        colors.put( SourceElement.MNEMONIC, Color.MAGENTA );
         colors.put( SourceElement.COMMENT , Color.ORANGE );
         colors.put( SourceElement.PREPROCESSOR, Color.PINK);
     }
@@ -71,12 +74,12 @@ public class EditorSettings
         return result;
     }
     
-    public void setColors(Map<SourceElement, Color> colors) 
-    {
-        Validate.notNull(colors, "colors must not be NULL");
-        this.colors.clear();
-        this.colors.putAll(colors);
-    }
+//    public void setColors(Map<SourceElement, Color> colors) 
+//    {
+//        Validate.notNull(colors, "colors must not be NULL");
+//        this.colors.clear();
+//        this.colors.putAll(colors);
+//    }
 
     public EditorSettings createCopy() 
     {

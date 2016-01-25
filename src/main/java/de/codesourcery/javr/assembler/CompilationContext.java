@@ -18,7 +18,9 @@ package de.codesourcery.javr.assembler;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Stack;
 
 import org.apache.commons.lang3.StringUtils;
@@ -88,11 +90,20 @@ public final class CompilationContext implements ICompilationContext
     }
     
     @Override
-    public void setRegisterAlias(Identifier alias, Register register) 
+    public boolean setRegisterAlias(Identifier alias, Register register) 
     {
         Validate.notNull(alias, "alias must not be NULL");
 		Validate.notNull(register, "register must not be NULL");
+		final boolean alreadyMapped = registerAliases.values().stream().anyMatch( r -> r.equals( register ));
     	this.registerAliases.put( Identifier.of( alias.getValue().toLowerCase() ) ,register);
+    	return ! alreadyMapped;
+    }
+    
+    @Override
+    public void clearRegisterAlias(Identifier alias) 
+    {
+        Validate.notNull(alias, "alias must not be NULL");
+        this.registerAliases.remove( alias );
     }
     
     @Override
@@ -175,6 +186,7 @@ public final class CompilationContext implements ICompilationContext
 
     public void beforePhase() throws IOException
     {
+        registerAliases.clear();
         compilationUnits.clear();
         currentCompilationUnit = null;
         pushCompilationUnit( rootCompilationUnit );
