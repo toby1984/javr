@@ -26,7 +26,6 @@ import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.LexerImpl;
 import de.codesourcery.javr.assembler.parser.OperatorType;
 import de.codesourcery.javr.assembler.parser.Parser;
-import de.codesourcery.javr.assembler.parser.PreprocessingLexer;
 import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.CharacterLiteralNode;
@@ -37,6 +36,7 @@ import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.EquLabelNode;
 import de.codesourcery.javr.assembler.parser.ast.FunctionCallNode;
 import de.codesourcery.javr.assembler.parser.ast.FunctionDefinitionNode;
+import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierDefNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
@@ -998,6 +998,27 @@ public class ParserTest
         final NumberLiteralNode num = (NumberLiteralNode) insn.child( 0 );
         assertEquals( 0b1011 , num.getValue().intValue()  );
         assertEquals( NumberLiteralNode.LiteralType.BINARY , num.getType() );
+    }     
+    
+    @Test
+    public void testParseORG() 
+    {
+        AST ast = parse(".org 42");
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
+        
+        final StatementNode stmt = (StatementNode) ast.child(0);
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
+        
+        final DirectiveNode insn = (DirectiveNode) stmt.child(0);
+        assertNotNull(insn);
+        assertEquals( Directive.ORG , insn.directive );
+        assertEquals(1,insn.childCount());
+        
+        assertTrue( insn.child(0) instanceof IValueNode);
+        assertEquals( (int) 42 , ((Number) ((IValueNode) insn.child(0)).getValue()).intValue() );
     }     
     
     @Test

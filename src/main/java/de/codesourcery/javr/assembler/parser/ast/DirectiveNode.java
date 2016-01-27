@@ -32,6 +32,7 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
     
     public static enum Directive 
     {
+        ORG("org",1,1),
         CSEG("cseg",0,0),
         DSEG("dseg",0,0),
         ESEG("eseg",0,0),

@@ -88,6 +88,9 @@ public class ObjectCodeWriter implements IObjectCodeWriter
             {
                 throw new IllegalStateException( segment+" start address already set");
             }
+            if ( this.dataPtr != 0 ) {
+                throw new IllegalStateException("Cannot change start address of segment "+segment+" after bytes have already been written/allocated to this segment");
+            }
             this.startAddress = adr;   
         }
         

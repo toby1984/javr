@@ -456,6 +456,17 @@ public class Parser
         final String value = tok2.value;
         switch( value.toLowerCase() ) // AVR documentation states that directives are matched ignoring case
         {
+            case "org":
+                {
+                    final ASTNode expr = parseExpression(lexer);
+                    if ( expr != null ) 
+                    {
+                        final DirectiveNode result = new DirectiveNode( Directive.ORG , tok2.region() );
+                        result.addChild( expr );
+                        return result;
+                    }
+                }
+                throw new ParseException(".byte requires at least one value",tok2);                
             case "device":
                 final int start = lexer.peek().offset;
                 final List<String> values2 = parseText();
@@ -473,8 +484,8 @@ public class Parser
                     final DirectiveNode result = new DirectiveNode( Directive.RESERVE , tok2.region() );
                     result.addChild( expr );
                     return result;
-                }
-                break;
+                } 
+                throw new ParseException(".byte requires at least one value",tok2);
             case "def":
 	            {
 	            	if ( lexer.peek().isValidIdentifier() ) 

@@ -24,6 +24,7 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
+import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierDefNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 
@@ -52,6 +53,24 @@ public abstract class AbstractPhase implements Phase
 			final Directive directive = dnNode.directive;
             switch( directive ) 
             {
+                case ORG:
+                    final IValueNode expr = (IValueNode) node.child(0);
+                    final Object value = expr.getValue();
+                    if ( !( value instanceof Number) ) 
+                    {
+                        if ( generateMessages ) 
+                        {
+                            if ( value != null ) {
+                                context.message( CompilationMessage.warning( context.currentCompilationUnit() , "Expected a number" , expr) );
+                            } else {
+                                context.message( CompilationMessage.warning( context.currentCompilationUnit() , "Failed to resolve expression" , expr) );
+                            }
+                        }
+                        return;
+                    }
+                    final int address = ((Number) value).intValue();
+                    context.setStartAddress( address );
+                    break;
             	case DEF:
             	    {
             	        final IdentifierDefNode identifier = (IdentifierDefNode) dnNode.child(0);

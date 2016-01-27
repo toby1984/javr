@@ -47,6 +47,8 @@ public interface ICompilationContext
      */
     public boolean setRegisterAlias(Identifier alias,Register register);
     
+    public void setStartAddress(int address);
+    
     public void clearRegisterAlias(Identifier alias);
     
     public Register getRegisterByAlias(Identifier alias);

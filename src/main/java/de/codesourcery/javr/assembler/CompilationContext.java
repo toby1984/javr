@@ -282,4 +282,9 @@ public final class CompilationContext implements ICompilationContext
     public CompilationUnit currentCompilationUnit() {
         return currentCompilationUnit;
     }
+
+    @Override
+    public void setStartAddress(int address) {
+        objectCodeWriter.setStartAddress( Address.byteAddress( currentSegment() , address ) );
+    }
 }

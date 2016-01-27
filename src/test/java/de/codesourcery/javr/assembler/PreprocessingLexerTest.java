@@ -194,6 +194,11 @@ public class PreprocessingLexerTest extends TestCase
         public Register getRegisterByAlias(Identifier alias) {
             throw new RuntimeException("method not implemented: getRegisterByAlias()");
         }
+
+        @Override
+        public void setStartAddress(int address) {
+            throw new RuntimeException("method not implemented: setStartAddress");
+        }
     };
     
     @Test
