@@ -22,10 +22,12 @@ package de.codesourcery.javr.assembler.parser;
  */
 public class TextRegion 
 {
+    private int line;
+    private int column;
     private int start;
     private int len;
     
-    public TextRegion(int start, int len) 
+    public TextRegion(int start, int len,int line,int column) 
     {
         if ( start < 0 ) {
             throw new IllegalArgumentException("offset must be >= 0");
@@ -35,6 +37,8 @@ public class TextRegion
         }        
         this.start = start;
         this.len = len;
+        this.line = line;
+        this.column = column;
     }
     
     @Override
@@ -45,7 +49,7 @@ public class TextRegion
     
     public TextRegion createCopy() 
     {
-        return new TextRegion(this.start,this.len);
+        return new TextRegion(this.start,this.len,this.line, this.column );
     }
     
     public TextRegion incLength() {
@@ -78,6 +82,14 @@ public class TextRegion
         this.start = newStart;
         this.len = newEnd-newStart;
         return this;
+    }
+    
+    public int line() {
+        return line;
+    }
+    
+    public int column() {
+        return column;
     }
     
     public int start() {

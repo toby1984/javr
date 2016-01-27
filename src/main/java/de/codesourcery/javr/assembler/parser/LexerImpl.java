@@ -37,6 +37,9 @@ public class LexerImpl implements Lexer
     
     private boolean ignoreWhitespace = true;
     
+    private int line = 1;
+    private int column = 0;
+    
     public LexerImpl(Scanner s) {
         Validate.notNull(s,"Scanner must not be null");
         this.scanner = s;
@@ -75,23 +78,25 @@ public class LexerImpl implements Lexer
             return;
         }
         
-        int offset = scanner.offset();
+        int startOffset = scanner.offset();
+        int startColumn = column;
         buffer.setLength( 0 );
         
         while ( ! scanner.eof() && isWhitespace( scanner.peek() ) ) 
         {
             final char c = scanner.next();
+            column++;
             if ( ! ignoreWhitespace ) {
                 buffer.append( c );
             }
         }
         
         if ( buffer.length() > 0 ) {
-            addToken(TokenType.WHITESPACE, buffer.toString(), offset );
+            addToken(TokenType.WHITESPACE, buffer.toString(), startOffset , line , startColumn );
             return;
         }
         
-        offset = scanner.offset();
+        startOffset = scanner.offset();
         
 outer:      
         while ( ! scanner.eof() )
@@ -101,11 +106,12 @@ outer:
                 scanner.pushBack();
                 break;
             }
+            column++;
            
             if ( c == '-' ) 
             {
-                parseBuffer(offset);
-                addToken( TokenType.OPERATOR , c , scanner.offset()-1 ); 
+                parseBuffer(startOffset,startColumn);
+                addToken( TokenType.OPERATOR , c , scanner.offset()-1 , line , column ); 
                 break outer;
             }
             
@@ -116,51 +122,56 @@ outer:
             }
             else if ( OperatorType.getExactMatch( buffer.toString() ) != null ) 
             {
-                addToken( TokenType.OPERATOR , buffer.toString() , offset );
+                addToken( TokenType.OPERATOR , buffer.toString() , startOffset , line , startColumn );
                 buffer.setLength(0);
                 scanner.pushBack();
+                column--;
                 break;
             } else if ( OperatorType.mayBeOperator( c ) ) {
                 scanner.pushBack();
+                column--;
                 break;
             }
             
             switch( c ) 
             {
-                case '(':  parseBuffer(offset) ; addToken( TokenType.PARENS_OPEN, c , scanner.offset()-1 ); break outer;
-                case ')':  parseBuffer(offset) ; addToken( TokenType.PARENS_CLOSE, c , scanner.offset()-1 ); break outer;
-                case '=':  parseBuffer(offset) ; addToken( TokenType.EQUALS, c , scanner.offset()-1 ); break outer;
-                case ';':  parseBuffer(offset) ; addToken( TokenType.SEMICOLON, c , scanner.offset()-1 ); break outer;
-                case '\'': parseBuffer(offset) ; addToken( TokenType.SINGLE_QUOTE , c , scanner.offset()-1 );    break outer;
-                case '"':  parseBuffer(offset) ; addToken( TokenType.DOUBLE_QUOTE , c , scanner.offset()-1 );    break outer;
-                case '.':  parseBuffer(offset) ; addToken( TokenType.DOT   , c , scanner.offset()-1 );    break outer;
-                case '#':  parseBuffer(offset) ; addToken( TokenType.HASH , c , scanner.offset()-1 );    break outer;
-                case ',':  parseBuffer(offset) ; addToken( TokenType.COMMA , c , scanner.offset()-1 );    break outer;
-                case '\n': parseBuffer(offset) ; addToken( TokenType.EOL   , c , scanner.offset()-1 );    break outer;
-                case ':':  parseBuffer(offset) ; addToken( TokenType.COLON , ':' , scanner.offset()-1 );  break outer;
+                case '(':  parseBuffer(startOffset, startColumn) ; addToken( TokenType.PARENS_OPEN, c , scanner.offset()-1 , line ,column ); break outer;
+                case ')':  parseBuffer(startOffset, startColumn) ; addToken( TokenType.PARENS_CLOSE, c , scanner.offset()-1 , line ,column); break outer;
+                case '=':  parseBuffer(startOffset, startColumn) ; addToken( TokenType.EQUALS, c , scanner.offset()-1 , line ,column); break outer;
+                case ';':  parseBuffer(startOffset, startColumn) ; addToken( TokenType.SEMICOLON, c , scanner.offset()-1 , line ,column); break outer;
+                case '\'': parseBuffer(startOffset, startColumn) ; addToken( TokenType.SINGLE_QUOTE , c , scanner.offset()-1 , line ,column);    break outer;
+                case '"':  parseBuffer(startOffset, startColumn) ; addToken( TokenType.DOUBLE_QUOTE , c , scanner.offset()-1 , line ,column);    break outer;
+                case '.':  parseBuffer(startOffset, startColumn) ; addToken( TokenType.DOT   , c , scanner.offset()-1 , line ,column);    break outer;
+                case '#':  parseBuffer(startOffset, startColumn) ; addToken( TokenType.HASH , c , scanner.offset()-1 , line ,column);    break outer;
+                case ',':  parseBuffer(startOffset, startColumn) ; addToken( TokenType.COMMA , c , scanner.offset()-1 , line ,column);    break outer;
+                case '\n': parseBuffer(startOffset, startColumn) ; addToken( TokenType.EOL   , c , scanner.offset()-1 , line ,column);    break outer;
+                case ':':  parseBuffer(startOffset, startColumn) ; addToken( TokenType.COLON , ':' , scanner.offset()-1 , line ,column);  break outer;
                 case '\r':
-                    parseBuffer(offset);
+                    parseBuffer(startOffset,startColumn);
                     if ( ! scanner.eof() && scanner.peek() == '\n' ) 
                     {
                         scanner.next();
-                        addToken( TokenType.EOL ,"\r\n" , scanner.offset()-2 );
+                        addToken( TokenType.EOL ,"\r\n" , scanner.offset()-2 , line ,column);
+                        column++;
                     } else { 
-                        addToken( TokenType.EOL ,"\r" , scanner.offset()-1 );
+                        addToken( TokenType.EOL ,"\r" , scanner.offset()-1 , line ,column );
                     }
+                    line++;
+                    column = 0;
                     break outer;
                 default:
                     buffer.append( c );
             }
         }
         
-        parseBuffer( offset );
+        parseBuffer( startOffset , startColumn );
         
         if ( scanner.eof() ) {
-            addToken( TokenType.EOF , "" , scanner.offset() );
+            addToken( TokenType.EOF , "" , scanner.offset() , line ,column );
         }        
     }
     
-    private void parseBuffer(int startOffset) 
+    private void parseBuffer(int startOffset,int startColumn) 
     {
         if ( buffer.length() == 0 ) {
             return;
@@ -170,12 +181,12 @@ outer:
         
         if ( OperatorType.getExactMatch( value ) != null ) 
         {
-            addToken(TokenType.OPERATOR , value , startOffset );
+            addToken(TokenType.OPERATOR , value , startOffset , line , startColumn );
             return;
         }
         
         if ( "=".equals( value ) ) {
-            addToken( TokenType.EQUALS, "=" , scanner.offset()-1 );
+            addToken( TokenType.EQUALS, "=" , scanner.offset()-1 , line , startColumn );
             return;
         }
         
@@ -190,23 +201,23 @@ outer:
         
         if ( isOnlyDigits ) 
         {
-            addToken(TokenType.DIGITS , value , startOffset );
+            addToken(TokenType.DIGITS , value , startOffset , line , startColumn );
             return;
         }
-        addToken(TokenType.TEXT , value , startOffset );
+        addToken(TokenType.TEXT , value , startOffset , line , startColumn);
     }
     
-    private void addToken(TokenType t, char value,int offset) 
+    private void addToken(TokenType t, char value,int offset,int line,int column) 
     {
-        final Token token = new Token( t , Character.toString( value ) , offset );
+        final Token token = new Token( t , Character.toString( value ) , offset ,line,column);
         if ( DEBUG ) {
             System.out.println("PARSED: "+token);
         }        
         tokens.add( token );
     }    
     
-    private void addToken(TokenType t, String value,int offset) {
-        final Token token = new Token( t , value , offset );
+    private void addToken(TokenType t, String value,int offset,int line,int column) {
+        final Token token = new Token( t , value , offset , line , column );
         if ( DEBUG ) {
             System.out.println("PARSED: "+token);
         }

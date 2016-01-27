@@ -186,7 +186,7 @@ public class LexerTest {
     }     
     
     private Token token(TokenType t,String value,int offset) {
-        return new Token(t,value,offset);
+        return new Token(t,value,offset,-1,-1);
     }
 
     private void assertEOF() 

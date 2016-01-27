@@ -86,6 +86,8 @@ public class PreprocessingLexer implements Lexer
     // and are thus inaccessible afterwards, the offset needs to be stored somewhere
     // else
     private int eofOffset = -1;
+    private int eofLine = -1;
+    private int eofColumn = -1;
 
     /**
      * Holds a macro definition (parameter names and macro body).
@@ -141,7 +143,6 @@ public class PreprocessingLexer implements Lexer
     {
         Validate.notNull(delegate, "delegate must not be NULL");
         Validate.notNull(context, "context must not be NULL");
-
         this.compilationContext = context;
         pushLexer( delegate );
     }	
@@ -186,7 +187,7 @@ public class PreprocessingLexer implements Lexer
             if ( eofOffset == -1 ) {
                 throw new RuntimeException("Internal error, no more lexers but EOF offset not set ?");
             }
-            tokens.add( new Token(TokenType.EOF , "" , eofOffset ) );
+            tokens.add( new Token(TokenType.EOF , "" , eofOffset , eofLine , eofColumn) );
             return;
         }
         unexpandedTokens.clear();
@@ -213,10 +214,13 @@ public class PreprocessingLexer implements Lexer
                         final Lexer popped = popLexer();
                         if ( lexerStack.isEmpty() ) 
                         {
-                            if ( ! popped.peek(TokenType.EOF ) ) {
+                            final Token lastToken = popped.peek();
+                            if ( ! lastToken.is(TokenType.EOF ) ) {
                                 throw new RuntimeException("Internal error, expected lexer to be at EOF");
                             }
-                            eofOffset = popped.peek().offset;
+                            eofOffset = lastToken.offset;
+                            eofLine = lastToken.line;
+                            eofColumn = lastToken.column;
                         }
                         compilationContext.popCompilationUnit();
                     }			
@@ -543,13 +547,14 @@ public class PreprocessingLexer implements Lexer
                     }
                     consume();
                 }
-                skipWhitespace();						
+                skipWhitespace();		
                 final List<Token> macroBody = new ArrayList<>();
                 processTokensUntilEndOfLine( t -> {
                     macroBody.add(t);
                 } );
                 if ( macroBody.isEmpty() ) {
-                    macroBody.add( new Token(TokenType.DIGITS,"1" , macroName.offset ) );
+                    final Token tmpToken = lexer().peek(); // get token to take line/column from
+                    macroBody.add( new Token(TokenType.DIGITS,"1" , macroName.offset , tmpToken.line , tmpToken.column ) );
                 }
                 if ( symbols().isDeclared(macroId) ) 
                 {
@@ -688,7 +693,7 @@ public class PreprocessingLexer implements Lexer
                 {
                     expandedLength= 1; // just replace the identifier with '1'
                     replacedTokensLen = macroName.value.length();
-                    tokens.set( tokenIdx , new Token( TokenType.DIGITS , "1" , macroName.offset ) );
+                    tokens.set( tokenIdx , new Token( TokenType.DIGITS , "1" , macroName.offset , macroName.line , macroName.column ) );
                 } 
                 else 
                 {
@@ -882,6 +887,8 @@ public class PreprocessingLexer implements Lexer
 
         private final List<Token> tokens;
         private final int lastOffset;
+        private final int lastLine;
+        private final int lastColumn;
 
         private boolean ignoreWhitespace = true;
 
@@ -892,6 +899,8 @@ public class PreprocessingLexer implements Lexer
             this.tokens = tokens;
             final Token lastToken = tokens.get(tokens.size()-1);
             this.lastOffset = lastToken.offset+lastToken.value.length();
+            this.lastLine = lastToken.line;
+            this.lastColumn = lastToken.column;
         }
 
         @Override
@@ -906,7 +915,7 @@ public class PreprocessingLexer implements Lexer
                 tokens.remove(0);
             }
             if ( tokens.isEmpty() ) {
-                return new Token(TokenType.EOF,"",lastOffset);
+                return new Token(TokenType.EOF,"",lastOffset,lastLine,lastColumn);
             }
             return tokens.remove(0);
         }
@@ -923,10 +932,10 @@ public class PreprocessingLexer implements Lexer
                         return tok;
                     }
                 }
-                return new Token(TokenType.EOF,"",lastOffset);
+                return new Token(TokenType.EOF,"",lastOffset,lastLine,lastColumn);
             }
             if ( tokens.isEmpty() ) {
-                return new Token(TokenType.EOF,"",lastOffset);
+                return new Token(TokenType.EOF,"",lastOffset,lastLine,lastColumn);
             }
             return tokens.get(0);
         }

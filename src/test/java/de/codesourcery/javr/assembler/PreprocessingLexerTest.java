@@ -522,7 +522,7 @@ public class PreprocessingLexerTest extends TestCase
     {
         final Token tok = it.next();
         if ( tok.type != t || ! tok.value.equals(value) || tok.offset != offset ) {
-            final Token expected=new Token(t,value,offset);
+            final Token expected=new Token(t,value,offset,-1,-1);
             fail("expected: "+expected+" but got: "+tok);
         }
     }

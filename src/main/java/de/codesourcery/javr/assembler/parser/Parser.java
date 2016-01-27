@@ -284,7 +284,7 @@ public class Parser
                 
                 if ( proc == Preprocessor.PRAGMA ) // #pragma is currently ignored 
                 {
-                    final TextRegion r = new TextRegion( offset , lexer.peek().offset - offset );
+                    final TextRegion r = new TextRegion( offset , lexer.peek().offset - offset, keywordToken.line , keywordToken.column );
                     final List<String> values = new ArrayList<>();
                     while ( ! lexer.peek().isEOLorEOF() ) 
                     {
@@ -295,7 +295,7 @@ public class Parser
                 }
                 if ( proc == Preprocessor.IF_DEFINE || proc == Preprocessor.IF_NDEFINE ) 
                 {
-                    final TextRegion r = new TextRegion( offset , lexer.peek().offset - offset );
+                    final TextRegion r = new TextRegion( offset , lexer.peek().offset - offset , keywordToken.line , keywordToken.column);
                     ASTNode expr = parseExpression(lexer);
                     if ( expr == null ) {
                         throw new ParseException("Expected an identifier/expression", lexer.peek() );
@@ -367,13 +367,13 @@ public class Parser
                         throw new ParseException("Expected an expression",lexer.peek());
                     } 
 
-                    final TextRegion r = new TextRegion( offset , keywordToken.endOffset() - offset );
+                    final TextRegion r = new TextRegion( offset , keywordToken.endOffset() - offset , keywordToken.line , keywordToken.column);
                     final PreprocessorNode preproc= new PreprocessorNode(Preprocessor.DEFINE , r);                        
                     preproc.addChild( funcDef );
                     return preproc;
                 }
                 final List<String> args = parseText();
-                final TextRegion r = new TextRegion( offset , lexer.peek().offset - offset );
+                final TextRegion r = new TextRegion( offset , lexer.peek().offset - offset , keywordToken.line , keywordToken.column);
                 return new PreprocessorNode( proc , args , r );
             }
             throw new ParseException("Expected a keyword",lexer.peek());
@@ -475,7 +475,7 @@ public class Parser
                 }
                 final String device= values2.stream().collect(Collectors.joining());
                 final ASTNode dResult = new DirectiveNode(Directive.DEVICE , tok2.region() );
-                dResult.addChild( new StringLiteral( device , new TextRegion(start, lexer.peek().offset - start ) ) ); 
+                dResult.addChild( new StringLiteral( device , new TextRegion(start, lexer.peek().offset - start , tok2.line , tok2.column ) ) ); 
                 return dResult;
             case "byte":
                 final ASTNode expr = parseExpression(lexer);

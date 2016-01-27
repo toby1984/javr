@@ -66,7 +66,6 @@ import javax.swing.text.Style;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyleContext;
 import javax.swing.text.StyledDocument;
-import javax.swing.text.Utilities;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreePath;
@@ -109,7 +108,6 @@ import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
 import de.codesourcery.javr.ui.EditorSettings.SourceElement;
 import de.codesourcery.javr.ui.IProject;
-import de.codesourcery.javr.ui.LineMap;
 import de.codesourcery.javr.ui.Main;
 import de.codesourcery.javr.ui.config.IApplicationConfig;
 import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
@@ -159,8 +157,6 @@ public class EditorPanel extends JPanel
 	protected Style STYLE_COMMENT;
 
 	private CompilationUnit currentUnit = new CompilationUnit( new StringResource("dummy",  "" ) );
-
-	private LineMap lineMap;
 
 	private final MessageFrame messageFrame;
 	
@@ -752,8 +748,6 @@ public class EditorPanel extends JPanel
         
 		add( panel , cnstrs );
 
-		this.lineMap = new LineMap("",project);
-
 		// setup styles
 		setupStyles();
 
@@ -895,8 +889,6 @@ public class EditorPanel extends JPanel
 		String text = editor.getText();
 		text = text == null ? "" : text;
 
-		this.lineMap = new LineMap( text , project);            
-
 		// save source to file
 		try {
 			saveSource();
@@ -946,8 +938,7 @@ public class EditorPanel extends JPanel
 
 		final float seconds = assembleTime/1000f;
 		final DecimalFormat DF = new DecimalFormat("#######0.0#");
-		final float linesPerSeconds = lineMap.getLineCount()/seconds;
-		final String time = "Time: "+ assembleTime +" ms , "+DF.format( linesPerSeconds )+" lines/s";
+		final String time = "Time: "+ assembleTime +" ms ";
 
 		currentUnit.addMessage( CompilationMessage.info(currentUnit,time) );
 
@@ -959,7 +950,7 @@ public class EditorPanel extends JPanel
 	private static CompilationMessage toCompilationMessage(CompilationUnit unit,Exception e)
 	{
 		if ( e instanceof ParseException ) {
-			return new CompilationMessage(unit,Severity.ERROR , e.getMessage() , new TextRegion( ((ParseException ) e).getOffset() , 0 ) ); 
+			return new CompilationMessage(unit,Severity.ERROR , e.getMessage() , new TextRegion( ((ParseException ) e).getOffset() , 0 ,-1 , -1 ) ); 
 		} 
 		return new CompilationMessage(unit,Severity.ERROR , e.getMessage() );
 	}
@@ -1278,12 +1269,26 @@ public class EditorPanel extends JPanel
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
-			if ( no > 0 ) {
-				int position = lineMap.getPositionOfLine( no );                
-				if ( position != -1 ) {
-					editor.setCaretPosition( position );
-					editor.requestFocus();
-				}                
+			if ( no > 0 ) 
+			{
+			    String text = editor.getText();
+			    if ( text == null ) {
+			        text = "";
+			    }
+			    int offset = 0;
+			    for ( final int len=text.length() ; no > 1 && offset < len ; offset++ ) {
+			        final char c = text.charAt( offset );
+			        if ( c == '\r' && (offset+1) < len && text.charAt(offset+1) == '\n' ) {
+			            no--;
+			            offset++;
+			        } 
+			        else if ( c == '\n' ) 
+			        {
+			            no--;
+			        }
+			    }
+			    editor.setCaretPosition( offset );
+				editor.requestFocus();
 			}
 		}
 	}

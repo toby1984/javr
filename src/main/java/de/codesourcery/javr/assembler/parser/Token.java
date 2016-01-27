@@ -30,8 +30,10 @@ public final class Token
     public int offset;
     public final String value;
     public final TokenType type;
+    public final int line; // first line = 1 !!
+    public final int column; // first column = 1 !!
     
-    public Token(TokenType type,String value,int offset) 
+    public Token(TokenType type,String value,int offset,int line,int column) 
     {
         Validate.notNull(type, "type must not be NULL");
         Validate.notNull(value, "value must not be NULL");
@@ -46,6 +48,8 @@ public final class Token
         this.offset = offset;
         this.value = value;
         this.type = type;
+        this.line = line;
+        this.column = column;
     }
     
     public boolean isValidIdentifier() 
@@ -79,7 +83,7 @@ public final class Token
     }     
     
     public Token copyWithOffset(int newOffset) {
-    	return new Token(this.type , this.value , newOffset );
+    	return new Token(this.type , this.value , newOffset , this.line , this.column );
     }
     
     public int endOffset() {
@@ -144,7 +148,7 @@ public final class Token
     
     public TextRegion region() 
     {
-        return new TextRegion(this.offset, this.value.length() );
+        return new TextRegion(this.offset, this.value.length() , this.line , this.column );
     }
     
     public boolean intersects(TextRegion r) 
