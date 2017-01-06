@@ -949,7 +949,8 @@ public class EditorPanel extends JPanel
 			root.addMessage( toCompilationMessage( currentUnit, e ) );
 		}
 		symbolModel.setSymbolTable( currentUnit.getSymbolTable() );    
-		messageFrame.addAll( root.getMessages(true) );        
+		final List<CompilationMessage> allMessages = root.getMessages(true);
+        messageFrame.addAll( allMessages );        
 
 		final float seconds = assembleTime/1000f;
 		final DecimalFormat DF = new DecimalFormat("#######0.0#");

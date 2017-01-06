@@ -286,10 +286,7 @@ public class ProjectConfiguration implements ResourceFactory
         Validate.notNull(architecture, "architecture must not be NULL");
         if ( this.architecture.getType() != architecture ) 
         {
-            if ( architecture != Architecture.ATMEGA88 ) { // TODO: Handle other architectures ? 
-                throw new RuntimeException("Internal error, architectures other than "+Architecture.ATMEGA88+" are currently not handled");
-            }            
-            this.architecture = new ATMega88();
+            this.architecture = architecture.createImplementation();
         }
     }
     

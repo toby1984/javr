@@ -185,7 +185,7 @@ public class Parser
         if ( arch == null ) {
             throw new IllegalStateException("architecture must be set");
         }
-
+        
         this.context = context;
         this.lexer = lexer;
         this.ast = new AST();
@@ -972,7 +972,7 @@ public class Parser
         {
             do {
                 lexer.next();
-            } while ( lexer.peek( TokenType.EOL ) );
+            } while ( ! lexer.eof() && lexer.peek( TokenType.EOL ) );
             return true;
         }
         return false;

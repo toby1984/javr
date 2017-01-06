@@ -64,7 +64,7 @@ public class CompilationUnit
         this.resource = resource;
         this.symbolTable = symbolTable;
     }    
-
+    
     public void beforeCompilationStarts(SymbolTable parentSymbolTable) 
     {
         clearMessages();
@@ -95,7 +95,7 @@ public class CompilationUnit
 
     @Override
     public String toString() {
-        return "Unit: "+resource;
+        return "Unit: "+super.toString()+" - "+resource;
     }
 
     public Resource getResource() {

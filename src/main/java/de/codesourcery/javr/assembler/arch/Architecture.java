@@ -15,6 +15,9 @@
  */
 package de.codesourcery.javr.assembler.arch;
 
+import de.codesourcery.javr.assembler.arch.impl.ATMega328p;
+import de.codesourcery.javr.assembler.arch.impl.ATMega88;
+
 /**
  * Enumeration of all supported architectures.
  *
@@ -23,7 +26,18 @@ package de.codesourcery.javr.assembler.arch;
  */
 public enum Architecture 
 {
-    ATMEGA88("atmega88");
+    ATMEGA88("atmega88") {
+        @Override
+        public IArchitecture createImplementation() {
+            return new ATMega88();
+        }
+    },
+    ATMEGA328P("atmega328p") {
+        @Override
+        public IArchitecture createImplementation() {
+            return new ATMega328p();
+        }
+    };
     
     private final String id;
     
@@ -34,4 +48,6 @@ public enum Architecture
     public String getIdentifier() {
         return id;
     }
+    
+    public abstract IArchitecture createImplementation();
 }

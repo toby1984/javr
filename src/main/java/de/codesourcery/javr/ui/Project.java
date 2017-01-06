@@ -286,7 +286,7 @@ public class Project implements IProject
         artifactsGenerated = false;
         
         final Assembler asm = new Assembler();
-        compilationSuccess = asm.compile( this , getObjectCodeWriter() , projectConfig , this );
+        compilationSuccess = asm.compile(  this , getObjectCodeWriter() , projectConfig , this );
         return compilationSuccess;
     }
 

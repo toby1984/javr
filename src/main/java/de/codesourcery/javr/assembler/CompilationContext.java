@@ -18,13 +18,11 @@ package de.codesourcery.javr.assembler;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
-import java.util.Iterator;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Stack;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
+import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.parser.Identifier;
@@ -38,6 +36,8 @@ import de.codesourcery.javr.ui.config.IConfig;
 
 public final class CompilationContext implements ICompilationContext 
 {
+    private static final Logger LOG = Logger.getLogger(CompilationContext.class);
+    
     private final SymbolTable globalSymbolTable;
     
     private final CompilerSettings compilerSettings;
@@ -53,7 +53,7 @@ public final class CompilationContext implements ICompilationContext
     private final Map<Identifier,Register> registerAliases = new HashMap<>();
     
     // stack to keep track of the current compilation unit while processing #include directives
-    private final Stack<CompilationUnit> compilationUnits = new Stack<>();
+    private final Stack<CompilationUnit> compilationUnits = new Stack<CompilationUnit>();
     
     // the compilation unit that was passed to start the compilation process
     private final CompilationUnit rootCompilationUnit;
@@ -86,6 +86,7 @@ public final class CompilationContext implements ICompilationContext
         this.compilerSettings = compilerSettings;
         this.config = config;
         this.maxErrorsLimit = compilerSettings.getMaxErrors();
+        
         pushCompilationUnit( rootCompilationUnit );
     }
     
@@ -148,6 +149,7 @@ public final class CompilationContext implements ICompilationContext
             
             if ( unique.containsKey( current ) ) 
             {
+                LOG.error("pushCompilationUnit(): Circular includes detected: "+unique.keySet()+" in "+newUnit.getAST());
                 error("Circular includes detected: "+unique.keySet(),newUnit.getAST());
                 return false;
             }
@@ -162,7 +164,7 @@ public final class CompilationContext implements ICompilationContext
         if ( currentCompilationUnit != null ) { // NULL when this method is called by the constructor
             currentCompilationUnit().addDependency( newUnit );
         }
-        compilationUnits.add( newUnit );
+        compilationUnits.push( newUnit );
         this.currentCompilationUnit = newUnit;
         return true;
     }
@@ -196,7 +198,12 @@ public final class CompilationContext implements ICompilationContext
 
     @Override
     public SymbolTable currentSymbolTable() {
-        return currentCompilationUnit().getSymbolTable();
+        final CompilationUnit unit = currentCompilationUnit();
+        if ( unit == null ) {
+            LOG.error("Internal error, no current compilation unit in context,root: "+this.rootCompilationUnit+", stack: "+compilationUnits);
+            throw new RuntimeException("Internal error, no current compilation unit in context,root: "+this.rootCompilationUnit+", stack: "+compilationUnits);
+        }
+        return unit.getSymbolTable();
     }
 
     @Override
@@ -286,5 +293,10 @@ public final class CompilationContext implements ICompilationContext
     @Override
     public void setStartAddress(int address) {
         objectCodeWriter.setStartAddress( Address.byteAddress( currentSegment() , address ) );
+    }
+    
+    @Override
+    public String toString() {
+        return "Compilation context "+super.toString()+" - current unit: "+currentCompilationUnit+", unit stack size: "+this.compilationUnits.size();
     }
 }
