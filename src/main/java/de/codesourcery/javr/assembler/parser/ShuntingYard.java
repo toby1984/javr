@@ -114,7 +114,7 @@ When there are no more tokens to read:
                 op.setType( OperatorType.UNARY_MINUS );
             }
         }
-        this.expectingValue = true; // TODO: Does not properly handle postfix operators
+        this.expectingValue = ! tok1.isParensClose(); // TODO: Does not properly handle postfix operators
 
         if ( tok1.isFunction() )
         {

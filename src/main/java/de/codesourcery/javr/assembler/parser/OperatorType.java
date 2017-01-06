@@ -272,8 +272,8 @@ public enum OperatorType
                     // $$FALL-THROUGH
             }
             
-            final int num1 = value1 == null ? 0 : toInt( value1 );
-            final int num2 = value2 == null ? 0 : toInt( value2 );            
+            final long num1 = value1 == null ? 0 : toLong( value1 );
+            final long num2 = value2 == null ? 0 : toLong( value2 );            
             switch( type ) 
             {
                 case SHIFT_LEFT:
@@ -310,10 +310,10 @@ public enum OperatorType
         throw new RuntimeException("Internal error - don't know how to evaluate "+node.getClass().getName());
     }
     
-    private static int toInt(Object o) 
+    private static long toLong(Object o) 
     {
         if ( o instanceof Number ) {
-            return ((Number) o).intValue();
+            return ((Number) o).longValue();
         }
         if ( o instanceof Address ) {
             return ((Address) o).getByteAddress();

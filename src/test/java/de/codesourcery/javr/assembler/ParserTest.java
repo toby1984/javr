@@ -955,6 +955,15 @@ public class ParserTest
     }     
     
     @Test
+    public void testParseExpression() {
+        
+        AST ast = parse(".equ a = ((16000000 * 500)/1000)-3");
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
+    }
+    
+    @Test
     public void testParseEQUWithHexValue() 
     {
         AST ast = parse(".equ _SIGNATURE_000   = 0x1e");
