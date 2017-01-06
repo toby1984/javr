@@ -19,6 +19,7 @@ import java.util.Optional;
 
 import org.apache.commons.lang3.Validate;
 
+import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.TextRegion;
@@ -67,20 +68,31 @@ public class FunctionCallNode extends AbstractASTNode implements IValueNode, Res
                 if ( child instanceof Resolvable) {
                     ((Resolvable) child).resolve( context );
                 }
-                Number v = (Number) child.getValue();
+                Number v = null;
+                if ( child.getValue() instanceof Address) 
+                {
+                    v = ((Address) child.getValue()).getByteAddress();
+                } 
+                else if ( child.getValue() instanceof Number ) 
+                {
+                    v = (Number) child.getValue();
+                } 
                 if ( v == null ) {
                     return false;
                 }
                 
                 switch ( name ) {
-                    case "HIGH": v = ( v.intValue() >>> 8 ) & 0xff; break;
-                    case "LOW": v = v.intValue() & 0xff; break;
-                    default: throw new RuntimeException("Unreachable code reached");
+                    case "HIGH": v = ( v.longValue() >>> 8 ) & 0xff; break;
+                    case "LOW": v = v.longValue() & 0xff; break;
+                    default: 
+                        throw new RuntimeException("Unreachable code reached");
                 }
                 this.value = v;
                 return true;
             }
             context.error("Unknown built-in function "+name,this);
+        } else {
+            System.out.println(">>>> function with no arguments?");
         }
         return false;
     }    

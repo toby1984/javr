@@ -79,7 +79,7 @@ public final class Symbol
     
     @Override
     public String toString() {
-        return name.getValue()+" [ "+type+" ] , value= "+value;
+        return name.getValue()+" [ "+type+" ] , value= "+value+", hash code "+hashCode();
     }
     
     public CompilationUnit getCompilationUnit() {

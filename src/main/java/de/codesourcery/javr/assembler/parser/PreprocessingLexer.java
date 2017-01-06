@@ -163,8 +163,15 @@ public class PreprocessingLexer implements Lexer
     }
 
     @Override
-    public boolean eof() {
-        if ( tokens.isEmpty() ) {
+    public boolean eof() 
+    {
+        if ( ! tokens.isEmpty() && isIgnoreWhitespace ) 
+        {
+            tokens.removeIf( Token::isWhitespace );
+        }
+                
+        if ( tokens.isEmpty() ) 
+        {
             parse();
         }
         return tokens.get(0).isEOF();
@@ -863,7 +870,12 @@ public class PreprocessingLexer implements Lexer
     @Override
     public void setIgnoreWhitespace(boolean ignoreWhitespace) 
     {
+        boolean oldState = this.isIgnoreWhitespace;
         this.isIgnoreWhitespace = ignoreWhitespace;
+        if ( ! oldState && ignoreWhitespace ) // transition: do not ignore whitespace -> ignore whitespace
+        {
+            tokens.removeIf( Token::isWhitespace );
+        }
     }
 
     @Override

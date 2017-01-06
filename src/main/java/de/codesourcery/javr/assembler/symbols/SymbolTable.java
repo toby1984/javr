@@ -226,4 +226,14 @@ public class SymbolTable
 		Validate.notNull(symbolTable, "symbolTable must not be NULL");
 		this.parent = symbolTable;
 	}
+	
+	/**
+	 * DEBUGGING ONLY.
+	 * @return
+	 * @deprecated DEBUGGING ONLY
+	 */
+	@Deprecated
+    public Map<Identifier,Symbol> symbols() {
+        return this.symbols;
+    }
 }

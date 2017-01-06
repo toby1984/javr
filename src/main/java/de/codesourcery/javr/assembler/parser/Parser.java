@@ -192,14 +192,19 @@ public class Parser
         unit.setAst( ast );
         ast.setCompilationUnit( unit );
 
-        // skip leading newlines since parseStatement()
-        // only consumes trailing newlines
-        parseEOL();
-
-        while ( ! lexer.eof() ) 
+        int stmtCount = 0;
+        while ( ! this.lexer.eof() ) 
         {
-            try {
-                ast.addChild( parseStatement() );
+            try 
+            {
+                skipWhitespace();
+
+                skipNewlines();
+
+                StatementNode stmt = parseStatement();
+                stmtCount++;
+                System.out.println("Parsed statement #"+stmtCount);
+                ast.addChild( stmt );                    
             } 
             catch(Exception e) 
             {
@@ -220,6 +225,22 @@ public class Parser
             }
         }
         return ast;
+    }
+    
+    private void skipWhitespace() 
+    {
+        while ( lexer.peek().isWhitespace() )
+        {
+            lexer.next();
+        }
+    }
+    
+    private void skipNewlines() 
+    {
+        while ( lexer.peek().isEOL() ) 
+        {
+            lexer.next();
+        }
     }
 
     private StatementNode parseStatement() 
@@ -260,9 +281,10 @@ public class Parser
             result.addChild( comment );
         }
         
-        // parse EOF/EOL
-        if ( ! parseEOL() ) {
-            throw new ParseException("Expected EOF/EOL but got "+lexer.peek(),currentOffset());
+        skipWhitespace();
+        
+        if ( ! lexer.peek().isEOLorEOF() ) {
+            throw new ParseException("Not a valid statement",lexer.peek());
         }
         return result;
     }

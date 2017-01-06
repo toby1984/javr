@@ -20,7 +20,10 @@ import org.apache.log4j.Logger;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
+import de.codesourcery.javr.assembler.parser.ast.ASTNode.IASTVisitor;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
+import de.codesourcery.javr.assembler.parser.ast.IValueNode;
+import de.codesourcery.javr.assembler.parser.ast.Resolvable;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
 import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.symbols.Symbol.Type;
@@ -73,6 +76,27 @@ public class PrepareGenerateCodePhase extends GenerateCodePhase
             {
                 context.error("Unresolved symbol '"+symbol.name()+"'",symbol.getNode());
             }
-        });                 
+        });   
+        
+        // now try again resolving any IValueNode instances
+        // that do not yield a value yet
+        // This is necessary to deal with function nodes that had
+        // forward references in their expressions
+        // TODO: This feels very much like a hack...have a look at this again !!!
+        final IASTVisitor visitor = (node,ictx) -> 
+        {
+            if ( node instanceof IValueNode && ((IValueNode) node).getValue() == null ) 
+            {
+                if ( node instanceof Resolvable ) 
+                {
+                    ((Resolvable) node).resolve( context );
+                }
+            }
+        };
+        for ( ASTNode child : ast.children() ) 
+        {
+            final StatementNode stmt = (StatementNode) child;
+            stmt.visitDepthFirst(visitor);
+        }        
     }
 }

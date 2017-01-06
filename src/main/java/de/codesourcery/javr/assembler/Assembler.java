@@ -64,21 +64,21 @@ public class Assembler
         boolean success = false;
         try 
         {
-            for ( Phase p : phases )
+            for ( Phase phase : phases )
             {
-                LOG.debug("Assembler phase: "+p);
+                LOG.debug("Assembler phase: "+phase);
                 compilationContext.beforePhase();
 
                 boolean hasErrors;
                 try 
                 {
-                    p.beforeRun( compilationContext );
+                    phase.beforeRun( compilationContext );
 
-                    p.run( compilationContext );
+                    phase.run( compilationContext );
 
                     hasErrors = unit.hasErrors(true);
                     if ( ! hasErrors ) {
-                        p.afterSuccessfulRun( compilationContext );
+                        phase.afterSuccessfulRun( compilationContext );
                     } 
                 } 
                 catch (Exception e) 
@@ -92,9 +92,9 @@ public class Assembler
 
                 if ( hasErrors ) 
                 {
-                    LOG.error("compile(): Compilation failed with errors in phase '"+p.getName()+"'");
+                    LOG.error("compile(): Compilation failed with errors in phase '"+phase.getName()+"'");
                     return false;
-                }
+                }                
             }
 
             success = true;
