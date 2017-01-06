@@ -790,7 +790,7 @@ public abstract class AbstractAchitecture implements IArchitecture
                     return fail( "Operand needs to be a single register",node,context);
                 }                   
                 if ( result < 0 || result > 15 ) {
-                    throw new RuntimeException("Operand needs to be R0...15");
+                    return fail("Operand neeeds to be R0...R15",node,context);
                 }
                 return result; 
             case R16_TO_R23:

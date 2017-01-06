@@ -258,8 +258,8 @@ public class Parser
         final CommentNode comment = parseComment();
         if ( comment != null ) {
             result.addChild( comment );
-        }           
-
+        }
+        
         // parse EOF/EOL
         if ( ! parseEOL() ) {
             throw new ParseException("Expected EOF/EOL but got "+lexer.peek(),currentOffset());
@@ -964,15 +964,15 @@ public class Parser
 
     private boolean parseEOL() {
 
-        if ( lexer.eof() ) {
-            return true;
-        }
-
-        if ( lexer.peek( TokenType.EOL ) ) 
+        if ( lexer.peek().isEOLorEOF() ) 
         {
-            do {
+            if ( lexer.eof() ) 
+            {
+                return true;
+            }            
+            while ( lexer.peek().isEOL() ) { // consume all linefeeds
                 lexer.next();
-            } while ( ! lexer.eof() && lexer.peek( TokenType.EOL ) );
+            }
             return true;
         }
         return false;

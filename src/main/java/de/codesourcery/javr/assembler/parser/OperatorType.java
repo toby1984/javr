@@ -279,17 +279,17 @@ public enum OperatorType
                 case SHIFT_LEFT:
                     return num1 << num2;
                 case SHIFT_RIGHT:
-                    return num1 >> num2;                    
+                    return num1 >>> num2;                    
                 case BINARY_MINUS:
-                    return num1-num2;
+                    return num1 - num2;
                 case BITWISE_AND:
-                    return num1&num2;
+                    return num1 & num2;
                 case BITWISE_NEGATION:
                     return ~num1;
                 case BITWISE_OR:
-                    return num1|num2;
+                    return num1 | num2;
                 case DIVIDE:
-                    return num1/num2;
+                    return num1 / num2;
                 case GT:
                     return num1 > num2;
                 case GTE:
