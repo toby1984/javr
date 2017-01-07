@@ -285,7 +285,6 @@ When there are no more tokens to read:
 
         if ( this.valueQueue.isEmpty() ) {
             return null;
-            // throw new BadExpressionException("Empty expression?",currentParseOffset);
         }
 
         if ( this.valueQueue.size() != 1 )

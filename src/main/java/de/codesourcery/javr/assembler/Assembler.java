@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
+import de.codesourcery.javr.assembler.phases.ExpandMacrosPhase;
 import de.codesourcery.javr.assembler.phases.GatherSymbolsPhase;
 import de.codesourcery.javr.assembler.phases.GenerateCodePhase;
 import de.codesourcery.javr.assembler.phases.ParseSourcePhase;
@@ -56,6 +57,7 @@ public class Assembler
         phases.add( new ParseSourcePhase(config) );
         phases.add( new SyntaxCheckPhase() );
         phases.add( new GatherSymbolsPhase() );
+        phases.add( new ExpandMacrosPhase() );
         phases.add( new PrepareGenerateCodePhase() );
         phases.add( new GenerateCodePhase() );
 

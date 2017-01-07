@@ -57,7 +57,8 @@ import de.codesourcery.javr.ui.config.IConfig;
 public class ParserTest 
 {
     private final IArchitecture arch = new ATMega88();
-    // single-line tests
+    
+    private CompilationContext compilationContext;
     
     @Test
     public void testEmptyFile() 
@@ -113,7 +114,6 @@ public class ParserTest
         AST ast = parse("\n");
         assertNotNull(ast);
         assertFalse( ast.hasChildren() );
-        assertEquals( 0 ,  ast.childCount() );
     } 
     
     @Test
@@ -235,6 +235,13 @@ public class ParserTest
         assertEquals( 0 , in.getArgumentCount() );
         assertEquals( new Identifier("test") , in.name );
     }
+    
+    @Test
+    public void testParseDefineInstruction() 
+    {
+        parse("#define test sbi 0x05 , 1\n"
+                + "test");
+    }    
     
     @Test
     public void testParseErrorMessage() 
@@ -1210,7 +1217,7 @@ public class ParserTest
     {
         final Parser p = new Parser(arch);
         final StringResource resource = new StringResource("dummy", s);
-        CompilationUnit unit = new CompilationUnit( resource );
+        final CompilationUnit unit = new CompilationUnit( resource );
         
         final IProject project = new Project(unit);
         final ObjectCodeWriter writer = new ObjectCodeWriter();
@@ -1228,9 +1235,9 @@ public class ParserTest
             @Override
             public Lexer createLexer(Scanner s) { return new LexerImpl(s); }
         };
-        final CompilationContext ctx = new CompilationContext( project , writer , project ,new CompilerSettings(), config );
+        compilationContext = new CompilationContext( project , writer , project ,new CompilerSettings(), config );
 //        PreprocessingLexer l = new PreprocessingLexer( new LexerImpl(new Scanner(resource) ) , ctx );
 //        return p.parse( ctx, unit , l );
-        return p.parse( ctx, unit , new LexerImpl(new Scanner(resource) ) );
+        return p.parse( compilationContext, unit , new LexerImpl(new Scanner(resource) ) );
     }
 }

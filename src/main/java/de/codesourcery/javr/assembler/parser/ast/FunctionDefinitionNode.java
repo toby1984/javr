@@ -25,7 +25,7 @@ import de.codesourcery.javr.assembler.symbols.Symbol;
  * Children:
  * 
  * child (0): ArgumentNamesNode
- * child (1): Either node is absent , a single expression or the AST of the function/macro body
+ * child (1): Either node is either a single expression or the AST of the function/macro body
  * 
  * @author tobias.gierke@code-sourcery.de
  */
@@ -43,8 +43,9 @@ public class FunctionDefinitionNode extends AbstractASTNode
         this.type = type;
     }
     
-    public int getArgumentCount() {
-        return ((ArgumentNamesNode) child(0) ).childCount();
+    public int getArgumentCount() 
+    {
+        return getArgumentNames().childCount();
     }
     
     public boolean hasArguments() {
@@ -54,5 +55,14 @@ public class FunctionDefinitionNode extends AbstractASTNode
     @Override
     protected FunctionDefinitionNode createCopy() {
         return new FunctionDefinitionNode( this.name , this.type , getTextRegion().createCopy() );
+    }
+    
+    public ArgumentNamesNode getArgumentNames() 
+    {
+        return (ArgumentNamesNode) child(0); 
+    }
+    
+    public ASTNode getBody() {
+        return child(1);
     }
 }

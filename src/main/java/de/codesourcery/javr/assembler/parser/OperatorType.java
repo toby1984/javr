@@ -177,23 +177,10 @@ public enum OperatorType
         }
     }
     
-    public static Number evaluateToNumber(ASTNode node,ICompilationContext context) 
-    {
-        Object result = evaluate(node,context);
-        if ( result == null ) {
-            return null;
-        }
-        if ( result != null && !(result instanceof Number) ) {
-            context.error("Expected node "+node+" to evaluate to a number but got "+result,node);
-            return null;
-        }
-        return (Number) result;
-    }
-    
-    public static Object evaluate(ASTNode node,ICompilationContext context) 
+    public static Object evaluate(ASTNode node,ICompilationContext context,boolean registerErrorOnFailure) 
     {
         if ( node instanceof ExpressionNode ) {
-            return evaluate( ((ExpressionNode) node).child(0) , context);
+            return evaluate( ((ExpressionNode) node).child(0) , context , registerErrorOnFailure );
         }
         if ( node instanceof FunctionCallNode ) {
             return evaluateBuiltInFunction( (FunctionCallNode) node , context );
@@ -216,20 +203,25 @@ public enum OperatorType
         if( node instanceof OperatorNode ) 
         {
             final OperatorType type = ((OperatorNode) node).type;
-            final Object value1 = node.childCount() >= 1 ? evaluate( node.child(0) , context ) : null;
-            final Object value2 = node.childCount() >= 2 ? evaluate( node.child(1) , context ) : null;
+            final Object value1 = node.childCount() >= 1 ? evaluate( node.child(0) , context , registerErrorOnFailure ) : null;
+            final Object value2 = node.childCount() >= 2 ? evaluate( node.child(1) , context , registerErrorOnFailure ) : null;
             final int argCount = ( value1 == null ? 0 : 1 ) + ( value2 == null ? 0 : 1 );
             if ( argCount != type.getArgumentCount() ) 
             {
-                context.error("Operator '"+type.symbol+"' requires "+type.getArgumentCount()+" arguments , got "+argCount,node);
+                if ( registerErrorOnFailure ) {
+                    context.error("Operator '"+type.symbol+"' requires "+type.getArgumentCount()+" arguments , got "+argCount,node);
+                }
                 return null;
             }
             switch(type) 
             {
                 case REF_EQ:
                 case REF_NEQ:
-                    if ( value1.getClass() != value2.getClass() ) {
-                        context.error("'==' / '!=' operators require arguments of the same type, got "+value1.getClass().getSimpleName()+" and "+value2.getClass().getSimpleName(),node);
+                    if ( value1.getClass() != value2.getClass() ) 
+                    {
+                        if ( registerErrorOnFailure ) {
+                            context.error("'==' / '!=' operators require arguments of the same type, got "+value1.getClass().getSimpleName()+" and "+value2.getClass().getSimpleName(),node);
+                        }
                         return null;
                     }
                     return type == REF_EQ ? value1.equals(value2) : ! value1.equals(value2); 
@@ -240,18 +232,24 @@ public enum OperatorType
                 // logical operators
                 case LOGICAL_NOT:
                     if ( !(value1 instanceof Boolean)) {
-                        context.error("'!' operator requires a boolean argument",node);
+                        if ( registerErrorOnFailure ) {
+                            context.error("'!' operator requires a boolean argument",node);
+                        }
                         return null;
                     }
                     return ! ((Boolean) value1).booleanValue();
                 case LOGICAL_AND:
                 case LOGICAL_OR:
                     if ( !(value1 instanceof Boolean)) {
-                        context.error("'"+type.symbol+"' operator requires boolean arguments",node);
+                        if ( registerErrorOnFailure ) {
+                            context.error("'"+type.symbol+"' operator requires boolean arguments",node);
+                        }
                         return null;
                     }
                     if ( !(value2 instanceof Boolean)) {
-                        context.error("'"+type.symbol+"' operator requires boolean arguments",node);
+                        if ( registerErrorOnFailure ) {
+                            context.error("'"+type.symbol+"' operator requires boolean arguments",node);
+                        }
                         return null;
                     }              
                     final boolean b1 = ((Boolean) value1).booleanValue();

@@ -506,7 +506,7 @@ public abstract class AbstractAchitecture implements IArchitecture
     {
         if ( StringUtils.isNotBlank( s ) ) 
         {
-            return lookupInstruction( s ) != null;
+            return lookupInstruction( s , false ) != null;
         }
         return false;
     }
@@ -1421,6 +1421,11 @@ public abstract class AbstractAchitecture implements IArchitecture
     
     protected final EncodingEntry lookupInstruction(String mnemonic) 
     {
+        return lookupInstruction( mnemonic , true );
+    }
+    
+    protected final EncodingEntry lookupInstruction(String mnemonic,boolean failIfUnknown) 
+    {
         Validate.notBlank(mnemonic, "mnemonic must not be NULL or blank");
         final String lowerCaseMnemonic = mnemonic.toLowerCase();
         EncodingEntry result = instructions.get( lowerCaseMnemonic );
@@ -1430,7 +1435,7 @@ public abstract class AbstractAchitecture implements IArchitecture
             if ( alias != null ) {
                 result = instructions.get( alias );
             }
-            if ( result == null ) {
+            if ( result == null && failIfUnknown ) {
                 throw new RuntimeException("Unknown instruction: "+mnemonic);
             }
         }         

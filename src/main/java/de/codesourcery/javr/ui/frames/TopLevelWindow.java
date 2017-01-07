@@ -24,7 +24,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.stream.Stream;
 
 import javax.swing.JDesktopPane;
 import javax.swing.JDialog;
@@ -104,15 +103,6 @@ public class TopLevelWindow implements IWindow
         topLevelFrame.setVisible( true );
         topLevelFrame.setExtendedState(topLevelFrame.getExtendedState() | JFrame.MAXIMIZED_BOTH);
 
-//        Stream.of( desktopPane.getAllFrames() ).forEach( internalFrame -> 
-//        {
-//            try {
-//                internalFrame.setMaximum(true);
-//            } catch (Exception e) {
-//                e.printStackTrace();
-//            }
-//        });       
-        
         applicationConfigProvider.getApplicationConfig().apply( this );
         applicationConfigProvider.getApplicationConfig().apply( editorFrame );
         applicationConfigProvider.getApplicationConfig().apply( messageFrame );

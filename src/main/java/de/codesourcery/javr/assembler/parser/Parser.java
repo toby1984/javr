@@ -54,6 +54,9 @@ import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
 import de.codesourcery.javr.assembler.parser.ast.StringLiteral;
 import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.Symbol.Type;
+import de.codesourcery.javr.assembler.util.InMemoryResource;
+import de.codesourcery.javr.assembler.util.Resource;
 
 /**
  * Using a given lexer, turns a token stream into an AST.
@@ -178,7 +181,7 @@ public class Parser
         this.arch = arch;
     }
     
-    public AST parse(ICompilationContext context,CompilationUnit unit,Lexer lexer) 
+    protected void initialize(ICompilationContext context,CompilationUnit unit,Lexer lexer) 
     {
         Validate.notNull(context, "context must not be NULL");
         Validate.notNull(lexer, "lexer must not be NULL");
@@ -187,24 +190,32 @@ public class Parser
         }
         
         this.context = context;
+        // this.lexer = new DebugLexer( lexer );
         this.lexer = lexer;
         this.ast = new AST();
         unit.setAst( ast );
-        ast.setCompilationUnit( unit );
-
+        ast.setCompilationUnit( unit );        
+    }
+    
+    public AST parse(ICompilationContext context,CompilationUnit unit,Lexer lexer) 
+    {
+        initialize(context,unit,lexer);
+        
         int stmtCount = 0;
         while ( ! this.lexer.eof() ) 
         {
             try 
             {
-                skipWhitespace();
-
-                skipNewlines();
-
-                StatementNode stmt = parseStatement();
-                stmtCount++;
-                System.out.println("Parsed statement #"+stmtCount);
-                ast.addChild( stmt );                    
+                final StatementNode stmt = parseStatement();
+                if ( stmt == null ) 
+                {
+                    throw new ParseException("Not a valid statement",lexer.peek());
+                }
+                if ( stmt.hasChildren() ) {
+                    stmtCount++;
+                    System.out.println("Parsed statement #"+stmtCount);
+                    ast.addChild( stmt );
+                }
             } 
             catch(Exception e) 
             {
@@ -224,6 +235,7 @@ public class Parser
                 }
             }
         }
+        unit.setAst( ast );        
         return ast;
     }
     
@@ -245,6 +257,10 @@ public class Parser
 
     private StatementNode parseStatement() 
     {
+        skipWhitespace();
+
+        skipNewlines();
+        
         final StatementNode result = new StatementNode();
 
         final ASTNode preproc = parsePreprocessor();
@@ -271,7 +287,15 @@ public class Parser
                 final InstructionNode insn = parseInstruction();
                 if ( insn!= null ) {
                     result.addChild( insn );
-                }       
+                } 
+                else 
+                {
+                    // parse macro
+                    final IdentifierNode macroName = parseIdentifier( lexer );
+                    if ( macroName!= null ) {
+                        result.addChild( macroName );
+                    } 
+                }
             }
         }
 
@@ -284,7 +308,7 @@ public class Parser
         skipWhitespace();
         
         if ( ! lexer.peek().isEOLorEOF() ) {
-            throw new ParseException("Not a valid statement",lexer.peek());
+            return null;
         }
         return result;
     }
@@ -301,7 +325,7 @@ public class Parser
                 final String keyword = keywordToken.value;
                 final PreprocessorNode.Preprocessor proc = Preprocessor.parse( keyword );
                 if ( proc == null ) {
-                    throw new ParseException("Unknown preprocessor instruction ",keywordToken);
+                    throw new ParseException("Unknown preprocessor instruction: "+keywordToken,keywordToken);
                 }
                 
                 if ( proc == Preprocessor.PRAGMA ) // #pragma is currently ignored 
@@ -363,6 +387,7 @@ public class Parser
                      * #define a
                      * #define a (1+2)
                      * #define a(x) x*x
+                     * #define a sbi 0x3f , 5
                      */
                     final FunctionDefinitionNode funcDef = new FunctionDefinitionNode( name , Symbol.Type.PREPROCESSOR_MACRO , nameToken.region() );
 
@@ -375,7 +400,7 @@ public class Parser
                         funcDef.addChild( new ArgumentNamesNode() );
                     }
 
-                    final ASTNode macroBody = parseExpression(lexer);
+                    final ASTNode macroBody = parseSingleLineMacro();
                     if ( macroBody != null ) 
                     {
                         funcDef.addChild( macroBody );
@@ -388,7 +413,7 @@ public class Parser
                     { 
                         throw new ParseException("Expected an expression",lexer.peek());
                     } 
-
+                    
                     final TextRegion r = new TextRegion( offset , keywordToken.endOffset() - offset , keywordToken.line , keywordToken.column);
                     final PreprocessorNode preproc= new PreprocessorNode(Preprocessor.DEFINE , r);                        
                     preproc.addChild( funcDef );
@@ -401,6 +426,33 @@ public class Parser
             throw new ParseException("Expected a keyword",lexer.peek());
         }
         return null;
+    }
+    
+    public ASTNode parseSingleLineMacro() 
+    {
+        final Parser p = new Parser( this.context.getArchitecture() );
+        
+        final InMemoryResource nopResource = new InMemoryResource("nop" , Resource.ENCODING_UTF);
+        final Lexer subLexer = new LexerImpl( new Scanner( nopResource ) );
+        final List<Token> tokens = new ArrayList<>();
+        while ( ! lexer.eof() && ! lexer.peek(TokenType.EOL) ) {
+            tokens.add( 0 , lexer.next() );
+        }
+        tokens.forEach( subLexer::pushBack );
+        p.initialize( this.context , this.context.currentCompilationUnit() , subLexer );
+        ASTNode node = p.parseStatement();
+        if ( node == null ) 
+        {
+            node = Parser.parseExpression( p.lexer );
+            if ( node == null ) {
+                throw new ParseException("Neither a valid statement nor a valid expression",p.lexer.peek());
+            }
+        } 
+        else if ( node.childCount() == 1 ) 
+        {
+            node = node.child(0);
+        }
+        return node;
     }
 
     private ArgumentNamesNode parseArgumentNamesList() {
@@ -597,11 +649,6 @@ public class Parser
                 lexer.next();
             }
         } 
-    }
-
-    private int currentOffset() 
-    {
-        return lexer.peek().offset;
     }
 
     private LabelNode parseLabel() 

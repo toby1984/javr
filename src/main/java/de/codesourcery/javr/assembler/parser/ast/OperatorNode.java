@@ -55,7 +55,7 @@ public class OperatorNode extends AbstractASTNode implements IValueNode , Resolv
     @Override
     public boolean resolve(ICompilationContext context) 
     {
-        this.value = OperatorType.evaluate( this , context );
+        this.value = OperatorType.evaluate( this , context , false );
         return value != null;
     }
 

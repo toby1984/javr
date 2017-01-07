@@ -18,6 +18,7 @@ package de.codesourcery.javr.assembler.util;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Objects;
 
 import org.apache.commons.lang3.Validate;
 
@@ -51,7 +52,15 @@ public class InMemoryResource implements Resource
     @Override
     public boolean pointsToSameData(Resource other) 
     {
-        return other == this;
+        if ( other == this ) {
+            return true;
+        }
+        if ( other instanceof InMemoryResource) 
+        {
+            final InMemoryResource obj = (InMemoryResource) other;
+            return Objects.equals( this.contentHash , obj.contentHash );
+        }
+        return false;
     }    
     
     private void updateContentHash() 

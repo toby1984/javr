@@ -974,7 +974,6 @@ public class EditorPanel extends JPanel
 	private void doSyntaxHighlighting() 
 	{
 		ignoreEditEvents = true;
-		final String text = editor.getText();
 		try 
 		{
 			final StyledDocument doc = editor.getStyledDocument();
