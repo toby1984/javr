@@ -1,20 +1,30 @@
 #include "m328Pdef.inc"
 
-.equ freq = 16000000
-.equ target_freq = 100000
+.equ freq = 16000000 ; Hz
+.equ target_freq = 100000 ; Hz
 
-.equ cycles_per_us = freq / 1000000
+.equ cycles_per_us = freq / 1000000 ; 1 us = 10^-6 s
 
 .equ delay_in_cycles = (freq / target_freq)/2
 
-.equ loop_count = (delay_in_cycles-4)/5 ; 3 cycles for register loads + 1 cycle for brne not taken
+#define ERROR_LED 7
+#define SUCCESS_LED 6
+#define TX_PIN 2
+#define CLK_PIN 4
+#define TRIGGER_PIN 0
 
-.equ loop_count_low = LOW(loop_count)
-.equ loop_count_middle = HIGH(loop_count)
-.equ loop_count_high = (loop_count & 0xff0000) >> 16
+#define CLK_HI sbi PORTD , CLK_PIN
 
-.equ TX_PIN = 1
-.equ CLK_PIN = 2
+#define CLK_LO cbi PORTD , CLK_PIN
+
+#define DATA_HI sbi PORTD , TX_PIN
+#define DATA_LO cbi PORTD , TX_PIN
+
+#define SUCCESS_LED_ON  sbi PORTD, SUCCESS_LED
+#define SUCCESS_LED_OFF cbi PORTD, SUCCESS_LED
+
+#define ERROR_LED_ON  sbi PORTD, ERROR_LED
+#define ERROR_LED_OFF cbi PORTD, ERROR_LED
 
 jmp init  ; RESET
 jmp onirq ; INT0 - ext IRQ 0
@@ -56,56 +66,89 @@ init:
 	out 0x3e,r29	; SPH = 0x08
 	out 0x3d,r28	; SPL = 0xff
 ; call main program
-	call start
-	cli
-forever: 
-	rjmp forever
+again:
+	call main
+	call wait_for_button  
+          rjmp again
 onirq:
 	jmp 0x00
 ; ==========================
 ; main program starts here
 ; ==========================
-start:
-          call reset
+main:
+         call reset
+          
+         call wait_for_button  
+          
           ldi r31 , HIGH(data)
           ldi r30 , LOW(data)
+          ldi r20 , data_end-data
 	call send_bytes
+          brcs error
+          SUCCESS_LED_ON
           ret
-
+error:          
+	ERROR_LED_ON
+	ret
 ; ====
 ; reset bus
 ; =====
 reset:
-	sbi DDRB , CLK_PIN ; set to output
-	sbi DDRB , TX_PIN ; set to output
-	sbi PORTB , CLK_PIN ; CLK HI
-	sbi PORTB , TX_PIN ; DATA HI
+	sbi DDRD,CLK_PIN ; set to output
+	sbi DDRD,TX_PIN ; set to output
+	sbi DDRD,ERROR_LED ; set to output
+	sbi DDRD,SUCCESS_LED ; set to output
+	cbi DDRB,TRIGGER_PIN ; set to input
+          ERROR_LED_OFF
+          SUCCESS_LED_OFF
+	CLK_HI 
+	DATA_HI
 	ret
+
+; ======
+; wait for button press 
+; ======
+wait_for_button:
+          ldi r18,255
+          call usleep
+wait_released:
+          sbic PINB , TRIGGER_PIN
+          rjmp wait_released
+wait_pressed:
+          sbis PINB , TRIGGER_PIN
+          rjmp wait_pressed
+          ret
 
 ; ====== send bytes
 ; Assumption: CLK HI , DATA HI when method is entered
 ; INPUT: r31:r30 (Z register) start address of bytes to transmit
 ; INPUT: r20 - number of bytes to transmit
 ; SCRATCHED: r0,r1,r16,r17,r18
-; RETURN: Carry clear => byte acknowledged by receiver , Carry set => Byte not acknowledged
+; RETURN: Carry clear => transmission successful , Carry set => Transmission failed
 ; ======
 send_bytes:
-          cbi PORTB , TX_PIN ; DATA LOW
+; generate start sequence
+          DATA_LO
           ldi r18 , 4 ; wait 4 us
           call usleep          
 send_loop:     lpm r2 , Z+
           call send_byte
 ; CLK = HI , DATA = LOW
-          brcs tx_failed
+          brcs tx_error
           dec r20
-          brne send_loop
-          clc ; => transmission successful
-	rjmp stop
-tx_failed:
-          sec ; => transmission failed
+	brne send_loop          
+	rcall send_stop
+          clc
+          ret
+tx_error:
+          rcall send_stop
+          sec
+          ret
+; =======
 ; send STOP sequence
-stop:
-	sbi PORTB , TX_PIN ; DATA HIGH
+; =======
+send_stop:
+	DATA_HI
           ldi r18, 5 ; wait 5 us
           call usleep	
           ret
@@ -116,95 +159,77 @@ stop:
 ; SCRATCHED: r0,r1,r4,r16,r17,r18,r19
 ; ====================
 send_byte:
-          ldi r19,7 ; number of bits to transmit
+          ldi r19,8 ; number of bits to transmit
 bitbang:
-	cbi PORTB , CLK_PIN ; CLK LOW
+	CLK_LO
 	ldi r18, 2 ; wait 2 us
           call usleep
 	lsl r2 ; load bit #7 into carry
 	brcc transmit0
 ; transmit 1-bit	
-	sbi PORTB , TX_PIN ; DATA HIGH
-	rjmp cont
+	DATA_HI
+	jmp cont
 transmit0:
-          cbi PORTB , TX_PIN ; DATA LOW               
+          DATA_LO            
 cont:
           ldi r18 , 3 ; wait 3 us while holding clk lo
           call usleep  
-	sbi PORTB , CLK_PIN ; CLK HI
+	CLK_HI
           ldi r18 , 4 ; wait 4 us while holding clk hi
           call usleep           
           dec r19     ; decrement bit counter
           brne bitbang ; => more bits to send
 ; ACK phase starts , CLK is HI here
-	cbi PORTB , CLK_PIN ; CLK LOW
-	cbi PORTB , TX_PIN ; DATA LOW (release data line )
+	CLK_LO
+	DATA_LO
 
           ldi r18 , 5 ; wait 5 us while holding clk lo
           call usleep  	
 
-	sbi PORTB , CLK_PIN ; CLK HIGH
+	CLK_HI
 
           ldi r18 , 2 ; wait 2 us while holding clk HIGH
           call usleep  	
 
 	call sample_data ; sample data line
-	brcs ack_received ; carry set => line is HIGH
+	brcs ok1 ; carry set => line is HIGH
 
           ldi r18 , 3 ; wait 3 us while holding clk HIGH
           call usleep  	
 
 	call sample_data ; sample data line
-	brcc nack_received ; carry not set => line is still low
-ack_received:
-	clc
-	cbi PORTB , TX_PIN ; DATA LOW
+	brcs ok2 ; carry set => data line is HIGH
+          sec ; no ACK received
+          ret
+ok1:
+          ldi r18 , 3 ; wait 3 us while holding clk HIGH
+          call usleep  	
+ok2:	
+          clc
           ret 
-nack_received:
-          sec
-	cbi PORTB , TX_PIN ; DATA LOW
-          ret
           
-; =========
-; sleep for half a i2c clock cycle
-; =========
-
-sleep:
-	ldi r18,loop_count_low ; 1 cycles
-	ldi r24,loop_count_middle ; 1 cycles
-	ldi r25,loop_count_high ; 1 cycles
-loop2:
-	subi r18,1 ; 1 cycles
-	sbci r24,0 ; 1 cycles
-	sbci r25,0 ; 1 cycles
-	brne loop2 ; 2 cycles, 1 cycle if branch not taken
-          ret
 ; =========
 ; sleep for up to 255 micro seconds
 ;
-; >>>> Must not be called with a value less than 2 us <<<<
+; >>>> Must NEVER be called with a value less than 2 us (infinite loop) <<<<
 
 ; IN: r18 = number of microseconds to sleep
 ; SCRATCHED: r0,r1,r16,r17,r18
 ;
 ; Total execution time: 
-; +1 cycles for loading R18 register 
+; +1 cycles for caller having to load the R18 register with time to wait
 ; +4 cycles for CALL invoking this method
-; +6 cycles for calculating cycle count
+; +5 cycles for calculating cycle count
 ; +4 cycles for RET 
 ; =========
 usleep:
           ldi r17 , cycles_per_us ; 1 cycle
           mul r18 , r17 ; 1 cycle , result is in r1:r0     
-          movw r18:r17 , r1:r0 ; 1 cycle
-          subi r17 , 16 ; 1 cycle , adjust for cycles spent invoking this method + preparation
-          sbci r18 , 0 ; 1 cycle     
-; divide by 4 cycles (=time a single loop iteration takes)
-          lsr r18 ; 1 cycle
-          ror r17 ; 1 cycle
-usleep2:  subi r17,1 ; 1 cycle
-          sbci r18,0 ; 1 cycle          
-	brne usleep2 ; 2 cycles, 1 cycle if branch not taken
+          movw r27:r26 , r1:r0 ; 1 cycle
+          sbiw r27:r26,14  ; 2 cycles , adjust for cycles spent invoking this method + preparation  
+usleep2:  sbiw r27:r26,4 ; 2 cycles , subtract 4 cycles per loop iteration      
+	brpl usleep2 ; 2 cycles, 1 cycle if branch not taken
+exit:
 	ret ; 4 cycles
 
 ; ======
@@ -213,10 +238,10 @@ usleep2:  subi r17,1 ; 1 cycle
 ; ======
 sample_clock:
           clc ; 1 cycle , clear carry 
-          cbi DDRB , CLK_PIN ; 2 cycles , switch CLK pin to INPUT
-          sbic PINB , CLK_PIN ; 1/2 cycles , skip next insn if bit is clear
+          cbi DDRD , CLK_PIN ; 2 cycles , switch CLK pin to INPUT
+          sbic PIND , CLK_PIN ; 1/2 cycles , skip next insn if bit is clear
           sec ; 1 cycle
-          sbi DDRB , CLK_PIN ; 2 cycles , switch CLK pin to OUTPUT
+          sbi DDRD , CLK_PIN ; 2 cycles , switch CLK pin to OUTPUT
           ret ; 4 cycles   
 
 ; ======
@@ -225,10 +250,11 @@ sample_clock:
 ; ======
 sample_data:
           clc ; 1 cycle , clear carry 
-          cbi DDRB , TX_PIN ; 2 cycles , switch TX_PIN pin to INPUT
-          sbic PINB , TX_PIN ; 1/2 cycles , skip next insn if bit is clear
+          cbi DDRD , TX_PIN ; 2 cycles , switch TX_PIN pin to INPUT
+          sbic PIND , TX_PIN ; 1/2 cycles , skip next insn if bit is clear
           sec ; 1 cycle
-          sbi DDRB , TX_PIN ; 2 cycles , switch TX_PIN pin to OUTPUT
+          sbi DDRD , TX_PIN ; 2 cycles , switch TX_PIN pin to OUTPUT
           ret ; 4 cycles  
 
-data:     .db 01,02 
+data:     .db %11101111,%11001100
+data_end:
