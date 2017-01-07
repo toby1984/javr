@@ -570,6 +570,22 @@ public abstract class AbstractAchitecture implements IArchitecture
     @Override
     public void compile(InstructionNode node, ICompilationContext context) 
     {
+        final String mnemonic = node.instruction.getMnemonic();
+        
+        final EncodingEntry variants;
+        if (  mnemonic.equalsIgnoreCase("lsl" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for LSL ... 
+        {
+            variants = lookupInstruction( "add" );
+            // turn "LSL rX" into "ADD rX,rX"
+            node = (InstructionNode) node.createCopy( true );
+            if ( node.childCount() == 1 ) 
+            {
+                node.addChild( node.child(0).createCopy( true ) );
+            }
+        } else {
+            variants = lookupInstruction( mnemonic );
+        }
+        
         ASTNode dstArgument = null;
         ASTNode srcArgument = null;
         switch( node.childCount() ) 
@@ -582,9 +598,8 @@ public abstract class AbstractAchitecture implements IArchitecture
                 break;
             default:
         }
-        final int argCount = ( dstArgument != null ? 1 : 0 ) + (srcArgument != null ? 1 : 0 );
+        final int argCount = ( dstArgument != null ? 1 : 0 ) + (srcArgument != null ? 1 : 0 );        
         
-        final EncodingEntry variants = lookupInstruction( node.instruction.getMnemonic() );
         final InstructionEncoding encoding = variants.getEncoding( node );
         int expectedArgumentCount = encoding.getArgumentCountFromPattern();
         if ( encoding.hasImplicitSourceArgument() ) 

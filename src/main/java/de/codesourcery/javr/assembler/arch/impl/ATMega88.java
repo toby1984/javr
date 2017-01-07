@@ -37,6 +37,7 @@ public class ATMega88 extends AbstractAchitecture
     protected void initInstructions()
     {
         final InstructionEncoding adc = insn("adc",   "0001 11rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER ); 
+        
         final InstructionEncoding add = insn("add",   "0000 11rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER );  
         insn("adiw",  "1001 0110 KKdd KKKK" , ArgumentType.COMPOUND_REGISTERS_R24_TO_R30 , ArgumentType.SIX_BIT_CONSTANT );
         final InstructionEncoding and = insn("and",   "0010 00rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER );
@@ -260,8 +261,8 @@ public class ATMega88 extends AbstractAchitecture
         };
         add( new EncodingEntry( lpmSelector , lpmNoArgs , lpmZWithPostIncrement , lpmOnlyZ ) );        
         
-        
-        final InstructionEncoding lsl = insn("lsl",   "0000 11dd dddd dddd" , ArgumentType.SINGLE_REGISTER );
+        // TODO: Compiling LSL is currently broken but a dirty hack in AbstractArchitecture#compile() makes it work nonetheless....
+        final InstructionEncoding lsl = insn("lsl", "0000 11dd dddd dddd" , ArgumentType.SINGLE_REGISTER );
         
         final DisassemblySelector addOrLsl = new SameOperandsDisassemblySelector(lsl,add);
         add.disassemblySelector( addOrLsl );
