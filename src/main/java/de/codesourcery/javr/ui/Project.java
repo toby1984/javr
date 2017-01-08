@@ -15,6 +15,7 @@
  */
 package de.codesourcery.javr.ui;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,6 +46,7 @@ import de.codesourcery.javr.assembler.ObjectCodeWriterWrapper;
 import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.arch.impl.ATMega88;
+import de.codesourcery.javr.assembler.elf.ElfFile;
 import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.LexerImpl;
 import de.codesourcery.javr.assembler.parser.Parser;
@@ -120,6 +122,12 @@ public class Project implements IProject
                     else if ( spec.format == OutputFormat.RAW ) 
                     {
                         bytesWritten = IOUtils.copy( in , out );
+                    } 
+                    else if ( spec.format == OutputFormat.ELF ) 
+                    {
+                        final ByteArrayOutputStream program = new ByteArrayOutputStream();
+                        bytesWritten = IOUtils.copy( in , program );
+                        new ElfFile().write( program.toByteArray() , out );  
                     } else {
                         throw new RuntimeException("Unhandled output format: "+spec.format);
                     }

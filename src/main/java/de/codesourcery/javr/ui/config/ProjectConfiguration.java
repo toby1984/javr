@@ -45,7 +45,8 @@ public class ProjectConfiguration implements ResourceFactory
     public static enum OutputFormat 
     {
         RAW,
-        INTEL_HEX;
+        INTEL_HEX,
+        ELF;
     }
     
     public static final class OutputSpec 
@@ -130,6 +131,7 @@ public class ProjectConfiguration implements ResourceFactory
             {
                 case INTEL_HEX: fileEnding = ".hex"; break;
                 case RAW: fileEnding = ".raw"; break;
+                case ELF: fileEnding = ".elf" ; break;
                 default:
                     throw new RuntimeException("Unhandled file format: "+outputFormat);
             }
