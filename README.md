@@ -29,6 +29,8 @@ java -jar target/javr.jar
 Note that for reasons unknown to me the AVR assembler duplicates a lot of preprocessor instructions as assembler directives ... I'm currently only implementing the preprocessor instructions
 
 - full ATmega88 instruction set
+- local labels 
+  - Just write '.myLabel' instead of 'myLabel:' when declaring them ; referencing local labels works just like with global labels so no 'b' or 'f' suffixes are needed. Note that its illegal to declare a local label that has the same identifier as a global label ; otherwise I would've needed to use the ugly 'b'/'f' suffix solution to resolve the ambiguity)  
 - Expression correctly handles nested expressions and operator precedence for the following operators: 
   - arithmetic operators: -(unary+binary),+,/,*
   - bitwise operators: ~,<<,>>,|,&
