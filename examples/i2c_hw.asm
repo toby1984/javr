@@ -238,10 +238,7 @@ clr_screen_buffer:
 .clr_loop  
            st x+, r16
            sbiw r29:r28,1
-           brne clr_loop2
-           ret
-
-.clr_loop2
+           brne clr_loop
            ret
 
 ; =========
