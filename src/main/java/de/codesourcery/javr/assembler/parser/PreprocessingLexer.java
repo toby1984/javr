@@ -179,7 +179,7 @@ public class PreprocessingLexer implements Lexer
 
     private Token adjustOffset(Token token) 
     {
-        token.offset += expansionOffset;
+        // token.offset += expansionOffset;
         return token;
     }
 
@@ -748,7 +748,7 @@ public class PreprocessingLexer implements Lexer
                 final int delta = expandedLength - replacedTokensLen;
                 // adjust any tokens remaining in our queue
                 for (int j = tokenIdx ; j < tokens.size() ; j++ ) {
-                    tokens.get(j).offset += delta;
+                    // tokens.get(j).offset += delta;
                 }
                 totalOffset += delta;
             }

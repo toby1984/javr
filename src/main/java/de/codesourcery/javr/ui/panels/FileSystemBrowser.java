@@ -61,6 +61,8 @@ public class FileSystemBrowser extends JPanel
 	
 	private Consumer<File> selectionHandler = file -> {}; 
 	
+	private File root;
+	
 	public static final class DirNode 
 	{
 		public final File file;
@@ -389,10 +391,15 @@ public class FileSystemBrowser extends JPanel
 	public void setFolder(File directory) {
 
 		Validate.notNull(directory, "directory must not be NULL");
+		this.root = directory;
 		final DirNode root = new DirNode( directory , null );
 		this.treeModel = new MyTreeModel( root );
 		treeModel.fetchChildren( root );
 		this.tree.setModel( treeModel );
+	}
+	
+	public File getRoot() {
+		return this.root;
 	}
 	
 	public void setFileFilter(Predicate<File> fileFilter) 

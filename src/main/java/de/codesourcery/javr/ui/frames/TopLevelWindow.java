@@ -24,6 +24,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
 import javax.swing.JDesktopPane;
 import javax.swing.JDialog;
@@ -198,21 +202,43 @@ public class TopLevelWindow implements IWindow
                 });
                 addMenuItem(menu,"Delete" , () -> 
                 {
+                    final File toDelete = dirNode.file;
+                	final List<File> files = new ArrayList<>();                    
                     try 
                     {
-                        if ( dirNode.file.isDirectory() ) {
-                            FileUtils.deleteDirectory( dirNode.file );
+						if ( toDelete.isDirectory() ) 
+						{
+							Files.list( toDelete.toPath() ).filter( p -> Files.isRegularFile( p ) ).forEach( p -> files.add( p.toFile() ) );
+                            FileUtils.deleteDirectory( toDelete );
                         } else {
-                            if ( ! dirNode.file.delete() ) {
-                                throw new IOException("Failed to delete "+dirNode.file.getAbsolutePath());
+                            if ( ! toDelete.delete() ) {
+                                throw new IOException("Failed to delete "+toDelete.getAbsolutePath());
                             }
+                            files.add( toDelete );
                         }
                     } catch (Exception e) {
-                        LOG.error("delete(): Failed to delete "+dirNode.file.getAbsolutePath(),e);
+                        LOG.error("delete(): Failed to delete "+toDelete.getAbsolutePath(),e);
                         Main.fail(e);
                         return;
                     }          
-                    navigator.fileRemoved( dirNode.file );
+					try 
+					{
+						for ( File f : files ) 
+						{
+							final Resource resource = Resource.file( f );
+							final Optional<CompilationUnit> existing = project.maybeGetCompilationUnit( resource );
+							existing.ifPresent( unit -> 
+							{
+								if ( editorFrame.closeEditor( unit, true ) ) 
+								{
+									existing.ifPresent( project::removeCompilationUnit );
+								} 
+							});
+						}
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+                    navigator.fileRemoved( toDelete );
                 });
                 addMenuItem(menu,"Open" , () -> 
                 {
@@ -240,6 +266,7 @@ public class TopLevelWindow implements IWindow
                             throw new IOException("Failed to create "+newFile.getAbsolutePath());
                         }
                         openFile( newFile );
+                        navigator.refreshPath();
                     }
                     catch (Exception e) {
                         LOG.error("newFile(): Failed to create file "+newFile.getAbsolutePath(),e);
@@ -282,8 +309,8 @@ public class TopLevelWindow implements IWindow
                 LOG.info("editProjectConfiguration(): Saving configuration to "+configFile.getAbsolutePath());
                 try ( FileOutputStream out = new FileOutputStream( configFile ) ) 
                 {
+                	project.setConfiguration( config );
                     config.save( out );
-                    project.setConfiguration( config );
                 } catch(Exception e) {
                     Main.fail(e);
                 }

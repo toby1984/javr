@@ -59,6 +59,11 @@ public class NavigatorFrame extends JInternalFrame implements IWindow
         browser.fileRemoved( file );
     }
     
+    public void refreshPath() 
+    {
+        browser.pathChanged( browser.getRoot() );
+    }    
+    
     public void refreshPath(File topLevelDir) {
         browser.pathChanged( topLevelDir );
     }

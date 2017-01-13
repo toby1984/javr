@@ -27,7 +27,7 @@ public final class Token
     // for performance reasons the offset is mutable so that
     // the preprocessor lexer can adjust the offset
     // when macros are expanded
-    public int offset;
+    public final int offset;
     public final String value;
     public final TokenType type;
     public final int line; // first line = 1 !!

@@ -41,6 +41,7 @@ public abstract class ProjectConfigWindow extends JPanel
     
     private JTextField projectName = new JTextField();
     private JTextField outputName = new JTextField();
+    private JTextField compilationRoot = new JTextField();
     private JComboBox<OutputFormat> outputFormat = new JComboBox<>( OutputFormat.values() );
     private JComboBox<Architecture> architecture = new JComboBox<>( Architecture.values() );
     private JCheckBox failOnAddressOutOfBounds = new JCheckBox();
@@ -53,6 +54,7 @@ public abstract class ProjectConfigWindow extends JPanel
         
         projectName.setText( currentConfig.getProjectName() );
         outputName.setText( currentConfig.getOutputName() );
+        compilationRoot.setText( currentConfig.getCompilationRoot() );
         outputFormat.setSelectedItem( currentConfig.getOutputFormat() );
         architecture.setSelectedItem( currentConfig.getArchitecture().getType() );
         failOnAddressOutOfBounds.setSelected( currentConfig.getCompilerSettings().isFailOnAddressOutOfRange() );
@@ -63,6 +65,7 @@ public abstract class ProjectConfigWindow extends JPanel
         cancel.addActionListener( ev -> onCancel() );
         save.addActionListener( ev -> 
         {
+        	toEdit.setCompilationRoot( compilationRoot.getText() );
             toEdit.setProjectName( projectName.getText() );
             toEdit.setOutputName( outputName.getText() );
             toEdit.setOutputFormat( (OutputFormat) outputFormat.getSelectedItem() );
@@ -80,6 +83,7 @@ public abstract class ProjectConfigWindow extends JPanel
         int y = 0;
         addRow( y++ , "Project name" , projectName );
         addRow( y++ , "Output name" , outputName );
+        addRow( y++ , "Compilation root" , compilationRoot );
         addRow( y++ , "Output format" , outputFormat );
         addRow( y++ , "Architecture" , architecture );
         addRow( y++ , "Upload command" , uploadCommand);

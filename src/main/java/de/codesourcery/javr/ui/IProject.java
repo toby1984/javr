@@ -16,6 +16,7 @@
 package de.codesourcery.javr.ui;
 
 import java.io.IOException;
+import java.util.Optional;
 
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.IObjectCodeWriter;
@@ -38,7 +39,7 @@ public interface IProject extends ResourceFactory,IConfigProvider
     
     public ProjectConfiguration getConfiguration();
     
-    public void setConfiguration(ProjectConfiguration other);
+    public void setConfiguration(ProjectConfiguration other) throws IOException;
     
     public boolean canUploadToController();
     
@@ -46,7 +47,11 @@ public interface IProject extends ResourceFactory,IConfigProvider
     
     public boolean compile() throws IOException;
     
+    public Optional<CompilationUnit> maybeGetCompilationUnit(Resource resource); 
+    
     public CompilationUnit getCompilationUnit(Resource resource);
     
     public SymbolTable getGlobalSymbolTable();
+
+	public void removeCompilationUnit(CompilationUnit newUnit);
 }

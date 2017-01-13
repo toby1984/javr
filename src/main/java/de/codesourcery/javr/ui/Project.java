@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import org.apache.commons.io.IOUtils;
@@ -72,6 +73,8 @@ public class Project implements IProject
     private final SymbolTable globalSymbolTable = new SymbolTable( SymbolTable.GLOBAL );
 
     private ProjectConfiguration projectConfig = new ProjectConfiguration();
+    
+    private final List<IProjectChangedListener> listeners = new ArrayList<>();
 
     private final ObjectCodeWriter writerDelegate = new ObjectCodeWriter();
     private final IObjectCodeWriter objWriter = new ObjectCodeWriterWrapper( writerDelegate ) 
@@ -184,24 +187,36 @@ public class Project implements IProject
     public void setCompileRoot(CompilationUnit compileRoot) 
     {
         Validate.notNull(compileRoot, "compileRoot must not be NULL");
-
-        if ( this.compileRoot != null ) {
-            this.units.remove( this.compileRoot );
-        }
+    	System.out.println("Setting compile root "+compileRoot);
         this.compileRoot = compileRoot;
-        this.units.add( compileRoot );
+        if ( ! this.units.stream().anyMatch( existing -> existing.getResource().pointsToSameData( compileRoot.getResource() ) ) ) 
+        {
+        	addCompilationUnit( compileRoot );
+        }
+    }
+    
+    @Override
+    public Optional<CompilationUnit> maybeGetCompilationUnit(Resource resource) 
+    {
+        return units.stream().filter( unit -> unit.getResource().pointsToSameData( resource ) ).findFirst();
     }
     
     @Override
     public CompilationUnit getCompilationUnit(Resource resource) 
     {
-        final Optional<CompilationUnit> existing = units.stream().filter( unit -> unit.getResource().pointsToSameData( resource ) ).findFirst();
+        final Optional<CompilationUnit> existing = maybeGetCompilationUnit(resource);
         if ( existing.isPresent() ) {
             return existing.get();
         }
-        final CompilationUnit unit = new CompilationUnit(resource,globalSymbolTable);
+        return addCompilationUnit( new CompilationUnit( resource , new SymbolTable( resource.getName() , globalSymbolTable) ) );
+    }
+    
+    private CompilationUnit addCompilationUnit(CompilationUnit unit) 
+    {
+    	System.out.println("Adding new compilation unit: "+unit);
         units.add( unit );
-        return unit;
+		invokeProjectChangedListeners( l -> l.unitAdded( this , unit ) ) ;   
+		return unit;
     }
 
     @Override
@@ -336,11 +351,16 @@ public class Project implements IProject
     }
 
     @Override
-    public void setConfiguration(ProjectConfiguration other) 
+    public void setConfiguration(ProjectConfiguration newConfig) throws IOException 
     {
+    	Resource resource = newConfig.getCompilationRootResource();
+    	if ( ! resource.exists() ) {
+    		throw new IllegalArgumentException("Failed to find compilation root file: "+resource);
+    	}
+    	setCompileRoot( getCompilationUnit( resource ) );
         this.compilationSuccess = false;
         this.artifactsGenerated = false;
-        this.projectConfig = other.createCopy();
+        this.projectConfig = newConfig.createCopy();
     }
 
     @Override
@@ -358,4 +378,27 @@ public class Project implements IProject
     public SymbolTable getGlobalSymbolTable() {
         return globalSymbolTable;
     }
+
+	@Override
+	public void removeCompilationUnit(CompilationUnit unit) 
+	{
+		if ( this.units.remove( unit ) ) {
+			invokeProjectChangedListeners( l -> l.unitRemoved( this , unit ) ) ;
+		}
+	}
+	
+	private void invokeProjectChangedListeners(Consumer<IProjectChangedListener> invoker) 
+	{
+		this.listeners.forEach( invoker::accept );
+	}
+	
+	public void addProjectChangedListener(IProjectChangedListener l) 
+	{
+		this.listeners.add(l);
+	}
+	
+	public void removeProjectChangedListener(IProjectChangedListener l) 
+	{
+		this.listeners.remove(l);
+	}	
 }

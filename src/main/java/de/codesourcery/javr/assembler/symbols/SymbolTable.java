@@ -18,6 +18,7 @@ package de.codesourcery.javr.assembler.symbols;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +61,11 @@ public class SymbolTable
     {
         this(name);
         Validate.notNull(parent, "parent must not be NULL");
-        this.parent = parent;
+        setParent( parent );
+    }
+    
+    public SymbolTable getParent() {
+    	return parent;
     }
     
     public void clear() {
@@ -224,7 +229,18 @@ public class SymbolTable
 
 	public void setParent(SymbolTable symbolTable) {
 		Validate.notNull(symbolTable, "symbolTable must not be NULL");
+		
 		this.parent = symbolTable;
+        IdentityHashMap<SymbolTable,Integer> chain = new IdentityHashMap<>();
+        SymbolTable current = this;
+        while ( current != null ) {
+        	if ( chain.containsKey( current ) ) {
+        		throw new IllegalArgumentException("Symbol table parents form a cycle");
+        	}
+        	chain.put( current , Integer.valueOf(0) );
+        	current = current.getParent();
+        }
+
 	}
 	
 	/**

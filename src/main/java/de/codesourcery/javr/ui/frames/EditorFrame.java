@@ -64,11 +64,29 @@ public class EditorFrame extends JInternalFrame implements IWindow
 	public void gotoMessage(CompilationMessage msg) 
 	{
         final Optional<EditorPanel> editor = editors.stream().filter( ed -> ed.getCompilationUnit().hasSameResourceAs( msg.unit ) ).findFirst();
-        editor.ifPresent( panel -> 
+        if ( editor.isPresent() ) 
         {
-            tabbedPane.setSelectedComponent( panel );
-            panel.gotoMessage( msg );
-        });
+        	tabbedPane.setSelectedComponent( editor.get() );
+        	System.out.println("Found window for resource "+msg.unit+" , going to "+msg.region);
+            editor.get().gotoMessage( msg );
+        } else {
+        	System.err.println("Failed to locate window for "+msg);
+        }
+	}
+	
+	private Optional<EditorPanel>  getEditor(CompilationUnit unit ) 
+	{
+		return editors.stream().filter( ed -> ed.getCompilationUnit().hasSameResourceAs( unit ) ).findFirst();
+	}
+	
+	public boolean closeEditor(CompilationUnit unit,boolean askIfDirty) {
+		
+		final Optional<EditorPanel> editor = getEditor(unit);
+		if ( editor.isPresent() ) 
+		{
+			return editor.get().close( askIfDirty );
+		}
+		return false;
 	}
 	
 	public EditorPanel openEditor(IProject project,CompilationUnit unit) throws IOException 

@@ -18,6 +18,7 @@ package de.codesourcery.javr.ui.panels;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
@@ -1340,6 +1341,15 @@ public class EditorPanel extends JPanel
 		}
 	}
 	
+	public boolean close(boolean askIfDirty) 
+	{
+		setVisible( false );
+		final Container parent = getParent();
+		parent.remove( this );
+		parent.revalidate();
+		return true;
+	}
+	
 	public IProject getProject() {
         return project;
     }
@@ -1360,6 +1370,8 @@ public class EditorPanel extends JPanel
 		{
 			editor.setCaretPosition( message.region.start() );
 			editor.requestFocus();
+		} else {
+			System.err.println("Index "+message.region+" is out of range, cannot set caret");
 		}
 	}
 }

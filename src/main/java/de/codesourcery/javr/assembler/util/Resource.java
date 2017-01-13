@@ -15,6 +15,7 @@
  */
 package de.codesourcery.javr.assembler.util;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -27,6 +28,16 @@ import java.io.OutputStream;
 public interface Resource 
 {
     public static final String ENCODING_UTF = "utf8";
+    
+    public static Resource file(File file) throws IOException 
+    {
+    	return new FileResource( file , ENCODING_UTF );
+    }
+    
+    public static Resource file(String file) throws IOException 
+    {
+    	return new FileResource( file , ENCODING_UTF );
+    }
     
     public InputStream createInputStream() throws IOException;
     
