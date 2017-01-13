@@ -18,6 +18,7 @@ package de.codesourcery.javr.assembler.parser;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Validate;
 
 /**
  * A valid identifier.
@@ -26,6 +27,8 @@ import org.apache.commons.lang3.StringUtils;
  */
 public final class Identifier 
 {
+    public static final String LOCAL_GLOBAL_LABEL_SEPARATOR = ".";
+    
     private static final Pattern ID_PATTERN = Pattern.compile("^[_]*[a-zA-Z]+[_a-zA-Z0-9]*$");
     
     public final String value;
@@ -36,6 +39,37 @@ public final class Identifier
             throw new IllegalArgumentException("Not a valid identifier: '"+value+"'");
         }
         this.value = value;
+    }
+    
+    private Identifier(String value,boolean dummy) 
+    {
+        this.value = value;
+    }
+    
+    /**
+     * Create a compound symbol from a local label and a global label.
+     * 
+     * @param globalPart name of the previous global label
+     * @param localPart name of the local label
+     * @return
+     */
+    public static Identifier newLocalGlobalIdentifier(Identifier globalPart,Identifier localPart) 
+    {
+        Validate.notNull(globalPart, "globalPart must not be NULL");
+        Validate.notNull(localPart, "localPart must not be NULL");
+        return new Identifier(globalPart+LOCAL_GLOBAL_LABEL_SEPARATOR+localPart,true);
+    }
+    
+    public static boolean isLocalGlobalIdentifier(Identifier identifier ) {
+        return identifier.value.contains( LOCAL_GLOBAL_LABEL_SEPARATOR );
+    }
+    
+    public static Identifier getLocalIdentifierPart(Identifier localGlobal) 
+    {
+        if ( ! isLocalGlobalIdentifier( localGlobal ) ) {
+            throw new IllegalArgumentException("Not a local-global identifier: "+localGlobal);
+        }
+        return new Identifier( localGlobal.value.split( Pattern.quote( LOCAL_GLOBAL_LABEL_SEPARATOR ) )[1] ); 
     }
     
     public String getValue() {

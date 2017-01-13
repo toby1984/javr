@@ -15,6 +15,7 @@
  */
 package de.codesourcery.javr.assembler.parser.ast;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
@@ -58,6 +59,20 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
         public boolean isValidOperandCount(int actual) 
         {
             return minOperandCount <= actual && actual <= maxOperandCount;
+        }
+        
+        public static boolean isValidDirective(String s) 
+        {
+            if ( s != null ) {
+                for ( Directive d : values() ) 
+                {
+                    if ( d.literal.equalsIgnoreCase( s ) ) 
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
         
         public static Directive parse(String s) 

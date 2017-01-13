@@ -15,6 +15,8 @@
  */
 package de.codesourcery.javr.assembler.arch;
 
+import java.util.Arrays;
+
 import de.codesourcery.javr.assembler.arch.impl.ATMega328p;
 import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 

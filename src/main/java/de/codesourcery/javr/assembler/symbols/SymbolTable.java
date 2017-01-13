@@ -16,6 +16,7 @@
 package de.codesourcery.javr.assembler.symbols;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -23,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 import org.apache.commons.lang3.Validate;
@@ -49,6 +51,8 @@ public class SymbolTable
     
     private final String name;
     private SymbolTable parent;
+    
+    private final List<SymbolTable> children = new ArrayList<>();
     
     private final Map<Identifier,Symbol> symbols = new HashMap<>();
     
@@ -231,6 +235,8 @@ public class SymbolTable
 		Validate.notNull(symbolTable, "symbolTable must not be NULL");
 		
 		this.parent = symbolTable;
+		this.parent.children.add( this );
+		
         IdentityHashMap<SymbolTable,Integer> chain = new IdentityHashMap<>();
         SymbolTable current = this;
         while ( current != null ) {
@@ -252,4 +258,33 @@ public class SymbolTable
     public Map<Identifier,Symbol> symbols() {
         return this.symbols;
     }
+	
+	/**
+	 * Removes a symbol from this table and 
+	 * all its children.
+	 * 
+	 * @param s
+	 */
+	public void removeSymbol(Symbol s) 
+	{
+	    this.symbols.remove( s.name() );
+	    children.forEach( child -> child.removeSymbol( s ) );
+	}
+	
+	/**
+	 * Visit all symbols in this table.
+	 * 
+	 * @param visitor visitor that accepts a symbol and returns either <code>true</code> to continue iteration or <code>false</code> to stop iteration and return
+	 */
+	public void visitSymbols(Function<Symbol,Boolean> visitor) 
+	{
+	    Collection<Symbol> values = this.symbols.values();
+	    for (Iterator<Symbol>  it = values.iterator(); it.hasNext();) 
+	    {
+            final Symbol symbol = (Symbol) it.next();
+            if ( ! Boolean.TRUE.equals( visitor.apply( symbol ) ) ) {
+                return;
+            }
+        }
+	}
 }

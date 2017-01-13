@@ -238,6 +238,7 @@ public class ProjectConfiguration implements ResourceFactory
     
     public static ProjectConfiguration load(File baseDir , InputStream in) throws IOException 
     {
+        LOG.info("load(): Loading project configuration from "+baseDir);
         Validate.notNull(baseDir, "baseDir must not be NULL");
         Validate.notNull(in, "in must not be NULL");
         
@@ -248,6 +249,8 @@ public class ProjectConfiguration implements ResourceFactory
         for ( String key : props.stringPropertyNames() ) 
         {
             final String value = props.getProperty( key );
+            System.out.println("===> Got property: "+key+"="+value);
+            
             switch( key ) 
             {
                 case "projectName": config.setProjectName( value ); break;

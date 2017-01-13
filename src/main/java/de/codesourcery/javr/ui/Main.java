@@ -306,16 +306,30 @@ public class Main
     {
         fail("Error",e);
     }
+    
+    public static void fail(String msg) 
+    {
+        fail(msg,null);
+    }
 
     public static void fail(String msg,Exception e) 
     {
-        LOG.error("fail(): "+e.getMessage(),e);
+        if ( e == null ) {
+            LOG.error("fail(): "+msg,e);
+        } else {
+            LOG.error("fail(): "+msg,e);
+        }
 
-        final ByteArrayOutputStream out = new ByteArrayOutputStream();
-        final PrintWriter writer = new PrintWriter( out );
-        e.printStackTrace( writer );
-
-        final String body = msg+"\n\nError: "+e.getMessage()+"\n\n"+new String( out.toByteArray() );
+        final String body;
+        if ( e == null ) 
+        {
+            body = msg;
+        } else {
+            final ByteArrayOutputStream out = new ByteArrayOutputStream();
+            final PrintWriter writer = new PrintWriter( out );
+            e.printStackTrace( writer );            
+            body = msg+"\n\nError: "+e.getMessage()+"\n\n"+new String( out.toByteArray() );
+        }
         JOptionPane.showMessageDialog(null, body , "Error", JOptionPane.ERROR_MESSAGE);
     }
 }

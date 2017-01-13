@@ -337,15 +337,24 @@ public class TopLevelWindow implements IWindow
 
         addItem( menu , "Open project" , () -> doWithFile( "Open project" , true , lastOpenedProject, file -> 
         {
+            final File realFile;
+            if ( file.isDirectory() ) 
+            {
+                realFile = new File( file , IProject.PROJECT_FILE );
+            } else {
+                Main.fail("You need to select a project directory");
+                return;
+            }
             try ( FileInputStream in = new FileInputStream( file ) )
             {
+                LOG.info("Opening project configuration "+file.getAbsolutePath());
                 final ProjectConfiguration config = ProjectConfiguration.load( file.getParentFile() , in );
                 lastOpenedProject = file;
                 this.project = new Project( new CompilationUnit( new StringResource("unnamed", "" ) ) , config );
             } 
             catch(Exception e) 
             {
-                Main.fail(e);
+                Main.fail("Failed ro read project configuration from "+realFile.getAbsolutePath(),e);
             }
         }));
 

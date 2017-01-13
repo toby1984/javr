@@ -163,7 +163,7 @@ public class Project implements IProject
         Validate.notNull(compilationRoot, "compilationUnit must not be NULL");
         Validate.notNull(config, "config must not be NULL");
         
-        this.architecture = new ATMega88();
+        this.architecture = config.getArchitecture();
         this.compileRoot = compilationRoot;
         this.projectConfig = config;
         units.add( compilationRoot );
@@ -360,6 +360,7 @@ public class Project implements IProject
     	setCompileRoot( getCompilationUnit( resource ) );
         this.compilationSuccess = false;
         this.artifactsGenerated = false;
+        this.architecture = newConfig.getArchitecture();
         this.projectConfig = newConfig.createCopy();
     }
 

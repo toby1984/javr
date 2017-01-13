@@ -15,6 +15,8 @@
  */
 package de.codesourcery.javr.assembler.phases;
 
+import java.util.List;
+
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.exceptions.DuplicateSymbolException;
 import de.codesourcery.javr.assembler.parser.Identifier;
@@ -30,6 +32,7 @@ import de.codesourcery.javr.assembler.parser.ast.FunctionDefinitionNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
 import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 
 /**
  * Compiler phase that is responsible for gathering all the symbols from the source code
@@ -79,7 +82,13 @@ public class GatherSymbolsPhase extends AbstractPhase
                 else if ( node instanceof LabelNode ) 
                 {
                     final LabelNode label = (LabelNode) node;
-                    final Symbol symbol = new Symbol( label.identifier , Symbol.Type.ADDRESS_LABEL , context.currentCompilationUnit() , label );
+                    final Identifier identifier;
+                    if ( label.isGlobal() ) {
+                        identifier = label.identifier;
+                    } else {
+                        identifier = Identifier.newLocalGlobalIdentifier( previousGlobalLabel.identifier , label.identifier );
+                    }
+                    final Symbol symbol = new Symbol( identifier , Symbol.Type.ADDRESS_LABEL , context.currentCompilationUnit() , label );
                     label.setSymbol( symbol );
                     if ( ! defineSymbol( label , symbol ) ) 
                     {
@@ -108,5 +117,24 @@ public class GatherSymbolsPhase extends AbstractPhase
         
         // gather symbols
         ast.visitBreadthFirst( visitor );
+        
+        // sanity check that local variable names do not clash with any globals
+        context.globalSymbolTable().visitSymbols( (symbol) -> 
+        {
+            if ( symbol.hasType( Type.ADDRESS_LABEL ) ) 
+            {
+                if ( Identifier.isLocalGlobalIdentifier( symbol.name() ) ) 
+                {
+                    final Identifier localPart = Identifier.getLocalIdentifierPart( symbol.name() );
+                    if ( context.globalSymbolTable().isDefined( localPart ) ) 
+                    {
+                        if ( ! context.message( CompilationMessage.error( context.currentCompilationUnit() , "Local label '"+localPart.value+"' clashes with like-named global label" ,symbol.getNode()) ) ) {
+                            return Boolean.FALSE;
+                        }
+                    }
+                }
+            }            
+            return Boolean.TRUE;
+        });
     }
 }

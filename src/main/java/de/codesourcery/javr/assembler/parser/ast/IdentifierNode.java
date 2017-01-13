@@ -24,7 +24,7 @@ import de.codesourcery.javr.assembler.symbols.Symbol;
 
 public class IdentifierNode extends AbstractASTNode implements IValueNode,Resolvable {
 
-    public final Identifier name;
+    public Identifier name;
 
     private Symbol symbol;
     
@@ -51,15 +51,31 @@ public class IdentifierNode extends AbstractASTNode implements IValueNode,Resolv
         return new IdentifierNode(this.name , getTextRegion().createCopy() );
     }     
     
+    public void setName(Identifier identifier) {
+        Validate.notNull(identifier, "identifier must not be NULL");
+        this.name = identifier;
+    }
+    
     @Override
     public String toString() {
         return "Identifier[ "+name+" ] = "+symbol;
     }
-
+    
+    public void setSymbol(Symbol symbol) {
+        Validate.notNull(symbol, "symbol must not be NULL");
+        this.symbol = symbol;
+    }
+    
+    public Symbol getSymbol() {
+        return symbol;
+    }
+    
     @Override
     public boolean resolve(ICompilationContext context) 
     {
-        symbol = context.currentSymbolTable().maybeGet( name ).orElse( null );
+        if ( symbol == null ) {
+            symbol = context.currentSymbolTable().maybeGet( name ).orElse( null );
+        }
         return symbol != null;
     }
 }

@@ -311,9 +311,11 @@ public class CmdLine
                             throw new RuntimeException("Unhandled output format: "+spec.format);
                         }
                     }
+                    
                     if ( bytesWritten > 0 )
                     {
                         final int segSize = arch.getSegmentSize( s );
+                        System.out.println("Architecture "+arch+" has "+segSize+" bytes of "+s);
                         final float percentage = 100.0f*(bytesWritten/(float) segSize);
                         final DecimalFormat DF = new DecimalFormat("#####0.00");
                         final String msg = s+": Wrote "+bytesWritten+" bytes ("+DF.format(percentage)+" %) to "+spec.resource;

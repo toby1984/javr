@@ -24,6 +24,7 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
+import de.codesourcery.javr.assembler.parser.ast.LabelNode;
 
 /**
  * Performs semantic checks on the AST.
@@ -44,10 +45,22 @@ public class SyntaxCheckPhase implements Phase
         
         final IASTVisitor visitor = new IASTVisitor() 
         {
+            private LabelNode previousGlobalLabel;
+            
             @Override
             public void visit(ASTNode node, IIterationContext ctx) 
             {
-                if ( node instanceof InstructionNode) 
+                if ( node instanceof LabelNode ) 
+                {
+                    if ( ((LabelNode) node).isGlobal() ) {
+                        previousGlobalLabel = (LabelNode) node;
+                    } else if ( previousGlobalLabel == null ) {
+                        if ( ! context.error("Local label without preceding global label" , node ) ) {
+                            ctx.stop();
+                        }
+                    }
+                } 
+                else if ( node instanceof InstructionNode) 
                 {
                     if ( context.currentSegment() != Segment.FLASH ) 
                     {
@@ -74,9 +87,18 @@ public class SyntaxCheckPhase implements Phase
                    {
                        case DEF: break;
                        case UNDEF: break;
-                       case CSEG: context.setSegment( Segment.FLASH ); break;
-                       case DSEG: context.setSegment( Segment.SRAM ) ; break;
-                       case ESEG: context.setSegment( Segment.EEPROM ); break;                       
+                       case CSEG:
+                           previousGlobalLabel = null; // local labels cannot belong to a global label from a different segment
+                           context.setSegment( Segment.FLASH ); 
+                           break;
+                       case DSEG: 
+                           previousGlobalLabel = null; // local labels cannot belong to a global label from a different segment
+                           context.setSegment( Segment.SRAM ) ;
+                           break;
+                       case ESEG:
+                           previousGlobalLabel = null; // local labels cannot belong to a global label from a different segment
+                           context.setSegment( Segment.EEPROM ); 
+                           break;                       
                        case INIT_BYTES:
                        case INIT_WORDS:
                            break;

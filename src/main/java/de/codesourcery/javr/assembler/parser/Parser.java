@@ -54,7 +54,6 @@ import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
 import de.codesourcery.javr.assembler.parser.ast.StringLiteral;
 import de.codesourcery.javr.assembler.symbols.Symbol;
-import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 import de.codesourcery.javr.assembler.util.InMemoryResource;
 import de.codesourcery.javr.assembler.util.Resource;
 
@@ -595,9 +594,12 @@ public class Parser
                     return result;
                 }
                 throw new ParseException("Expected an identifier",lexer.peek());
-            case "dseg": return new DirectiveNode(Directive.DSEG , tok2.region() );
-            case "eseg": return new DirectiveNode(Directive.ESEG , tok2.region() );
-            case "cseg": return new DirectiveNode(Directive.CSEG , tok2.region() );
+            case "dseg":
+                return new DirectiveNode(Directive.DSEG , tok2.region() );
+            case "eseg":
+                return new DirectiveNode(Directive.ESEG , tok2.region() );
+            case "cseg": 
+                return new DirectiveNode(Directive.CSEG , tok2.region() );
             case "db":
             case "dw":
             case "word":
@@ -653,14 +655,37 @@ public class Parser
 
     private LabelNode parseLabel() 
     {
-        final Token tok = lexer.peek();
+        Token tok = lexer.peek();
+        boolean isLocal = false;
+        
+        final TextRegion region;
+        if ( tok.is(TokenType.DOT ) ) 
+        {
+            Token dot = lexer.next();
+            region = dot.region();
+            if ( lexer.eof() || Directive.isValidDirective( lexer.peek().value ) || ! lexer.peek().isValidIdentifier() ) 
+            {
+                lexer.pushBack( dot );
+                return null;
+            }
+            tok = lexer.peek();
+            region.merge( tok.region() );
+            isLocal = true;
+        } else {
+            region = tok.region().incLength();
+        }
+        
         if ( tok.isValidIdentifier() )
         {
             final Identifier id = new Identifier( lexer.next().value );
+            if ( isLocal ) 
+            {
+                return new LabelNode( id , true , region );
+            } 
             if ( lexer.peek( TokenType.COLON ) ) 
             {
                 lexer.next();
-                return new LabelNode( id , tok.region().incLength() );
+                return new LabelNode( id , false , region );
             } 
             lexer.pushBack( tok );
         }

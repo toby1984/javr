@@ -582,6 +582,15 @@ public abstract class AbstractAchitecture implements IArchitecture
             {
                 node.addChild( node.child(0).createCopy( true ) );
             }
+        } else if (  mnemonic.equalsIgnoreCase("tst" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for TST ... 
+            {
+            variants = lookupInstruction( "and" );
+            // turn "TST rX" into "AND rX,rX"
+            node = (InstructionNode) node.createCopy( true );
+            if ( node.childCount() == 1 ) 
+            {
+                node.addChild( node.child(0).createCopy( true ) );
+            }            
         } else {
             variants = lookupInstruction( mnemonic );
         }

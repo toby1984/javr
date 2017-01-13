@@ -26,24 +26,34 @@ public class LabelNode extends AbstractASTNode implements Resolvable
 {
     public final Identifier identifier;
     private Symbol symbol;
+    private final boolean isLocal;
     
-    public LabelNode(Identifier id,TextRegion region) {
+    public LabelNode(Identifier id,boolean isLocal,TextRegion region) {
         super(region);
         Validate.notNull(id, "id must not be NULL");
         this.identifier= id;
+        this.isLocal = isLocal;
     }
     
     @Override
     protected LabelNode createCopy() 
     {
-        final LabelNode result = new LabelNode( this.identifier , getTextRegion().createCopy() );
+        final LabelNode result = new LabelNode( this.identifier , this.isLocal , getTextRegion().createCopy() );
         result.symbol = symbol;
         return result;
     }    
     
+    public boolean isLocal() {
+        return isLocal;
+    }
+    
+    public boolean isGlobal() {
+        return ! isLocal;
+    }
+    
     @Override
     public String getAsString() {
-        return identifier.value+":";
+        return isGlobal() ? identifier.value+":" : "."+identifier.value;
     }
     
     public void setSymbol(Symbol symbol) 

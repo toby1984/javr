@@ -17,6 +17,7 @@ package de.codesourcery.javr.assembler.phases;
 
 import org.apache.log4j.Logger;
 
+import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.AST;
@@ -112,14 +113,42 @@ public class GenerateCodePhase extends AbstractPhase
                     for ( ASTNode child : node.children() ) 
                     {
                         Object value = ((IValueNode) child).getValue();
-                        final int iValue = ((Number) value).intValue();
+                        final int iValue;
+                        if ( isInResolvePhase ) 
+                        {
+                            iValue = 0;
+                        } 
+                        else 
+                        {
+                            if ( value instanceof Number) 
+                            {
+                                iValue = ((Number) value).intValue();
+                            } 
+                            else if ( value instanceof Address ) 
+                            {
+                                if ( directive == Directive.INIT_BYTES ) {
+                                    context.message( CompilationMessage.error( context.currentCompilationUnit() , "Storing 16-bit address as byte value would truncate it",node ) );
+                                }
+                                iValue = ((Address) value).getByteAddress();
+                            } else {
+                                throw new RuntimeException("Internal error,unhandled IValueNode: "+value);
+                            }
+                        }
                         switch( directive ) 
                         {
                             case INIT_BYTES:
-                                context.writeByte( iValue );
+                                if ( isInResolvePhase ) {
+                                    context.allocateByte();
+                                } else {
+                                    context.writeByte( iValue );
+                                }
                                 break;
                             case INIT_WORDS:
-                                context.writeWord( iValue );
+                                if ( isInResolvePhase ) {
+                                    context.allocateWord();
+                                } else {
+                                    context.writeWord( iValue );
+                                }
                                 break;
                             default:
                                 throw new RuntimeException("Unreachable code reached");

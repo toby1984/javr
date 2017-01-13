@@ -18,11 +18,16 @@ package de.codesourcery.javr.assembler.phases;
 import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
+import de.codesourcery.javr.assembler.Segment;
+import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode.IASTVisitor;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
+import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
+import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
+import de.codesourcery.javr.assembler.parser.ast.LabelNode;
 import de.codesourcery.javr.assembler.parser.ast.Resolvable;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
 import de.codesourcery.javr.assembler.symbols.Symbol;
@@ -69,10 +74,63 @@ public class PrepareGenerateCodePhase extends GenerateCodePhase
             return;
         }
         
+        // check unresolved labels to see if they maybe refer to a local label
+        final IASTVisitor labelVisitor = new IASTVisitor() 
+        {
+            private LabelNode previousGlobalLabel;
+            
+            public void visit(ASTNode node,IIterationContext ctx) 
+            {
+                if ( node instanceof DirectiveNode )
+                {
+                    switch( ((DirectiveNode) node).directive ) 
+                    {
+                        case CSEG:
+                            previousGlobalLabel = null; // local labels cannot belong to a global label from a different segment 
+                            break;
+                        case DSEG:
+                            previousGlobalLabel = null; // local labels cannot belong to a global label from a different segment 
+                            break;
+                        case ESEG:
+                            previousGlobalLabel = null; // local labels cannot belong to a global label from a different segment 
+                            break;
+                        default:
+                            // $$FALL-THROUGH$$
+                    }
+                    ctx.dontGoDeeper();
+                } 
+                else if ( node instanceof LabelNode) 
+                {
+                    if ( ((LabelNode) node).isGlobal() ) {
+                        previousGlobalLabel = (LabelNode) node;
+                    }
+                }
+                else if ( node instanceof IdentifierNode) 
+                {
+                    final IdentifierNode id = (IdentifierNode) node;
+                    if ( ! context.globalSymbolTable().isDefined( id.name ) ) 
+                    {
+                        if ( previousGlobalLabel != null ) 
+                        {
+                            final Identifier localVar = Identifier.newLocalGlobalIdentifier( previousGlobalLabel.identifier , id.name );
+                            if ( context.globalSymbolTable().isDefined( localVar ) ) 
+                            {
+                                final Symbol badSymbol = id.getSymbol();
+                                id.setName( localVar );
+                                id.setSymbol( context.globalSymbolTable().get( localVar , Type.ADDRESS_LABEL ) );
+                                context.globalSymbolTable().removeSymbol( badSymbol );
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        ast.visitBreadthFirst(labelVisitor);
+        
         // sanity check
         context.globalSymbolTable().getAllSymbolsUnsorted().stream().filter( Symbol::isUnresolved ).forEach( symbol -> 
         {
-            if ( ! symbol.hasType( Type.PREPROCESSOR_MACRO ) ) // preprocessor macros/defines are special since "#define something" is a valid statement and needs to value/body
+            if ( ! symbol.hasType( Type.PREPROCESSOR_MACRO ) ) // preprocessor macros/defines are special since "#define something" is a valid statement and needs no value/body
             {
                 context.error("Unresolved symbol '"+symbol.name()+"'",symbol.getNode());
             }

@@ -26,6 +26,7 @@ import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierDefNode;
+import de.codesourcery.javr.assembler.parser.ast.LabelNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 
 /**
@@ -38,6 +39,8 @@ public abstract class AbstractPhase implements Phase
     private final String name;
     private final boolean generateMessages;
     
+    protected LabelNode previousGlobalLabel;
+    
     public AbstractPhase(String name,boolean generateMessages) 
     {
         Validate.notBlank(name, "name must not be NULL or blank");
@@ -45,9 +48,21 @@ public abstract class AbstractPhase implements Phase
         this.generateMessages = generateMessages;
     }
     
+    @Override
+    public void beforeRun(ICompilationContext ctx) {
+        previousGlobalLabel = null;
+    }
+    
     protected void visitNode(ICompilationContext context, ASTNode node,IIterationContext ctx) 
     {
-        if ( node instanceof DirectiveNode )
+        if ( node instanceof LabelNode) 
+        {
+            final LabelNode label = (LabelNode) node;
+            if ( label.isGlobal() ) {
+                previousGlobalLabel = label;
+            }
+        } 
+        else if ( node instanceof DirectiveNode )
         {
             final DirectiveNode dnNode = (DirectiveNode) node;
 			final Directive directive = dnNode.directive;
@@ -85,12 +100,15 @@ public abstract class AbstractPhase implements Phase
                     context.clearRegisterAlias( identifier.name );
                     break;            		
                 case CSEG: 
+                    previousGlobalLabel = null; // local labels cannot belong to a global label from a different segment
                 	context.setSegment( Segment.FLASH ); 
                 	break;
                 case DSEG: 
+                    previousGlobalLabel = null; // local labels cannot belong to a global label from a different segment
                 	context.setSegment( Segment.SRAM ) ; 
                 	break;
                 case ESEG: 
+                    previousGlobalLabel = null; // local labels cannot belong to a global label from a different segment
                 	context.setSegment( Segment.EEPROM ); 
                 	break;
                 default:
