@@ -113,23 +113,32 @@ public class GenerateCodePhase extends AbstractPhase
                     for ( ASTNode child : node.children() ) 
                     {
                         Object value = ((IValueNode) child).getValue();
-                        final int iValue;
+                        final int[] data;
                         if ( isInResolvePhase ) 
                         {
-                            iValue = 0;
+                            final int len = value == null ? 1 : value instanceof String ? ((String) value).length() : 1;
+                            data = new int[len];
                         } 
                         else 
                         {
                             if ( value instanceof Number) 
                             {
-                                iValue = ((Number) value).intValue();
+                                data = new int[] { ((Number) value).intValue() };
                             } 
                             else if ( value instanceof Address ) 
                             {
                                 if ( directive == Directive.INIT_BYTES ) {
                                     context.message( CompilationMessage.error( context.currentCompilationUnit() , "Storing 16-bit address as byte value would truncate it",node ) );
                                 }
-                                iValue = ((Address) value).getByteAddress();
+                                data = new int[] { ((Address) value).getByteAddress() };         
+                            } 
+                            else if ( value instanceof String ) 
+                            {
+                                final String s = (String) value;
+                                data = new int[ s.length() ];
+                                for ( int i = 0  ; i < data.length ; i++ ) {
+                                    data[i] = s.charAt(i);
+                                }
                             } else {
                                 throw new RuntimeException("Internal error,unhandled IValueNode: "+value);
                             }
@@ -137,17 +146,23 @@ public class GenerateCodePhase extends AbstractPhase
                         switch( directive ) 
                         {
                             case INIT_BYTES:
-                                if ( isInResolvePhase ) {
-                                    context.allocateByte();
-                                } else {
-                                    context.writeByte( iValue );
+                                for ( int i = 0 ; i < data.length ; i++ ) 
+                                {
+                                    if ( isInResolvePhase ) {
+                                        context.allocateByte();
+                                    } else {
+                                        context.writeByte( data[i] );
+                                    }
                                 }
                                 break;
                             case INIT_WORDS:
-                                if ( isInResolvePhase ) {
-                                    context.allocateWord();
-                                } else {
-                                    context.writeWord( iValue );
+                                for ( int i = 0 ; i < data.length ; i++ ) 
+                                {
+                                    if ( isInResolvePhase ) {
+                                        context.allocateWord();
+                                    } else {
+                                        context.writeWord( data[i] );
+                                    }
                                 }
                                 break;
                             default:
