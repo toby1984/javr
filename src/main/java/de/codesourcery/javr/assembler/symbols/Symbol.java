@@ -21,6 +21,7 @@ import org.apache.log4j.Logger;
 import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.parser.Identifier;
+import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 
@@ -38,6 +39,7 @@ public final class Symbol
     private final CompilationUnit compilationUnit;
     private Type type;
     private Object value;
+    private TextRegion textRegion;
     
     public static enum Type 
     {
@@ -75,6 +77,7 @@ public final class Symbol
         this.name = name;
         this.node = node;
         this.type = type;
+        this.textRegion = node != null ? node.getTextRegion() : null;
     }
     
     @Override
@@ -119,7 +122,7 @@ public final class Symbol
         }
         
         Validate.notNull(value, "value for symbol '"+name+"' must not be NULL");
-        if ( ! hasType(Type.UNDEFINED ) ) 
+        if ( ! hasType(Type.UNDEFINED ) && ! type.equals( this.type ) ) 
         {
             throw new IllegalStateException("Refusing to set value on symbol that already has a type "+this);
         }        
@@ -135,5 +138,15 @@ public final class Symbol
             throw new IllegalStateException("Setting a value on a UNDEFINED symbol requires a type, use setValue(Object,Type) instead.");
         }
         this.value = value;
+    }
+    
+    public TextRegion getTextRegion() 
+    {
+        final TextRegion result = node != null ? node.getTextRegion() : null;
+        return result != null ? result : textRegion;
+    }
+    
+    public void setTextRegion(TextRegion textRegion) {
+        this.textRegion = textRegion;
     }
 }

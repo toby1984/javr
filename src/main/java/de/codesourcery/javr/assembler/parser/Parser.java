@@ -29,8 +29,10 @@ import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Instruction;
 import de.codesourcery.javr.assembler.Register;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
+import de.codesourcery.javr.assembler.exceptions.DuplicateSymbolException;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
 import de.codesourcery.javr.assembler.parser.ExpressionToken.ExpressionTokenType;
+import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.ArgumentNamesNode;
@@ -69,6 +71,8 @@ public class Parser
     private ICompilationContext context;
     private Lexer lexer;
     private AST ast;
+    
+    private LabelNode previousGlobalLabel;
 
     public static enum Severity 
     {
@@ -416,6 +420,8 @@ public class Parser
                     final TextRegion r = new TextRegion( offset , keywordToken.endOffset() - offset , keywordToken.line , keywordToken.column);
                     final PreprocessorNode preproc= new PreprocessorNode(Preprocessor.DEFINE , r);                        
                     preproc.addChild( funcDef );
+                    
+                    defineSymbol( funcDef , new Symbol(funcDef.name,Symbol.Type.PREPROCESSOR_MACRO , context.currentCompilationUnit() , funcDef ) ); 
                     return preproc;
                 }
                 final List<String> args = parseText();
@@ -442,7 +448,7 @@ public class Parser
         ASTNode node = p.parseStatement();
         if ( node == null ) 
         {
-            node = Parser.parseExpression( p.lexer );
+            node = parseExpression( p.lexer );
             if ( node == null ) {
                 throw new ParseException("Neither a valid statement nor a valid expression",p.lexer.peek());
             }
@@ -501,19 +507,19 @@ public class Parser
         return result;
     }
 
-    private ASTNode parseDirective() // parse .XXXX commands
+    private DirectiveNode parseDirective() // parse .XXXX commands
     {
         Token tok = lexer.peek();
         if ( tok.is( TokenType.DOT ) ) 
         {
-            final TextRegion region = lexer.next().region(); // consume ','
+            final TextRegion region = lexer.next().region(); // consume '.'
 
             final Token tok2 = lexer.peek();
             if ( ! tok2.is(TokenType.TEXT ) ) {
                 throw new ParseException("Expected a keyword", tok2 );
             }
             lexer.next(); // consume keyword
-            final ASTNode result = parseDirective2( tok2 );
+            final DirectiveNode result = parseDirective2( tok2 );
             if ( result != null ) 
             {
                 region.merge( tok2 );
@@ -524,7 +530,7 @@ public class Parser
         return null;
     }
 
-    private ASTNode parseDirective2(Token tok2) 
+    private DirectiveNode parseDirective2(Token tok2) 
     {
         final String value = tok2.value;
         switch( value.toLowerCase() ) // AVR documentation states that directives are matched ignoring case
@@ -547,7 +553,7 @@ public class Parser
                     throw new ParseException("Missing value", lexer.peek() );
                 }
                 final String device= values2.stream().collect(Collectors.joining());
-                final ASTNode dResult = new DirectiveNode(Directive.DEVICE , tok2.region() );
+                final DirectiveNode dResult = new DirectiveNode(Directive.DEVICE , tok2.region() );
                 dResult.addChild( new StringLiteral( device , new TextRegion(start, lexer.peek().offset - start , tok2.line , tok2.column ) ) ); 
                 return dResult;
             case "byte":
@@ -595,10 +601,13 @@ public class Parser
                 }
                 throw new ParseException("Expected an identifier",lexer.peek());
             case "dseg":
+                previousGlobalLabel = null;
                 return new DirectiveNode(Directive.DSEG , tok2.region() );
             case "eseg":
+                previousGlobalLabel = null;
                 return new DirectiveNode(Directive.ESEG , tok2.region() );
             case "cseg": 
+                previousGlobalLabel = null;
                 return new DirectiveNode(Directive.CSEG , tok2.region() );
             case "db":
             case "dw":
@@ -622,8 +631,12 @@ public class Parser
                         final ASTNode expr2 = parseExpression(lexer);
                         if ( expr2 != null ) {
                             final DirectiveNode result2 = new DirectiveNode(Directive.EQU , tok2.region() );
-                            result2.addChild( new EquLabelNode( name , tok.region() ) );
+                            final EquLabelNode equLabel = new EquLabelNode( name , tok.region() );
+                            
+                            result2.addChild( equLabel );
                             result2.addChild( expr2 );
+                            
+                            defineSymbol( equLabel , new Symbol( equLabel.name , Symbol.Type.EQU , context.currentCompilationUnit() , equLabel ) );
                             return result2;
                         }
                         throw new ParseException("Expected an expression",lexer.peek());
@@ -637,6 +650,25 @@ public class Parser
         return null;
     }
 
+    private void defineSymbol(ASTNode node,final Symbol symbol) throws DuplicateSymbolException 
+    {
+        try {
+            context.currentSymbolTable().defineSymbol( symbol );
+        } 
+        catch(DuplicateSymbolException e) 
+        {
+            if ( ! context.message( CompilationMessage.error( context.currentCompilationUnit() , "Duplicate symbol: "+symbol.name() ,node) ) ) 
+            {
+                throw new ParseException("Too many errors",lexer.peek().offset );
+            }
+        }
+    }
+    
+    private static void declareSymbol(ICompilationContext context,final Identifier identifier) 
+    {
+        context.currentSymbolTable().declareSymbol( identifier , context.currentCompilationUnit() );
+    }
+    
     private List<ASTNode> parseExpressionList() 
     {
         final List<ASTNode> result = new ArrayList<>();
@@ -677,16 +709,32 @@ public class Parser
         
         if ( tok.isValidIdentifier() )
         {
+            LabelNode label = null;
             final Identifier id = new Identifier( lexer.next().value );
             if ( isLocal ) 
             {
-                return new LabelNode( id , true , region );
+                label = new LabelNode( id , true , region );
             } 
-            if ( lexer.peek( TokenType.COLON ) ) 
+            else if ( lexer.peek( TokenType.COLON ) ) 
             {
                 lexer.next();
-                return new LabelNode( id , false , region );
-            } 
+                label = new LabelNode( id , false , region );
+                previousGlobalLabel = label;
+            }
+            if ( label != null ) {
+                
+                // define symbol
+                final Identifier identifier;
+                if ( ! isLocal ) {
+                    identifier = label.identifier;
+                } else {
+                    identifier = Identifier.newLocalGlobalIdentifier( previousGlobalLabel.identifier , label.identifier );
+                }
+                final Symbol symbol = new Symbol( identifier , Symbol.Type.ADDRESS_LABEL , context.currentCompilationUnit() , label );
+                label.setSymbol( symbol );
+                defineSymbol( label , symbol ); 
+                return label;
+            }
             lexer.pushBack( tok );
         }
         return null;
@@ -837,7 +885,13 @@ public class Parser
         return null;
     }
 
-    public static ASTNode parseExpression(Lexer lexer) 
+
+    private ASTNode parseExpression(Lexer lexer) 
+    {
+        return parseExpression(lexer,context);
+    }
+    
+    public static ASTNode parseExpression(Lexer lexer,ICompilationContext context) 
     {
         final ShuntingYard yard = new ShuntingYard();
         while ( ! lexer.eof() ) 
@@ -871,7 +925,7 @@ public class Parser
                 if ( lexer.peek(TokenType.DOT ) ) {
                     node = new CurrentAddressNode( lexer.next().region() );
                 } else {
-                    node = parseAtom(lexer);
+                    node = parseAtom(lexer,context);
                 }
                 if ( node != null ) 
                 {
@@ -893,7 +947,12 @@ public class Parser
         return yard.getResult( lexer.peek().region() );
     }
 
-    private static ASTNode parseAtom(Lexer lexer) 
+    private ASTNode parseAtom(Lexer lexer) 
+    {
+        return parseAtom(lexer,context);
+    }
+    
+    private static ASTNode parseAtom(Lexer lexer,ICompilationContext context) 
     {
         // character literal
         ASTNode result = parseCharLiteral(lexer);
@@ -914,7 +973,7 @@ public class Parser
         }
 
         // identifier
-        return parseIdentifier(lexer);         
+        return parseIdentifier(lexer,context);         
     }
 
     private boolean isCompoundRegister(String name) {
@@ -987,14 +1046,21 @@ public class Parser
         }
         return null;
     }
+    
+    private IdentifierNode parseIdentifier(Lexer lexer) 
+    {
+        return parseIdentifier(lexer,context);
+    }
 
-    private static IdentifierNode parseIdentifier(Lexer lexer) 
+    private static IdentifierNode parseIdentifier(Lexer lexer,ICompilationContext context) 
     {
         Token tok = lexer.peek();
         if ( Identifier.isValidIdentifier( tok.value ) ) 
         {
             lexer.next();
-            return new IdentifierNode( new Identifier( tok.value ) , tok.region() );
+            IdentifierNode result = new IdentifierNode( new Identifier( tok.value ) , tok.region() );
+            declareSymbol( context , result.name );
+            return result;
         }
         return null;
     }

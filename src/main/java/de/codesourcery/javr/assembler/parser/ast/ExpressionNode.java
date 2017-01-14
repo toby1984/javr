@@ -22,13 +22,17 @@ public class ExpressionNode extends AbstractASTNode implements IValueNode , Reso
 
     private Object value;
     
-    public ExpressionNode(TextRegion region) {
-        super(region);
+    public ExpressionNode() {
+        super();
     }
 
     @Override
-    protected ExpressionNode createCopy() {
-        return new ExpressionNode( getTextRegion().createCopy() );
+    protected ExpressionNode createCopy() 
+    {
+        final ExpressionNode result = new ExpressionNode();
+        // TODO: Maybe value needs to be deep-copied here instead ? ....
+        result.value = value;
+        return result;
     }
     
     @Override

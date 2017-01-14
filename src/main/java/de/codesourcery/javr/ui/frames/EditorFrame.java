@@ -63,7 +63,7 @@ public class EditorFrame extends JInternalFrame implements IWindow
 	
 	public void gotoMessage(CompilationMessage msg) 
 	{
-        final Optional<EditorPanel> editor = editors.stream().filter( ed -> ed.getCompilationUnit().hasSameResourceAs( msg.unit ) ).findFirst();
+        final Optional<EditorPanel> editor = getEditor( msg.unit );
         if ( editor.isPresent() ) 
         {
         	tabbedPane.setSelectedComponent( editor.get() );
@@ -112,7 +112,7 @@ public class EditorFrame extends JInternalFrame implements IWindow
  	
 	private EditorPanel createEditor(IProject project,CompilationUnit compUnit) throws IOException
 	{
-	    return new EditorPanel(project, compUnit,appConfigProvider,messageFrame);
+	    return new EditorPanel(project, this , compUnit,appConfigProvider,messageFrame);
 	}
 	
 	private EditorPanel currentEditor() 

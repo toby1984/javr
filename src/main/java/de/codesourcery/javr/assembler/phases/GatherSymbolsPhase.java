@@ -47,77 +47,8 @@ public class GatherSymbolsPhase extends AbstractPhase
     }
     
     @Override
-    public void run(ICompilationContext context) {
-
-        final AST ast = context.currentCompilationUnit().getAST();
-        
-        final IASTVisitor visitor = new IASTVisitor() 
-        {
-            @Override
-            public void visit(ASTNode node, IIterationContext ctx) 
-            {
-                visitNode( context , node , ctx );
-                
-                if ( node instanceof DirectiveNode ) 
-                {
-                    final DirectiveNode dn = (DirectiveNode) node;
-                    if ( dn.is( Directive.EQU ) ) 
-                    {
-                        final EquLabelNode label = (EquLabelNode) dn.firstChild();
-                        declareSymbol(context, label.name );
-                    }
-                } 
-                else if ( node instanceof FunctionDefinitionNode ) 
-                {
-                    final FunctionDefinitionNode func =(FunctionDefinitionNode) node;
-                    if ( ! defineSymbol( func , new Symbol(func.name,Symbol.Type.PREPROCESSOR_MACRO , context.currentCompilationUnit() , func ) ) ) {
-                        ctx.stop();
-                    }
-                } 
-                else if ( node instanceof IdentifierNode) 
-                {
-                    final Identifier identifier = ((IdentifierNode) node).name;
-                    declareSymbol(context, identifier);
-                } 
-                else if ( node instanceof LabelNode ) 
-                {
-                    final LabelNode label = (LabelNode) node;
-                    final Identifier identifier;
-                    if ( label.isGlobal() ) {
-                        identifier = label.identifier;
-                    } else {
-                        identifier = Identifier.newLocalGlobalIdentifier( previousGlobalLabel.identifier , label.identifier );
-                    }
-                    final Symbol symbol = new Symbol( identifier , Symbol.Type.ADDRESS_LABEL , context.currentCompilationUnit() , label );
-                    label.setSymbol( symbol );
-                    if ( ! defineSymbol( label , symbol ) ) 
-                    {
-                        ctx.stop();
-                    }
-                } 
-            }
-
-            private void declareSymbol(ICompilationContext context,final Identifier identifier) 
-            {
-                context.currentSymbolTable().declareSymbol( identifier , context.currentCompilationUnit() );
-            }
-
-            private boolean defineSymbol(ASTNode node,final Symbol symbol) throws DuplicateSymbolException 
-            {
-                try {
-                    context.currentSymbolTable().defineSymbol( symbol );
-                } 
-                catch(DuplicateSymbolException e) 
-                {
-                    return context.message( CompilationMessage.error( context.currentCompilationUnit() , "Duplicate symbol: "+symbol.name() ,node) );
-                }
-                return true;
-            }
-        };
-        
-        // gather symbols
-        ast.visitBreadthFirst( visitor );
-        
+    public void run(ICompilationContext context) 
+    {
         // sanity check that local variable names do not clash with any globals
         context.globalSymbolTable().visitSymbols( (symbol) -> 
         {

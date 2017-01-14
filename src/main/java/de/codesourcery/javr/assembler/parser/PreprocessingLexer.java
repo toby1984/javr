@@ -36,6 +36,7 @@ import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.Resolvable;
 import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Resource;
 
@@ -585,6 +586,7 @@ public class PreprocessingLexer implements Lexer
                 {
                     final Symbol symbol = new Symbol(macroId,Symbol.Type.PREPROCESSOR_MACRO,compilationContext.currentCompilationUnit(),null);
                     symbol.setValue( new MacroDefinition( argumentNames , macroBody ) );
+                    symbol.setTextRegion( macroName.region() );
                     symbols().defineSymbol( symbol );
                 }
                 skipToNextLine();
@@ -638,7 +640,7 @@ public class PreprocessingLexer implements Lexer
             if ( macroName.isValidIdentifier() ) // check whether the identifier refers to a macro definition
             {
                 final Optional<Symbol> optSymbol = symbols().maybeGet( new Identifier( macroName.value ) );
-                if ( ! optSymbol.isPresent() || alreadyExpandedMacros.contains( macroName.value ) ) // prevent infinite expansion
+                if ( ! optSymbol.isPresent() || alreadyExpandedMacros.contains( macroName.value ) || ! optSymbol.get().hasType( Type.PREPROCESSOR_MACRO ) ) // prevent infinite expansion
                 {
                     continue;
                 }
@@ -905,7 +907,7 @@ public class PreprocessingLexer implements Lexer
 
     private IValueNode parseExpression(List<Token> tokens) 
     {
-        return (IValueNode) Parser.parseExpression( new WrappingLexer(tokens ) );
+        return (IValueNode) Parser.parseExpression( new WrappingLexer(tokens ) , this.compilationContext );
     }
 
     private Lexer lexer() {

@@ -157,7 +157,7 @@ When there are no more tokens to read:
                 throw new BadExpressionException("Mismatched closing parens",tok1.getTextRegion());
             }
 
-            final ExpressionToken openingParens = this.stack.pop(); // pop opening parens
+            this.stack.pop(); // pop opening parens
 
             // If the token at the top of the stack is a function token, pop it onto the output queue.
             if ( ! this.stack.isEmpty() && this.stack.peek().hasType(ExpressionTokenType.FUNCTION) )
@@ -167,8 +167,7 @@ When there are no more tokens to read:
             else {
                 // not a function invocation, wrap in ExpressionNode
                 final ExpressionToken pop = this.valueQueue.pop();
-                final ExpressionNode expr = new ExpressionNode( openingParens.getTextRegion() );
-                expr.getTextRegion().merge( tok1.getTextRegion() );
+                final ExpressionNode expr = new ExpressionNode();
                 expr.insertChild( 0 , pop.getNode() );
                 this.valueQueue.push( new ExpressionToken( ExpressionTokenType.EXPRESSION , expr ) );
             }

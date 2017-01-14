@@ -22,7 +22,7 @@ public class ArgumentNamesNode extends AbstractASTNode {
     }
 
     @Override
-    protected ASTNode createCopy() {
+    protected ArgumentNamesNode createCopy() {
         return new ArgumentNamesNode();
     }
 }

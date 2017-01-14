@@ -23,9 +23,12 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.Point;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.ByteArrayOutputStream;
@@ -44,6 +47,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -99,6 +103,7 @@ import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.IObjectCodeWriter;
 import de.codesourcery.javr.assembler.ObjectCodeWriter;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
+import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.parser.TextRegion;
@@ -138,6 +143,8 @@ public class EditorPanel extends JPanel
 
 	private final JTextPane editor = new JTextPane();
 
+	private final EditorFrame topLevelWindow;
+	   
 	private final IApplicationConfigProvider appConfigProvider;
 	
 	private final Consumer<IApplicationConfig> configListener = config -> 
@@ -171,15 +178,125 @@ public class EditorPanel extends JPanel
 	protected Style STYLE_PREPROCESSOR;
 	protected Style STYLE_MNEMONIC;
 	protected Style STYLE_COMMENT;
+	protected Style STYLE_HIGHLIGHTED;
 
 	private CompilationUnit currentUnit = new CompilationUnit( new StringResource("dummy",  "" ) );
 
 	private final MessageFrame messageFrame;
 	
 	private final SearchHelper searchHelper=new SearchHelper();
+	
+	private ASTNode highlight;
+	private boolean controlKeyPressed;
+	
+	private boolean wasCompiledAtLeastOnce = false; 
+	private final List<Runnable> afterCompilation = new ArrayList<>();
+	
+	protected class MyMouseListener extends MouseAdapter 
+	{
+	    private final Point point = new Point();
+	    
+	    @Override
+	    public void mouseClicked(MouseEvent e) 
+	    {
+	        if ( e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1 ) 
+	        {
+	            final IdentifierNode node = getNode( e );
+	            if ( node != null ) 
+	            {
+	                final Symbol symbol = getSymbol( node );
+	                if ( symbol != null && symbol.getTextRegion() != null ) 
+	                {
+	                    final TextRegion region = symbol.getTextRegion();
+	                    if ( symbol.getCompilationUnit().hasSameResourceAs( currentUnit ) ) {
+	                        setSelection( region );
+	                    } 
+	                    else 
+	                    {
+	                        try 
+	                        {
+                                final EditorPanel editor = topLevelWindow.openEditor( project , symbol.getCompilationUnit() );
+                                SwingUtilities.invokeLater( () -> editor.setSelection( region ) );
+                            } 
+	                        catch (IOException e1) 
+	                        {
+                                e1.printStackTrace();
+                            }
+	                    }
+	                }
+	            }
+	        }
+	    }
+	    
+	    private Symbol getSymbol(IdentifierNode node) 
+	    {
+	        Symbol result = node.getSymbol();
+	        if ( result == null ) 
+	        {
+	            SymbolTable table = currentUnit.getSymbolTable();
+	            while ( table.hasParent() ) 
+	            {
+	                table = table.getParent();
+	            }
+	            result = table.maybeGet( node.name ).orElse( null );
+	            if ( result == null ) 
+	            { 
+	                // maybe this is the name of a local variable.
+	                //
+	                // Traverse the AST backwards until we find the next global label while looking for a match,
+	                // if this fails try traversing the AST forwards until we reach the next global label
+	                StatementNode statement = node.getStatement();
+	                while ( true ) 
+	                {
+	                    final List<LabelNode> labels = statement.findLabels();
+	                    boolean foundGlobalLabel = false;
+	                    for ( LabelNode ln : labels ) 
+	                    {
+	                        if ( ln.isGlobal() ) 
+	                        {
+	                            foundGlobalLabel = true;
+	                            result = table.maybeGet( Identifier.newLocalGlobalIdentifier( ln.identifier , node.name ) ).orElse( null );
+	                            if ( result != null ) {
+	                                return result;
+	                            }
+	                        } 
+	                    }
+	                    final int previousIdx = statement.getParent().indexOf( statement )-1;
+	                    if ( foundGlobalLabel || previousIdx < 0 ) {
+	                        break;
+	                    }
+	                    statement = (StatementNode) statement.getParent().child( previousIdx );
+	                }
+	            }
+	        }
+	        return result;
+	    }
+	    
+	    @Override
+	    public void mouseMoved(MouseEvent e) 
+	    {
+            setHighlight( getNode( e ) );
+	    }
+	    
+	    private IdentifierNode getNode(MouseEvent e) 
+	    {
+            point.x = e.getX();
+            point.y = e.getY();
+            final int pos = editor.viewToModel( point );
+            ASTNode node = null;
+            if ( pos >= 0 &&  controlKeyPressed ) 
+            {
+                node = astTreeModel.getAST().getNodeAtOffset( pos );
+                if ( node != null ) {
+                    System.out.println("Node @ "+point+" = "+node.getClass().getSimpleName()+" , region: "+node.getTextRegion());
+                }
+            }
+            return node == null || node.getTextRegion() == null || !(node instanceof IdentifierNode)? null : (IdentifierNode) node;
+	    }
+	}
 
-	protected class SearchHelper {
-
+	protected class SearchHelper 
+	{
 		private int currentPosition;
 		private String term;
 
@@ -458,8 +575,9 @@ public class EditorPanel extends JPanel
 			}
 		}
 
-		public void documentChanged() 
+		public void documentChanged(DocumentEvent event) 
 		{
+		    new Exception("===============> Document changed").printStackTrace();
 			synchronized ( SLEEP_LOCK ) 
 			{
 				lastChange = System.currentTimeMillis();
@@ -517,11 +635,11 @@ public class EditorPanel extends JPanel
 
 		@Override
 		public int getColumnCount() {
-			return 3;
+			return 5;
 		}
 
 		private void assertValidColumn(int columnIndex) {
-			if ( columnIndex < 0 || columnIndex > 3 ) {
+			if ( columnIndex < 0 || columnIndex > 4 ) {
 				throw new RuntimeException("Invalid column: "+columnIndex);
 			}
 		}
@@ -535,6 +653,10 @@ public class EditorPanel extends JPanel
 					return "Type";
 				case 2:
 					return "Value";
+				case 3:
+				    return "Node";
+				case 4:
+				    return "Compilation unit";
 				default:
 					throw new RuntimeException("Invalid column: "+columnIndex);
 			}
@@ -564,6 +686,10 @@ public class EditorPanel extends JPanel
 				case 2:
 					final Object value = symbol.getValue(); 
 					return value == null ? "<no value>" : value.toString();
+				case 3:
+				    return symbol.getNode() == null ? null : symbol.getNode().toString();
+				case 4:
+				    return symbol.getCompilationUnit().getResource().toString();
 				default:
 					throw new RuntimeException("Invalid column: "+columnIndex);                 
 			}
@@ -648,7 +774,7 @@ public class EditorPanel extends JPanel
 		}
 	}
 
-	public EditorPanel(IProject project, CompilationUnit unit,IApplicationConfigProvider appConfigProvider,MessageFrame messageFrame) throws IOException 
+	public EditorPanel(IProject project, EditorFrame topLevelWindow , CompilationUnit unit,IApplicationConfigProvider appConfigProvider,MessageFrame messageFrame) throws IOException 
 	{
 		Validate.notNull(project, "project must not be NULL");
 		Validate.notNull(unit, "unit must not be NULL");
@@ -658,6 +784,7 @@ public class EditorPanel extends JPanel
         this.appConfigProvider = appConfigProvider;
 		this.project = project;
 		this.currentUnit = unit;
+		this.topLevelWindow = topLevelWindow;
 
 		editor.addCaretListener( new CaretListener() 
 		{
@@ -667,8 +794,31 @@ public class EditorPanel extends JPanel
                 cursorPositionLabel.setText( Integer.toString( e.getDot()  ) );
             }
 		});
-		editor.addKeyListener( new KeyAdapter() {
-
+		final MyMouseListener mouseListener = new MyMouseListener(); 
+		editor.addMouseMotionListener( mouseListener);
+		editor.addMouseListener( mouseListener );
+		editor.addKeyListener( new KeyAdapter() 
+		{
+		    
+		    @Override
+		    public void keyPressed(KeyEvent e) 
+		    {
+		        if ( e.getKeyCode() == KeyEvent.VK_CONTROL ) {
+		            System.out.println("key pressed");
+		            controlKeyPressed = true;
+		        }
+		    }
+		    
+		    @Override
+		    public void keyReleased(KeyEvent e) 
+		    {
+                if ( e.getKeyCode() == KeyEvent.VK_CONTROL ) {
+                    System.out.println("key released");
+                    setHighlight( null );
+                    controlKeyPressed = false;
+                }
+		    }
+		    
 			@Override
 			public void keyTyped(KeyEvent e) 
 			{
@@ -785,7 +935,12 @@ public class EditorPanel extends JPanel
         STYLE_REGISTER = createStyle( "registerStyle" , SourceElement.REGISTER , ctx );
         STYLE_MNEMONIC = createStyle( "mnemonicStyle" , SourceElement.MNEMONIC, ctx );
         STYLE_COMMENT  = createStyle( "commentStyle" , SourceElement.COMMENT , ctx );     
-        STYLE_PREPROCESSOR = createStyle( "preprocStyle" , SourceElement.PREPROCESSOR , ctx );   	    
+        STYLE_PREPROCESSOR = createStyle( "preprocStyle" , SourceElement.PREPROCESSOR , ctx );   
+        
+        // highlight
+        STYLE_HIGHLIGHTED = ctx.addStyle( "highlight", topLevelStyle );
+        STYLE_HIGHLIGHTED.addAttribute(StyleConstants.Foreground, Color.BLUE);
+        STYLE_HIGHLIGHTED.addAttribute(StyleConstants.Underline, Boolean.TRUE );
 	}
 	
 	private Style createStyle(String name,SourceElement sourceElement,StyleContext ctx) 
@@ -810,19 +965,19 @@ public class EditorPanel extends JPanel
 			@Override public void insertUpdate(DocumentEvent e) 
 			{
 				if ( ! ignoreEditEvents ) {
-					recompilationThread.documentChanged();
+					recompilationThread.documentChanged(e);
 				}
 			}
 			@Override public void removeUpdate(DocumentEvent e) 
 			{ 
 				if ( ! ignoreEditEvents ) {
-					recompilationThread.documentChanged(); 
+					recompilationThread.documentChanged(e); 
 				}
 			}
 			@Override public void changedUpdate(DocumentEvent e) 
 			{ 
 				if ( ! ignoreEditEvents ) {
-					recompilationThread.documentChanged();
+					recompilationThread.documentChanged(e);
 				}
 			}
 		});
@@ -898,6 +1053,9 @@ public class EditorPanel extends JPanel
 
 	public void compile() 
 	{
+	    new Exception("##################################### COMPILE TRIGGERED ##################").printStackTrace();
+	    highlight = null;
+	    
 	    messageFrame.clearMessages();
 	    currentUnit.clearMessages();
 		symbolModel.clear();
@@ -930,9 +1088,9 @@ public class EditorPanel extends JPanel
 		    LOG.error("Parsing source failed",e);
 		}
         astTreeModel.setAST( currentUnit.getAST() );
-		
-        doSyntaxHighlighting();		
 
+        doSyntaxHighlighting();
+        
 		// assemble
 		final CompilationUnit root = project.getCompileRoot();
 
@@ -962,6 +1120,19 @@ public class EditorPanel extends JPanel
 		final String success = compilationSuccessful ? "successful" : "failed"; 
 		final DateTimeFormatter df = DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss");
 		currentUnit.addMessage( CompilationMessage.info(currentUnit,"Compilation "+success+" ("+assembleTime+" millis) on "+df.format( ZonedDateTime.now() ) ) );
+		
+        wasCompiledAtLeastOnce = true;
+        if ( ! afterCompilation.isEmpty() ) 
+        {
+            for ( Runnable r : afterCompilation ) {
+                try {
+                    r.run();
+                } catch(Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            afterCompilation.clear();
+        }
 	}
 
 	private static CompilationMessage toCompilationMessage(CompilationUnit unit,Exception e)
@@ -974,53 +1145,95 @@ public class EditorPanel extends JPanel
 
 	private void doSyntaxHighlighting() 
 	{
-		ignoreEditEvents = true;
-		try 
-		{
-			final StyledDocument doc = editor.getStyledDocument();
-			final IASTVisitor visitor = new IASTVisitor() 
-			{
-				@Override
-				public void visit(ASTNode node, IIterationContext ctx) 
-				{
-					final TextRegion region = node.getTextRegion();
-					if ( region != null ) 
-					{
-						Style style = null;
-						if ( node instanceof PreprocessorNode ) {
-							style = STYLE_PREPROCESSOR;
-						} 
-						else if ( node instanceof RegisterNode) {
-							style = STYLE_REGISTER;
-						} 
-						else if ( node instanceof InstructionNode ) 
-						{
-							style = STYLE_MNEMONIC;
-						} 
-						else if ( node instanceof CommentNode ) 
-						{
-							style = STYLE_COMMENT;
-						}     
-						else if ( node instanceof LabelNode || node instanceof IdentifierNode) 
-						{
-							style = STYLE_LABEL;
-						}      
-						else if ( node instanceof NumberLiteralNode ) 
-						{
-							style = STYLE_NUMBER;
-						}                      
+	    doSyntaxHighlighting(astTreeModel.getAST());
+	}
+	
+    private void doSyntaxHighlighting(ASTNode subtree) 
+    {
+        ignoreEditEvents = true;
+        try 
+        {
+            final StyledDocument doc = editor.getStyledDocument();
+            final IASTVisitor visitor = new IASTVisitor() 
+            {
+                @Override
+                public void visit(ASTNode node, IIterationContext ctx) 
+                {
+                    setNodeStyle( node , doc );
+                }
+            };
+            subtree.visitBreadthFirst( visitor );
+        } finally {
+            ignoreEditEvents = false;
+        }        
+    }
+	private void setNodeStyle(ASTNode node,StyledDocument styledDoc) 
+	{
+        final TextRegion region = node.getTextRegion();
+        if ( region != null ) 
+        {
+            Style style = null;
+            if ( node instanceof PreprocessorNode ) {
+                style = STYLE_PREPROCESSOR;
+            } 
+            else if ( node instanceof RegisterNode) {
+                style = STYLE_REGISTER;
+            } 
+            else if ( node instanceof InstructionNode ) 
+            {
+                style = STYLE_MNEMONIC;
+            } 
+            else if ( node instanceof CommentNode ) 
+            {
+                style = STYLE_COMMENT;
+            }     
+            else if ( node instanceof LabelNode || node instanceof IdentifierNode) 
+            {
+                style = STYLE_LABEL;
+            }      
+            else if ( node instanceof NumberLiteralNode ) 
+            {
+                style = STYLE_NUMBER;
+            }                      
+            if ( style != null ) 
+            {
+                styledDoc.setCharacterAttributes( region.start(), region.length() , style , true );
+            } else {
+                styledDoc.setCharacterAttributes( region.start(), region.length() , STYLE_TOPLEVEL , true );
+            }
+        }
+	}
+	
+	private void setHighlight(ASTNode newHighlight) 
+	{
+	    if ( this.highlight == newHighlight ) {
+	        return;
+	    }
+	    
+	    if ( newHighlight != null && newHighlight.getTextRegion() == null ) {
+	        throw new IllegalStateException("Cannot highlight a node that has no text region assigned");
+	    }
+	    
+	    if ( this.highlight != null && newHighlight != null && this.highlight.getTextRegion().equals( newHighlight.getTextRegion() ) ) {
+	        return;
+	    }
 
-						if ( style != null ) 
-						{
-							doc.setCharacterAttributes( region.start(), region.length() , style , true );
-						}
-					}
-				}
-			};
-			astTreeModel.getAST().visitBreadthFirst( visitor );
-		} finally {
-			ignoreEditEvents = false;
-		}
+        if ( this.highlight != null ) {
+            System.out.println("Clearing highlight @ "+this.highlight.getTextRegion());
+            doSyntaxHighlighting( this.highlight );
+        }
+        this.highlight = newHighlight;
+        if ( newHighlight != null ) 
+        {
+            System.out.println("Highlighting "+newHighlight.getTextRegion());
+            final TextRegion region = newHighlight.getTextRegion();
+            ignoreEditEvents = true;
+            try {
+                editor.getStyledDocument().setCharacterAttributes( region.start(), region.length() , STYLE_HIGHLIGHTED , true );
+            } finally {
+                ignoreEditEvents = false;
+            }
+        }
 	}
 
 	private JButton button(String label,ActionListener l) {
@@ -1358,22 +1571,43 @@ public class EditorPanel extends JPanel
         return currentUnit;
     }
 	
-	public void setCursorPosition(int position) 
-	{
-	    editor.setCaretPosition( position );
-	}
-	
 	public void gotoMessage(CompilationMessage message) 
 	{
 		final int len = editor.getText().length();
 		if ( message.region != null && 0 <= message.region.start() && message.region.start() < len ) 
 		{
-			editor.setCaretPosition( message.region.start() );
-			editor.setSelectionStart( message.region.start() );
-			editor.setSelectionEnd( message.region.end() );
-			editor.requestFocus();
+		    setSelection( message.region );
 		} else {
 			System.err.println("Index "+message.region+" is out of range, cannot set caret");
 		}
 	}
+	
+	public void setSelection(TextRegion region) 
+	{
+	    final Runnable r = () -> {
+	        editor.setCaretPosition( region.start() );
+	        editor.setSelectionStart( region.start() );
+	        editor.setSelectionEnd( region.end() );
+	        editor.requestFocus();
+	    };
+	    runAfterCompilation(r);
+	}
+	
+	private void runAfterCompilation(Runnable r) 
+	{
+       if ( wasCompiledAtLeastOnce ) {
+            r.run();
+        } else {
+            afterCompilation.add( r );
+        }
+	}
+	
+    public void setCaretPosition(TextRegion region) {
+        setCaretPosition( region.start() );
+    }
+	
+    public void setCaretPosition(int position) 
+    {
+        runAfterCompilation( () -> editor.setCaretPosition( position ) );
+    }	
 }

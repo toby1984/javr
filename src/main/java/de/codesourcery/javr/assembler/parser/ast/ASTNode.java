@@ -22,6 +22,7 @@ import java.util.function.Predicate;
 import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.parser.TextRegion;
+import de.codesourcery.javr.assembler.parser.ast.ASTNode.IASTVisitor;
 import de.codesourcery.javr.assembler.parser.ast.AbstractASTNode.IterationContext;
 
 /**
@@ -88,6 +89,17 @@ public interface ASTNode
      * @throws IllegalStateException when invoked on a node that has no parent
      */
     public void replaceWith(ASTNode other);
+    
+    /**
+     * Returns the AST node with the smallest {@link TextRegion}} that contains
+     * a given text offset.
+     * 
+     * @param offset
+     * 
+     * @return node or <code>null</code> if none of the nodes covered a text region
+     * that contained the offset 
+     */
+    public ASTNode getNodeAtOffset(int offset);
     
     /**
      * Replace a direct child of this node with another instance.
@@ -204,8 +216,19 @@ public interface ASTNode
      * the text region covered by any of this node's children).
      * 
      * @return
+     * @see #getMergedTextRegion()
      */
     public TextRegion getTextRegion();
+    
+    /**
+     * Returns the union of all text regions covered by this node and all of its children.
+     * 
+     * @param result TextRegion object to merge against
+     * @return the input region for method chaining
+     *  
+     * @see #getTextRegion()
+     */
+    public TextRegion getMergedTextRegion();
 
     /**
      * Insert a direct child node at a specific position.
@@ -307,4 +330,13 @@ public interface ASTNode
      * @throws IllegalStateException
      */
     public int getSizeInBytes() throws IllegalStateException;
+    
+    /**
+     * Recalculates the merged text region of this node by calculating
+     * the union of all merged regions of its child nodes.
+     * 
+     * @see #getMergedTextRegion()
+     * @return merged region (may be NULL)
+     */
+    public TextRegion recalculateMergedRegion();
 }

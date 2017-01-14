@@ -72,6 +72,10 @@ public class SymbolTable
     	return parent;
     }
     
+    public boolean hasParent() {
+        return parent != null;
+    }
+    
     public void clear() {
     	this.symbols.clear();
     }

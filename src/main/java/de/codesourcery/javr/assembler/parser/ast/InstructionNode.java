@@ -34,7 +34,7 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
     }
     
     @Override
-    protected ASTNode createCopy() {
+    protected InstructionNode createCopy() {
         return new InstructionNode( this.instruction.createCopy() , getTextRegion().createCopy() );
     }
     

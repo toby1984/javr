@@ -46,7 +46,14 @@ public class TextRegion
         int result = 31 + len;
         return 31 * result + start;
     }
-    
+
+    public void setToZero() {
+        this.start = 0;
+        this.len = 0;
+        this.line=0;
+        this.column=0;
+    }
+
     public TextRegion createCopy() 
     {
         return new TextRegion(this.start,this.len,this.line, this.column );

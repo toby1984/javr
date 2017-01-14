@@ -18,6 +18,7 @@ package de.codesourcery.javr.assembler.parser.ast;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Predicate;
 
 import org.apache.commons.lang3.Validate;
@@ -36,26 +37,11 @@ public abstract class AbstractASTNode implements ASTNode
     private final List<ASTNode> children=new ArrayList<>();
     
     private TextRegion region;
+    private TextRegion mergedRegion;
+    
     private ASTNode parent;
     
     public AbstractASTNode() {
-    }
-    
-    public final TextRegion getMergedTextRegion() {
-        
-        final TextRegion[] result = {null};
-        visitBreadthFirst( (node,ctx) -> 
-        {
-            final TextRegion r = node.getTextRegion();
-            if ( r != null ) {
-                if ( result[0] == null ) {
-                    result[0] = r.createCopy();
-                } else {
-                    result[0].merge( r );
-                }
-            }
-        }); 
-        return result[0];
     }
     
     @Override
@@ -66,6 +52,75 @@ public abstract class AbstractASTNode implements ASTNode
         }
         parent.replaceChild( this , other );
     }
+    
+    @Override
+    public final TextRegion recalculateMergedRegion() 
+    {
+        TextRegion region = this.region != null ? this.region.createCopy() : null;
+        for ( ASTNode child : children ) 
+        {
+            final TextRegion m = child.getMergedTextRegion();
+            if ( m != null ) {
+                if ( region == null ) {
+                    region = m.createCopy();
+                } else {
+                    region.merge( m );
+                }
+            }
+        }
+        final boolean regionChanged = ! Objects.equals( this.mergedRegion , region );
+        mergedRegion = region;
+        if ( regionChanged && hasParent() ) 
+        {
+            parent.recalculateMergedRegion();
+        }
+        return mergedRegion;
+    }
+    
+    @Override
+    public final TextRegion getMergedTextRegion()
+    {
+        if ( mergedRegion == null ) 
+        {
+            return recalculateMergedRegion();
+        }
+        return mergedRegion;
+    }
+    
+    @Override
+    public final ASTNode getNodeAtOffset(int offset) 
+    {
+        TextRegion m = getMergedTextRegion();
+        if ( m == null || ! m.contains( offset ) )
+        {
+            return null;
+        }
+        
+        TextRegion bestMatch = m;
+        ASTNode result = this;
+        ASTNode current = this;
+        int i = 0;
+        while ( i < current.childCount() ) 
+        {
+            if ( current.getTextRegion() != null && current.getTextRegion().contains( offset ) ) {
+                return current;
+            }
+            
+            ASTNode child = current.child(i);
+            final TextRegion tmp = child.getMergedTextRegion();
+            // if ( tmp.contains( offset ) && tmp.length() <= bestMatch.length() ) 
+            if ( tmp.contains( offset ) ) 
+            {
+                result = child;
+                bestMatch = tmp;
+                current = child;
+                i=0;
+            } else {
+                i++;
+            }
+        }
+        return result;
+    }    
     
     @Override
     public CompilationUnit getCompilationUnit() 
@@ -79,6 +134,7 @@ public abstract class AbstractASTNode implements ASTNode
     	return findMatchingParent(predicate) != null;
     }
     
+    @Override
     public final ASTNode findMatchingParent(Predicate<ASTNode> predicate) {
     	ASTNode current = getParent();
     	while ( current != null ) {
@@ -90,6 +146,7 @@ public abstract class AbstractASTNode implements ASTNode
     	return null;
     }
     
+    @Override
     public final void replaceChild(ASTNode child,  ASTNode newNode) 
     {
         Validate.notNull(child, "child must not be NULL");
@@ -101,6 +158,7 @@ public abstract class AbstractASTNode implements ASTNode
         children.set( idx , newNode );
         newNode.setParent( this );
         child.setParent( null );
+        recalculateMergedRegion();
     }
     
     @Override
@@ -129,7 +187,9 @@ public abstract class AbstractASTNode implements ASTNode
          * not cloned here since preprocessor macro expansion
          * would otherwise have to always undo this
          */
-        final ASTNode result = createCopy();
+        final AbstractASTNode result = createCopy();
+        result.region = this.region != null ? this.region.createCopy() : null;
+        result.mergedRegion = this.mergedRegion != null ? this.mergedRegion.createCopy() : null;
         if ( deep ) 
         {
             for ( ASTNode child : children ) 
@@ -140,7 +200,7 @@ public abstract class AbstractASTNode implements ASTNode
         return result;
     }
     
-    protected abstract ASTNode createCopy();
+    protected abstract AbstractASTNode createCopy();
     
     public AbstractASTNode(TextRegion region) 
     {
@@ -152,6 +212,7 @@ public abstract class AbstractASTNode implements ASTNode
     public final void setRegion(TextRegion region) {
         Validate.notNull(region, "region must not be NULL");
         this.region = region;
+        recalculateMergedRegion();
     }
     
     @Override
@@ -269,6 +330,19 @@ public abstract class AbstractASTNode implements ASTNode
         Validate.notNull(child, "child must not be NULL");
         this.children.add( index , child );
         child.setParent( this );
+        childAdded( child );
+    }
+    
+    private void childAdded(ASTNode child) 
+    {
+        TextRegion tmp = child.getMergedTextRegion();
+        if ( tmp != null ) {
+            if ( this.mergedRegion == null ) {
+                this.mergedRegion = tmp.createCopy();
+            } else {
+                this.mergedRegion.merge( tmp );
+            }
+        }
     }
     
     @Override
@@ -277,13 +351,15 @@ public abstract class AbstractASTNode implements ASTNode
         Validate.notNull(child, "child must not be NULL");
         this.children.add( child );
         child.setParent( this );
+        childAdded( child );
     }
     
     @Override
-    public final void addChildren(Collection<? extends ASTNode> children) 
+    public final void addChildren(Collection<? extends ASTNode> toAdd) 
     {
-        Validate.notNull(children, "child must not be NULL");
-        for ( ASTNode child : children ) {
+        Validate.notNull(toAdd, "child must not be NULL");
+        for ( ASTNode child : toAdd ) 
+        {
             addChild( child );
         }
     }
