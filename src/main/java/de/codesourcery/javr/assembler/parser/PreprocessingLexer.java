@@ -131,6 +131,16 @@ public class PreprocessingLexer implements Lexer
             }
             return -1;
         }
+        
+        @Override
+        public String toString() { // use for debugging only !
+            StringBuilder buffer = new StringBuilder();
+            for ( Token tok : tokens ) 
+            {
+                buffer.append( tok.value );
+            }
+            return buffer.toString();
+        }
     }
 
     /**

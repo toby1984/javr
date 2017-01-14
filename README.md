@@ -65,6 +65,8 @@ Note that for reasons unknown to me the AVR assembler duplicates a lot of prepro
 ## Known issues
 
 - Syntax coloring is off when using MSDOS-style line endings (won't fix this since it is related to the fact that Swing text components internally convert all EOL sequences to '\n' but my parser uses the 'true' text offsets)
+- parsing #define is currently broken when trying to #define stuff like (a+b)/c (gets irritated by the leading parens)
+- SRAM address calculations do not consider the I/O mapped area at the start of SRAM
 
 ## To do
 

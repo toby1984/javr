@@ -99,6 +99,12 @@ public interface IArchitecture
     public boolean isValidMnemonic(String s);
     
     /**
+     * Returns the 'real' start address of the SRAM (register file + I/O register + etc.)
+     * @return
+     */
+    public int getSRAMStartAddress();
+    
+    /**
      * Checks that code generation is possible for a given {@link ASTNode}.
      * 
      * @param node

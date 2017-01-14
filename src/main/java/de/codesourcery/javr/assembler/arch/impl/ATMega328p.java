@@ -20,6 +20,12 @@ public class ATMega328p extends ATMega88 {
         }
     }
     
+    @Override
+    public int getSRAMStartAddress() 
+    {
+        return 0x100;
+    }    
+    
     public Architecture getType() {
         return Architecture.ATMEGA328P;
     }

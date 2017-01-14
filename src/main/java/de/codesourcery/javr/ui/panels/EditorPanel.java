@@ -139,7 +139,7 @@ public class EditorPanel extends JPanel
 {
 	private static final Logger LOG = Logger.getLogger(EditorFrame.class);
 
-	public static final Duration RECOMPILATION_DELAY = Duration.ofMillis( 150 );
+	public static final Duration RECOMPILATION_DELAY = Duration.ofMillis( 500 );
 
 	private final JTextPane editor = new JTextPane();
 
@@ -199,7 +199,7 @@ public class EditorPanel extends JPanel
 	    @Override
 	    public void mouseClicked(MouseEvent e) 
 	    {
-	        if ( e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1 ) 
+	        if ( e.getClickCount() == 1 && e.getButton() == MouseEvent.BUTTON1 ) 
 	        {
 	            final IdentifierNode node = getNode( e );
 	            if ( node != null ) 

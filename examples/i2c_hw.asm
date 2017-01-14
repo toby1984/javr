@@ -1,3 +1,6 @@
+
+.equ test = 3
+
 #include "m328Pdef.inc"
 
 .equ freq = 16000000 ; Hz
@@ -9,16 +12,8 @@
 
 #define ERROR_LED 7
 #define SUCCESS_LED 6
-#define TX_PIN 2
-#define CLK_PIN 4
 #define TRIGGER_PIN 0
-
-#define CLK_HI sbi PORTD , CLK_PIN
-
-#define CLK_LO cbi PORTD , CLK_PIN
-
-#define DATA_HI sbi PORTD , TX_PIN
-#define DATA_LO cbi PORTD , TX_PIN
+#define DISPLAY_RESET_PIN 4
 
 #define SUCCESS_LED_ON  sbi PORTD, SUCCESS_LED
 #define SUCCESS_LED_OFF cbi PORTD, SUCCESS_LED
@@ -26,9 +21,31 @@
 #define ERROR_LED_ON  sbi PORTD, ERROR_LED
 #define ERROR_LED_OFF cbi PORTD, ERROR_LED
 
-#define DISPLAY_ADDR %01111000
+#define DISPLAY_I2C_ADDR %01111000
+#define DISPLAY_WIDTH_IN_PIXEL 128
+#define DISPLAY_HEIGHT_IN_PIXEL 64
 
-#define SCREENBUFFER_SIZE 1024
+#define GLYPH_WIDTH_IN_BITS 8 
+#define GLYPH_HEIGHT_IN_BITS 8
+
+.equ GLYPH_WIDTH_IN_BYTES = GLYPH_WIDTH_IN_BITS/8
+.equ BYTES_PER_GLYPH = (GLYPH_WIDTH_IN_BITS*GLYPH_HEIGHT_IN_BITS)/8
+
+#define BYTES_PER_ROW DISPLAY_WIDTH_IN_PIXEL/8
+
+.equ FRAMEBUFFER_SIZE = (DISPLAY_WIDTH_IN_PIXEL*DISPLAY_HEIGHT_IN_PIXEL)/8
+; .equ FRAMEBUFFER_SIZE = 768
+; SSD1306 request types
+
+.equ REQ_SINGLE_COMMAND = 0x80
+.equ REQ_COMMAND_STREAM = 0x00
+.equ REQ_SINGLE_DATA = 0xc0
+.equ REQ_DATA_STREAM = 0x40
+
+; Display commands
+
+#define CMD_DISPLAY_ON 0
+#define CMD_ROW_ADDRESSING_MODE 1
 
 jmp init  ; RESET
 jmp onirq ; INT0 - ext IRQ 0
@@ -72,8 +89,8 @@ init:
 	out 0x3d,r28	; SPL = 0xff
 ; call main program
 again:
-	call main
-	call wait_for_button  
+	rcall main
+	rcall wait_for_button  
           rjmp again
 onirq:
 	jmp 0x00
@@ -81,24 +98,51 @@ onirq:
 ; main program starts here
 ; ==========================
 main:
-          call reset
+          rcall reset
           
-          call wait_for_button  
+          rcall wait_for_button  
           
-	call send_commands
+	ldi r16, CMD_ROW_ADDRESSING_MODE
+	rcall send_command
+          brcs error	
 
-          brcs error
+	ldi r16, CMD_DISPLAY_ON
+	rcall send_command
+          brcs error	
+
+	rcall clear_framebuffer
+
+; INPUT: r16 - character to write
+; INPUT: r17 - row (X)
+; INPUT: r18 - column (Y)
+	ldi r16,0
+	ldi r17,0
+	ldi r18,0
+	rcall write_char
+
+	ldi r16,0
+	ldi r17,1
+	ldi r18,1
+	rcall write_char
+
+	rcall send_framebuffer
+	brcs error
+
           SUCCESS_LED_ON
           ret
-error:          
+.error        
 	ERROR_LED_ON
-	ret
+
+          rcall wait_for_button  	
+	rjmp main
 ; ====
 ; reset bus
 ; =====
 reset:
-	sbi DDRD,CLK_PIN ; set to output
-	sbi DDRD,TX_PIN ; set to output
+;	cbi DDRD,DISPLAY_RESET_PIN ; set to input
+;          sbi PORTD,DISPLAY_RESET_PIN ; Enable pull-up resistor
+	sbi DDRD,DISPLAY_RESET_PIN ; set to output
+
 	sbi DDRD,ERROR_LED ; set to output
 	sbi DDRD,SUCCESS_LED ; set to output
 	cbi DDRB,TRIGGER_PIN ; set to input
@@ -110,52 +154,54 @@ reset:
           sts TWBR,r16 ; factor
           ERROR_LED_OFF
           SUCCESS_LED_OFF
-	CLK_HI 
-	DATA_HI
-	ret
+	rjmp reset_display
 
+; ======
+; Reset display
+; ======
+reset_display:
+	cbi PORTD, DISPLAY_RESET_PIN
+	ldi r18,255
+	rcall usleep  	
+	sbi PORTD, DISPLAY_RESET_PIN
+	ret
+	
 ; ======
 ; wait for button press 
 ; ======
 wait_for_button:
           ldi r18,255
           call usleep
-wait_released:
+.wait_released
           sbic PINB , TRIGGER_PIN
           rjmp wait_released
-wait_pressed:
+.wait_pressed
           sbis PINB , TRIGGER_PIN
           rjmp wait_pressed
+          ldi r18,255
+          call usleep
           ret
 
 ; ====
-; send commands
-; SCRATCHED: r16,r19:r18,r20,r31:r30
+; send command.
+; INPUT: r16 - command table entry index 
+; SCRATCHED: r2,r16,r19:r18,r20,r31:r30
 ; ====
 
-send_commands:
-          ldi r19 , HIGH(commands)
-          ldi r18 , LOW(commands)
-send_cmds_loop:
-          movw r31:r30,r19:r18 ; copy to Z
-          ldi r18, 5
-          call usleep
+send_command:
+          lsl r16 ; *4 => size of command table entries
+          lsl r16
+          ldi r31 , HIGH(commands)
+          ldi r30 , LOW(commands)
+	eor r2,r2
+          add r30,r16
+          adc r31,r2
           lpm r16,Z+ ; cmd address low
           lpm r17,Z+ ; cmd address hi
-          tst r16
-          brne cont
-          tst r17
-          breq all_cmds_send
-cont:
           lpm r28,Z+ ; LOW(number of bytes in cmd )
           lpm r29,Z+ ; HIGH(number of bytes in cmd )
-          movw r19:r18,r31:r30 ; r19:r18 = Z
-          movw r31:r30,r17:r16 ; Z = r17:r16
+          movw Z,r17:r16 ; Z = r17:r16
           call send_bytes
-          brcc send_cmds_loop
-	ret
-all_cmds_send:
-          clc ; success
           ret
           
 ; ====== send bytes
@@ -167,11 +213,46 @@ all_cmds_send:
 ; ======
 send_bytes:
 ; send START
+          rcall send_start
+	brcs send_failed
+.data_loop
+          lpm r16,Z+
+          rcall send_byte
+          brcs send_failed             
+          sbiw r29:r28,1
+          brne data_loop          
+; transmission successful
+	rcall send_stop       	
+          clc
+          ret
+.send_failed
+          rcall send_stop
+	sec
+	ret
+
+; =====
+; send stop
+; SCRATCHED: r16,r0,r1,r17,r27:r26
+; =============
+
+send_stop:
+	ldi r16, (1<<TWINT)|(1<<TWEN)| (1<<TWSTO) 
+	sts TWCR, r16
+          ldi r18,5
+          call usleep
+	ret
+
+; ===================
+;  Send Start command and slave address 
+; SCRATCHED: r16
+; ====================
+
+send_start:
+; send START
           ldi r16, (1<<TWINT)|(1<<TWSTA)|(1<<TWEN) 
           sts TWCR, r16
 ; wait for START transmitted
-
-wait_start: 
+.wait_start
           lds r16,TWCR
           sbrs r16,TWINT 
           rjmp wait_start
@@ -182,12 +263,12 @@ wait_start:
 	cpi r16, 0x08 ; 0x08 = status code: START transmitted 
 	brne send_failed
 ; transmit address (first byte)
-          ldi r16,DISPLAY_ADDR
+          ldi r16,DISPLAY_I2C_ADDR
           sts TWDR, r16 
           ldi r16, (1<<TWINT) | (1<<TWEN) 
           sts TWCR, r16
 ; wait for address transmission
-wait_adr: 
+.wait_adr
 	lds r16,TWCR
 	sbrs r16,TWINT 
 	rjmp wait_adr
@@ -196,12 +277,23 @@ wait_adr:
 	andi r16, 0xF8 
 	cpi r16, 0x18 ; 0x18 = status code: Adress transmitted,ACK received
 	brne send_failed
-data_loop:
-          lpm r16,Z+
+          clc
+	ret
+.send_failed
+	sec
+	ret
+
+; =========
+; send a single byte
+; INPUT: r16 - byte to send
+; SCRATCHED: r16
+; RETURN: Carry set = transmission error, carry clear = transmission ok
+; =========
+send_byte:
 	sts TWDR, r16 
 	ldi r16, (1<<TWINT) | (1<<TWEN) 
 	sts TWCR, r16                    
-wait_data:
+.wait_data
 	lds r16,TWCR 
 	sbrs r16,TWINT 
 	rjmp wait_data
@@ -210,33 +302,102 @@ wait_data:
 	andi r16, 0xF8 
 	cpi r16, 0x28 ; 0x28 = status code: data transmitted,ACK received 
 	brne send_failed
-          sbiw r29:r28,1
-          brne data_loop          
-; transmission successful
-end_transmission:
-	ldi r16, (1<<TWINT)|(1<<TWEN)| (1<<TWSTO) 
-	sts TWCR, r16         	
           clc
-          ret
-send_failed:
-	ldi r16, (1<<TWINT)|(1<<TWEN)| (1<<TWSTO) 
-	sts TWCR, r16   
+	ret
+.send_failed
+          sec
+	ret
+
+
+; ====== send full framebuffer
+; Assumption: CLK HI , DATA HI when method is entered
+; INPUT: r31:r30 (Z register) start address of bytes to transmit
+; INPUT: r29:r28 - number of bytes to transmit
+; SCRATCHED: r16,r20,r31:r30
+; RETURN: Carry clear => transmission successful , Carry set => Transmission failed
+; ======
+send_framebuffer:
+	rcall send_start
+          brcs error
+	ldi r16,REQ_DATA_STREAM
+	rcall send_byte
+	brcs error
+           ldi r31, HIGH(framebuffer) ;Z
+           ldi r30, LOW(framebuffer)
+           ldi r29, HIGH(FRAMEBUFFER_SIZE)
+           ldi r28, LOW(FRAMEBUFFER_SIZE)
+.loop	
+	ld r16,Z+
+           rcall send_byte
+	brcs error
+	sbiw r29:r28,1
+	brne loop
+	rcall send_stop
+	clc
+	ret
+.error
+	rcall send_stop
 	sec
 	ret
+
+; ========
+; write one ASCII glyph into the framebuffer
+; INPUT: r16 - character to write
+; INPUT: r17 - row (X)
+; INPUT: r18 - column (Y)
+; SCRATCHED: r16
+; =======
+write_char:
+; map ASCII code to glyph  
+	ldi r31,HIGH(charset_mapping)
+	ldi r30,LOW(charset_mapping)
+	add r30,r16
+	ldi r16,0
+          adc  r31,r16
+	lpm r0 , Z ; fetch glyph offset into charset ROM
+	ldi r16, BYTES_PER_GLYPH ; 8x8 pixel per glyph
+	mul r16,r0	 ; r1:r0 now hold offset of glyph in flash memory
+; add start address of charset ROM 
+	ldi r31,HIGH(charset)
+	ldi r30,LOW(charset)
+	add r30,r0
+	adc r31,r1
+; Z now holds start of glyph in font ROM
+	ldi r16, GLYPH_WIDTH_IN_BYTES
+	mul r17,r16 ;  X * GLYPH_WIDTH_IN_BYTES => r1:r0
+	movw r3:r2,r1:r0 ; backup result
+          ldi r16,BYTES_PER_ROW
+	mul r18,r16 ; Y * BYTES_PER_ROW => r1:r0
+	add r0,r2
+	adc r1,r3
+; r1:r0 now hold offset into framebuffer
+	ldi r29,HIGH(framebuffer)	
+	ldi r28,LOW(framebuffer)
+	add r28,r0
+	adc r29,r1
+; r29:r28 holds pointer into framebuffer where to write glyph data
+	ldi r16 , GLYPH_HEIGHT_IN_BITS ; write 8 bytes (TODO: Hard-coded glyph heigh)
+.row_loop
+	lpm r18,Z+
+	st r29:r28,r18
+	adiw r29:r28,BYTES_PER_ROW
+	dec r16
+	brne row_loop
+	ret
+	
 ; ======
 ; clears the screen buffer
-; SCRATCHED: r16, r27:r26 , r29:r28
+; SCRATCHED: r16, r29:r28, r31:r30
 ; ======
 
-clr_screen_buffer:
-           ldi r16,0
-           ldi r27, HIGH(screenbuffer)
-           ldi r26, LOW(screenbuffer)
-           ldi r29, HIGH(SCREENBUFFER_SIZE)
-           ldi r28, LOW(SCREENBUFFER_SIZE)
-
+clear_framebuffer:
+           ldi r16,0x00
+           ldi r31, HIGH(framebuffer) ; Z
+           ldi r30, LOW(framebuffer) ; Z
+           ldi r29, HIGH(FRAMEBUFFER_SIZE)
+           ldi r28, LOW(FRAMEBUFFER_SIZE)
 .clr_loop  
-           st x+, r16
+           st Z+, r16
            sbiw r29:r28,1
            brne clr_loop
            ret
@@ -260,13 +421,14 @@ usleep:
           mul r18 , r17 ; 1 cycle , result is in r1:r0     
           movw r27:r26 , r1:r0 ; 1 cycle
           sbiw r27:r26,14  ; 2 cycles , adjust for cycles spent invoking this method + preparation  
-usleep2:  sbiw r27:r26,4 ; 2 cycles , subtract 4 cycles per loop iteration      
-	brpl usleep2 ; 2 cycles, 1 cycle if branch not taken
-exit:
+.loop     sbiw r27:r26,4 ; 2 cycles , subtract 4 cycles per loop iteration      
+	brpl loop ; 2 cycles, 1 cycle if branch not taken
 	ret ; 4 cycles
 
-commands:  .dw cmd1,2,0,0  
-cmd1:     .db 0x80,0xaf
+commands: .dw cmd1,2
+          .dw cmd2,3
+cmd1:     .db REQ_SINGLE_COMMAND,0xaf ; switch display on
+cmd2:     .db REQ_COMMAND_STREAM,0x20, %00 ; set horizontal addressing mode
 
 charset:
     .db 0x3c,0x66,0x6e,0x6e,0x60,0x62,0x3c,0x00 ; '@'
@@ -331,7 +493,7 @@ charset:
     .db 0x70,0x18,0x0c,0x06,0x0c,0x18,0x70,0x00 ; '>'
     .db 0x3c,0x66,0x06,0x0c,0x18,0x00,0x18,0x00 ; '?' 
 charset_mapping:
-    .db 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+    .db 0x65,0x00,0x00,0x00,0x00,0x00,0x00,0x00
     .db 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
     .db 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
     .db 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
@@ -365,5 +527,6 @@ charset_mapping:
     .db 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
 
 .dseg 
-screenbuffer:
+     .byte 0x100 ; TODO: hack to skip register file
+framebuffer:
     .byte 1024

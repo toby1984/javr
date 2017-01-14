@@ -790,6 +790,14 @@ public abstract class AbstractAchitecture implements IArchitecture
         } 
         else if ( node instanceof RegisterNode) 
         {
+            if ( type == ArgumentType.SIX_BIT_CONSTANT ) {
+                return fail("Instruction requires a 6-bit operand",node,context);
+            }
+            // SIXTEEN_BIT_SRAM_MEM_ADDRESS
+            if ( type == ArgumentType.SIXTEEN_BIT_SRAM_MEM_ADDRESS ) {
+                return fail("Instruction requires a 16-bit SRAM address",node,context);
+            }
+            
             result = getRegisterValue( (RegisterNode) node , type , context );
             if ( result == -1 ) { // something went wrong...
                 return fail("Failed to get register value from ",node,context);

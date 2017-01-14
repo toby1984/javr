@@ -456,6 +456,12 @@ public class ATMega88 extends AbstractAchitecture
     }
     
     @Override
+    public int getSRAMStartAddress() 
+    {
+        return 0x100;
+    }
+    
+    @Override
     protected boolean isValidFlashAdress(int byteAddress) 
     {
         return byteAddress >= 0 && byteAddress < getSegmentSize(Segment.FLASH);
