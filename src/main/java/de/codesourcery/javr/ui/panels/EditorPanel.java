@@ -1369,6 +1369,8 @@ public class EditorPanel extends JPanel
 		if ( message.region != null && 0 <= message.region.start() && message.region.start() < len ) 
 		{
 			editor.setCaretPosition( message.region.start() );
+			editor.setSelectionStart( message.region.start() );
+			editor.setSelectionEnd( message.region.end() );
 			editor.requestFocus();
 		} else {
 			System.err.println("Index "+message.region+" is out of range, cannot set caret");

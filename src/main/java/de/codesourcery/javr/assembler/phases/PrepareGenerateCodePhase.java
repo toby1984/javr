@@ -15,6 +15,8 @@
  */
 package de.codesourcery.javr.assembler.phases;
 
+import java.util.List;
+
 import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
@@ -127,15 +129,6 @@ public class PrepareGenerateCodePhase extends GenerateCodePhase
         };
         ast.visitBreadthFirst(labelVisitor);
         
-        // sanity check
-        context.globalSymbolTable().getAllSymbolsUnsorted().stream().filter( Symbol::isUnresolved ).forEach( symbol -> 
-        {
-            if ( ! symbol.hasType( Type.PREPROCESSOR_MACRO ) ) // preprocessor macros/defines are special since "#define something" is a valid statement and needs no value/body
-            {
-                context.error("Unresolved symbol '"+symbol.name()+"'",symbol.getNode());
-            }
-        });   
-        
         // now try again resolving any IValueNode instances
         // that do not yield a value yet
         // This is necessary to deal with function nodes that had
@@ -155,6 +148,22 @@ public class PrepareGenerateCodePhase extends GenerateCodePhase
         {
             final StatementNode stmt = (StatementNode) child;
             stmt.visitDepthFirst(visitor);
-        }        
+        }   
+        
+        // Check for unresolved symbols
+        final IASTVisitor unresolvedSymbolsVisitor = (node,ictx) -> 
+        {
+            if ( node instanceof IdentifierNode)
+            {
+                final IdentifierNode ln = (IdentifierNode) node;
+                if ( ln.getValue() == null ) 
+                {
+                    if ( ! context.error("Unresolved symbol '"+ln.name+"'' with symbol "+ln.getSymbol(),node) ) {
+                        ictx.stop();
+                    }                    
+                }
+            }
+        };
+        ast.visitBreadthFirst( unresolvedSymbolsVisitor );
     }
 }
