@@ -1077,6 +1077,7 @@ public class EditorPanel extends JPanel
 		// try to parse only this compilation unit
 		// to get an AST suitable for syntax highlighting
         astTreeModel.setAST( new AST() );
+        final long parseStart =  System.currentTimeMillis();
 		try 
 		{
 		    final CompilerSettings compilerSettings = new CompilerSettings();
@@ -1089,18 +1090,18 @@ public class EditorPanel extends JPanel
 		}
         astTreeModel.setAST( currentUnit.getAST() );
 
+        final long parseEnd =  System.currentTimeMillis();
         doSyntaxHighlighting();
         
+        final long highlightEnd =  System.currentTimeMillis();
 		// assemble
 		final CompilationUnit root = project.getCompileRoot();
 
-		long assembleTime = 0;
 		boolean compilationSuccessful = false;
 		try 
 		{
-			final long start = System.currentTimeMillis();
 			compilationSuccessful = project.compile();
-			assembleTime = System.currentTimeMillis() -start;
+
 		} 
 		catch(Exception e) 
 		{
@@ -1108,19 +1109,23 @@ public class EditorPanel extends JPanel
 			root.addMessage( toCompilationMessage( currentUnit, e ) );
 		}
 		symbolModel.setSymbolTable( currentUnit.getSymbolTable() );    
-		final List<CompilationMessage> allMessages = root.getMessages(true);
-        messageFrame.addAll( allMessages );        
 
-		final float seconds = assembleTime/1000f;
-		final DecimalFormat DF = new DecimalFormat("#######0.0#");
-		final String time = "Time: "+ assembleTime +" ms ";
-
-		currentUnit.addMessage( CompilationMessage.info(currentUnit,time) );
-
+		final long compileEnd =  System.currentTimeMillis();
+		
 		final String success = compilationSuccessful ? "successful" : "failed"; 
 		final DateTimeFormatter df = DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss");
-		currentUnit.addMessage( CompilationMessage.info(currentUnit,"Compilation "+success+" ("+assembleTime+" millis) on "+df.format( ZonedDateTime.now() ) ) );
 		
+		final long parseTime = parseEnd - parseStart;
+		final long highlightTime = highlightEnd - parseEnd;
+		final long compileTime = compileEnd - highlightEnd;
+		
+		final String assembleTime = "parsing: "+parseTime+" ms,highlighting: "+highlightTime+" ms,compile: "+compileTime+" ms";
+		
+		currentUnit.addMessage( CompilationMessage.info(currentUnit,"Compilation "+success+" ("+assembleTime+") on "+df.format( ZonedDateTime.now() ) ) );
+
+        final List<CompilationMessage> allMessages = root.getMessages(true);
+        messageFrame.addAll( allMessages );        
+        
         wasCompiledAtLeastOnce = true;
         if ( ! afterCompilation.isEmpty() ) 
         {
@@ -1134,7 +1139,7 @@ public class EditorPanel extends JPanel
             afterCompilation.clear();
         }
 	}
-
+	
 	private static CompilationMessage toCompilationMessage(CompilationUnit unit,Exception e)
 	{
 		if ( e instanceof ParseException ) {
