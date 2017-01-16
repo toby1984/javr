@@ -96,8 +96,7 @@ init:
 	out 0x3e,r29	; SPH = 0x08
 	out 0x3d,r28	; SPL = 0xff
 ; call main program
-again:
-	rcall main
+.again	rcall main
 	rcall wait_for_button  
           rjmp again
 onirq:
@@ -120,11 +119,20 @@ main:
 
 	rcall clear_framebuffer
 
-	ldi r16,169
+	ldi r16,0xff
+	mov r5,r16
+.print_loop
+	mov r16,r5
 	rcall write_dec
 
 	rcall send_framebuffer
 	brcs error
+
+	ldi r16,32
+	rcall msleep
+
+	dec r5
+	brne print_loop
 
           SUCCESS_LED_ON
           ret
@@ -133,6 +141,7 @@ main:
 
           rcall wait_for_button  	
 	rjmp main
+
 ; ====
 ; reset bus
 ; =====
@@ -144,12 +153,14 @@ reset:
 	sbi DDRD,ERROR_LED ; set to output
 	sbi DDRD,SUCCESS_LED ; set to output
 	cbi DDRB,TRIGGER_PIN ; set to input
-;          setup TWI rate 
+
+;          setup TWI rate to 100kHz
           lds r16,TWSR
           andi r16,%11111100
           sts TWSR,r16 ; prescaler bits = 00 => factor 1x
           ldi r16,72
           sts TWBR,r16 ; factor
+
           ERROR_LED_OFF
           SUCCESS_LED_OFF
 
@@ -159,9 +170,11 @@ reset:
 	sts cursorx,r16
 	sts cursory,r16
 
-	ldi r16,198
+	ldi r16,255
 	rcall msleep
 
+	ldi r16,255
+	rcall msleep
 	ret
 
 ; ======
@@ -169,7 +182,7 @@ reset:
 ; ======
 reset_display:
 	cbi PORTD, DISPLAY_RESET_PIN
-	ldi r16,1
+	ldi r16,10
 	rcall msleep
 	sbi PORTD, DISPLAY_RESET_PIN
 	ret
@@ -244,9 +257,9 @@ send_bytes:
 ; =============
 
 send_stop:
-	ldi r16, (1<<TWINT)|(1<<TWEN)| (1<<TWSTO) 
-	sts TWCR, r16
-	ldi r16,1
+	ldi r16, (1<<TWINT)|(1<<TWEN)| (1<<TWSTO) ; 1 cycle
+	sts TWCR, r16 ; 2 cycles
+	ldi r16,5 ; 1 cycle
 	rcall msleep
 	ret
 
@@ -317,9 +330,6 @@ send_byte:
 	ret
 
 ; ====== send full framebuffer
-; Assumption: CLK HI , DATA HI when method is entered
-; INPUT: r31:r30 (Z register) start address of bytes to transmit
-; INPUT: r29:r28 - number of bytes to transmit
 ; SCRATCHED: r16,r17,r20,r27:r26,r29:r28,r31:r30
 ; RETURN: Carry clear => transmission successful , Carry set => Transmission failed
 ; ======
@@ -340,12 +350,13 @@ send_framebuffer:
 	ldi r17,0 ; X byte offset (0 ... BYTES_IN_ROW)
 	ldi r18,0 ; page no.
 	ldi r19,128 ; mask that extracts bit from byte designated by r17 that should go into the data byte
+; 1390 
 .loop
-	rcall read_column
-	rcall send_byte
-	brcs error
-	lsr r19
-	brne loop
+	rcall read_column ; 3 cycles
+	rcall send_byte ; 3 cycles
+	brcs error ; 1 cycle
+	lsr r19 ; 1 cycle
+	brne loop ; 2 clies
 	ldi r19,128	
 	inc r17 ; byteOffset += 1
 	cpi r17,BYTES_PER_ROW
@@ -353,8 +364,7 @@ send_framebuffer:
 	ldi r17,0 ; reset byte offset
 	inc r18 ; page no += 1
 	cpi r18,8
-	brne loop
-	
+	brne loop	
 	rcall send_stop
 	clc
 	ret
@@ -467,6 +477,7 @@ div10:
 .end	
 	ret
 
+
 ; =======
 ; write string from flash memory
 ; INPUT: r27:r26 - String to print (FLASH)
@@ -525,10 +536,13 @@ internal_write_string:
 	brne next
 .newline
 	ldi r19,0 ; x = 0
+	cpi r20,7
+	brne cont
+	rcall scroll_up
+	rjmp next
+.cont
 	inc r20 ; y = y + 1
-	cpi r20,8
-	brne next
-; TODO: Scroll screen up one row
+	rjmp next
 .end
 	ret
 	
@@ -580,7 +594,50 @@ write_char:
 	dec r16
 	brne row_loop
 	ret
-	
+
+; ============
+; scroll up one line
+; SCRATCHED: r16
+; ============
+scroll_up:
+	push r26
+	push r27
+	push r28
+	push r29
+	push r30
+	push r31
+
+	ldi r27 , HIGH(FRAMEBUFFER_SIZE-128) ; X
+	ldi r26 , LOW(FRAMEBUFFER_SIZE-128)
+	ldi r29, HIGH(framebuffer) ; Y
+          	ldi r28, LOW(framebuffer) ; Y
+
+	ldi r31, HIGH(framebuffer+128) ; Z
+          ldi r30, LOW(framebuffer+128) ; Z
+
+.loop
+	ld r16,Z+
+	st Y+,r16
+	sbiw r27:r26,1
+	brne loop
+
+; clear last line
+	ldi r31, HIGH(framebuffer+7*8*BYTES_PER_ROW) ; Z
+          ldi r30, LOW(framebuffer+7*8*BYTES_PER_ROW) ; Z
+	ldi r27 , HIGH(BYTES_PER_ROW*8) ; X
+	ldi r26 , LOW(BYTES_PER_ROW*8)	
+	ldi r16,0x00
+.clrloop
+	st Z+,r16
+	sbiw r27:r26,1
+	brne clrloop
+	pop r31
+	pop r30
+	pop r29
+	pop r28
+	pop r27
+	pop r26
+	ret
 ; ======
 ; clears the screen buffer
 ; SCRATCHED: r16, r29:r28, r31:r30
@@ -757,7 +814,7 @@ charset_mapping:
     .db 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
 .dseg 
      .byte 0x100 ; TODO: hack to skip CPU register file
-framebuffer: .byte 1024
 cursorx: .byte 1
 cursory: .byte 1
+framebuffer: .byte 1024
 stringbuffer: .byte 4

@@ -38,7 +38,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.text.DecimalFormat;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -47,7 +46,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -782,6 +780,7 @@ public class EditorPanel extends JPanel
 		this.currentUnit = unit;
 		this.topLevelWindow = topLevelWindow;
 
+		editor.setFont( new Font(Font.MONOSPACED, Font.PLAIN, 12) );
 		editor.addCaretListener( new CaretListener() 
 		{
             @Override

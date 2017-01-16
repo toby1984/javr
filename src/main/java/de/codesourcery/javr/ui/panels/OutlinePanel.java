@@ -136,7 +136,7 @@ public class OutlinePanel extends JPanel
 	}
 	
 	public void setPattern(String pat) {
-		this.pattern = pat;
+		this.pattern = pat == null ? null : pat.toLowerCase();
 		modelChanged();
 	}
 	
