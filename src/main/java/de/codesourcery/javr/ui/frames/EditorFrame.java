@@ -47,6 +47,7 @@ public class EditorFrame extends JInternalFrame implements IWindow
 	    this.appConfigProvider = appConfigProvider;
 	    
 		tabbedPane = new JTabbedPane();
+		 
 		openEditor( project , compUnit );
 		
 		messageFrame.setDoubleClickListener( this::gotoMessage );
@@ -92,8 +93,7 @@ public class EditorFrame extends JInternalFrame implements IWindow
 	public EditorPanel openEditor(IProject project,CompilationUnit unit) throws IOException 
 	{
 	    Optional<EditorPanel> existing = editors.stream().filter( editor -> editor.getProject().equals( project ) && 
-	                                                                    editor.getCompilationUnit().hasSameResourceAs( unit ) ).findFirst();
-	    
+	                                                                    editor.getCompilationUnit().hasSameResourceAs( unit ) ).findFirst();	
 	    if ( ! existing.isPresent() ) {
 	        existing = Optional.of( addEditor(project,unit ) );
 	    }

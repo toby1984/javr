@@ -31,6 +31,15 @@ public interface IProject extends ResourceFactory,IConfigProvider
 {
     public static final String PROJECT_FILE = ".javr_project.properties";
     
+    public interface IProjectChangeListener 
+    {
+    	public default void compilationFinished(IProject project,boolean sucess) {}
+    	
+    	public default void unitAdded(Project project,CompilationUnit newUnit) {}
+    	
+    	public default void unitRemoved(Project project,CompilationUnit newUnit) {}   	
+    }
+    
     public IArchitecture getArchitecture();
     
     public IObjectCodeWriter getObjectCodeWriter();
@@ -54,4 +63,8 @@ public interface IProject extends ResourceFactory,IConfigProvider
     public SymbolTable getGlobalSymbolTable();
 
 	public void removeCompilationUnit(CompilationUnit newUnit);
+	
+	public void addProjectChangeListener(IProjectChangeListener listener);
+	
+	public void removeProjectChangeListener(IProjectChangeListener listener);
 }

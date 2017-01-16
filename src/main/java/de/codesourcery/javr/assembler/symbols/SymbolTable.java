@@ -76,6 +76,28 @@ public class SymbolTable
         return parent != null;
     }
     
+    public boolean isEmpty() {
+    	return symbols.isEmpty();
+    }
+    
+    public int size() {
+    	return symbols.size();
+    }
+    
+    /**
+     * Walks the symbol table hierarchy upwards, returning the top-level symbol table.
+     * 
+     * @return
+     */
+    public SymbolTable getTopLevelTable() 
+    {
+    	SymbolTable result = this;
+    	while ( result.hasParent() ) {
+    		result = result.getParent();
+    	}
+    	return result;
+    }
+    
     public void clear() {
     	this.symbols.clear();
     }

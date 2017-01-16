@@ -233,11 +233,7 @@ public class EditorPanel extends JPanel
 	        Symbol result = node.getSymbol();
 	        if ( result == null ) 
 	        {
-	            SymbolTable table = currentUnit.getSymbolTable();
-	            while ( table.hasParent() ) 
-	            {
-	                table = table.getParent();
-	            }
+	            final SymbolTable table = currentUnit.getSymbolTable().getTopLevelTable();
 	            result = table.maybeGet( node.name ).orElse( null );
 	            if ( result == null ) 
 	            { 
@@ -965,18 +961,21 @@ public class EditorPanel extends JPanel
 			@Override public void insertUpdate(DocumentEvent e) 
 			{
 				if ( ! ignoreEditEvents ) {
+					lastEditLocation = e.getOffset();
 					recompilationThread.documentChanged(e);
 				}
 			}
 			@Override public void removeUpdate(DocumentEvent e) 
 			{ 
 				if ( ! ignoreEditEvents ) {
+					lastEditLocation = e.getOffset();
 					recompilationThread.documentChanged(e); 
 				}
 			}
 			@Override public void changedUpdate(DocumentEvent e) 
 			{ 
 				if ( ! ignoreEditEvents ) {
+					lastEditLocation = e.getOffset();
 					recompilationThread.documentChanged(e);
 				}
 			}
@@ -1011,13 +1010,32 @@ public class EditorPanel extends JPanel
 
 		result.add( button("Compile" , ev -> this.compile() ) );
 		result.add( button("AST" , ev -> this.toggleASTWindow() ) );
+		result.add( button("Goto last edit" , ev -> this.gotoLastEditLocation() ) );
 		result.add( button("Symbols" , ev -> this.toggleSymbolTableWindow() ) );
 		result.add( button("Upload to uC" , ev -> this.uploadToController() ) );
+		
 		result.add( new JLabel("Cursor pos:" ) );
 		result.add( cursorPositionLabel );
 		return result;
 	}
 
+	private int lastEditLocation = -1;
+	
+	private void gotoLastEditLocation() 
+	{
+		if ( lastEditLocation != -1 ) 
+		{
+	        runAfterCompilation( () -> 
+	        {
+	        	if ( lastEditLocation != -1 ) 
+	        	{
+	        		editor.setCaretPosition( lastEditLocation ); 
+	        		editor.requestFocus();
+	        	}
+	        });
+		}
+	}
+	
 	private void uploadToController() 
 	{
 		if ( project.canUploadToController() ) 
@@ -1543,6 +1561,8 @@ public class EditorPanel extends JPanel
 		final byte[] data = out.toByteArray();
 		final String source = new String(data, unit.getResource().getEncoding() );
 
+		lastEditLocation = -1;
+		
 		editor.setDocument( createDocument() );
 		editor.setText( source );
 		editor.setCaretPosition( 0 );
@@ -1561,6 +1581,7 @@ public class EditorPanel extends JPanel
 	
 	public boolean close(boolean askIfDirty) 
 	{
+		lastEditLocation = -1;
 		setVisible( false );
 		final Container parent = getParent();
 		parent.remove( this );

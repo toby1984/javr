@@ -74,8 +74,6 @@ public class Project implements IProject
 
     private ProjectConfiguration projectConfig = new ProjectConfiguration();
     
-    private final List<IProjectChangedListener> listeners = new ArrayList<>();
-
     private final ObjectCodeWriter writerDelegate = new ObjectCodeWriter();
     private final IObjectCodeWriter objWriter = new ObjectCodeWriterWrapper( writerDelegate ) 
     {
@@ -215,7 +213,7 @@ public class Project implements IProject
     {
     	System.out.println("Adding new compilation unit: "+unit);
         units.add( unit );
-		invokeProjectChangedListeners( l -> l.unitAdded( this , unit ) ) ;   
+		invokeProjectListeners( l -> l.unitAdded( this , unit ) ) ;   
 		return unit;
     }
 
@@ -303,16 +301,22 @@ public class Project implements IProject
     }
 
     @Override
-    public boolean compile() throws IOException {
-        
-        compilationSuccess  = false;
-        artifactsGenerated = false;
-        
-        final Assembler asm = new Assembler();
-        compilationSuccess = asm.compile(  this , getObjectCodeWriter() , projectConfig , this );
-        return compilationSuccess;
+    public boolean compile() throws IOException 
+    {
+    	try 
+    	{
+	        compilationSuccess  = false;
+	        artifactsGenerated = false;
+	        
+	        final Assembler asm = new Assembler();
+	        compilationSuccess = asm.compile(  this , getObjectCodeWriter() , projectConfig , this );
+	        return compilationSuccess;
+    	} 
+    	finally {
+    		invokeProjectListeners( l -> l.compilationFinished( Project.this , compilationSuccess ) );
+    	}
     }
-
+    
     @Override
     public IConfig getConfig()
     {
@@ -384,22 +388,33 @@ public class Project implements IProject
 	public void removeCompilationUnit(CompilationUnit unit) 
 	{
 		if ( this.units.remove( unit ) ) {
-			invokeProjectChangedListeners( l -> l.unitRemoved( this , unit ) ) ;
+			invokeProjectListeners( l -> l.unitRemoved( this , unit ) ) ;
 		}
 	}
 	
-	private void invokeProjectChangedListeners(Consumer<IProjectChangedListener> invoker) 
-	{
-		this.listeners.forEach( invoker::accept );
+	private final List<IProjectChangeListener> projectListeners = new ArrayList<>();
+
+	@Override
+	public void addProjectChangeListener(IProjectChangeListener listener) {
+		Validate.notNull(listener, "listener must not be NULL");
+		projectListeners.add(listener);
 	}
-	
-	public void addProjectChangedListener(IProjectChangedListener l) 
-	{
-		this.listeners.add(l);
-	}
-	
-	public void removeProjectChangedListener(IProjectChangedListener l) 
-	{
-		this.listeners.remove(l);
+
+    private void invokeProjectListeners(Consumer<IProjectChangeListener> callback) 
+    {
+		projectListeners.forEach( l -> 
+		{
+			try {
+				callback.accept( l );
+			} catch(Exception e) {
+				LOG.error("invokeProjectListeners(): Failed to invoke "+callback,e);
+			}
+		});
+    }
+    
+	@Override
+	public void removeProjectChangeListener(IProjectChangeListener listener) {
+		Validate.notNull(listener, "listener must not be NULL");
+		projectListeners.remove(listener);		
 	}	
 }

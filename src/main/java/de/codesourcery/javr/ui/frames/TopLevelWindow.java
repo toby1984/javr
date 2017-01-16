@@ -58,6 +58,7 @@ import de.codesourcery.javr.ui.ProjectConfigWindow;
 import de.codesourcery.javr.ui.config.IApplicationConfig;
 import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
 import de.codesourcery.javr.ui.config.ProjectConfiguration;
+import de.codesourcery.javr.ui.panels.EditorPanel;
 import de.codesourcery.javr.ui.panels.FileSystemBrowser.DirNode;
 
 public class TopLevelWindow implements IWindow
@@ -73,6 +74,7 @@ public class TopLevelWindow implements IWindow
     private final JDesktopPane desktopPane = new JDesktopPane();
     private final JFrame topLevelFrame = new JFrame();
     private final MessageFrame messageFrame = new MessageFrame("Messages");
+    private final OutlineFrame outlineFrame = new OutlineFrame();
     
     private File lastOpenedProject = new File("/home/tobi/atmel/asm/testproject.properties");
     private File lastDisassembledFile = new File("/home/tobi/atmel/asm/random.raw");
@@ -86,12 +88,22 @@ public class TopLevelWindow implements IWindow
         
         addWindows( desktopPane );
         
+        outlineFrame.setDoubleClickListener( symbol -> 
+        {
+        	try 
+        	{
+				final EditorPanel editor = editorFrame.openEditor( project , symbol.getCompilationUnit() );
+				editor.setSelection( symbol.getTextRegion() );
+			} catch (IOException e1) {
+				LOG.error("Failed to open compilation unit for symbol "+symbol,e1);
+			}
+        });
+        
         topLevelFrame.setJMenuBar( createMenu(topLevelFrame) );
         topLevelFrame.setDefaultCloseOperation( JFrame.DISPOSE_ON_CLOSE );
         
         topLevelFrame.addWindowListener( new WindowAdapter() 
         {
-            
             @Override
             public void windowClosing(WindowEvent e) 
             {
@@ -111,6 +123,10 @@ public class TopLevelWindow implements IWindow
         applicationConfigProvider.getApplicationConfig().apply( editorFrame );
         applicationConfigProvider.getApplicationConfig().apply( messageFrame );
         applicationConfigProvider.getApplicationConfig().apply( navigator );           
+        applicationConfigProvider.getApplicationConfig().apply( outlineFrame );        
+        
+        project.addProjectChangeListener( outlineFrame );
+        outlineFrame.setCompilationUnit( project.getCompileRoot() );
     }
     
     public void quit() 
@@ -122,6 +138,7 @@ public class TopLevelWindow implements IWindow
             config.save( editorFrame );
             config.save( navigator );
             config.save( messageFrame );
+            config.save( outlineFrame);
             config.save( TopLevelWindow.this );
             applicationConfigProvider.setApplicationConfig( config );
             try {
@@ -173,6 +190,7 @@ public class TopLevelWindow implements IWindow
         editorFrame = new EditorFrame( project , project.getCompileRoot() , applicationConfigProvider, messageFrame );
         addWindow(pane,messageFrame);
         addWindow(pane,editorFrame);
+        addWindow(pane,outlineFrame);
         navigator = new NavigatorFrame( project.getConfiguration().getBaseDir() );
         
         navigator.setMenuSupplier( dirNode -> 
