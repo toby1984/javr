@@ -20,17 +20,12 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.geom.Rectangle2D;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Consumer;
 
 import javax.swing.JInternalFrame;
@@ -39,7 +34,6 @@ import javax.swing.JTable;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.DefaultTableCellRenderer;
-import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableModel;
 
@@ -203,7 +197,7 @@ public class MessageFrame extends JInternalFrame implements IWindow
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) 
             {
                 final Component result = super.getTableCellRendererComponent(errorTable, value, isSelected, hasFocus, row, column);
-                if ( column == 1 ) {
+                if ( column == 2 ) {
                 	final CompilationMessage msg = messageModel.getRow( row );            	
                     switch ( msg.severity ) 
                     {
