@@ -50,6 +50,8 @@
 .equ REQ_SINGLE_DATA = 0xc0
 .equ REQ_DATA_STREAM = 0x40
 
+.equ RAM_END = 32768
+
 ; Display commands
 
 #define CMD_DISPLAY_ON 0
@@ -91,10 +93,10 @@ init:
 	eor r1,r1
 	out 0x3f,r1
 ; initialize stack pointer
-	ldi r28,0xff
-	ldi r29,0x08
-	out 0x3e,r29	; SPH = 0x08
-	out 0x3d,r28	; SPL = 0xff
+	ldi r28,LOW(RAM_END)
+	ldi r29,HIGH(RAM_END)
+	out 0x3d,r28	; SPL 
+	out 0x3e,r29	; SPH
 ; call main program
 .again	rcall main
 	rcall wait_for_button  
@@ -132,12 +134,11 @@ main:
 	brne print_loop
 
           SUCCESS_LED_ON
-          ret
+          rjmp back
 .error        
 	ERROR_LED_ON
-
-          rcall wait_for_button  	
-	rjmp main
+.back	rcall wait_for_button  
+	ret
 
 ; ====
 ; reset bus
@@ -237,13 +238,10 @@ send_bytes:
           sbiw r29:r28,1
           brne data_loop          
 ; transmission successful
-	rcall send_stop       	
           clc
-          ret
 .send_failed
-          rcall send_stop
-	sec
-	ret
+	rcall send_stop       	
+          ret
 
 ; =====
 ; send stop
@@ -347,14 +345,10 @@ send_framebuffer:
 	brcs error
 	sbiw r29:r28,1
 	brne loop
-
-	rcall send_stop
 	clc
+.error	rcall send_stop
 	ret
-.error
-	rcall send_stop
-	sec
-	ret
+
 ; ========
 ; Write decimal number
 ; INPUT: r16 - number to write
@@ -755,6 +749,7 @@ charset_mapping:
     .db 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
     .db 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
     .db 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
+
 .dseg 
 cursorx: .byte 1
 cursory: .byte 1
