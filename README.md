@@ -29,7 +29,7 @@ java -jar target/javr.jar
 Note that for reasons unknown to me the AVR assembler duplicates a lot of preprocessor instructions as assembler directives ... I'm currently only implementing the preprocessor instructions
 
 - full ATmega88 instruction set
-- local labels ( watch out, not working properly when used in macros) 
+- local labels ( watch out, currently not working properly when used in macros) 
   - Just write '.myLabel' instead of 'myLabel:' when declaring them ; referencing local labels works just like with global labels so no 'b' or 'f' suffixes are needed. Note that its illegal to declare a local label that has the same identifier as a global label ; otherwise I would've needed to use the ugly 'b'/'f' suffix solution to resolve the ambiguity)  
 - Expression correctly handles nested expressions and operator precedence for the following operators: 
   - arithmetic operators: -(unary+binary),+,/,*
@@ -66,7 +66,6 @@ Note that for reasons unknown to me the AVR assembler duplicates a lot of prepro
 
 - Syntax coloring is off when using MSDOS-style line endings (won't fix this since it is related to the fact that Swing text components internally convert all EOL sequences to '\n' but my parser uses the 'true' text offsets)
 - parsing #define is currently broken when trying to #define stuff like (a+b)/c (gets irritated by the leading parens)
-- SRAM address calculations do not consider the I/O mapped area at the start of SRAM
 - parsing string literals currently swallows whitespace (0x20) chars
 
 ## To do
