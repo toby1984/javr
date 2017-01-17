@@ -127,7 +127,7 @@ import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
 import de.codesourcery.javr.ui.EditorSettings.SourceElement;
 import de.codesourcery.javr.ui.IProject;
-import de.codesourcery.javr.ui.Main;
+import de.codesourcery.javr.ui.IDEMain;
 import de.codesourcery.javr.ui.config.IApplicationConfig;
 import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
 import de.codesourcery.javr.ui.frames.EditorFrame;
@@ -845,7 +845,7 @@ public class EditorPanel extends JPanel
 						} 
 						catch (IOException e1) 
 						{
-							Main.fail(e1);
+							IDEMain.fail(e1);
 						}
 					} else if ( e.getKeyChar() == 0x1a && undoStackPtr > 0 ) { // CTRL-Z
 						final UndoableEdit edit = undoStack.get( --undoStackPtr );
@@ -1046,7 +1046,7 @@ public class EditorPanel extends JPanel
 			catch(Exception e) 
 			{
 				LOG.error("UPLOAD failed",e);
-				Main.fail("Upload failed",e);
+				IDEMain.fail("Upload failed",e);
 			} 
 		}
 		else 
@@ -1094,18 +1094,25 @@ public class EditorPanel extends JPanel
 		// try to parse only this compilation unit
 		// to get an AST suitable for syntax highlighting
         astTreeModel.setAST( new AST() );
+        
+        // do not use the current unit directly as this will break because
+        // all the symbols are already defined
+        final CompilationUnit tmpUnit = new CompilationUnit( currentUnit.getResource() );
+        
         final long parseStart =  System.currentTimeMillis();
 		try 
 		{
 		    final CompilerSettings compilerSettings = new CompilerSettings();
 		    final IObjectCodeWriter writer = new ObjectCodeWriter();
-            final ICompilationContext context = new CompilationContext( project , writer , project , compilerSettings , project.getConfig() );
-            ParseSourcePhase.parseWithoutIncludes( context, currentUnit , project );
+            final SymbolTable globalSymbolTable = new SymbolTable( SymbolTable.GLOBAL ); // fake global symbol table so we don't fail parsing because of duplicate symbols
+			final ICompilationContext context = new CompilationContext( tmpUnit , globalSymbolTable , writer , project , compilerSettings , project.getConfig() );
+
+            ParseSourcePhase.parseWithoutIncludes( context, tmpUnit , project );
 		} 
 		catch(Exception e) {
 		    LOG.error("Parsing source failed",e);
 		}
-        astTreeModel.setAST( currentUnit.getAST() );
+        astTreeModel.setAST( tmpUnit.getAST() );
 
         final long parseEnd =  System.currentTimeMillis();
         doSyntaxHighlighting();

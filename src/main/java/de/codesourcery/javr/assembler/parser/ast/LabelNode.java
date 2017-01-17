@@ -65,7 +65,6 @@ public class LabelNode extends AbstractASTNode implements Resolvable
     @Override
     public boolean resolve(ICompilationContext context) 
     {
-        System.out.println("Symbol: "+symbol+" resolves to address "+context.currentAddress());
         symbol.setValue( context.currentAddress() );
         return true;
     }

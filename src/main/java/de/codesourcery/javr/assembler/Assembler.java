@@ -51,8 +51,8 @@ public class Assembler
         project.getGlobalSymbolTable().clear();
         unit.beforeCompilationStarts( project.getGlobalSymbolTable() );
 
-        this.compilationContext = new CompilationContext( project , codeWriter , rf , compilerSettings , config.getConfig() );
-
+        this.compilationContext = new CompilationContext( unit , project.getGlobalSymbolTable() , codeWriter , rf , compilerSettings , config.getConfig() );
+        
         final List<Phase> phases = new ArrayList<>();
         phases.add( new ParseSourcePhase(config) );
         phases.add( new SyntaxCheckPhase() );
@@ -63,6 +63,7 @@ public class Assembler
 
         LOG.info("assemble(): Now compiling "+unit);
 
+        final StringBuilder debugOutput = new StringBuilder(); 
         boolean success = false;
         try 
         {
@@ -71,17 +72,30 @@ public class Assembler
                 LOG.debug("Assembler phase: "+phase);
                 compilationContext.beforePhase();
 
+                final long start = System.currentTimeMillis();
                 boolean hasErrors;
                 try 
                 {
                     phase.beforeRun( compilationContext );
 
+                    final long timeAtPhaseStart = System.currentTimeMillis();
                     phase.run( compilationContext );
+                    final long timeAfterPhaseStart = System.currentTimeMillis();
 
                     hasErrors = unit.hasErrors(true);
                     if ( ! hasErrors ) {
                         phase.afterSuccessfulRun( compilationContext );
                     } 
+                    final long timeAfterRun = System.currentTimeMillis();
+                    
+                    final String msg = "**** Phase "+phase+" ****\n"+
+                    		     "Preparation   : "+(timeAtPhaseStart-start)+" ms\n"+
+                    		     "Runtime       : "+(timeAfterPhaseStart-timeAtPhaseStart)+" ms\n"+
+                    		     "Postprocessing: "+(timeAfterRun-timeAfterPhaseStart)+" ms";
+                    if ( debugOutput.length() > 0 ) {
+                    	debugOutput.append("\n");
+                    }
+                    debugOutput.append(msg);
                 } 
                 catch (Exception e) 
                 {
@@ -99,6 +113,12 @@ public class Assembler
                 }                
             }
 
+            System.err.flush();
+            System.out.flush();
+            System.out.println( "=================================");
+            System.out.println( debugOutput );
+            System.out.println( "=================================");
+            System.out.flush();
             success = true;
         } 
         finally 

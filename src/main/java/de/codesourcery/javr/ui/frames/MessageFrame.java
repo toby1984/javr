@@ -20,11 +20,17 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.geom.Rectangle2D;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 import javax.swing.JInternalFrame;
@@ -33,6 +39,8 @@ import javax.swing.JTable;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableColumn;
 import javax.swing.table.TableModel;
 
 import org.apache.commons.lang3.Validate;
@@ -41,10 +49,21 @@ import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 
 public class MessageFrame extends JInternalFrame implements IWindow 
 {
+	private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.S");
+	
+	public static final int COLUMN_TIMESTAMP = 0;
+	public static final int COLUMN_LOCATION = 1;
+	public static final int COLUMN_SEVERITY = 2;
+	public static final int COLUMN_MESSAGE = 3;
+	
     public static final String WINDOW_ID = "messagewindow";
 
     private final MessageTableModel messageModel = new MessageTableModel();
+    
+    final JTable errorTable = new JTable( messageModel );
+    
     private Consumer<CompilationMessage> doubleClickListener = msg -> {};
+    
 
     protected final class MessageTableModel implements TableModel 
     {
@@ -85,7 +104,7 @@ public class MessageFrame extends JInternalFrame implements IWindow
 
         @Override
         public int getColumnCount() {
-            return 3;
+            return 4;
         }
 
         private void assertValidColumn(int columnIndex) {
@@ -96,12 +115,15 @@ public class MessageFrame extends JInternalFrame implements IWindow
         @Override
         public String getColumnName(int columnIndex) 
         {
-            switch(columnIndex) {
-                case 0:
+            switch(columnIndex) 
+            {
+            	case 0:
+            		return "Time";
+	            case 1:
                     return "Location";
-                case 1:
-                    return "Severity";
                 case 2:
+                    return "Severity";
+                case 3:
                     return "Message";
                 default:
                     throw new RuntimeException("Invalid column: "+columnIndex);
@@ -124,16 +146,18 @@ public class MessageFrame extends JInternalFrame implements IWindow
         public Object getValueAt(int rowIndex, int columnIndex) 
         {
             final CompilationMessage msg = errors.get(rowIndex);
-            switch( columnIndex ) {
-                case 0:
-
+            switch( columnIndex ) 
+            {
+            	case 0:
+            		return DATE_FORMAT.format( msg.getTimestamp() );
+                case 1:
                     if ( msg.region == null ) {
                         return "<unknown>";
                     }
                     return msg.region.toString();
-                case 1:
-                    return msg.severity.toString();
                 case 2:
+                    return msg.severity.toString();
+                case 3:
                     return msg.message;
                 default:
                     throw new RuntimeException("Invalid column: "+columnIndex);                 
@@ -164,15 +188,23 @@ public class MessageFrame extends JInternalFrame implements IWindow
     {
         super(title,true,true,true);
 
-        final JTable errorTable = new JTable( messageModel );
+        errorTable.setAutoResizeMode( JTable.AUTO_RESIZE_OFF );
 
+        errorTable.setFillsViewportHeight(true);
+        errorTable.setPreferredScrollableViewportSize( new Dimension(800,400));
+        
         errorTable.setDefaultRenderer( String.class , new DefaultTableCellRenderer() 
         {
+        	
+        	private int stringWidth(String text) {
+        		return (int) (getFontMetrics( getFont() ).stringWidth( text )*1.5);
+        	}
+        	
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) 
             {
                 final Component result = super.getTableCellRendererComponent(errorTable, value, isSelected, hasFocus, row, column);
                 if ( column == 1 ) {
-                    final CompilationMessage msg = messageModel.getRow( row );
+                	final CompilationMessage msg = messageModel.getRow( row );            	
                     switch ( msg.severity ) 
                     {
                         case ERROR:
@@ -187,6 +219,14 @@ public class MessageFrame extends JInternalFrame implements IWindow
                 } else {
                     result.setBackground( Color.WHITE );
                 }
+                final int columnNameWidth = stringWidth( errorTable.getColumnName( column ) );
+                final int textWidth = stringWidth( value.toString() );
+                final Dimension size = new Dimension( Math.max( textWidth, columnNameWidth ) , getPreferredSize().height );
+                final TableColumn col = errorTable.getColumnModel().getColumn( column );
+                
+                col.setMinWidth( size.width );
+                col.setMaxWidth( size.width );
+                setPreferredSize( size );
                 return result;
             }
         } );
@@ -206,14 +246,13 @@ public class MessageFrame extends JInternalFrame implements IWindow
             }
         });       
 
-        errorTable.setPreferredSize( new Dimension(800,200 ) );
         getContentPane().setLayout( new GridBagLayout() );
         final GridBagConstraints cnstrs = new GridBagConstraints();
         cnstrs.gridheight = 1; cnstrs.gridwidth = 1;
         cnstrs.fill = GridBagConstraints.BOTH;
         cnstrs.gridx = 0 ; cnstrs.gridy = 0;
         cnstrs.weightx = 1; cnstrs.weighty = 1;
-        final JScrollPane pane = new JScrollPane( errorTable , JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED , JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS  );
+        final JScrollPane pane = new JScrollPane( errorTable );
         getContentPane().add( pane , cnstrs );
     }
 

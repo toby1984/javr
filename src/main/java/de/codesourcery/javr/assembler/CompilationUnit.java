@@ -51,7 +51,7 @@ public class CompilationUnit
     {
         this( resource , new SymbolTable( resource.toString() ) );
     }
-
+    
     /**
      * 
      * @param resource

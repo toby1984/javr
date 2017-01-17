@@ -46,13 +46,13 @@ import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
 import de.codesourcery.javr.ui.config.ProjectConfiguration;
 import de.codesourcery.javr.ui.frames.TopLevelWindow;
 
-public class Main 
+public class IDEMain 
 {
     private static final String WORKSPACE_FILE = ".javr_workspace";
 
-    private static final Logger LOG = Logger.getLogger(Main.class);
+    private static final Logger LOG = Logger.getLogger(IDEMain.class);
 
-    private static final Main INSTANCE = new Main();
+    private static final IDEMain INSTANCE = new IDEMain();
 
     public interface ThrowingConsumer<T> {
         public void apply(T obj) throws Exception;
@@ -72,7 +72,7 @@ public class Main
     private IApplicationConfigProvider applicationConfigProvider;
     private IProject project;
 
-    public static Main getInstance() {
+    public static IDEMain getInstance() {
         return INSTANCE;
     }
 

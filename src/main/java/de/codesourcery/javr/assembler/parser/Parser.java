@@ -15,6 +15,9 @@
  */
 package de.codesourcery.javr.assembler.parser;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,7 +35,6 @@ import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.exceptions.DuplicateSymbolException;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
 import de.codesourcery.javr.assembler.parser.ExpressionToken.ExpressionTokenType;
-import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.ArgumentNamesNode;
@@ -64,7 +66,7 @@ import de.codesourcery.javr.assembler.util.Resource;
  *
  * @author tobias.gierke@code-sourcery.de
  */
-public class Parser 
+public class Parser
 {
     private final IArchitecture arch;
     
@@ -91,6 +93,7 @@ public class Parser
 
     public static final class CompilationMessage 
     {
+    	public final long timestamp = System.currentTimeMillis();
         public final Severity severity;
         public final String message;
         public final TextRegion region;
@@ -100,6 +103,10 @@ public class Parser
         public static Comparator<CompilationMessage> compareSeverityDescending() 
         {
             return (a,b) -> Integer.compare(b.severity.level,a.severity.level);
+        }
+        
+        public ZonedDateTime getTimestamp() {
+        	return ZonedDateTime.ofInstant( Instant.ofEpochMilli( timestamp ) , ZoneId.systemDefault() );
         }
         
         @Override
@@ -216,7 +223,6 @@ public class Parser
                 }
                 if ( stmt.hasChildren() ) {
                     stmtCount++;
-                    System.out.println("Parsed statement #"+stmtCount);
                     ast.addChild( stmt );
                 }
             } 

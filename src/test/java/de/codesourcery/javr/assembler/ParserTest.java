@@ -1235,7 +1235,8 @@ public class ParserTest
             @Override
             public Lexer createLexer(Scanner s) { return new LexerImpl(s); }
         };
-        compilationContext = new CompilationContext( project , writer , project ,new CompilerSettings(), config );
+        
+        compilationContext = new CompilationContext( project.getCompileRoot() , project.getGlobalSymbolTable() , writer , project ,new CompilerSettings(), config );
 //        PreprocessingLexer l = new PreprocessingLexer( new LexerImpl(new Scanner(resource) ) , ctx );
 //        return p.parse( ctx, unit , l );
         return p.parse( compilationContext, unit , new LexerImpl(new Scanner(resource) ) );

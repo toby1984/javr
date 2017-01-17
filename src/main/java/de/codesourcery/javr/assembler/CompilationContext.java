@@ -46,8 +46,6 @@ public final class CompilationContext implements ICompilationContext
     
     private final ResourceFactory resourceFactory;
     
-    private final IProject project;
-    
     private final IConfig config;        
     
     private final Map<Identifier,Register> registerAliases = new HashMap<>();
@@ -67,22 +65,22 @@ public final class CompilationContext implements ICompilationContext
     
     private int errorCount; // total error count
     
-    public CompilationContext(IProject project,
+    public CompilationContext(
+    		CompilationUnit rootCompilationUnit,
+    		SymbolTable globalSymbolTable,
             IObjectCodeWriter objectCodeWriter, 
             ResourceFactory resourceFactory,
             CompilerSettings compilerSettings,
             IConfig config) 
     {
-        Validate.notNull(project, "project must not be NULL");
         Validate.notNull(objectCodeWriter, "objectCodeWriter must not be NULL");
         Validate.notNull(resourceFactory, "resourceFactory must not be NULL");
         Validate.notNull(compilerSettings,"compilerSettings must not be NULL");
         Validate.notNull(config,"config must not be NULL");
-        this.project = project;
         this.resourceFactory = resourceFactory;
-        this.rootCompilationUnit = project.getCompileRoot();
+        this.rootCompilationUnit = rootCompilationUnit;
         this.objectCodeWriter = objectCodeWriter;
-        this.globalSymbolTable = project.getGlobalSymbolTable();
+        this.globalSymbolTable = globalSymbolTable;
         this.compilerSettings = compilerSettings;
         this.config = config;
         this.maxErrorsLimit = compilerSettings.getMaxErrors();
@@ -193,6 +191,7 @@ public final class CompilationContext implements ICompilationContext
         currentCompilationUnit = null;
         pushCompilationUnit( rootCompilationUnit );
         objectCodeWriter.reset();
+        objectCodeWriter.setStartAddress( Address.byteAddress( Segment.SRAM , config.getArchitecture().getSRAMStartAddress() ) );        
         objectCodeWriter.setCurrentSegment( Segment.FLASH );
     }
 
