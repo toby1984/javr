@@ -31,6 +31,7 @@ import java.util.function.Consumer;
 import javax.swing.JInternalFrame;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.SwingUtilities;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -72,6 +73,7 @@ public class MessageFrame extends JInternalFrame implements IWindow
             int idx = this.errors.size();
             final TableModelEvent ev = new TableModelEvent( this , idx ,idx );
             listeners.forEach( l -> l.tableChanged( ev ) );
+            resizeColumns();
         }
 
         public void addAll(Collection<CompilationMessage> msg) 
@@ -82,6 +84,7 @@ public class MessageFrame extends JInternalFrame implements IWindow
             final int end = this.errors.size();
             final TableModelEvent ev = new TableModelEvent( this , start,end );
             listeners.forEach( l -> l.tableChanged( ev ) );
+            resizeColumns();
         }        
 
         public void clear() 
@@ -89,6 +92,7 @@ public class MessageFrame extends JInternalFrame implements IWindow
             errors.clear();
             final TableModelEvent ev = new TableModelEvent( this );
             listeners.forEach( l -> l.tableChanged( ev ) );
+            resizeColumns();
         }
 
         @Override
@@ -177,6 +181,29 @@ public class MessageFrame extends JInternalFrame implements IWindow
             return errors.get( row );
         }
     }
+    
+    private int stringWidth(String text) {
+        return (int) (getFontMetrics( getFont() ).stringWidth( text )*1.5);
+    }
+    
+    private void resizeColumns() 
+    {
+        SwingUtilities.invokeLater( () -> {
+        System.out.println("=====> Resizing table");
+        for ( int i = 0 , len = errorTable.getModel().getColumnCount(); i < len ; i++) 
+        {
+            int maxWidth = stringWidth( errorTable.getColumnName( i ) );
+            for ( int j = 0 , len2 = errorTable.getModel().getRowCount() ; j < len2 ; j++ ) 
+            {
+                final int textWidth = stringWidth( (String) errorTable.getModel().getValueAt( j , i ) );
+                maxWidth = Math.max( maxWidth , textWidth );
+            }
+            final TableColumn col = errorTable.getColumnModel().getColumn( i );
+            col.setMinWidth( maxWidth );
+            col.setMaxWidth(maxWidth  );
+        }
+        });
+    }
 
     public MessageFrame(String title) 
     {
@@ -189,10 +216,6 @@ public class MessageFrame extends JInternalFrame implements IWindow
         
         errorTable.setDefaultRenderer( String.class , new DefaultTableCellRenderer() 
         {
-        	
-        	private int stringWidth(String text) {
-        		return (int) (getFontMetrics( getFont() ).stringWidth( text )*1.5);
-        	}
         	
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) 
             {
@@ -213,14 +236,6 @@ public class MessageFrame extends JInternalFrame implements IWindow
                 } else {
                     result.setBackground( Color.WHITE );
                 }
-                final int columnNameWidth = stringWidth( errorTable.getColumnName( column ) );
-                final int textWidth = stringWidth( value.toString() );
-                final Dimension size = new Dimension( Math.max( textWidth, columnNameWidth ) , getPreferredSize().height );
-                final TableColumn col = errorTable.getColumnModel().getColumn( column );
-                
-                col.setMinWidth( size.width );
-                col.setMaxWidth( size.width );
-                setPreferredSize( size );
                 return result;
             }
         } );

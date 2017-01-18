@@ -48,11 +48,12 @@ import de.codesourcery.javr.assembler.arch.IArchitecture.DisassemblerSettings;
 import de.codesourcery.javr.assembler.util.FileResource;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
-import de.codesourcery.javr.ui.IProject;
+import de.codesourcery.javr.ui.CaretPositionTracker;
 import de.codesourcery.javr.ui.IDEMain;
 import de.codesourcery.javr.ui.IDEMain.ThrowingConsumer;
 import de.codesourcery.javr.ui.IDEMain.ThrowingFunction;
 import de.codesourcery.javr.ui.IDEMain.ThrowingRunnable;
+import de.codesourcery.javr.ui.IProject;
 import de.codesourcery.javr.ui.Project;
 import de.codesourcery.javr.ui.ProjectConfigWindow;
 import de.codesourcery.javr.ui.config.IApplicationConfig;
@@ -79,6 +80,8 @@ public class TopLevelWindow implements IWindow
     private File lastOpenedProject = new File("/home/tobi/atmel/asm/testproject.properties");
     private File lastDisassembledFile = new File("/home/tobi/atmel/asm/random.raw");
     private File lastSourceFile = new File("/home/tobi/atmel/asm/random.raw.javr.asm");
+    
+    private final CaretPositionTracker caretTracker = new CaretPositionTracker();
     
     public TopLevelWindow(IProject project,IApplicationConfigProvider applicationConfigProvider) throws IOException 
     {
@@ -187,7 +190,7 @@ public class TopLevelWindow implements IWindow
 
     private void addWindows(JDesktopPane pane) throws IOException 
     {
-        editorFrame = new EditorFrame( project , project.getCompileRoot() , applicationConfigProvider, messageFrame );
+        editorFrame = new EditorFrame( project , project.getCompileRoot() , applicationConfigProvider, messageFrame , caretTracker );
         addWindow(pane,messageFrame);
         addWindow(pane,editorFrame);
         addWindow(pane,outlineFrame);

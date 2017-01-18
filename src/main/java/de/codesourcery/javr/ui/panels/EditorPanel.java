@@ -127,6 +127,8 @@ import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
 import de.codesourcery.javr.ui.EditorSettings.SourceElement;
+import de.codesourcery.javr.ui.CaretPositionTracker;
+import de.codesourcery.javr.ui.CaretPositionTracker.CaretPosition;
 import de.codesourcery.javr.ui.IDEMain;
 import de.codesourcery.javr.ui.IProject;
 import de.codesourcery.javr.ui.config.IApplicationConfig;
@@ -769,17 +771,20 @@ public class EditorPanel extends JPanel
 		}
 	}
 
-	public EditorPanel(IProject project, EditorFrame topLevelWindow , CompilationUnit unit,IApplicationConfigProvider appConfigProvider,MessageFrame messageFrame) throws IOException 
+	public EditorPanel(IProject project, EditorFrame topLevelWindow , CompilationUnit unit,IApplicationConfigProvider appConfigProvider,MessageFrame messageFrame,
+	        CaretPositionTracker caretTracker) throws IOException 
 	{
 		Validate.notNull(project, "project must not be NULL");
 		Validate.notNull(unit, "unit must not be NULL");
         Validate.notNull(appConfigProvider, "appConfigProvider must not be NULL");
         Validate.notNull(messageFrame, "messageFrame must not be NULL");
+        Validate.notNull(caretTracker,"caretTracker must not be NULL");
         this.messageFrame = messageFrame;
         this.appConfigProvider = appConfigProvider;
 		this.project = project;
 		this.currentUnit = unit;
 		this.topLevelWindow = topLevelWindow;
+		this.caretTracker = caretTracker;
 
 		editor.setFont( new Font(Font.MONOSPACED, Font.PLAIN, 12) );
 		editor.addCaretListener( new CaretListener() 
@@ -963,7 +968,7 @@ public class EditorPanel extends JPanel
 			{
 				if ( ! ignoreEditEvents ) {
 					lastEditLocation = e.getOffset();
-					rememberCaretPosition(e.getOffset());
+					caretTracker.rememberCaretPosition(e.getOffset(),currentUnit);
 					recompilationThread.documentChanged(e);
 				}
 			}
@@ -972,7 +977,7 @@ public class EditorPanel extends JPanel
 				if ( ! ignoreEditEvents ) 
 				{
 					lastEditLocation = e.getOffset();
-                    rememberCaretPosition(e.getOffset());					
+                    caretTracker.rememberCaretPosition(e.getOffset(),currentUnit);
 					recompilationThread.documentChanged(e); 
 				}
 			}
@@ -980,7 +985,7 @@ public class EditorPanel extends JPanel
 			{ 
 				if ( ! ignoreEditEvents ) {
                     lastEditLocation = e.getOffset();
-                    rememberCaretPosition(e.getOffset());					
+                    caretTracker.rememberCaretPosition(e.getOffset(),currentUnit);
 					recompilationThread.documentChanged(e);
 				}
 			}
@@ -1016,8 +1021,8 @@ public class EditorPanel extends JPanel
 		result.add( button("Compile" , ev -> this.compile() ) );
 		result.add( button("AST" , ev -> this.toggleASTWindow() ) );
 		result.add( button("Goto last edit" , ev -> this.gotoLastEditLocation() ) );
-		result.add( button("Goto previous" , ev -> setCaretPosition( this::getPreviousCaretPosition ) ) );
-		result.add( button("Goto next" , ev -> setCaretPosition( this::getNextCaretPosition ) ) );
+		result.add( button("Goto previous" , ev -> setCaretPosition( caretTracker.getPreviousCaretPosition() ) ) );
+		result.add( button("Goto next" , ev -> setCaretPosition( caretTracker.getNextCaretPosition() ) ) );
 		
 		result.add( button("Symbols" , ev -> this.toggleSymbolTableWindow() ) );
 		result.add( button("Upload to uC" , ev -> this.uploadToController() ) );
@@ -1027,69 +1032,29 @@ public class EditorPanel extends JPanel
 		return result;
 	}
 
-	private List<Integer> caretPositionHistory = new ArrayList<>();
-	private int caretHistoryPtr = 0;
+	private final CaretPositionTracker caretTracker;
 	
 	private int lastEditLocation = -1;
-	
-	private void gotoLastEditLocation() 
-	{
-		if ( lastEditLocation != -1 ) 
-		{
-	        runAfterCompilation( () -> 
-	        {
-	        	if ( lastEditLocation != -1 ) 
-	        	{
-	        		editor.setCaretPosition( lastEditLocation ); 
-	        		editor.requestFocus();
-	        	}
-	        });
-		}
-	}
-	
-	private int getPreviousCaretPosition() 
-	{
-	    if ( caretHistoryPtr > 0 ) {
-	        return caretPositionHistory.get(caretHistoryPtr--); 
-	    }
-	    return -1;
-	}
-	
-    private int getNextCaretPosition() 
-    {
-        if ( caretHistoryPtr < ( caretPositionHistory.size()-1 ) ) {
-            return caretPositionHistory.get(caretHistoryPtr++); 
-        }
-        return -1;
-    }	
     
-    private void setCaretPosition(IntSupplier supplier) 
+    private void gotoLastEditLocation() 
     {
-        final int pos = supplier.getAsInt();
-        if ( pos >= 0 ) {
-            setCaretPosition( pos );
-        }
-    }
-    
-    private void resetCaretPositionHistory() {
-        caretHistoryPtr = 0;
-        caretPositionHistory.clear();
-    }
-    
-    private void rememberCaretPosition(int position) 
-    {
-        if ( ! caretPositionHistory.isEmpty() ) 
+        if ( lastEditLocation != -1 ) 
         {
-            final int delta = Math.abs( caretPositionHistory.get( caretPositionHistory.size()-1 ) - position );
-            if ( delta < 30 ) 
+            runAfterCompilation( () -> 
             {
-                return;
-            }
+                if ( lastEditLocation != -1 ) 
+                {
+                    editor.setCaretPosition( lastEditLocation ); 
+                    editor.requestFocus();
+                }
+            });
         }
-        caretPositionHistory.add( caretHistoryPtr , position );
-        if ( caretHistoryPtr < caretPositionHistory.size()-1 ) 
-        {
-            caretPositionHistory = new ArrayList<>( caretPositionHistory.subList( 0 , caretHistoryPtr+1 ) );
+    }
+    
+    private void setCaretPosition(CaretPosition position) 
+    {
+        if ( position != null ) {
+            setCaretPosition( position.offset );
         }
     }
 	
@@ -1626,7 +1591,6 @@ public class EditorPanel extends JPanel
 		final String source = new String(data, unit.getResource().getEncoding() );
 
 		lastEditLocation = -1;
-		resetCaretPositionHistory();
 		
 		editor.setDocument( createDocument() );
 		editor.setText( source );
@@ -1647,7 +1611,6 @@ public class EditorPanel extends JPanel
 	public boolean close(boolean askIfDirty) 
 	{
 		lastEditLocation = -1;
-		resetCaretPositionHistory();
 		setVisible( false );
 		final Container parent = getParent();
 		parent.remove( this );

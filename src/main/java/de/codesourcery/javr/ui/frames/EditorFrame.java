@@ -29,6 +29,7 @@ import javax.swing.JTabbedPane;
 
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
+import de.codesourcery.javr.ui.CaretPositionTracker;
 import de.codesourcery.javr.ui.IProject;
 import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
 import de.codesourcery.javr.ui.panels.EditorPanel;
@@ -41,10 +42,13 @@ public class EditorFrame extends JInternalFrame implements IWindow
     
 	private final List<EditorPanel> editors = new ArrayList<>();
 	
-	public EditorFrame(IProject project,CompilationUnit compUnit,IApplicationConfigProvider appConfigProvider,MessageFrame messageFrame) throws IOException {
+	private final CaretPositionTracker caretTracker;
+	
+	public EditorFrame(IProject project,CompilationUnit compUnit,IApplicationConfigProvider appConfigProvider,MessageFrame messageFrame,CaretPositionTracker caretTracker) throws IOException {
 
 	    this.messageFrame = messageFrame;
 	    this.appConfigProvider = appConfigProvider;
+	    this.caretTracker = caretTracker;
 	    
 		tabbedPane = new JTabbedPane();
 		 
@@ -112,7 +116,7 @@ public class EditorFrame extends JInternalFrame implements IWindow
  	
 	private EditorPanel createEditor(IProject project,CompilationUnit compUnit) throws IOException
 	{
-	    return new EditorPanel(project, this , compUnit,appConfigProvider,messageFrame);
+	    return new EditorPanel(project, this , compUnit,appConfigProvider,messageFrame,caretTracker);
 	}
 	
 	private EditorPanel currentEditor() 
