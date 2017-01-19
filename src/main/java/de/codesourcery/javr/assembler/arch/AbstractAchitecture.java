@@ -68,22 +68,35 @@ public abstract class AbstractAchitecture implements IArchitecture
         Y_REGISTER_SIX_BIT_DISPLACEMENT,
         Z_REGISTER_SIX_BIT_DISPLACEMENT,
         // unsigned constant values
-        THREE_BIT_CONSTANT,
-        FOUR_BIT_CONSTANT,
-        SIX_BIT_CONSTANT,        
-        EIGHT_BIT_CONSTANT,
+        THREE_BIT_CONSTANT(false),
+        FOUR_BIT_CONSTANT(false),
+        SIX_BIT_CONSTANT(false),        
+        EIGHT_BIT_CONSTANT(false),
         // absolute addresses
-        TWENTYTWO_BIT_FLASH_MEM_ADDRESS, // device-dependent, covers whole address range
-        SIXTEEN_BIT_SRAM_MEM_ADDRESS, // device-dependent, covers whole address range
-        SEVEN_BIT_SRAM_MEM_ADDRESS,
+        TWENTYTWO_BIT_FLASH_MEM_ADDRESS(false), // device-dependent, covers whole address range
+        SIXTEEN_BIT_SRAM_MEM_ADDRESS(false), // device-dependent, covers whole address range
+        SEVEN_BIT_SRAM_MEM_ADDRESS(false),
         // signed jump offsets
-        SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET,
-        TWELVE_BIT_SIGNED_JUMP_OFFSET,
+        SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET(false),
+        TWELVE_BIT_SIGNED_JUMP_OFFSET(false),
         // IO register constants
-        FIVE_BIT_IO_REGISTER_CONSTANT,
-        SIX_BIT_IO_REGISTER_CONSTANT,        
+        FIVE_BIT_IO_REGISTER_CONSTANT(false),
+        SIX_BIT_IO_REGISTER_CONSTANT(false),        
         // special no-argument type
-        NONE
+        NONE;
+        
+        private boolean requiresRegisterRef;
+        
+        private ArgumentType() {
+            this(true);
+        }
+        
+        private ArgumentType(boolean registerRef) {
+            this.requiresRegisterRef = registerRef;
+        }
+        public boolean requiresRegisterReference() {
+            return requiresRegisterRef;
+        }
     }
     
     protected interface DisassemblySelector 
@@ -770,8 +783,9 @@ public abstract class AbstractAchitecture implements IArchitecture
             return 0;
         }
         
+        final boolean isValueNode = node instanceof IValueNode; 
         final int result;
-        if ( node instanceof IValueNode ) 
+        if ( isValueNode ) 
         {
             final Object value = ((IValueNode) node).getValue();
             
@@ -923,26 +937,41 @@ public abstract class AbstractAchitecture implements IArchitecture
                 }
                 return result;
             case EIGHT_BIT_CONSTANT:
+                if ( ! isValueNode ) {
+                    return fail("Operand needs to be an 8-bit constant",node,context);
+                }
                 if ( ! fitsInBitfield( result , 8 ) ) {
                     return fail("Operand out of 8-bit range: "+result,node,context);
                 }
                 return result;
             case SIX_BIT_CONSTANT:
+                if ( ! isValueNode ) {
+                    return fail("Operand needs to be an 6-bit constant",node,context);
+                }
                 if ( ! fitsInBitfield( result , 6 ) ) {
                     return fail("Operand out of 6-bit range: "+result,node,context);
                 }
                 return result;                
             case FOUR_BIT_CONSTANT:
+                if ( ! isValueNode ) {
+                    return fail("Operand needs to be an 4-bit constant",node,context);
+                }
                 if ( ! fitsInBitfield( result , 4 ) ) {
                     return fail("Operand out of 4-bit range: "+result,node,context);
                 }
                 return result;                 
             case THREE_BIT_CONSTANT:
+                if ( ! isValueNode ) {
+                    return fail("Operand needs to be an 3-bit constant",node,context);
+                }                
                 if ( ! fitsInBitfield( result , 3 ) ) {
                     return fail("Operand out of 3-bit range: "+result,node,context);
                 }
                 return result;                  
             case FIVE_BIT_IO_REGISTER_CONSTANT:  // 0..63
+                if ( ! isValueNode ) {
+                    return fail("Operand needs to be an 5-bit I/O register constant",node,context);
+                }                    
                 if ( ! fitsInBitfield( result , 5 ) ) {
                     return fail("Operand out of 5-bit range (IO register): "+result,node,context);
                 }
@@ -950,7 +979,10 @@ public abstract class AbstractAchitecture implements IArchitecture
                     return fail("Operand is not a valid I/O register address: "+result,node,context);
                 }
                 return result;
-            case SIX_BIT_IO_REGISTER_CONSTANT: 
+            case SIX_BIT_IO_REGISTER_CONSTANT:
+                if ( ! isValueNode ) {
+                    return fail("Operand needs to be an 6-bit I/O register constant",node,context);
+                }                  
                 if ( ! fitsInBitfield( result , 6 ) ) {
                     return fail("Operand out of 6-bit range (IO register): "+result,node,context);
                 }
@@ -963,6 +995,9 @@ public abstract class AbstractAchitecture implements IArchitecture
                 }                
                 return result; 
             case SEVEN_BIT_SRAM_MEM_ADDRESS:       
+                if ( ! isValueNode ) {
+                    return fail("Operand needs to be an 7-bit SRAM address",node,context);
+                } 
                 if ( ! fitsInBitfield( result , 7 ) ) {
                     return fail("Operand out of 7-bit range (SRAM address): "+result,node,context);
                 }
@@ -976,6 +1011,9 @@ public abstract class AbstractAchitecture implements IArchitecture
                 }
                 return result;
             case SIXTEEN_BIT_SRAM_MEM_ADDRESS:
+                if ( ! isValueNode ) {
+                    return fail("Operand needs to be an 16-bit SRAM address",node,context);
+                }                 
                 if ( ! fitsInBitfield( result , 16 ) ) {
                     return fail("Operand out of 16-bit range (SRAM address): "+result,node,context);
                 }
@@ -992,7 +1030,7 @@ public abstract class AbstractAchitecture implements IArchitecture
             case SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET:
             case TWELVE_BIT_SIGNED_JUMP_OFFSET:                     
             case TWENTYTWO_BIT_FLASH_MEM_ADDRESS:                
-                if ( ! (node instanceof IValueNode)) {
+                if ( ! isValueNode ) {
                     return fail("Operand must evaluate to a constant (expected: " +type+", was: "+node.getClass().getName()+")",node,context);
                 }                
                 // convert to word address since the assembler uses byte addresses internally

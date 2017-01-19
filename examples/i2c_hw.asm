@@ -121,17 +121,25 @@ main:
 
 	rcall clear_framebuffer
 	
-	ldi r16,0xff
-	mov r5,r16
-.print_loop
-	mov r16,r5
-	rcall write_dec
+; ============================
+; blit sprite from FLASH into framebuffer
+; INPUT: r19 - Destination X position (pixel)
+; INPUT: r20 - Destination Y position (pixel)
+; INPUT: r21 - Sprite width (pixel)
+; INPUT: r22 - Sprite height (pixel)
+; INPUT: r31:r30 - Ptr to start of sprite in FLASH
+; SCRATCHED: r0,r1,r16,r17,r18,r19,r22,r23,r26,r27,r28,r29,r30,r31
+; ============================
+
+	ldi r19,64-(32/2)
+	ldi r20,32-(32/2)
+	ldi r21, 32
+	ldi r22, 32
+	ldi r31,HIGH(sprite1)
+	ldi r30,LOW(sprite1)
+	rcall blit_sprite
 
 	rcall send_framebuffer
-	brcs error
-
-	dec r5
-	brne print_loop
 
           SUCCESS_LED_ON
           rjmp back
@@ -352,9 +360,42 @@ send_framebuffer:
 ; ========
 ; Write decimal number
 ; INPUT: r16 - number to write
-; SCRATCHED: r0,r1,r2,r3,r16, r17, r18,r19, r20 , r21, r28, r29, r30 ,r31
+; SCRATCHED: r0,r1,r16,r19,r20,r26,r27,r31,r30
 ; ========	
 write_dec:
+	push r0
+	push r1
+	push r2
+	push r3
+	push r4
+	push r5
+	push r6
+	push r7
+	push r8
+	push r9
+	push r10
+	push r11
+	push r12
+	push r13
+	push r14
+	push r15
+	push r16
+	push r17
+	push r18
+	push r19
+	push r20
+	push r21
+	push r22
+	push r23
+	push r24
+	push r25
+	push r26
+	push r27
+	push r28
+	push r29
+	push r30
+	push r31
+
 	mov r19,r16 ; backup: r19 = x
 	ldi r31, HIGH(stringbuffer)
 	ldi r30, LOW(stringbuffer)
@@ -400,6 +441,39 @@ write_dec:
 	ldi r26,LOW(stringbuffer)
 	ldi r27,HIGH(stringbuffer)
 	rcall write_sram_string	
+
+	pop r31
+	pop r30
+	pop r29
+	pop r28
+	pop r27
+	pop r26
+	pop r25
+	pop r24
+	pop r23
+	pop r22
+	pop r21
+	pop r20
+	pop r19
+	pop r18
+	pop r17
+	pop r16
+	pop r15
+	pop r14
+	pop r13
+	pop r12
+	pop r11
+	pop r10
+	pop r9
+	pop r8
+	pop r7
+	pop r6
+	pop r5
+	pop r4
+	pop r3
+	pop r2
+	pop r1
+	pop r0
 
 	ret
 ; ====
@@ -512,10 +586,10 @@ write_char:
 	adc r31,r1
 ; Z now points to start of glyph in font ROM
 	ldi r16,8
-	mul r17,r16 ;  r1:r0 = X * GLYPH_WIDTH_IN_BYTES 
+	mul r17,r16 ;  r1:r0 = X * GLYPH_WIDTH_IN_PIXELS
 	movw r3:r2,r1:r0 ; backup result
 	ldi r16,128
-	mul r18,r16 ; r1:r0 = row * 128
+	mul r18,r16 ; r1:r0 = Y * 128
 	add r0,r2
 	adc r1,r3
 ; r1:r0 now hold offset into framebuffer
@@ -532,6 +606,124 @@ write_char:
 	brne row_loop
 	ret
 
+; ============================
+; blit sprite from FLASH into framebuffer
+; INPUT: r19 - Destination X position (pixel)
+; INPUT: r20 - Destination Y position (pixel)
+; INPUT: r21 - Sprite width (pixel)
+; INPUT: r22 - Sprite height (pixel)
+; INPUT: r31:r30 - Ptr to start of sprite in FLASH
+; SCRATCHED: r0,r1,r16,r17,r18,r19,r22,r23,r26,r27,r28,r29,r30,r31
+; ============================
+blit_sprite:
+; calculate bit and byte offset for X start mask
+	mov r3,r19
+	mov r16,r19 ; input to remainder calculation: X start 
+	rcall calc_bit_and_byte_offset ; result: r16 = X start/8 , r17 = X start Bit Offset
+	mov r18,r17
+; r18 = Number of bits we need to shift byte from the sprite right before OR'ing
+	mov r23,r16 ; BACKUP: r23 =  X start/8
+; calculate bit and byte offset for X end mask
+	add r19,r21 ; r19 = x end pos (x start pos + sprite width)
+	mov r16,r19 ; use as input argument for remainder calculation
+	ldi r19,0xff ; r19 = X end bit mask
+	rcall calc_bit_and_byte_offset ; r16 = x end/8, r17 = X end bit offset
+	breq cont3 ; => x end is on a byte boundary, no mask needed
+.cont2	lsr r19
+	dec r17 ; decrement remainder from calc_bit_and_byte_offset by one
+	brne cont2
+	com r19 ; r19 = invert to get AND mask
+.cont3
+
+; r16 holds X end offset: (x start + sprite width)/8
+; r18 holds the number of bits we need to right-shift the sprite right before OR'ing it with the framebuffer byte
+; r19 holds the AND mask to apply to the sprite date before OR'ing the last byte in a row
+; r23 holds the X start offset on each row (in bytes)
+
+; calculate initial framebuffer write start address
+	ldi r17,BYTES_PER_ROW
+	mul r20,r17 ; Y*BYTES_PER_ROW
+	add r0 ,r3 ; + X
+	ldi r17,0
+	adc r1,r17 ; + carry
+
+	ldi r29,HIGH(framebuffer)
+	ldi r28,LOW(framebuffer)	
+	add r28,r0
+	adc r29,r1
+; r29:r28 now points to start of first row in frame buffer
+	movw r27:r26,r29:r28 ; backup start of row so we can later advance to the next framebuffer row
+	mov r0,r16 ; r0 = X end offset
+	sub r0,r23 ; r0 = number of bytes per row to copy (x end offset ) - (x start offset)
+
+; r0 now hold the number of bytes per row we need to copy
+	eor r1,r1 ; r1 = 0 => holds the index of the current byte in the row so we can check for first/last byte
+	eor r4,r4 ; TODO: Remove debug code
+
+.copy_row
+	lpm r17,Z+ ; fetch one byte of the sprite
+	cp r0,r1 ; is this the last byte on the row ?
+	brne cont
+; last byte on row, apply mask to sprite data
+	and r17,r19 ; mask out bits 
+.cont
+	tst r1 ; check whether this is the first byte in the row
+	brne cont_copy; 	
+; first byte on row , shift byte from sprite right if necessary
+	tst r18
+	breq cont_copy ; => no shift needed
+	mov r2,r18 ; r2 = shift counter
+.shift_loop
+	lsr r17
+	dec r2
+	brne shift_loop	
+.cont_copy
+	ld r16,Y ; fetch byte from frame buffer
+	or r16,r17 ; OR in byte from sprite
+	st Y+,r16 ; write byte to frame buffer	
+	inc r1 ; increment byte-on-row index
+	cp r1, r0 ; check whether this was the last byte on the row
+	brne copy_row
+	inc r4
+; we copied the last byte on the current row
+	eor r1,r1 ; reset byte-on-row counter
+; advance to next row of framebuffer
+	ldi r17,8
+	add r26,r17
+	ldi r17,0
+	adc r27,r17
+	movw r29:r28,r27:r26
+; decrement row counter
+	dec r22 ; decrement sprite height/rows-to-copy counter
+	brne copy_row
+
+; TODO: Remove debug
+	mov r16,r4
+	rcall write_dec	
+; TODO: Remove debug
+
+	ret
+
+; ===========================
+; Perform division by 8 and return the result and the remainder
+; INPUT: r16 - Pixel offset
+; RETURN: r16 = Byte offset
+; RETURN: r17 = Bit-offset
+; RETURN: flags indicate contents of r17
+; SCRATCHED: r16,r17
+; ===========================
+.calc_bit_and_byte_offset
+	mov r17,r16
+	lsr r16
+	lsr r16
+	lsr r16     ; r16 = floor(x/8) => Byte Offset
+	push r18
+	ldi r18,8
+	mul r16,r18 ; r1:r0 = floor(x/8)*8
+	pop r18
+	sub r17,r0 ; r17 = x - floor(x/8)*8 => Bit offset
+	ret
+	
 ; ============
 ; scroll up one line
 ; SCRATCHED: r16
@@ -654,6 +846,32 @@ text: .db "text1",0
 text2: .db "text2",0
 
 ; data organization: columns FLIP_XY 
+sprite1:
+    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+
+    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+
+    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+
+    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+
+    .db 0x0d,0x80,0xfc,0x9f,0x0c,0x00,0x00,0x00
+    .db 0xfc,0x9f,0x8c,0x98,0x0c,0x98,0x00,0x00
+    .db 0xfc,0x98,0x8c,0x98,0x8c,0x9f,0x00,0x00
+    .db 0x0c,0x00,0xfc,0x9f,0x0c,0x00,0x01,0x80 ; 16x16 sprite
+
 charset:
     .db 0x00,0x3e,0x7f,0x41,0x4d,0x4f,0x2e,0x00 ; '@' (offset 0)
     .db 0x00,0x7c,0x7e,0x0b,0x0b,0x7e,0x7c,0x00 ; 'a' (offset 8)

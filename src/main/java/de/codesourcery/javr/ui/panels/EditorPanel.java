@@ -180,6 +180,7 @@ public class EditorPanel extends JPanel
 	protected Style STYLE_MNEMONIC;
 	protected Style STYLE_COMMENT;
 	protected Style STYLE_HIGHLIGHTED;
+	protected Style STYLE_TODO;
 
 	private CompilationUnit currentUnit = new CompilationUnit( new StringResource("dummy",  "" ) );
 
@@ -937,6 +938,7 @@ public class EditorPanel extends JPanel
         STYLE_REGISTER = createStyle( "registerStyle" , SourceElement.REGISTER , ctx );
         STYLE_MNEMONIC = createStyle( "mnemonicStyle" , SourceElement.MNEMONIC, ctx );
         STYLE_COMMENT  = createStyle( "commentStyle" , SourceElement.COMMENT , ctx );     
+        STYLE_TODO = createStyle( "todoStyle" , SourceElement.TODO , ctx );     
         STYLE_PREPROCESSOR = createStyle( "preprocStyle" , SourceElement.PREPROCESSOR , ctx );   
         
         // highlight
@@ -947,7 +949,7 @@ public class EditorPanel extends JPanel
 	
 	private Style createStyle(String name,SourceElement sourceElement,StyleContext ctx) 
 	{
-	    final Color col = appConfigProvider.getApplicationConfig().getEditorSettings().getColor( sourceElement , Color.BLACK );
+	    final Color col = appConfigProvider.getApplicationConfig().getEditorSettings().getColor( sourceElement );
 	    System.out.println("Element "+sourceElement+" has color "+col);
 	    final Style style = ctx.addStyle( name , STYLE_TOPLEVEL );
 	    style.addAttribute(StyleConstants.Foreground, col );
@@ -1237,7 +1239,12 @@ public class EditorPanel extends JPanel
             } 
             else if ( node instanceof CommentNode ) 
             {
-                style = STYLE_COMMENT;
+                final String comment = ((CommentNode) node).value;
+                if ( comment.contains("TODO") ) {
+                    style = STYLE_TODO;
+                } else {
+                    style = STYLE_COMMENT;
+                }
             }     
             else if ( node instanceof LabelNode || node instanceof IdentifierNode) 
             {

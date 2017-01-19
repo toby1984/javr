@@ -19,6 +19,7 @@ import java.awt.Color;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
 public class EditorSettings 
@@ -27,21 +28,29 @@ public class EditorSettings
     
     private String indentString;
     
+    private static final Map<SourceElement,Color> DEFAULT_COLORS = new HashMap<>();
+    
+    static 
+    {
+        DEFAULT_COLORS.put( SourceElement.LABEL , Color.GREEN );
+        DEFAULT_COLORS.put( SourceElement.NUMBER, Color.BLUE);
+        DEFAULT_COLORS.put( SourceElement.REGISTER, Color.BLUE);
+        DEFAULT_COLORS.put( SourceElement.MNEMONIC, Color.MAGENTA );
+        DEFAULT_COLORS.put( SourceElement.COMMENT , Color.ORANGE );
+        DEFAULT_COLORS.put( SourceElement.PREPROCESSOR, Color.PINK);
+        DEFAULT_COLORS.put( SourceElement.TODO, Color.RED);     
+    }
+    
     public static enum SourceElement 
     {
-        LABEL,NUMBER,REGISTER,MNEMONIC,COMMENT,PREPROCESSOR
+        LABEL,NUMBER,REGISTER,MNEMONIC,COMMENT,PREPROCESSOR,TODO
     }
     
     private final Map<SourceElement,Color> colors = new HashMap<>();
     
     public EditorSettings() 
     {
-        colors.put( SourceElement.LABEL , Color.GREEN );
-        colors.put( SourceElement.NUMBER, Color.BLUE);
-        colors.put( SourceElement.REGISTER, Color.BLUE);
-        colors.put( SourceElement.MNEMONIC, Color.MAGENTA );
-        colors.put( SourceElement.COMMENT , Color.ORANGE );
-        colors.put( SourceElement.PREPROCESSOR, Color.PINK);
+        colors.putAll( DEFAULT_COLORS );
     }
     
     public EditorSettings(EditorSettings editorSettings) 
@@ -63,23 +72,16 @@ public class EditorSettings
         return new HashMap<>(colors);
     }
     
-    public Color getColor(SourceElement elem,Color defaultColor) 
+    public Color getColor(SourceElement elem) 
     {
+        Validate.notNull(elem, "elem must not be NULL");
         final Color result = colors.get( elem );
         if ( result == null ) {
-            colors.put( elem , defaultColor );
-            return defaultColor;
+            return DEFAULT_COLORS.get(elem);
         }
         return result;
     }
     
-//    public void setColors(Map<SourceElement, Color> colors) 
-//    {
-//        Validate.notNull(colors, "colors must not be NULL");
-//        this.colors.clear();
-//        this.colors.putAll(colors);
-//    }
-
     public EditorSettings createCopy() 
     {
         return new EditorSettings(this);
