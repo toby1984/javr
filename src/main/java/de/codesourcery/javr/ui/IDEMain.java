@@ -70,7 +70,7 @@ public class IDEMain
 
     private File workspaceDir;
     private IApplicationConfigProvider applicationConfigProvider;
-    private IProject project;
+    private IProject currentProject;
 
     public static IDEMain getInstance() {
         return INSTANCE;
@@ -272,16 +272,16 @@ public class IDEMain
 
         projects.addAll( findProjects( workspaceDir ) );
 
-        project = selectProjectToOpen( workspaceDir );
-        LOG.info("run(): Opening project "+project.getConfiguration().getBaseDir().getAbsolutePath());
-        assertCompilationRootExists( project ); // required so that editor can display something to the user
+        currentProject = selectProjectToOpen( workspaceDir );
+        LOG.info("run(): Opening project "+currentProject.getConfiguration().getBaseDir().getAbsolutePath());
+        assertCompilationRootExists( currentProject ); // required so that editor can display something to the user
 
-        final TopLevelWindow topLevel = new TopLevelWindow( project , applicationConfigProvider );
+        final TopLevelWindow topLevel = new TopLevelWindow( currentProject , applicationConfigProvider );
 
         applicationConfigProvider.getApplicationConfig().apply( topLevel );
     }
 
-    private IProject selectProjectToOpen(File workspaceDir) throws IOException 
+    public IProject selectProjectToOpen(File workspaceDir) throws IOException 
     {
         if ( projects.isEmpty() ) 
         {

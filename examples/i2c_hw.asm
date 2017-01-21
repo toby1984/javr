@@ -133,10 +133,10 @@ main:
 
 	ldi r19,64-(32/2)
 	ldi r20,32-(32/2)
-	ldi r21, 32
-	ldi r22, 32
-	ldi r31,HIGH(sprite1)
-	ldi r30,LOW(sprite1)
+	ldi r21, 16
+	ldi r22, 16
+	ldi r31,HIGH(sprite2)
+	ldi r30,LOW(sprite2)
 	rcall blit_sprite
 
 	rcall send_framebuffer
@@ -613,114 +613,88 @@ write_char:
 ; INPUT: r21 - Sprite width (pixel)
 ; INPUT: r22 - Sprite height (pixel)
 ; INPUT: r31:r30 - Ptr to start of sprite in FLASH
-; SCRATCHED: r0,r1,r16,r17,r18,r19,r22,r23,r26,r27,r28,r29,r30,r31
+; SCRATCHED:  r0,r1,r16,r17,r18,r19,r20,
 ; ============================
 blit_sprite:
-; calculate bit and byte offset for X start mask
-	mov r3,r19
-	mov r16,r19 ; input to remainder calculation: X start 
-	rcall calc_bit_and_byte_offset ; result: r16 = X start/8 , r17 = X start Bit Offset
-	mov r18,r17
-; r18 = Number of bits we need to shift byte from the sprite right before OR'ing
-	mov r23,r16 ; BACKUP: r23 =  X start/8
-; calculate bit and byte offset for X end mask
-	add r19,r21 ; r19 = x end pos (x start pos + sprite width)
-	mov r16,r19 ; use as input argument for remainder calculation
-	ldi r19,0xff ; r19 = X end bit mask
-	rcall calc_bit_and_byte_offset ; r16 = x end/8, r17 = X end bit offset
-	breq cont3 ; => x end is on a byte boundary, no mask needed
-.cont2	lsr r19
-	dec r17 ; decrement remainder from calc_bit_and_byte_offset by one
-	brne cont2
-	com r19 ; r19 = invert to get AND mask
-.cont3
-
-; r16 holds X end offset: (x start + sprite width)/8
-; r18 holds the number of bits we need to right-shift the sprite right before OR'ing it with the framebuffer byte
-; r19 holds the AND mask to apply to the sprite date before OR'ing the last byte in a row
-; r23 holds the X start offset on each row (in bytes)
-
-; calculate initial framebuffer write start address
-	ldi r17,BYTES_PER_ROW
-	mul r20,r17 ; Y*BYTES_PER_ROW
-	add r0 ,r3 ; + X
-	ldi r17,0
-	adc r1,r17 ; + carry
-
-	ldi r29,HIGH(framebuffer)
-	ldi r28,LOW(framebuffer)	
-	add r28,r0
-	adc r29,r1
-; r29:r28 now points to start of first row in frame buffer
-	movw r27:r26,r29:r28 ; backup start of row so we can later advance to the next framebuffer row
-	mov r0,r16 ; r0 = X end offset
-	sub r0,r23 ; r0 = number of bytes per row to copy (x end offset ) - (x start offset)
-
-; r0 now hold the number of bytes per row we need to copy
-	eor r1,r1 ; r1 = 0 => holds the index of the current byte in the row so we can check for first/last byte
-	eor r4,r4 ; TODO: Remove debug code
-
-.copy_row
-	lpm r17,Z+ ; fetch one byte of the sprite
-	cp r0,r1 ; is this the last byte on the row ?
-	brne cont
-; last byte on row, apply mask to sprite data
-	and r17,r19 ; mask out bits 
-.cont
-	tst r1 ; check whether this is the first byte in the row
-	brne cont_copy; 	
-; first byte on row , shift byte from sprite right if necessary
-	tst r18
-	breq cont_copy ; => no shift needed
-	mov r2,r18 ; r2 = shift counter
-.shift_loop
-	lsr r17
-	dec r2
-	brne shift_loop	
-.cont_copy
-	ld r16,Y ; fetch byte from frame buffer
-	or r16,r17 ; OR in byte from sprite
-	st Y+,r16 ; write byte to frame buffer	
-	inc r1 ; increment byte-on-row index
-	cp r1, r0 ; check whether this was the last byte on the row
-	brne copy_row
-	inc r4
-; we copied the last byte on the current row
-	eor r1,r1 ; reset byte-on-row counter
-; advance to next row of framebuffer
-	ldi r17,8
-	add r26,r17
-	ldi r17,0
-	adc r27,r17
-	movw r29:r28,r27:r26
-; decrement row counter
-	dec r22 ; decrement sprite height/rows-to-copy counter
-	brne copy_row
-
-; TODO: Remove debug
-	mov r16,r4
-	rcall write_dec	
-; TODO: Remove debug
-
+; calculate Y start (top) mask and Y start byte offset
+	mov r16,r20 ; use Y start as function argument
+	ldi r23,0xff ; initialize Y top mask
+	rcall calc_bit_and_byte_offset ; r16 = Y start / 8  , r17 = remainder
+	mov r25,r16 ; backup Y start/8 , needed later in framebuffer offset calculation
+	breq no_top_mask_needed ; remainder = 0 ?
+.create_top_mask
+	lsl r23 ; shift-in zero bit
+	dec r17
+	brne create_top_mask ; all mask bits processed ?
+.no_top_mask_needed
+; calculate Y end (bottom) mask and Y end byte offset
+	mov r16,r22 ; r16 = sprite height
+	add r16,r20 ; 16 = Y + sprite height
+	ldi r24,0xff ; initial Y bottom mask
+	rcall calc_bit_and_byte_offset ; calculate bit offset
+	breq no_bottom_mask_needed
+.create_bottom_mask
+	lsr r24 ; shift-in zero bit
+	dec r17 ; remainder-= 1
+	brne create_bottom_mask
+.no_bottom_mask_needed
+; calculate framebuffer start offset
+	ldi r18,128 ; CONSTANT: row height, also used later in copy loop when advancing to the next row !!!
+	ldi r20,0 ; CONSTANT: zero (also used in copy loop!!)
+	mul r25,r18 ; r1:r0 = ( Y start/8 ) * 128 bytes
+	add r0,r19 ; + X
+	adc r1,r20 ; + carry
+	ldi r29, HIGH(framebuffer) 	
+	ldi r28, LOW(framebuffer)
+	add r28,r0 ; + ( Y start/8 ) * 128 bytes + x 
+	adc r29,r1 ; 
+; r31:r30 now hold start of first row in framebuffer
+	mov r16,r21 ; r16 = column (X) counter
+	lsr r22 ; Sprite height /= 2
+	lsr r22  ; Sprite height /= 2
+	lsr r22  ; Sprite height /= 2
+	mov r17,r22 ; r17 = row ( sprite_height / 8 ) counter
+	movw X,Y  ; X = Y - backup start of row so we can later just increment it by 16 to advance to the start of the next row
+.copy_loop
+	lpm r25,Z+ ; load one byte worth of sprite data
+	cp r17,r22
+	brne not_first_row
+; apply top row mask
+	and r25,r23
+.not_first_row
+	tst r17
+	brne not_last_row
+; apply bottom row mask
+	and r25,r24
+.not_last_row	
+	ld r19, Y ; load one byte from framebuffer
+	or r19,r25 ; OR in sprite data
+	st Y+,r19
+	dec r16 ; x = x - 1
+	brne copy_loop
+	mov r16,r21 ; reset x column counter
+	add r26,r18 ; + 128
+	adc r27,r20 ; + 0 + carry
+	movw Y,X 
+	dec r17 ; decrement row counter
+	brne copy_loop
 	ret
-
+	
 ; ===========================
 ; Perform division by 8 and return the result and the remainder
 ; INPUT: r16 - Pixel offset
 ; RETURN: r16 = Byte offset
 ; RETURN: r17 = Bit-offset
 ; RETURN: flags indicate contents of r17
-; SCRATCHED: r16,r17
+; SCRATCHED: r0,r1,r16,r17,r18
 ; ===========================
 .calc_bit_and_byte_offset
 	mov r17,r16
 	lsr r16
 	lsr r16
 	lsr r16     ; r16 = floor(x/8) => Byte Offset
-	push r18
 	ldi r18,8
 	mul r16,r18 ; r1:r0 = floor(x/8)*8
-	pop r18
 	sub r17,r0 ; r17 = x - floor(x/8)*8 => Bit offset
 	ret
 	
@@ -851,28 +825,14 @@ sprite1:
     .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
     .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
     .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+sprite2:
+; data organization: 8 bits per column columns
+    .db 0xff,0x01,0x05,0x05,0xfd,0xfd,0x05,0x05
+    .db 0x01,0x01,0x01,0xf9,0x01,0x01,0x01,0xff
+    .db 0xff,0x80,0x80,0x80,0x9f,0x9f,0x80,0x9f
+    .db 0x93,0x9f,0x80,0x9f,0x92,0x9e,0x80,0xff ; 'x' (offset 0)
 
-    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
-    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
-    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
-    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
-
-    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
-    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
-    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
-    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
-
-    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
-    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
-    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
-    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
-
-    .db 0x0d,0x80,0xfc,0x9f,0x0c,0x00,0x00,0x00
-    .db 0xfc,0x9f,0x8c,0x98,0x0c,0x98,0x00,0x00
-    .db 0xfc,0x98,0x8c,0x98,0x8c,0x9f,0x00,0x00
-    .db 0x0c,0x00,0xfc,0x9f,0x0c,0x00,0x01,0x80 ; 16x16 sprite
-
-charset:
+charset:c
     .db 0x00,0x3e,0x7f,0x41,0x4d,0x4f,0x2e,0x00 ; '@' (offset 0)
     .db 0x00,0x7c,0x7e,0x0b,0x0b,0x7e,0x7c,0x00 ; 'a' (offset 8)
     .db 0x00,0x7f,0x7f,0x49,0x49,0x7f,0x36,0x00 ; 'b' (offset 16)
