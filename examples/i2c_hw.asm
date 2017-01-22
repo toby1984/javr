@@ -121,7 +121,15 @@ main:
 	ldi r16, CMD_DISPLAY_ON
 	rcall send_command
           brcs error	
-	
+
+	rcall clear_dirty_pages ; SCRATCHED: r0,r1,r16,r17,r18,r19,r31:r30
+
+	rcall send_framebuffer
+	brcs error
+
+	ldi r16,0
+	sts dirtyregions,r16
+
 ; ============================
 ; blit sprite from FLASH into framebuffer
 ; INPUT: r19 - Destination X position (pixel)
@@ -139,8 +147,6 @@ main:
 	sts spritedx,r16
 	sts spritedy,r16
 .loop
-	rcall clear_framebuffer
-
 	lds r19,spritex 
 	lds r16,spritedx
 	add r19,r16
@@ -174,17 +180,47 @@ main:
 	ldi r22, 16
 	ldi r31,HIGH(sprite1)
 	ldi r30,LOW(sprite1)
-	rcall blit_sprite
+;	rcall blit_sprite
 
 	SCOPE_PIN_OFF
+
+	lds r16,0
+	sts cursorx,r16
+	sts cursory,r16
+
+	ldi r16,0xff
+	sts dirtyregions,r16
+
+;	lds r16,dirtyregions
+;	rcall write_dec
+
+; INPUT: r27:r26 - String to print (FLASH)
+.check	ldi r27,HIGH(text)
+	ldi r26,LOW(text)
+	rcall write_flash_string
+
+; write one ASCII glyph into the framebuffer
+; INPUT: r16 - character to write
+; INPUT: r17 - column (X)
+; INPUT: r18 - row (Y)
+	ldi r16,'1'
+	ldi r17,5
+	ldi r18,5
+	rcall write_char
+
+	ldi r16,0xff
+	sts dirtyregions,r16
 
 	rcall send_framebuffer
 
 	SCOPE_PIN_ON
 	brcs error
-	rjmp loop
 
-          SUCCESS_LED_ON
+	rcall clear_dirty_pages ; SCRATCHED: r0,r1,r16,r17,r18,r19,r31:r30
+
+;	rjmp loop
+
+;          SUCCESS_LED_ON
           rjmp back
 .error        
 	ERROR_LED_ON
@@ -208,19 +244,15 @@ reset:
           lds r16,TWSR
           andi r16,%11111100
           sts TWSR,r16 ; prescaler bits = 00 => factor 1x
-;          ldi r16,12 ; 400 kHz
+          ldi r16,12 ; 400 kHz
 ;          ldi r16,19 ; 300 kHz
 ;          ldi r16,32 ; 200 kHz
-          ldi r16,72 ; 100 kHz
+;          ldi r16,72 ; 100 kHz
           sts TWBR,r16 ; factor
 
           ERROR_LED_OFF
           SUCCESS_LED_OFF
 	SCOPE_PIN_ON
-
-	ldi r16,0
-	sts cursorx,r16
-	sts cursory,r16
 
 	rcall reset_display
 	ret
@@ -229,12 +261,20 @@ reset:
 ; Reset display
 ; ======
 reset_display:
+	ldi r16,0
+	sts cursorx,r16
+	sts cursory,r16
+
 	cbi PORTD, DISPLAY_RESET_PIN
 	ldi r16,20
 	rcall msleep
 	sbi PORTD, DISPLAY_RESET_PIN
 	ldi r16,200
 	rcall msleep
+
+; mark all regions dirty so display RAM gets written completely
+	ldi r16,0xff
+	sts dirtyregions,r16
 
 ; switch to page addressing mode
 	ldi r16,CMD_PAGE_ADDRESSING_MODE
@@ -419,9 +459,7 @@ send_framebuffer:
 .pagenotdirty
 	dec r19
 	brne send_pages
-; mark all dirty regions as transmitted
-	ldi r16,0
-	sts dirtyregions,r16
+
 	clc
 	ret
 .error	
@@ -661,7 +699,7 @@ internal_write_string:
 ; INPUT: r16 - character to write
 ; INPUT: r17 - column (X)
 ; INPUT: r18 - row (Y)
-; SCRATCHED: r0,r1,r2,r3,r16, r18,r29,r28,r30 ,r31
+; SCRATCHED: r0,r1,r2,r3,r16,r17 r18,r29,r28,r30 ,r31
 ; =======
 write_char:
 ; map ASCII code to glyph  
@@ -693,6 +731,10 @@ write_char:
 	ldi r28,LOW(framebuffer)
 	add r28,r0
 	adc r29,r1
+
+;	mov r16,r18
+;	rcall mark_page_dirty
+
 ; r29:r28 holds pointer into framebuffer where to write glyph data
 	ldi r16 , GLYPH_HEIGHT_IN_BITS
 .row_loop
@@ -725,15 +767,25 @@ blit_sprite:
 .no_top_mask_needed
 ; calculate Y end (bottom) mask and Y end byte offset
 	mov r16,r22 ; r16 = sprite height
-	add r16,r20 ; 16 = Y + sprite height
+	add r16,r20 ; r16 = Y + sprite height
 	ldi r24,0xff ; initial Y bottom mask
-	rcall calc_bit_and_byte_offset ; calculate bit offset
+	rcall calc_bit_and_byte_offset ; r16 = (Y start + sprite height) / 8  , r17 = remainder
 	breq no_bottom_mask_needed
 .create_bottom_mask
 	lsr r24 ; shift-in zero bit
 	dec r17 ; remainder-= 1
 	brne create_bottom_mask
 .no_bottom_mask_needed
+; calculate display pages that will be dirtied
+; r25= Y start/8 
+; r16=(Y start + sprite height) / 8 
+.mark_dirty
+	rcall mark_page_dirty
+	cp r16,r25
+	breq all_marked
+	dec r16
+	rjmp mark_dirty
+.all_marked
 ; calculate framebuffer start offset
 	ldi r18,128 ; CONSTANT: row height, also used later in copy loop when advancing to the next row !!!
 	ldi r20,0 ; CONSTANT: zero (also used in copy loop!!)
@@ -775,7 +827,25 @@ blit_sprite:
 	dec r17 ; decrement row counter
 	brne copy_loop
 	ret
-	
+; ===========================
+; Mark page as dirty
+; INPUT: r16 - page no (0..7) to mark dirty
+; SCRATCHED: r17,r18
+; ===========================
+mark_page_dirty:
+	mov r17,r16
+	ldi r18,0x01
+.loop	tst r17
+	breq end
+	lsl r18
+	dec r17
+	rjmp loop
+.end
+	lds r17,dirtyregions
+	or r17,r18
+	sts dirtyregions,r17	
+	ret
+
 ; ===========================
 ; Perform division by 8 and return the result and the remainder
 ; INPUT: r16 - Pixel offset
@@ -784,7 +854,7 @@ blit_sprite:
 ; RETURN: flags indicate contents of r17
 ; SCRATCHED: r0,r1,r16,r17,r18
 ; ===========================
-.calc_bit_and_byte_offset
+calc_bit_and_byte_offset:
 	mov r17,r16
 	lsr r16
 	lsr r16
@@ -837,17 +907,37 @@ scroll_up:
 	pop r27
 	pop r26
 	ret
-; ======
-; clears the screen buffer
-; SCRATCHED: r16, r29:r28, r31:r30
-; ======
 
-clear_framebuffer:
-           ldi r16,0x00
+; ============================
+; Clears only the framebuffer regions that are marked dirty
+; SCRATCHED: r0,r1,r16,r17,r18,r19,r31:r30
+; ============================
+clear_dirty_pages:
+	lds r19,dirtyregions
+	ldi r17,7	; page no
+.clr_loop  
+	lsl r19
+	brcc pagenotdirty
+	rcall clear_page
+.pagenotdirty
+	dec r17
+	brne clr_loop	
+	ret
+
+; ============================
+; Clears only the framebuffer regions that are marked dirty
+; INPUT: r17 - page no to clear (0...7)
+; SCRATCHED: r0,r1,r16,18,r31:r30
+; ============================
+clear_page:
+	ldi r16,128
+	mul r16,r17
            ldi r31, HIGH(framebuffer) ; Z
            ldi r30, LOW(framebuffer) ; Z
-           ldi r29, HIGH(FRAMEBUFFER_SIZE/8)
-           ldi r28, LOW(FRAMEBUFFER_SIZE/8)
+	add r30,r0
+	adc r31,r1
+	 ldi r18,16 ; 16 * 8 bytes to clear = 128 bytes = 1 page
+           ldi r16,0x00
 .clr_loop  
            st Z+, r16
            st Z+, r16
@@ -857,12 +947,9 @@ clear_framebuffer:
            st Z+, r16
            st Z+, r16
            st Z+, r16
-           sbiw r29:r28,1
+          	dec r18
            brne clr_loop
- ; mark all 8 display regions as needing transmission
-	ldi r16,0xff
-	sts dirtyregions,r16
-           ret
+	ret
 
 ; =======
 ; Sleep up to 255 millseconds
@@ -972,7 +1059,6 @@ cmd2:     .db REQ_COMMAND_STREAM,0x20, %00 ; set horizontal addressing mode (00)
 cmd3:     .db REQ_COMMAND_STREAM,0x20, %10 ; set horizontal addressing mode (00), vertical = (01),page = 10)
 
 text: .db "text1",0
-text2: .db "text2",0
 
 sprite1:
 ; data organization: 8 bits per column columns
