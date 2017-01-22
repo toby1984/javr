@@ -379,6 +379,10 @@ public class ATMega88 extends AbstractAchitecture
             @Override
             public InstructionEncoding pick(InstructionNode node, List<InstructionEncoding> candidates) 
             {
+                if ( ! (node.dst() instanceof RegisterNode ) ) 
+                {
+                    throw new RuntimeException("'st' instruction register a register as destination");
+                }
                 final RegisterNode reg = (RegisterNode) node.dst();
                 switch ( reg.register.getRegisterNumber() ) 
                 {

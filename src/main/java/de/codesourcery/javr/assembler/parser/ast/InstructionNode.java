@@ -79,7 +79,11 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
                 }
             });
         }
-        this.sizeInBytes = context.getArchitecture().getInstructionLengthInBytes( this, context , true );        
+        try {
+            this.sizeInBytes = context.getArchitecture().getInstructionLengthInBytes( this, context , true );
+        } catch(Exception e) {
+            context.error( e.getMessage() , this );
+        }
         return true;
     }
 }

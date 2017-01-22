@@ -10,10 +10,16 @@
 
 .equ delay_in_cycles = (freq / target_freq)/2
 
-#define ERROR_LED 7
-#define SUCCESS_LED 6
+; I/O pins
 #define TRIGGER_PIN 0
+#define SCOPE_PIN 2
 #define DISPLAY_RESET_PIN 4
+#define SUCCESS_LED 6
+#define ERROR_LED 7
+
+; Handy macros
+#define SCOPE_PIN_ON  sbi PORTD, SCOPE_PIN
+#define SCOPE_PIN_OFF cbi PORTD, SCOPE_PIN
 
 #define SUCCESS_LED_ON  sbi PORTD, SUCCESS_LED
 #define SUCCESS_LED_OFF cbi PORTD, SUCCESS_LED
@@ -118,8 +124,6 @@ main:
 	ldi r16, CMD_DISPLAY_ON
 	rcall send_command
           brcs error	
-
-	rcall clear_framebuffer
 	
 ; ============================
 ; blit sprite from FLASH into framebuffer
@@ -131,15 +135,55 @@ main:
 ; SCRATCHED: r0,r1,r16,r17,r18,r19,r22,r23,r26,r27,r28,r29,r30,r31
 ; ============================
 
-	ldi r19,64-(32/2)
-	ldi r20,32-(32/2)
+	ldi r16,10
+	sts spritex,r16
+	sts spritey,r16
+	ldi r16,1
+	sts spritedx,r16
+	sts spritedy,r16
+.loop
+	rcall clear_framebuffer
+
+	lds r19,spritex 
+	lds r16,spritedx
+	add r19,r16
+	cpi r19,5
+	breq invx
+	cpi r19,127-16
+	breq invx
+	rjmp noxborder
+.invx
+	com r16
+.noxborder
+	sts spritex,r19
+	sts spritedx,r16	
+
+; Y axis
+	lds r20,spritey
+	lds r16,spritedy
+	add r20,r16
+	cpi r20,5
+	breq invy
+	cpi r20,63-16
+	breq invy
+	rjmp noyborder
+.invy
+	com r16
+.noyborder
+	sts spritey,r20
+	sts spritedy,r16	
+	
 	ldi r21, 16
 	ldi r22, 16
-	ldi r31,HIGH(sprite2)
-	ldi r30,LOW(sprite2)
+	ldi r31,HIGH(sprite1)
+	ldi r30,LOW(sprite1)
 	rcall blit_sprite
 
+	SCOPE_PIN_OFF
 	rcall send_framebuffer
+	SCOPE_PIN_ON
+	brcs error
+	rjmp loop
 
           SUCCESS_LED_ON
           rjmp back
@@ -153,9 +197,9 @@ main:
 ; =====
 reset:
 ;	cbi DDRD,DISPLAY_RESET_PIN ; set to input
-;          sbi PORTD,DISPLAY_RESET_PIN ; Enable pull-up resistor
+;          sbi PORTD,DISPLAY_RESET_PIN ; Enable pull-up resisstor
 	sbi DDRD,DISPLAY_RESET_PIN ; set to output
-
+	sbi DDRD,SCOPE_PIN ; set to output
 	sbi DDRD,ERROR_LED ; set to output
 	sbi DDRD,SUCCESS_LED ; set to output
 	cbi DDRB,TRIGGER_PIN ; set to input
@@ -172,6 +216,7 @@ reset:
 
           ERROR_LED_OFF
           SUCCESS_LED_OFF
+	SCOPE_PIN_ON
 
 	rcall reset_display
 
@@ -331,6 +376,23 @@ send_byte:
           sec
 	ret
 
+
+; =========
+; send a single byte without error checking
+; INPUT: r16 - byte to send
+; SCRATCHED: r16
+; =========
+send_byte_fast:
+	sts TWDR, r16 
+	ldi r16, (1<<TWINT) | (1<<TWEN) 
+	sts TWCR, r16                    
+.wait_data
+	lds r16,TWCR 
+	sbrs r16,TWINT 
+	rjmp wait_data
+          clc
+	ret
+
 ; ====== send full framebuffer
 ; SCRATCHED: r16,r29:r28,r31:r30
 ; RETURN: Carry clear => transmission successful , Carry set => Transmission failed
@@ -345,9 +407,23 @@ send_framebuffer:
 
 	ldi r31,HIGH(framebuffer)
 	ldi r30,LOW(framebuffer)
-	ldi r29,HIGH(FRAMEBUFFER_SIZE)
-	ldi r28,LOW(FRAMEBUFFER_SIZE)
+	ldi r29,HIGH(FRAMEBUFFER_SIZE/8)
+	ldi r28,LOW(FRAMEBUFFER_SIZE/8)
 .loop
+	ld r16,Z+
+	rcall send_byte_fast
+	ld r16,Z+
+	rcall send_byte_fast
+	ld r16,Z+
+	rcall send_byte_fast	
+	ld r16,Z+
+	rcall send_byte_fast
+	ld r16,Z+
+	rcall send_byte_fast
+	ld r16,Z+
+	rcall send_byte_fast
+	ld r16,Z+
+	rcall send_byte_fast
 	ld r16,Z+
 	rcall send_byte
 	brcs error
@@ -363,39 +439,6 @@ send_framebuffer:
 ; SCRATCHED: r0,r1,r16,r19,r20,r26,r27,r31,r30
 ; ========	
 write_dec:
-	push r0
-	push r1
-	push r2
-	push r3
-	push r4
-	push r5
-	push r6
-	push r7
-	push r8
-	push r9
-	push r10
-	push r11
-	push r12
-	push r13
-	push r14
-	push r15
-	push r16
-	push r17
-	push r18
-	push r19
-	push r20
-	push r21
-	push r22
-	push r23
-	push r24
-	push r25
-	push r26
-	push r27
-	push r28
-	push r29
-	push r30
-	push r31
-
 	mov r19,r16 ; backup: r19 = x
 	ldi r31, HIGH(stringbuffer)
 	ldi r30, LOW(stringbuffer)
@@ -441,39 +484,6 @@ write_dec:
 	ldi r26,LOW(stringbuffer)
 	ldi r27,HIGH(stringbuffer)
 	rcall write_sram_string	
-
-	pop r31
-	pop r30
-	pop r29
-	pop r28
-	pop r27
-	pop r26
-	pop r25
-	pop r24
-	pop r23
-	pop r22
-	pop r21
-	pop r20
-	pop r19
-	pop r18
-	pop r17
-	pop r16
-	pop r15
-	pop r14
-	pop r13
-	pop r12
-	pop r11
-	pop r10
-	pop r9
-	pop r8
-	pop r7
-	pop r6
-	pop r5
-	pop r4
-	pop r3
-	pop r2
-	pop r1
-	pop r0
 
 	ret
 ; ====
@@ -750,9 +760,16 @@ clear_framebuffer:
            ldi r16,0x0
            ldi r31, HIGH(framebuffer) ; Z
            ldi r30, LOW(framebuffer) ; Z
-           ldi r29, HIGH(FRAMEBUFFER_SIZE)
-           ldi r28, LOW(FRAMEBUFFER_SIZE)
+           ldi r29, HIGH(FRAMEBUFFER_SIZE/8)
+           ldi r28, LOW(FRAMEBUFFER_SIZE/8)
 .clr_loop  
+           st Z+, r16
+           st Z+, r16
+           st Z+, r16
+           st Z+, r16
+           st Z+, r16
+           st Z+, r16
+           st Z+, r16
            st Z+, r16
            sbiw r29:r28,1
            brne clr_loop
@@ -803,13 +820,60 @@ sleep_one_ms:
 ; +4 cycles for RET 
 ; =========
 usleep:
-          ldi r17 , cycles_per_us ; 1 cycle
+          ldi r17 , cycles_per_us ; 1 cycles
           mul r18 , r17 ; 1 cycle , result is in r1:r0     
           movw r27:r26 , r1:r0 ; 1 cycle
           sbiw r27:r26,14  ; 2 cycles , adjust for cycles spent invoking this method + preparation  
 .loop     sbiw r27:r26,4 ; 2 cycles , subtract 4 cycles per loop iteration      
 	brpl loop ; 2 cycles, 1 cycle if branch not taken
 	ret ; 4 cycles
+
+; =================================================
+; Random number generator
+; OUTPUT: r4
+; SCRATCHED: r31:r30
+; =================================================
+rand:
+	push r5
+	push r6
+	push r7
+
+	ldi r31,HIGH(rnd)
+	ldi r30,LOW(rnd)
+
+	ld r4,Z+
+	ld r5,Z+
+	ld r6,Z+
+	ld r7,Z
+
+	lsl	r4
+	rol	r5
+	rol	r6
+	rol	r7
+	sbrs	r7,7
+	rjmp return
+	ldi	r24,0xB5
+	eor	r4,r24
+	ldi	r24,0x95
+	eor	r5,r24
+	ldi	r24,0xAA
+	eor	r6,r24
+	ldi	r24,0x20
+	eor	r7,r24
+
+.return
+	ldi r31,HIGH(rnd)
+	ldi r30,LOW(rnd)
+
+	st Z,r7
+	st -Z,r6
+	st -Z,r5
+	st Z,r4
+
+	pop r7
+	pop r6
+	pop r5
+	ret
 
 commands: .dw cmd1,2
           .dw cmd2,3
@@ -819,20 +883,11 @@ cmd2:     .db REQ_COMMAND_STREAM,0x20, %00 ; set horizontal addressing mode (00)
 text: .db "text1",0
 text2: .db "text2",0
 
-; data organization: columns FLIP_XY 
 sprite1:
-    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
-    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
-    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
-    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
-sprite2:
 ; data organization: 8 bits per column columns
-    .db 0xff,0x01,0x05,0x05,0xfd,0xfd,0x05,0x05
-    .db 0x01,0x01,0x01,0xf9,0x01,0x01,0x01,0xff
-    .db 0xff,0x80,0x80,0x80,0x9f,0x9f,0x80,0x9f
-    .db 0x93,0x9f,0x80,0x9f,0x92,0x9e,0x80,0xff ; 'x' (offset 0)
-
-charset:c
+    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+    .db 0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff ; '0'
+charset:
     .db 0x00,0x3e,0x7f,0x41,0x4d,0x4f,0x2e,0x00 ; '@' (offset 0)
     .db 0x00,0x7c,0x7e,0x0b,0x0b,0x7e,0x7c,0x00 ; 'a' (offset 8)
     .db 0x00,0x7f,0x7f,0x49,0x49,0x7f,0x36,0x00 ; 'b' (offset 16)
@@ -928,8 +983,16 @@ charset_mapping:
     .db 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
     .db 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
 
-.dseg 
+.dseg
 cursorx: .byte 1
 cursory: .byte 1
-framebuffer: .byte 1024
+
 stringbuffer: .byte 4
+rnd: .byte 4
+spritex: .byte 1
+spritey: .byte 1
+spritedx: .byte 1
+spritedy: .byte 1
+.byte 1
+
+framebuffer: .byte 1024
