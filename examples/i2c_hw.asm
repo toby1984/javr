@@ -62,6 +62,7 @@
 
 #define CMD_DISPLAY_ON 0
 #define CMD_ROW_ADDRESSING_MODE 1
+#define CMD_PAGE_ADDRESSING_MODE 2
 
 jmp init  ; RESET
 jmp onirq ; INT0 - ext IRQ 0
@@ -116,10 +117,6 @@ main:
           rcall reset
           
           rcall wait_for_button            
-
-	ldi r16, CMD_ROW_ADDRESSING_MODE
-	rcall send_command
-          brcs error	
 
 	ldi r16, CMD_DISPLAY_ON
 	rcall send_command
@@ -180,7 +177,9 @@ main:
 	rcall blit_sprite
 
 	SCOPE_PIN_OFF
+
 	rcall send_framebuffer
+
 	SCOPE_PIN_ON
 	brcs error
 	rjmp loop
@@ -193,7 +192,8 @@ main:
 	ret
 
 ; ====
-; reset bus
+; reset system
+; RETURN: Carry clear => succes , Carry set => failure
 ; =====
 reset:
 ;	cbi DDRD,DISPLAY_RESET_PIN ; set to input
@@ -208,21 +208,21 @@ reset:
           lds r16,TWSR
           andi r16,%11111100
           sts TWSR,r16 ; prescaler bits = 00 => factor 1x
-          ldi r16,12 ; 400 kHz
+;          ldi r16,12 ; 400 kHz
 ;          ldi r16,19 ; 300 kHz
 ;          ldi r16,32 ; 200 kHz
-;          ldi r16,72 ; 100 kHz
+          ldi r16,72 ; 100 kHz
           sts TWBR,r16 ; factor
 
           ERROR_LED_OFF
           SUCCESS_LED_OFF
 	SCOPE_PIN_ON
 
-	rcall reset_display
-
 	ldi r16,0
 	sts cursorx,r16
 	sts cursory,r16
+
+	rcall reset_display
 	ret
 
 ; ======
@@ -230,9 +230,15 @@ reset:
 ; ======
 reset_display:
 	cbi PORTD, DISPLAY_RESET_PIN
-	ldi r16,10
+	ldi r16,20
 	rcall msleep
 	sbi PORTD, DISPLAY_RESET_PIN
+	ldi r16,200
+	rcall msleep
+
+; switch to page addressing mode
+	ldi r16,CMD_PAGE_ADDRESSING_MODE
+	rcall send_command
 	ret
 	
 ; ======
@@ -255,14 +261,15 @@ wait_for_button:
 ; send command.
 ; INPUT: r16 - command table entry index 
 ; SCRATCHED: r2,r16,r19:r18,r20,r31:r30
+; RETURN: Carry clear => transmission successful , Carry set => Transmission failed
 ; ====
 
 send_command:
-          lsl r16 ; *4 => size of command table entries
-          lsl r16
           ldi r31 , HIGH(commands)
           ldi r30 , LOW(commands)
-	eor r2,r2
+          lsl r16 ; * 4 bytes per table entry ( 16-bit address + 16 bit byte count)
+          lsl r16
+	eor r2,r2 ; r2 = 0
           add r30,r16
           adc r31,r2
           lpm r16,Z+ ; cmd address low
@@ -291,8 +298,11 @@ send_bytes:
           sbiw r29:r28,1
           brne data_loop          
 ; transmission successful
+	rcall send_stop   
           clc
+	ret
 .send_failed
+	sec
 	rcall send_stop       	
           ret
 
@@ -389,27 +399,70 @@ send_byte_fast:
 .wait_data
 	lds r16,TWCR 
 	sbrs r16,TWINT 
-	rjmp wait_data
-          clc
+	rjmp wait_data          
 	ret
 
 ; ====== send full framebuffer
-; SCRATCHED: r16,r29:r28,r31:r30
+; SCRATCHED: r0,r1,r16,r29:r28,r31:r30
 ; RETURN: Carry clear => transmission successful , Carry set => Transmission failed
 ; ======
 send_framebuffer:
+	lds r18,dirtyregions	; load dirty regions bit-mask (bit X = page X)
+	ldi r19,7	; number of page we're currently checking
+.send_pages
+	lsl r18 ; shift bit 7 into carry
+	brcc pagenotdirty
+
+	mov r17,r19
+	rcall send_page ; SCRATCHED: r0,r1,r16,r17,r31:r30
+	brcs error
+.pagenotdirty
+	dec r19
+	brne send_pages
+; mark all dirty regions as transmitted
+	ldi r16,0
+	sts dirtyregions,r16
+	clc
+	ret
+.error	
+	sec
+	ret
+
+; =============================
+; INPUT: r17 - no. of page to send (0...7)
+; SCRATCHED: r0,r1,r16,r17,r31:r30
+; =============================
+send_page:
+; select page
+	ldi r16,0xb0 ; 0xb0 | page no => switch to page x
+	or r16,r17
+	rcall send_single_command
+	brcs error
+
+; select lower start column
+	ldi r16,0x00
+	rcall send_single_command
+; select upper start column
+	ldi r16,0x10
+	rcall send_single_command
+
+; initiage GDDRAM transfer
 	rcall send_start
-          brcs error
+	brcs error
 
 	ldi r16,REQ_DATA_STREAM
 	rcall send_byte
 	brcs error
 
+; calculate offset in frame buffer	
+	ldi r16,128
+	mul r16,r17 ; r1:r0 = 128 * pageNo
 	ldi r31,HIGH(framebuffer)
 	ldi r30,LOW(framebuffer)
-	ldi r29,HIGH(FRAMEBUFFER_SIZE/8)
-	ldi r28,LOW(FRAMEBUFFER_SIZE/8)
-.loop
+	add r30,r0
+	adc r31,r1	 ; + carry
+	ldi r17,16 ; 16*8 bytes to transmit
+.send_loop
 	ld r16,Z+
 	rcall send_byte_fast
 	ld r16,Z+
@@ -427,11 +480,45 @@ send_framebuffer:
 	ld r16,Z+
 	rcall send_byte
 	brcs error
-	sbiw r29:r28,1
-	brne loop
+	dec r17
+	brne send_loop
+	rcall send_stop
 	clc
-.error	rcall send_stop
 	ret
+.error
+	rcall send_stop
+	sec
+	ret			
+		
+; =========
+; send single-byte command to display
+; INPUT: r16 - command to send
+; SCRATCHED: r16
+; RESULT: carry clear => transmission ok, carry set => transmission failed
+; ============
+send_single_command:
+	push r17
+	mov r17,r16 ; backup
+	rcall send_start
+	brcs error
+
+	ldi r16,REQ_SINGLE_COMMAND
+	rcall send_byte
+	brcs error
+
+	mov r16,r17
+	rcall send_byte
+	brcs error
+
+	rcall send_stop
+	pop r17
+	clc
+	ret	
+.error 
+	rcall send_stop
+	pop r17
+	sec
+	ret	
 
 ; ========
 ; Write decimal number
@@ -500,7 +587,6 @@ div10:
 	rjmp loop
 .end	
 	ret
-
 
 ; =======
 ; write string from flash memory
@@ -757,7 +843,7 @@ scroll_up:
 ; ======
 
 clear_framebuffer:
-           ldi r16,0x0
+           ldi r16,0x00
            ldi r31, HIGH(framebuffer) ; Z
            ldi r30, LOW(framebuffer) ; Z
            ldi r29, HIGH(FRAMEBUFFER_SIZE/8)
@@ -773,6 +859,9 @@ clear_framebuffer:
            st Z+, r16
            sbiw r29:r28,1
            brne clr_loop
+ ; mark all 8 display regions as needing transmission
+	ldi r16,0xff
+	sts dirtyregions,r16
            ret
 
 ; =======
@@ -877,8 +966,10 @@ rand:
 
 commands: .dw cmd1,2
           .dw cmd2,3
+          .dw cmd3,3
 cmd1:     .db REQ_SINGLE_COMMAND,0xaf ; switch display on
-cmd2:     .db REQ_COMMAND_STREAM,0x20, %00 ; set horizontal addressing mode (00), vertical = (01)
+cmd2:     .db REQ_COMMAND_STREAM,0x20, %00 ; set horizontal addressing mode (00), vertical = (01),page = 10
+cmd3:     .db REQ_COMMAND_STREAM,0x20, %10 ; set horizontal addressing mode (00), vertical = (01),page = 10)
 
 text: .db "text1",0
 text2: .db "text2",0
@@ -913,7 +1004,7 @@ charset:
     .db 0x00,0x1f,0x3f,0x60,0x60,0x3f,0x1f,0x00 ; 'v' (offset 176)
     .db 0x00,0x7f,0x7f,0x30,0x18,0x30,0x7f,0x7f ; 'w' (offset 184)
     .db 0x00,0x63,0x77,0x1c,0x1c,0x77,0x63,0x00 ; 'x' (offset 192)
-    .db 0x00,0x07,0x0f,0x78,0x78,0x0f,0x07,0x00 ; 'y' (offset 200)
+    .db 0x00,0x07,0x0f,0x10,0x78,0x0f,0x07,0x00 ; 'y' (offset 200)
     .db 0x00,0x61,0x71,0x59,0x4d,0x47,0x43,0x00 ; 'z' (offset 208)
     .db 0x00,0x00,0x7f,0x7f,0x41,0x41,0x00,0x00 ; '[' (offset 216)
     .db 0x00,0x00,0x41,0x41,0x7f,0x7f,0x00,0x00 ; ']' (offset 224)
@@ -984,11 +1075,18 @@ charset_mapping:
     .db 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
 
 .dseg
+; current cursor position
 cursorx: .byte 1
 cursory: .byte 1
 
+; dirty-page tracking (0 bit per display page, bit 0 = page0)
+; only dirty pages are transmitted to display controller
+dirtyregions: .byte 1
+
+; buffer used by write_dec (3 digits + 0 byte)
 stringbuffer: .byte 4
 rnd: .byte 4
+; sprite coordinates
 spritex: .byte 1
 spritey: .byte 1
 spritedx: .byte 1
