@@ -1,9 +1,8 @@
 ## What's this ?
 
 A crude attempt at an editor & assembler/disassembler for Atmel microcontrollers (although not for the tiny ones)... very much a work in progress.
-
-Basic assembly/disassembly works properly (verified by comparing generated disassembly with avr-objdump output and disassembling and re-compiling large amounts of data that cover every possible opcode). 
-Not all preprocessor / assembler directives are implemented yet and the editor is still quite crude (supports background compilation,disassemble,save,load,searching back & forth (using CTRL-k,CTRL-k CTRL-b) and navigating to a specific line number (CTRL-g) nothing else is implemented. I intend to add a rename refactoring, hyperlinking and some other goodies soon though...
+Assembly/disassembly works pretty good now (verified by dog fooding and comparing generated disassembly with avr-objdump output and disassembling and re-compiling large amounts of data that cover every possible opcode). 
+Not all preprocessor / assembler directives are implemented yet and the editor is still quite crude (supports background compilation,disassemble,save,load,searching back & forth (using CTRL-k,CTRL-k CTRL-b) and navigating to a specific line number (CTRL-g)/your last edit as well as CTRL-clicking on identifiers to jump to their definition. I intend to add a rename refactoring and more goodies though (auto-indent and block editing are sorely needed as well as support for multi-line macros...)
 
 <img src="https://raw.githubusercontent.com/toby1984/javr/master/screenshot.png" width="640" height="480" />
 
@@ -66,12 +65,12 @@ Note that for reasons unknown to me the AVR assembler duplicates a lot of prepro
 
 - Syntax coloring is off when using MSDOS-style line endings (won't fix this since it is related to the fact that Swing text components internally convert all EOL sequences to '\n' but my parser uses the 'true' text offsets)
 - parsing #define is currently broken when trying to #define stuff like (a+b)/c (gets irritated by the leading parens)
-- parsing string literals currently swallows whitespace (0x20) chars
+- parsing string literals currently swallows whitespace (0x20) chars in the strings
+- Parser throws NPE because of NULL ICompilationContext when certain tokens are present at the end of the top-level file. This is because the PreprocessingLexer prematurely pops the last context while the parser is not yet done parsing. Work-around is to just add some more code to the very end of the top-level file.
 
 ## To do
 
 - Add support for .org directive
 - Add parse error recovery
-- Still lots of testing needed...
 - Add support for #else / #elseif
 - Find a way for meaningful error reporting when expanding macros...
