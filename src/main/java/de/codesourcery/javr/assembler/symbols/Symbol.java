@@ -40,6 +40,7 @@ public final class Symbol
     private Type type;
     private Object value;
     private TextRegion textRegion;
+    private boolean isReferenced;
     
     public static enum Type 
     {
@@ -149,4 +150,40 @@ public final class Symbol
     public void setTextRegion(TextRegion textRegion) {
         this.textRegion = textRegion;
     }
+    
+    /**
+     * Marks this symbol as being referenced at least once somewhere.
+     */
+    public void markAsReferenced() {
+        this.isReferenced = true;
+    }
+    
+    /**
+     * Returns whether this symbol is referenced at least once somewhere.
+     * 
+     * @return
+     */
+    public boolean isReferenced() {
+        return isReferenced;
+    }
+    
+    /**
+     * Check whether this symbol has a type that is not {@link Type#UNDEFINED}.
+     * 
+     * @return
+     */
+    public boolean isDefined() 
+    {
+        return this.getType() != Type.UNDEFINED;
+    }
+    
+    /**
+     * Check whether this symbol has type {@link Type#UNDEFINED}.
+     * 
+     * @return
+     */    
+    public boolean isUndefined() 
+    {
+        return ! isDefined();
+    }    
 }

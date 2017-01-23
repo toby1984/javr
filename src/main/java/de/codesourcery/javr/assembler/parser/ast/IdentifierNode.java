@@ -75,6 +75,9 @@ public class IdentifierNode extends AbstractASTNode implements IValueNode,Resolv
     {
         if ( symbol == null ) {
             symbol = context.currentSymbolTable().maybeGet( name ).orElse( null );
+            if ( symbol != null ) {
+                symbol.markAsReferenced();
+            }
         }
         return symbol != null;
     }

@@ -49,7 +49,6 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.IntSupplier;
 
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -126,9 +125,9 @@ import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
-import de.codesourcery.javr.ui.EditorSettings.SourceElement;
 import de.codesourcery.javr.ui.CaretPositionTracker;
 import de.codesourcery.javr.ui.CaretPositionTracker.CaretPosition;
+import de.codesourcery.javr.ui.EditorSettings.SourceElement;
 import de.codesourcery.javr.ui.IDEMain;
 import de.codesourcery.javr.ui.IProject;
 import de.codesourcery.javr.ui.config.IApplicationConfig;
@@ -167,7 +166,7 @@ public class EditorPanel extends JPanel
 	private JFrame searchWindow = null;
 
 	private JFrame symbolWindow = null;
-
+	
 	private final SymbolTableModel symbolModel = new SymbolTableModel();
 
 	private final RecompilationThread recompilationThread = new RecompilationThread();
@@ -1129,7 +1128,7 @@ public class EditorPanel extends JPanel
 		{
 		    final CompilerSettings compilerSettings = new CompilerSettings();
 		    final IObjectCodeWriter writer = new ObjectCodeWriter();
-            final SymbolTable globalSymbolTable = new SymbolTable( SymbolTable.GLOBAL ); // fake global symbol table so we don't fail parsing because of duplicate symbols
+            final SymbolTable globalSymbolTable = new SymbolTable( SymbolTable.GLOBAL ); // fake global symbol table so we don't fail parsing because of duplicate symbols already in the real one
 			final ICompilationContext context = new CompilationContext( tmpUnit , globalSymbolTable , writer , project , compilerSettings , project.getConfig() );
 
             ParseSourcePhase.parseWithoutIncludes( context, tmpUnit , project );
@@ -1150,7 +1149,6 @@ public class EditorPanel extends JPanel
 		try 
 		{
 			compilationSuccessful = project.compile();
-
 		} 
 		catch(Exception e) 
 		{
@@ -1158,7 +1156,7 @@ public class EditorPanel extends JPanel
 			root.addMessage( toCompilationMessage( currentUnit, e ) );
 		}
 		symbolModel.setSymbolTable( currentUnit.getSymbolTable() );    
-
+		
 		final long compileEnd =  System.currentTimeMillis();
 		
 		final String success = compilationSuccessful ? "successful" : "failed"; 
@@ -1173,6 +1171,23 @@ public class EditorPanel extends JPanel
 		currentUnit.addMessage( CompilationMessage.info(currentUnit,"Compilation "+success+" ("+assembleTime+") on "+df.format( ZonedDateTime.now() ) ) );
 
         final List<CompilationMessage> allMessages = root.getMessages(true);
+        
+        // create warnings for symbols defined in this unit but not used anywhere
+        if ( compilationSuccessful ) 
+        {
+            project.getGlobalSymbolTable().visitSymbols( (symbol) -> 
+            {
+                if ( symbol.getCompilationUnit().hasSameResourceAs( this.currentUnit ) ) 
+                {
+                    if ( ! symbol.isReferenced() ) 
+                    {
+                        allMessages.add( CompilationMessage.warning( currentUnit, "Symbol '"+symbol.name()+"' is not referenced" , symbol.getNode() ) );
+                    }
+                }
+                return true;
+            });
+        }
+        
         messageFrame.addAll( allMessages );        
         
         wasCompiledAtLeastOnce = true;
@@ -1357,6 +1372,24 @@ public class EditorPanel extends JPanel
 		});
 
 		final JTree tree = new JTree( astTreeModel );
+		
+		tree.addMouseListener( new MouseAdapter() 
+		{
+		    public void mouseClicked(MouseEvent e) 
+		    {
+		        if ( e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1 ) 
+		        {
+		            final TreePath path = tree.getClosestPathForLocation( e.getX() ,  e.getY() );
+		            if ( path != null && path.getPath() != null && path.getPath().length >= 1 ) 
+		            {
+		                final ASTNode node = (ASTNode) path.getLastPathComponent();
+		                if ( node.getTextRegion() != null ) {
+		                    setSelection( node.getTextRegion() );
+		                }
+		            }
+		        }
+		    }
+		});
 
 		tree.setCellRenderer( new DefaultTreeCellRenderer() 
 		{
@@ -1378,18 +1411,18 @@ public class EditorPanel extends JPanel
 					else  if ( node instanceof PreprocessorNode) {
 						text = "#"+((PreprocessorNode) node).type.literal;
 					} else if ( node instanceof OperatorNode) {
-						text = "Operator: "+((OperatorNode) node).type.getSymbol();
+						text = "OperatorNode: "+((OperatorNode) node).type.getSymbol();
 					} else  if ( node instanceof IdentifierNode) {
-						text = "identifier: "+((IdentifierNode) node).name.value;
+						text = "IdentifierNode: "+((IdentifierNode) node).name.value;
 					}
 					else if ( node instanceof StatementNode) {
-						text = "statement";
+						text = "StatementNode";
 					}                     
 					else if ( node instanceof LabelNode) {
-						text = "label:"+((LabelNode) node).identifier.value;
+						text = "LabelNode:"+((LabelNode) node).identifier.value;
 					} 
 					else if ( node instanceof CommentNode) {
-						text = "comment: "+((CommentNode) node).value;
+						text = "CommentNode: "+((CommentNode) node).value;
 					}                     
 					else if ( node instanceof NumberLiteralNode ) 
 					{

@@ -654,10 +654,12 @@ public class PreprocessingLexer implements Lexer
                 {
                     continue;
                 }
+                
                 expanded.add( macroName.value );
                 anyIdentifiersExpanded = true;
 
                 final Symbol symbol = optSymbol.get();
+                symbol.markAsReferenced();
                 final MacroDefinition macroDef = (MacroDefinition) symbol.getValue();		
 
                 // check whether first non-whitespace token is opening parenthesis (=start of argument list) 

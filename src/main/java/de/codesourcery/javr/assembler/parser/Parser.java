@@ -211,7 +211,6 @@ public class Parser
     {
         initialize(context,unit,lexer);
         
-        int stmtCount = 0;
         while ( ! this.lexer.eof() ) 
         {
             try 
@@ -222,7 +221,6 @@ public class Parser
                     throw new ParseException("Not a valid statement",lexer.peek());
                 }
                 if ( stmt.hasChildren() ) {
-                    stmtCount++;
                     ast.addChild( stmt );
                 }
             } 
@@ -953,11 +951,6 @@ public class Parser
         return yard.getResult( lexer.peek().region() );
     }
 
-    private ASTNode parseAtom(Lexer lexer) 
-    {
-        return parseAtom(lexer,context);
-    }
-    
     private static ASTNode parseAtom(Lexer lexer,ICompilationContext context) 
     {
         // character literal
@@ -1126,21 +1119,5 @@ public class Parser
             }
         }
         return null;
-    }
-
-    private boolean parseEOL() {
-
-        if ( lexer.peek().isEOLorEOF() ) 
-        {
-            if ( lexer.eof() ) 
-            {
-                return true;
-            }            
-            while ( lexer.peek().isEOL() ) { // consume all linefeeds
-                lexer.next();
-            }
-            return true;
-        }
-        return false;
     }
 }

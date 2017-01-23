@@ -29,6 +29,8 @@ import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 public class FunctionCallNode extends AbstractASTNode implements IValueNode, Resolvable {
 
     public static final Identifier BUILDIN_FUNCTION_DEFINED = new Identifier("defined");
+    public static final Identifier BUILDIN_FUNCTION_HIGH = new Identifier("HIGH");
+    public static final Identifier BUILDIN_FUNCTION_LOW = new Identifier("LOW");
     
     public final Identifier functionName;
     
@@ -51,7 +53,6 @@ public class FunctionCallNode extends AbstractASTNode implements IValueNode, Res
         if ( childCount() == 1 ) 
         {
             final IValueNode child = (IValueNode) child(0);
-            final String name = functionName.value;
             if ( BUILDIN_FUNCTION_DEFINED.equals( functionName ) )
             {
                 if ( !(child instanceof IdentifierNode )) {
@@ -60,10 +61,11 @@ public class FunctionCallNode extends AbstractASTNode implements IValueNode, Res
                 }
                 final Identifier identifier = ((IdentifierNode) child).name;
                 final Optional<Symbol> result = context.currentSymbolTable().maybeGet( identifier );
+                result.ifPresent( s -> s.markAsReferenced() );
                 this.value = result.isPresent() && result.get().getType() == Type.PREPROCESSOR_MACRO;
                 return true;
             } 
-            if ( name.equals("HIGH") || name.equals("LOW" ) ) 
+            if ( functionName.equals( BUILDIN_FUNCTION_HIGH ) || functionName.equals( BUILDIN_FUNCTION_LOW ) ) 
             {
                 if ( child instanceof Resolvable) {
                     ((Resolvable) child).resolve( context );
@@ -81,7 +83,8 @@ public class FunctionCallNode extends AbstractASTNode implements IValueNode, Res
                     return false;
                 }
                 
-                switch ( name ) {
+                switch ( functionName.value ) 
+                {
                     case "HIGH": v = ( v.longValue() >>> 8 ) & 0xff; break;
                     case "LOW": v = v.longValue() & 0xff; break;
                     default: 
@@ -90,7 +93,7 @@ public class FunctionCallNode extends AbstractASTNode implements IValueNode, Res
                 this.value = v;
                 return true;
             }
-            context.error("Unknown built-in function "+name,this);
+            context.error("Unknown function "+functionName.value,this);
         } else {
             System.out.println(">>>> function with no arguments?");
         }

@@ -80,7 +80,7 @@ public class CompilationUnit
     
     public boolean hasSameResourceAs(CompilationUnit other) 
     {
-        return this.resource.pointsToSameData( other.resource );
+        return this.resource == other.resource || this.resource.pointsToSameData( other.resource );
     }
 
     public boolean isDirty() 

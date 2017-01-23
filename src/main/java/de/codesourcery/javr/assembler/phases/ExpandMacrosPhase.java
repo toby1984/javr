@@ -36,6 +36,7 @@ public class ExpandMacrosPhase extends AbstractPhase
                     {
                         if ( symbol.getValue() != null && symbol.hasType( Type.PREPROCESSOR_MACRO ) ) 
                         {
+                            symbol.markAsReferenced();
                             final FunctionDefinitionNode macroDefinition = (FunctionDefinitionNode) symbol.getValue();
                             if ( macroDefinition.hasArguments() ) 
                             {

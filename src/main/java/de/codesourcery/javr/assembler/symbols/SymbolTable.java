@@ -226,7 +226,7 @@ public class SymbolTable
     {
         Validate.notNull(name, "name must not be NULL");
         final Symbol existing = internalGet( name );
-        return existing != null && ! existing.hasType( Type.UNDEFINED );
+        return existing != null && existing.isDefined();
     }
     
     public boolean isDeclared(Identifier name) 

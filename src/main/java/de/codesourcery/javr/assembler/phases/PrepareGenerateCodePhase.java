@@ -15,12 +15,11 @@
  */
 package de.codesourcery.javr.assembler.phases;
 
-import java.util.List;
+import java.util.Optional;
 
 import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
-import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
@@ -110,17 +109,22 @@ public class PrepareGenerateCodePhase extends GenerateCodePhase
                 else if ( node instanceof IdentifierNode) 
                 {
                     final IdentifierNode id = (IdentifierNode) node;
-                    if ( ! context.globalSymbolTable().isDefined( id.name ) ) 
+                    final Optional<Symbol> symbol = context.globalSymbolTable().maybeGet( id.name );
+                    if ( ! symbol.isPresent() || symbol.get().isUndefined() ) // this node refers to a symbol that is missing or undefined 
                     {
                         if ( previousGlobalLabel != null ) 
                         {
                             final Identifier localVar = Identifier.newLocalGlobalIdentifier( previousGlobalLabel.identifier , id.name );
                             if ( context.globalSymbolTable().isDefined( localVar ) ) 
                             {
-                                final Symbol badSymbol = id.getSymbol();
+                                // rewrite IdentifierNode to refer to local label, 
+                                // and remove the global label 
+                                final Symbol badGlobalSymbol = id.getSymbol();
                                 id.setName( localVar );
-                                id.setSymbol( context.globalSymbolTable().get( localVar , Type.ADDRESS_LABEL ) );
-                                context.globalSymbolTable().removeSymbol( badSymbol );
+                                final Symbol localSymbol = context.globalSymbolTable().get( localVar , Type.ADDRESS_LABEL );
+                                localSymbol.markAsReferenced();
+                                id.setSymbol( localSymbol );
+                                context.globalSymbolTable().removeSymbol( badGlobalSymbol );
                             }
                         }
                     }

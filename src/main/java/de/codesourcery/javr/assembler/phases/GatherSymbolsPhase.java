@@ -15,23 +15,9 @@
  */
 package de.codesourcery.javr.assembler.phases;
 
-import java.util.List;
-
 import de.codesourcery.javr.assembler.ICompilationContext;
-import de.codesourcery.javr.assembler.exceptions.DuplicateSymbolException;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
-import de.codesourcery.javr.assembler.parser.ast.AST;
-import de.codesourcery.javr.assembler.parser.ast.ASTNode;
-import de.codesourcery.javr.assembler.parser.ast.ASTNode.IASTVisitor;
-import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
-import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
-import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
-import de.codesourcery.javr.assembler.parser.ast.EquLabelNode;
-import de.codesourcery.javr.assembler.parser.ast.FunctionDefinitionNode;
-import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
-import de.codesourcery.javr.assembler.parser.ast.LabelNode;
-import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 
 /**
