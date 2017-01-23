@@ -115,20 +115,22 @@ onirq:
 ; ==========================
 main:
           rcall reset
-          
-          rcall wait_for_button            
-
+               
 	ldi r16, CMD_DISPLAY_ON
 	rcall send_command
           brcs error	
 
-	rcall clear_dirty_pages ; SCRATCHED: r0,r1,r16,r17,r18,r19,r31:r30
+	ldi r19,0xff ; clear all pages
+	rcall clear_pages ; SCRATCHED: r0,r1,r16,r17,r18,r19,r31:r30
 
 	rcall send_framebuffer
 	brcs error
 
 	ldi r16,0
 	sts dirtyregions,r16
+	sts previousdirtyregions,r16
+
+          rcall wait_for_button      
 
 ; ============================
 ; blit sprite from FLASH into framebuffer
@@ -147,10 +149,13 @@ main:
 	sts spritedx,r16
 	sts spritedy,r16
 .loop
+	ldi r16,0
+	sts dirtyregions,r16
+
 	lds r19,spritex 
 	lds r16,spritedx
 	add r19,r16
-	cpi r19,5
+	cpi r19,1
 	breq invx
 	cpi r19,127-16
 	breq invx
@@ -165,7 +170,7 @@ main:
 	lds r20,spritey
 	lds r16,spritedy
 	add r20,r16
-	cpi r20,5
+	cpi r20,1
 	breq invy
 	cpi r20,63-16
 	breq invy
@@ -180,47 +185,34 @@ main:
 	ldi r22, 16
 	ldi r31,HIGH(sprite1)
 	ldi r30,LOW(sprite1)
-;	rcall blit_sprite
+	rcall blit_sprite
 
 	SCOPE_PIN_OFF
 
-	lds r16,0
-	sts cursorx,r16
-	sts cursory,r16
-
-	ldi r16,0xff
-	sts dirtyregions,r16
-
+;	ldi r16,0
+;	sts cursorx,r16
+;	sts cursory,r16
 ;	lds r16,dirtyregions
+;	rcall popcnt
 ;	rcall write_dec
 
-; INPUT: r27:r26 - String to print (FLASH)
-.check	ldi r27,HIGH(text)
-	ldi r26,LOW(text)
-	rcall write_flash_string
-
-; write one ASCII glyph into the framebuffer
-; INPUT: r16 - character to write
-; INPUT: r17 - column (X)
-; INPUT: r18 - row (Y)
-	ldi r16,'1'
-	ldi r17,5
-	ldi r18,5
-	rcall write_char
-
-	ldi r16,0xff
-	sts dirtyregions,r16
+	lds r20,previousdirtyregions 
+	lds r21,dirtyregions
+	sts previousdirtyregions,r21 ; previousdirtyregions = dirtyregions
+	or r20,r21
+	sts dirtyregions,r20 ; transmit union of this and the previous frame
 
 	rcall send_framebuffer
-
-	SCOPE_PIN_ON
 	brcs error
 
-	rcall clear_dirty_pages ; SCRATCHED: r0,r1,r16,r17,r18,r19,r31:r30
+	lds r19,previousdirtyregions
+	rcall clear_pages
 
-;	rjmp loop
+	SCOPE_PIN_ON
 
-;          SUCCESS_LED_ON
+	rjmp loop
+
+          SUCCESS_LED_ON
           rjmp back
 .error        
 	ERROR_LED_ON
@@ -303,7 +295,6 @@ wait_for_button:
 ; SCRATCHED: r2,r16,r19:r18,r20,r31:r30
 ; RETURN: Carry clear => transmission successful , Carry set => Transmission failed
 ; ====
-
 send_command:
           ldi r31 , HIGH(commands)
           ldi r30 , LOW(commands)
@@ -402,7 +393,7 @@ send_start:
 	ret
 
 ; =========
-; send a single byte
+; send a single byte with error checking
 ; INPUT: r16 - byte to send
 ; SCRATCHED: r16
 ; RETURN: Carry set = transmission error, carry clear = transmission ok
@@ -448,8 +439,9 @@ send_byte_fast:
 ; ======
 send_framebuffer:
 	lds r18,dirtyregions	; load dirty regions bit-mask (bit X = page X)
-	ldi r19,7	; number of page we're currently checking
+	ldi r19,8	; number of page we're currently checking
 .send_pages
+	dec r19
 	lsl r18 ; shift bit 7 into carry
 	brcc pagenotdirty
 
@@ -457,7 +449,7 @@ send_framebuffer:
 	rcall send_page ; SCRATCHED: r0,r1,r16,r17,r31:r30
 	brcs error
 .pagenotdirty
-	dec r19
+	tst r19
 	brne send_pages
 
 	clc
@@ -471,18 +463,30 @@ send_framebuffer:
 ; SCRATCHED: r0,r1,r16,r17,r31:r30
 ; =============================
 send_page:
+	rcall send_start
+	brcs error
+
+	ldi r16,REQ_COMMAND_STREAM
+	rcall send_byte
+	brcs error
+
 ; select page
 	ldi r16,0xb0 ; 0xb0 | page no => switch to page x
 	or r16,r17
-	rcall send_single_command
+	rcall send_byte
 	brcs error
 
-; select lower start column
+; select lower 4 bits of start column (0..128)
 	ldi r16,0x00
-	rcall send_single_command
-; select upper start column
+	rcall send_byte
+	brcs error
+
+; select upper 4 bits of start column (0..128)
 	ldi r16,0x10
-	rcall send_single_command
+	rcall send_byte
+	brcs error
+
+	rcall send_stop
 
 ; initiage GDDRAM transfer
 	rcall send_start
@@ -499,7 +503,7 @@ send_page:
 	ldi r30,LOW(framebuffer)
 	add r30,r0
 	adc r31,r1	 ; + carry
-	ldi r17,16 ; 16*8 bytes to transmit
+	ldi r17,16 ; 16*8 bytes=128 bytes per page to transmit
 .send_loop
 	ld r16,Z+
 	rcall send_byte_fast
@@ -632,27 +636,16 @@ div10:
 ; SCRATCHED: r0,r1,r2,r3,r16, r17, r18,r19, r20 , r21, r29,r28,r30 ,r31
 ; =======
 write_flash_string:
-	lds r19,cursorx
-	lds r20,cursory
 	ldi r21,0 ; FLASH
-	rcall internal_write_string
-	sts cursorx,r19
-	sts cursory,r20
-	ret
-
+	rjmp internal_write_string
 ; =======
 ; write string from SRAM memory
 ; INPUT: r27:r26 - String to print (FLASH)
 ; SCRATCHED: r0,r1,r2,r3,r16, r17, r18,r19, r20 , r21, r29,r28,r30 ,r31
 ; =======
 write_sram_string:
-	lds r19,cursorx
-	lds r20,cursory
 	ldi r21,1 ; SRAM
-	rcall internal_write_string
-	sts cursorx,r19
-	sts cursory,r20
-	ret
+	rjmp internal_write_string
 	
 ; =======
 ; internal write string
@@ -663,7 +656,10 @@ write_sram_string:
 ; SCRATCHED: r0,r1,r2,r3,r16, r17, r18,r19, r20 , r21 , r29,r28,r30 ,r31
 ; ======
 internal_write_string:
-.next	movw r31:r30,r27:r26
+	lds r19,cursorx
+	lds r20,cursory
+.next	
+	movw r31:r30,r27:r26
 	tst r21
 	brne read_sram
           lpm r16,Z+
@@ -692,6 +688,8 @@ internal_write_string:
 	inc r20 ; y = y + 1
 	rjmp next
 .end
+	sts cursorx,r19
+	sts cursory,r20
 	ret
 	
 ; ========
@@ -732,8 +730,8 @@ write_char:
 	add r28,r0
 	adc r29,r1
 
-;	mov r16,r18
-;	rcall mark_page_dirty
+	mov r16,r18
+	rcall mark_page_dirty
 
 ; r29:r28 holds pointer into framebuffer where to write glyph data
 	ldi r16 , GLYPH_HEIGHT_IN_BITS
@@ -835,7 +833,8 @@ blit_sprite:
 mark_page_dirty:
 	mov r17,r16
 	ldi r18,0x01
-.loop	tst r17
+	tst r17
+.loop	
 	breq end
 	lsl r18
 	dec r17
@@ -910,17 +909,18 @@ scroll_up:
 
 ; ============================
 ; Clears only the framebuffer regions that are marked dirty
+; INPUT: r19 - dirty page mask ( bit 0 = page0 , bit 1 = page1 etc. bit set = page dirty)
 ; SCRATCHED: r0,r1,r16,r17,r18,r19,r31:r30
 ; ============================
-clear_dirty_pages:
-	lds r19,dirtyregions
-	ldi r17,7	; page no
+clear_pages:
+	ldi r17,8	; page no
 .clr_loop  
+	dec r17
 	lsl r19
 	brcc pagenotdirty
 	rcall clear_page
 .pagenotdirty
-	dec r17
+	tst r17
 	brne clr_loop	
 	ret
 
@@ -937,7 +937,7 @@ clear_page:
 	add r30,r0
 	adc r31,r1
 	 ldi r18,16 ; 16 * 8 bytes to clear = 128 bytes = 1 page
-           ldi r16,0x00
+           ldi r16,0x0
 .clr_loop  
            st Z+, r16
            st Z+, r16
@@ -1004,6 +1004,25 @@ usleep:
 	brpl loop ; 2 cycles, 1 cycle if branch not taken
 	ret ; 4 cycles
 
+; =================================================
+; Calculates 1-bit population count
+; INPUT: r16 - byte to count 1-bits in
+; OUTPUT: r16 - number of 1-bits in input
+; SCRATCHED: r0,r16,r17
+; =================================================
+popcnt:
+	mov r0,r16
+	ldi r16,0
+	ldi r17,8 ; 1
+.loop
+	lsl r0 ; 1
+	brcc notset ; 2
+	inc r16
+.notset
+	dec r17 ; 1
+	brne loop ; 2
+	ret ; 4
+	
 ; =================================================
 ; Random number generator
 ; OUTPUT: r4
@@ -1165,9 +1184,11 @@ charset_mapping:
 cursorx: .byte 1
 cursory: .byte 1
 
-; dirty-page tracking (0 bit per display page, bit 0 = page0)
+; dirty-page tracking (0 bit per display page, bit 0 = page0 , bit set = page dirty)
 ; only dirty pages are transmitted to display controller
 dirtyregions: .byte 1
+previousdirtyregions: .byte 1
+
 
 ; buffer used by write_dec (3 digits + 0 byte)
 stringbuffer: .byte 4
@@ -1177,6 +1198,5 @@ spritex: .byte 1
 spritey: .byte 1
 spritedx: .byte 1
 spritedy: .byte 1
-.byte 1
 
 framebuffer: .byte 1024
