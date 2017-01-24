@@ -1,14 +1,8 @@
-
-.equ test = 3
-
 #include "m328Pdef.inc"
 
 .equ freq = 16000000 ; Hz
-.equ target_freq = 100000 ; Hz
 
 .equ cycles_per_us = freq / 1000000 ; 1 us = 10^-6 s
-
-.equ delay_in_cycles = (freq / target_freq)/2
 
 ; I/O pins
 #define TRIGGER_PIN 0
@@ -34,20 +28,11 @@
 #define GLYPH_WIDTH_IN_BITS 8 
 #define GLYPH_HEIGHT_IN_BITS 8
 
-.equ GLYPH_WIDTH_IN_BYTES = GLYPH_WIDTH_IN_BITS/8
 .equ BYTES_PER_GLYPH = (GLYPH_WIDTH_IN_BITS*GLYPH_HEIGHT_IN_BITS)/8
 
 .equ BYTES_PER_ROW = DISPLAY_WIDTH_IN_PIXEL/GLYPH_WIDTH_IN_BITS
 
 .equ FRAMEBUFFER_SIZE = (DISPLAY_WIDTH_IN_PIXEL*DISPLAY_HEIGHT_IN_PIXEL)/8
-
-.equ PAGE_WIDTH_BITS = 8
-.equ PAGE_HEIGHT_BITS = 8
-
-.equ HORIZ_PAGES_PER_ROW = DISPLAY_WIDTH_IN_PIXEL/PAGE_WIDTH_BITS
-.equ VERT_PAGES_PER_COLUMN = DISPLAY_HEIGHT_IN_PIXEL/PAGE_HEIGHT_BITS
-
-.equ PAGE_SIZE_IN_BYTES = (PAGE_WIDTH_BITS*PAGE_HEIGHT_BITS)/8
 
 ; SSD1306 request types
 
@@ -185,16 +170,35 @@ main:
 	ldi r22, 16
 	ldi r31,HIGH(sprite1)
 	ldi r30,LOW(sprite1)
-	rcall blit_sprite
+;	rcall blit_sprite
+
+; ----------- TODO: DEBUG start
+; Draws a 1-pixel wide line.
+; INPUT: x1 - r16
+; INPUT: y1 - r17
+; INPUT: x2 - r18
+; INPUT: y2 - r19
+; SCRATCHED r0,r1,r20-r26,r27,r28,r30,r31
+
+          ldi r16,120 ;x0
+          ldi r17,50 ; y0 
+          ldi r18,30 ; x1
+          ldi r19,10 ; y1
+          rcall draw_line
+
+          ldi r16,0xff
+          sts dirtyregions,r16
+; ----------- TODO: DEBUG end
 
 	SCOPE_PIN_OFF
-
-;	ldi r16,0
-;	sts cursorx,r16
-;	sts cursory,r16
-;	lds r16,dirtyregions
-;	rcall popcnt
-;	rcall write_dec
+; ----------- TODO: DEBUG start
+	ldi r16,0
+	sts cursorx,r16
+	sts cursory,r16
+	lds r16,dirtyregions
+	rcall popcnt
+	rcall write_dec
+; ----------- TODO: DEBUG end
 
 	lds r20,previousdirtyregions 
 	lds r21,dirtyregions
@@ -210,7 +214,7 @@ main:
 
 	SCOPE_PIN_ON
 
-	rjmp loop
+;	rjmp loop
 
           SUCCESS_LED_ON
           rjmp back
@@ -979,7 +983,7 @@ sleep_one_ms:
 .loop1
 	sbiw r25:r24,1 ; 2 cycles
 	brne loop1 ; 1 if condition is false, otherwise 2 
-.end	ret ; 4 cles
+	ret ; 4 cles
 
 ; =========
 ; sleep for up to 255 micro seconds
@@ -1070,14 +1074,166 @@ rand:
 	pop r5
 	ret
 
+; ===================================
+; Draws a 1-pixel wide line.
+; INPUT: x1 - r16
+; INPUT: y1 - r17
+; INPUT: x2 - r18
+; INPUT: y2 - r19
+; SCRATCHED r0,r1,r20-r26,r27,r28,r30,r31
+; ===================================
+draw_line:    
+.def x1 = r16
+.def y1 = r17
+.def x2 = r18
+.def y2 = r19
+; private void drawLine(Graphics g, int x1, int y1, int x2, int y2) {
+;        // delta of exact value and rounded value of the dependant variable
+;        int d = 0;
+.def d = r20
+        ldi d,0
+;        int dy = Math.abs(y2 - y1);
+.def dy = r21
+         mov dy , y2
+         sub dy , y1
+         brpl ispositive1
+         neg dy
+.ispositive1         
+;        int dx = Math.abs(x2 - x1);
+.def dx = r22
+         mov dx,x2
+         sub dx,x1
+         brpl ispositive2
+         neg dx
+.ispositive2
+;       int dy2 = (dy << 1); // slope scaling factors to avoid floating
+.def dy2 = r23
+        mov dy2,dy
+        lsl dy2
+;        int dx2 = (dx << 1); // point
+; TODO: the next line overflows if dx >= 0x80
+.def dx2 = r24
+        mov dx2,dx
+        lsl dx2
+;       int ix = x1 < x2 ? 1 : -1; // increment direction
+.def ix = r25
+        ldi ix,0x01
+        cp x1,x2
+        brlt lessthan1
+        ldi ix,0xff        
+.lessthan1
+;       int iy = y1 < y2 ? 1 : -1;
+.def iy = r26
+        ldi iy,1
+        cp y1,y2
+        brlt lessthan2
+        ldi iy,0xff  
+.lessthan2
+;        if (dy <= dx) {
+         cp dy,dx
+         brlt lessloop
+         breq lessloop
+; dy > dx
+;            for (;;) {
+.greaterloop        
+;                plot(g, x1, y1);
+        rcall set_pixel
+;                if (y1 == y2)
+        cp y1,y2
+;                break;
+        breq end    
+;                y1 += iy;
+        add y1,iy
+;                d += dx2;
+        add d,dx2
+;                if (d > dy) {
+        cp d,dy
+        brlt greaterloop
+        breq greaterloop
+;                    x1 += ix;
+        add x1,ix
+;                    d -= dy2;
+        sub d,dy2             
+        rjmp greaterloop
+.end     
+        ret
+; dy <= dx
+.lessloop
+;            for (;;) {
+;                plot(g, x1, y1);
+        rcall set_pixel
+;                if (x1 == x2)
+        cp x1,x2
+;             break;
+        breq end
+;                x1 += ix;
+        add x1,ix
+;                d += dy2;
+        add d,dy2
+;                if (d > dx) {
+        cp d,dx
+        brlt lessloop
+        breq lessloop
+;                    y1 += iy;
+        add y1,iy
+;                    d -= dx2;        
+        sub d,dx2
+        rjmp lessloop
+
+; ===========================
+; Set pixel at (x,y)
+; INPUT: r16 - x
+; INPUT: r17 = y
+; SCRATCHED: r0,r1,r27,r28,r30,r31
+; ===========================
+.def px = r16
+.def py = r17
+.def tmp = r27
+.def tmp2 = r28
+set_pixel:
+        ldi r31,HIGH(framebuffer)
+        ldi r30,LOW(framebuffer)
+
+        mov r0, py
+        lsr r0
+        lsr r0
+        lsr r0 ; y / 8
+        mov tmp2,r0 ; remember y/ 8
+        ldi tmp,128
+        mul tmp,r0 ; r1:r0 = (y/8)*128
+        add r30,r0
+        adc r31,r1 ; + (y/8)*128       
+        ldi tmp,0
+        add r30,px ; + px
+        adc r31,tmp ; + carry
+; Z now points to byte in framebuffer
+; calculate remainder
+        ldi tmp,8
+        mul tmp2,tmp ; r1:r0 = (y/8)*8, yields 8-bit value
+        mov tmp2,py
+; do not put anything that changes the Z flag after the 
+; following sub instruction, the loop exit condition below needs it unaltered
+        sub tmp2,r0 ; tmp = py - (py/8)*8, cannot overflow/underflow
+.def remainder = r28
+.def mask = r27
+        ldi mask, 0x01
+.loop
+        breq cont ; on the first loop iteration this checks the Z flag set by the sub
+        lsl mask
+        dec remainder
+        rjmp loop	
+.cont
+        ld r0,Z              
+        or r0,mask
+        st Z,r0
+        ret
+
 commands: .dw cmd1,2
           .dw cmd2,3
           .dw cmd3,3
 cmd1:     .db REQ_SINGLE_COMMAND,0xaf ; switch display on
 cmd2:     .db REQ_COMMAND_STREAM,0x20, %00 ; set horizontal addressing mode (00), vertical = (01),page = 10
 cmd3:     .db REQ_COMMAND_STREAM,0x20, %10 ; set horizontal addressing mode (00), vertical = (01),page = 10)
-
-text: .db "text1",0
 
 sprite1:
 ; data organization: 8 bits per column columns

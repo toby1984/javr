@@ -711,7 +711,7 @@ public class Parser
             region = tok.region().incLength();
         }
         
-        if ( tok.isValidIdentifier() )
+        if ( tok.isValidIdentifier() && ! Register.isRegisterName( tok.value ) )
         {
             LabelNode label = null;
             final Identifier id = new Identifier( lexer.next().value );
@@ -725,19 +725,24 @@ public class Parser
                 label = new LabelNode( id , false , region );
                 previousGlobalLabel = label;
             }
-            if ( label != null ) {
-                
-                // define symbol
-                final Identifier identifier;
-                if ( ! isLocal ) {
-                    identifier = label.identifier;
+            if ( label != null ) 
+            {
+                if ( ! isLocal || (isLocal && previousGlobalLabel != null ) ) 
+                {
+                    // define symbol
+                    final Identifier identifier;
+                    if ( ! isLocal ) {
+                        identifier = label.identifier;
+                    } else {
+                        identifier = Identifier.newLocalGlobalIdentifier( previousGlobalLabel.identifier , label.identifier );
+                    }
+                    final Symbol symbol = new Symbol( identifier , Symbol.Type.ADDRESS_LABEL , context.currentCompilationUnit() , label );
+                    label.setSymbol( symbol );
+                    defineSymbol( label , symbol ); 
+                    return label;
                 } else {
-                    identifier = Identifier.newLocalGlobalIdentifier( previousGlobalLabel.identifier , label.identifier );
+                    context.message( CompilationMessage.error(context.currentCompilationUnit(),"Local label has no preceding global label",region ) );
                 }
-                final Symbol symbol = new Symbol( identifier , Symbol.Type.ADDRESS_LABEL , context.currentCompilationUnit() , label );
-                label.setSymbol( symbol );
-                defineSymbol( label , symbol ); 
-                return label;
             }
             lexer.pushBack( tok );
         }
@@ -991,48 +996,43 @@ public class Parser
         final Token tok = lexer.peek();
         if ( tok.is(TokenType.TEXT) )
         {
-            lexer.next();
-            final String lower = tok.value.toLowerCase();
-            if ( lower.charAt(0) == 'r' ) 
+            final String value = tok.value;
+            final char firstChar = value.charAt(0);
+            switch( firstChar ) 
             {
-                final String sub = tok.value.substring(1);
-                if ( isNumber(sub) ) 
-                {
-                    region.merge( tok );
-                    return tok.value;
-                }
+                case 'r':
+                case 'R':
+                    boolean isNumber = false;
+                    for ( int i = 1, len = value.length() ; i < len ; i++ ) 
+                    {
+                        if ( ! Character.isDigit( value.charAt( i ) ) ) {
+                            isNumber = false;
+                            break;
+                        }
+                        isNumber = true;
+                    }
+                    if ( isNumber ) 
+                    {
+                        lexer.next();
+                        region.merge( tok );
+                        return tok.value;
+                    }                    
+                    break;
+                case 'X':
+                case 'Y':
+                case 'Z':
+                case 'x':
+                case 'y':
+                case 'z':        
+                    if ( value.length() == 1 ) 
+                    {
+                        lexer.next();
+                        region.merge( tok );
+                        return tok.value;
+                    }
             }
-            switch( lower ) {
-                case "x":
-                case "y":
-                case "z":
-                    region.merge( tok );
-                    return tok.value;
-            }
-            if ( tok.isValidIdentifier() ) 
-            { 
-                final Register aliasedRegister = context.getRegisterByAlias( Identifier.of( tok.value ) );
-                if ( aliasedRegister != null ) 
-                {
-                    return aliasedRegister.getRegisterName();
-                }
-            }
-            lexer.pushBack( tok );
         }
         return null;
-    }
-
-    private static final boolean isNumber(String s) 
-    {
-        if ( s == null || s.length() == 0) {
-            return false;
-        }
-        for ( int i = 0 , len=s.length() ; i < len ; i++ ) {
-            if ( ! Character.isDigit( s.charAt(i) ) ) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private static NumberLiteralNode parseNumber(Lexer lexer) 

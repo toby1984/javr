@@ -48,8 +48,6 @@ public final class CompilationContext implements ICompilationContext
     
     private final IConfig config;        
     
-    private final Map<Identifier,Register> registerAliases = new HashMap<>();
-    
     // stack to keep track of the current compilation unit while processing #include directives
     private final Stack<CompilationUnit> compilationUnits = new Stack<CompilationUnit>();
     
@@ -86,29 +84,6 @@ public final class CompilationContext implements ICompilationContext
         this.maxErrorsLimit = compilerSettings.getMaxErrors();
         
         pushCompilationUnit( rootCompilationUnit );
-    }
-    
-    @Override
-    public boolean setRegisterAlias(Identifier alias, Register register) 
-    {
-        Validate.notNull(alias, "alias must not be NULL");
-		Validate.notNull(register, "register must not be NULL");
-		final boolean alreadyMapped = registerAliases.values().stream().anyMatch( r -> r.equals( register ));
-    	this.registerAliases.put( Identifier.of( alias.getValue().toLowerCase() ) ,register);
-    	return ! alreadyMapped;
-    }
-    
-    @Override
-    public void clearRegisterAlias(Identifier alias) 
-    {
-        Validate.notNull(alias, "alias must not be NULL");
-        this.registerAliases.remove( alias );
-    }
-    
-    @Override
-    public Register getRegisterByAlias(Identifier alias) 
-    {
-    	return registerAliases.get( Identifier.of( alias.getValue().toLowerCase() ) );
     }
     
     @Override
@@ -186,7 +161,6 @@ public final class CompilationContext implements ICompilationContext
 
     public void beforePhase() throws IOException
     {
-        registerAliases.clear();
         compilationUnits.clear();
         currentCompilationUnit = null;
         pushCompilationUnit( rootCompilationUnit );

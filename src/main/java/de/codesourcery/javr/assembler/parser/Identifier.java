@@ -20,6 +20,8 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
+import de.codesourcery.javr.assembler.Register;
+
 /**
  * A valid identifier.
  *
@@ -100,7 +102,7 @@ public final class Identifier
 
     public static boolean isValidIdentifier(String s) 
     {
-        if ( ! StringUtils.isBlank( s ) ) 
+        if ( s != null  ) 
         {
             return ID_PATTERN.matcher( s ).matches();
         }

@@ -181,20 +181,6 @@ public class PreprocessingLexerTest extends TestCase
             return arch;
         }
 
-        public void clearRegisterAlias(Identifier alias) {
-            throw new RuntimeException("method not implemented: clearRegisterAlias()");
-        }
-        
-        @Override
-        public boolean setRegisterAlias(Identifier alias, Register register) {
-            throw new RuntimeException("method not implemented: setRegisterAlias()");
-        }
-
-        @Override
-        public Register getRegisterByAlias(Identifier alias) {
-            throw new RuntimeException("method not implemented: getRegisterByAlias()");
-        }
-
         @Override
         public void setStartAddress(int address) {
             throw new RuntimeException("method not implemented: setStartAddress");

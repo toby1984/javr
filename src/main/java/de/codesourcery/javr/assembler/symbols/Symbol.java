@@ -68,9 +68,9 @@ public final class Symbol
     
     public Symbol(Identifier name,Type type,CompilationUnit compilationUnit, ASTNode node) 
     {
-        Validate.notNull(compilationUnit, "com must not be NULL");
-        Validate.notNull(name, "name must not be NULL");
-        Validate.notNull(type, "type must not be NULL");
+        Validate.notNull(compilationUnit, "internal error,compilation unit must not be NULL");
+        Validate.notNull(name, "internal error,name must not be NULL");
+        Validate.notNull(type, "internal error,type must not be NULL");
         if ( type != Type.UNDEFINED && type != Type.PREPROCESSOR_MACRO ) {
             Validate.notNull(node, "node must not be NULL");
         }

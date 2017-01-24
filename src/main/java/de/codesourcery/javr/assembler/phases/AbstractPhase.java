@@ -85,19 +85,6 @@ public abstract class AbstractPhase implements Phase
                     }
                     final int address = ((Number) value).intValue();
                     context.setStartAddress( address );
-                    break;
-            	case DEF:
-            	    {
-            	        final IdentifierDefNode identifier = (IdentifierDefNode) dnNode.child(0);
-            	        final RegisterNode register = (RegisterNode) dnNode.child(1);
-            	        if ( ! context.setRegisterAlias( identifier.name , register.register ) && generateMessages ) {
-            	            context.message( CompilationMessage.warning( context.currentCompilationUnit() , "Redefinition of existing alias" , identifier ) );
-            	        }
-            	    }
-            		break;
-                case UNDEF:
-                    final IdentifierDefNode identifier = (IdentifierDefNode) dnNode.child(0);
-                    context.clearRegisterAlias( identifier.name );
                     break;            		
                 case CSEG: 
                     previousGlobalLabel = null; // local labels cannot belong to a global label from a different segment

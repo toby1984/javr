@@ -112,6 +112,16 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
         return new DirectiveNode(this.directive );
     }
     
+    /**
+     * Check whether this node has a given {@link Directive type}.
+     * @param type
+     * @return
+     */
+    public boolean hasType(Directive type) 
+    {
+        return this.directive == type;
+    }
+    
     @Override
     public boolean hasMemoryLocation() 
     {

@@ -28,6 +28,7 @@ import de.codesourcery.javr.assembler.phases.GenerateCodePhase;
 import de.codesourcery.javr.assembler.phases.ParseSourcePhase;
 import de.codesourcery.javr.assembler.phases.Phase;
 import de.codesourcery.javr.assembler.phases.PrepareGenerateCodePhase;
+import de.codesourcery.javr.assembler.phases.SubstituteRegisterAliases;
 import de.codesourcery.javr.assembler.phases.SyntaxCheckPhase;
 import de.codesourcery.javr.ui.IProject;
 import de.codesourcery.javr.ui.config.IConfigProvider;
@@ -57,6 +58,7 @@ public class Assembler
         phases.add( new ParseSourcePhase(config) );
         phases.add( new SyntaxCheckPhase() );
         phases.add( new GatherSymbolsPhase() );
+        phases.add( new SubstituteRegisterAliases() );
         phases.add( new ExpandMacrosPhase() );
         phases.add( new PrepareGenerateCodePhase() );
         phases.add( new GenerateCodePhase() );

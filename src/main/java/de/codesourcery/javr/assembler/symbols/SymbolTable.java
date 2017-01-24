@@ -297,6 +297,25 @@ public class SymbolTable
 	    children.forEach( child -> child.removeSymbol( s ) );
 	}
 	
+    /**
+     * Removes a symbol from this table and 
+     * all its children.
+     * 
+     * @param s
+     */
+    public void removeDeclared(Identifier s) 
+    {
+        Symbol symbol = this.symbols.get( s );
+        if ( symbol != null ) 
+        {
+            if ( symbol.hasType( Type.UNDEFINED ) ) 
+            {
+                this.symbols.remove( s );
+            }
+        }
+        children.forEach( child -> child.removeDeclared( s ) );        
+    }	
+	
 	/**
 	 * Visit all symbols in this table.
 	 * 

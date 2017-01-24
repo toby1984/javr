@@ -15,14 +15,13 @@
  */
 package de.codesourcery.javr.assembler.arch;
 
+import static org.junit.Assert.*;
+
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
-import static org.junit.Assert.*;
 import org.junit.Before;
 import org.junit.Test;
-
-import de.codesourcery.javr.assembler.arch.AbstractAchitecture.ArgumentType;
 
 public class InstructionEncoderTest 
 {

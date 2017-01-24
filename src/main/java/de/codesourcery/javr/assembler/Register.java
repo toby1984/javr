@@ -17,6 +17,8 @@ package de.codesourcery.javr.assembler;
 
 import org.apache.commons.lang3.Validate;
 
+import de.codesourcery.javr.assembler.parser.Identifier;
+
 /**
  * Value class that identifies a CPU register,also providing hints about the context (post-increment,pre-decrement) 
  * in which this register was mentioned.
@@ -116,5 +118,44 @@ public final class Register
     public int hashCode() 
     {
         return expression.toLowerCase().hashCode();
+    }
+    
+    public static boolean isRegisterName(Identifier id) 
+    {
+        return isRegisterName( id.value );
+    }
+
+    public static boolean isRegisterName(String s) 
+    {
+        if ( s != null ) 
+        {
+            switch( s.charAt( 0 ) ) 
+            {
+                case 'r':
+                case 'R':
+                    if ( s.length() > 1 ) 
+                    {
+                        for ( int i = 1 , len = s.length() ; i < len ; i++ ) 
+                        {
+                            if ( ! Character.isDigit( s.charAt( i ) ) ) 
+                            {
+                                return false;
+                            }
+                        }
+                        return true;
+                    }
+                    return false;
+                case 'X':
+                case 'Y':
+                case 'Z':
+                case 'x':
+                case 'y':
+                case 'z':
+                    return s.length() == 1;
+                default:
+                    // $$FALL-THROUGH$$
+            }
+        }
+        return false;
     }
 }

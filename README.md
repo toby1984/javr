@@ -49,7 +49,7 @@ Note that for reasons unknown to me the AVR assembler duplicates a lot of prepro
   - .byte
   - .cseg
   - .db
-  - .def
+  - .def /.undef
   - .dw / .word
   - .dseg
   - .eseg
@@ -66,6 +66,7 @@ Note that for reasons unknown to me the AVR assembler duplicates a lot of prepro
 - Syntax coloring is off when using MSDOS-style line endings (won't fix this since it is related to the fact that Swing text components internally convert all EOL sequences to '\n' but my parser uses the 'true' text offsets)
 - parsing #define is currently broken when trying to #define stuff like (a+b)/c (gets irritated by the leading parens)
 - parsing string literals currently swallows whitespace (0x20) chars in the strings
+- parsing of .def is quite picky when it comes to whitespace ( '.def x = r16' works but '.def x=r16' doesnt ...)
 - Parser throws NPE because of NULL ICompilationContext when certain tokens are present at the end of the top-level file. This is because the PreprocessingLexer prematurely pops the last context while the parser is not yet done parsing. Work-around is to just add some more code to the very end of the top-level file.
 
 ## To do

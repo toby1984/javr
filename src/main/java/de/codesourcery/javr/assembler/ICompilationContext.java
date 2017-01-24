@@ -39,19 +39,7 @@ public interface ICompilationContext
         public ICompilationSettings setFailOnAddressOutOfRange(boolean failOnAddressOutOfRange);
     }
     
-    /**
-     * 
-     * @param alias
-     * @param register
-     * @return <code>false</code> if there already was a different alias registered for this alias that has now been replaced with the new one
-     */
-    public boolean setRegisterAlias(Identifier alias,Register register);
-    
     public void setStartAddress(int address);
-    
-    public void clearRegisterAlias(Identifier alias);
-    
-    public Register getRegisterByAlias(Identifier alias);
     
     // symbol tables
     public SymbolTable globalSymbolTable();
