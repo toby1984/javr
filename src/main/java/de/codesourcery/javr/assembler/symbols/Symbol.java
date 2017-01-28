@@ -178,6 +178,53 @@ public final class Symbol
     }
     
     /**
+     * Returns whether this is a local label that uses the special
+     * {@link Identifier#isLocalGlobalIdentifier(Identifier)} syntax for its identifier.
+     * 
+     * @return
+     * @see #isLocalLabel()
+     * @see #isGlobalLabel()
+     */
+    public boolean isLocalLabel() {
+        return Identifier.isLocalGlobalIdentifier( name() );
+    }
+
+    /**
+     * Returns whether this is a global label.
+     * 
+     * @return
+     */
+    public boolean isGlobalLabel() {
+        return ! isLocalLabel();
+    }
+    
+    /**
+     * Returns the local part of this symbol's name.
+     * 
+     * @return
+     * @throws IllegalArgumentException if this is not a local symbol
+     */
+    public Identifier getLocalNamePart() {
+        return Identifier.getLocalIdentifierPart( name() );
+    }
+    
+    /**
+     * Returns the global part of this symbol's name.
+     * 
+     * @return
+     * @see #isGlobalLabel()
+     * @see #isLocalLabel()
+     * @see #getLocalNamePart()
+     */
+    public Identifier getGlobalNamePart() 
+    {
+        if ( isLocalLabel() ) {
+            return Identifier.getGlobalIdentifierPart( name() );
+        }
+        return name();
+    }
+    
+    /**
      * Check whether this symbol has type {@link Type#UNDEFINED}.
      * 
      * @return

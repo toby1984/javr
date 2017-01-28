@@ -26,6 +26,11 @@
   </developers>
   <dependencies>
     <dependency>
+      <groupId>de.codesourcery.swing.autocomplete</groupId>
+      <artifactId>swing-autocomplete</artifactId>
+      <version>1.0.4</version>
+    </dependency>
+    <dependency>
         <groupId>com.cedarsoftware</groupId>
         <artifactId>json-io</artifactId>
         <version>4.3.0</version>

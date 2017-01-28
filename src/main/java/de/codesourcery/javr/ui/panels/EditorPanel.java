@@ -46,10 +46,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -80,6 +82,7 @@ import javax.swing.text.BadLocationException;
 import javax.swing.text.Document;
 import javax.swing.text.DocumentFilter;
 import javax.swing.text.Element;
+import javax.swing.text.JTextComponent;
 import javax.swing.text.Style;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyleContext;
@@ -122,6 +125,7 @@ import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
 import de.codesourcery.javr.assembler.phases.ParseSourcePhase;
 import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
@@ -134,6 +138,9 @@ import de.codesourcery.javr.ui.config.IApplicationConfig;
 import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
 import de.codesourcery.javr.ui.frames.EditorFrame;
 import de.codesourcery.javr.ui.frames.MessageFrame;
+import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour;
+import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour.DefaultAutoCompleteCallback;
+import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour.InitialUserInput;
 
 public class EditorPanel extends JPanel
 {
@@ -144,6 +151,8 @@ public class EditorPanel extends JPanel
 	private final JTextPane editor = new JTextPane();
 
 	private final EditorFrame topLevelWindow;
+	
+    private final AutoCompleteBehaviour<Symbol> autoComplete = new AutoCompleteBehaviour<>();
 	   
 	private final IApplicationConfigProvider appConfigProvider;
 	
@@ -284,9 +293,6 @@ public class EditorPanel extends JPanel
             if ( pos >= 0 &&  controlKeyPressed ) 
             {
                 node = astTreeModel.getAST().getNodeAtOffset( pos );
-                if ( node != null ) {
-                    System.out.println("Node @ "+point+" = "+node.getClass().getSimpleName()+" , region: "+node.getTextRegion());
-                }
             }
             return node == null || node.getTextRegion() == null || !(node instanceof IdentifierNode)? null : (IdentifierNode) node;
 	    }
@@ -785,7 +791,180 @@ public class EditorPanel extends JPanel
 		this.currentUnit = unit;
 		this.topLevelWindow = topLevelWindow;
 		this.caretTracker = caretTracker;
+		
+		// symbol auto completion callback
+		autoComplete.setCallback( new DefaultAutoCompleteCallback<Symbol>() 
+		{
+		    private Symbol previousGlobalSymbol;
+		    
+		    private final char[] separatorChars = new char[] {'(',')',','};
+		    
+		    private boolean matches(Identifier name,String userInput) 
+		    {
+                for ( int i = 0 , matchCount = 0 , len = name.value.length() < userInput.length() ? name.value.length() : userInput.length() ; i < len ; i++ ) 
+                {
+                    final char c = Character.toLowerCase( name.value.charAt( i ) );
+                    if ( c == userInput.charAt(i) ) 
+                    {
+                        matchCount++;
+                        if ( matchCount == 3 ) {
+                            return true;
+                        }
+                    } else {
+                        break;
+                    }
+                }		        
+		        if ( name.value.toLowerCase().contains( userInput ) ) {
+		            return true;
+		        }
+		        return false;
+		    }
+		    
+		    private boolean matches(Symbol symbol,String userInput) 
+		    {
+                if ( previousGlobalSymbol != null ) 
+                {
+                    if ( symbol.isLocalLabel() ) 
+                    {
+                        if ( symbol.getGlobalNamePart().equals( previousGlobalSymbol.name() ) )
+                        {
+                            if ( matches( symbol.getLocalNamePart() , userInput) ) {
+                                return true;
+                            }
+                        }
+                    } 
+                    else if ( matches( symbol.name() , userInput ) ) // global label 
+                    {
+                        return true;
+                    }
+                } 
+                else 
+                {
+                    // no previous global symbol, only consider global labels
+                    if ( symbol.isGlobalLabel() && matches( symbol.name() , userInput ) ) 
+                    {
+                        return true;
+                    }
+                }
+                return false;
+		    }
+		    
+		    @Override
+		    protected boolean isSeparatorChar(char c) 
+		    {
+		        if ( Character.isWhitespace( c ) ) {
+		            return true;
+		        }
+		        for ( int i = 0, len = separatorChars.length ; i < len ; i++ ) 
+		        {
+		            if ( c == separatorChars[i] ) {
+		                return true;
+		            }
+		        }
+		        return false;
+		    }
+		    
+            @Override
+            public List<Symbol> getProposals(String input) 
+            {
+                System.out.println("*** Looking for >"+input+"<");
+                final String lower = input.toLowerCase();
+                
+                final List<Symbol> globalMatches = new ArrayList<>();
+                final List<Symbol> localMatches = new ArrayList<>();
+                
+                final SymbolTable globalTable = currentUnit.getSymbolTable().getTopLevelTable();
+                globalTable.visitSymbols( (symbol) -> 
+                {
+                    switch( symbol.getType() ) 
+                    {
+                        case ADDRESS_LABEL:
+                            if ( matches(symbol , lower ) ) 
+                            {
+                                if ( symbol.isLocalLabel() ) {
+                                    localMatches.add(symbol);
+                                } else {
+                                    globalMatches.add(symbol); 
+                                }
+                            }
+                            break;
+                        case EQU:
+                        case PREPROCESSOR_MACRO:
+                            if ( symbol.name().value.toLowerCase().contains( lower ) ) 
+                            {
+                                globalMatches.add( symbol );
+                            }
+                            break;
+                        default:
+                            break;
+                    }
 
+                    return Boolean.TRUE;
+                });
+                
+                globalMatches.sort( (a,b) -> a.name().value.compareTo( b.name().value ) );
+                localMatches.sort( (a,b) -> a.getLocalNamePart().value.compareTo( b.getLocalNamePart().value ) );
+                
+                final List<Symbol> result = new ArrayList<>( globalMatches.size() + localMatches.size() );
+                result.addAll( localMatches );
+                result.addAll( globalMatches );
+                return result;
+            }
+
+            @Override
+            public String getStringToInsert(Symbol value) 
+            {
+                if ( value.isLocalLabel() ) {
+                    return value.getLocalNamePart().value;
+                }
+                return value.name().value;
+            }
+		 
+            @Override
+            public InitialUserInput getInitialUserInput(JTextComponent editor, int caretPosition) 
+            {
+                previousGlobalSymbol = null;
+                final ASTNode node = astTreeModel.getAST().getNodeAtOffset( caretPosition-1 );
+                if ( node != null ) 
+                {
+                    final SymbolTable globalTable = currentUnit.getSymbolTable().getTopLevelTable();
+                    node.searchBackwards( n -> 
+                    {
+                        if ( n instanceof LabelNode) 
+                        {
+                            if ( ((LabelNode) n).isGlobal() ) 
+                            {
+                                final Optional<Symbol> symbol = globalTable.maybeGet( ((LabelNode) n).identifier , Type.ADDRESS_LABEL );
+                                if ( symbol.isPresent() ) 
+                                {
+                                    previousGlobalSymbol = symbol.get();
+                                    return true;
+                                }
+                            }
+                        }
+                        return false;
+                    } );
+                } else {
+                    System.err.println("Failed to find AST node for current offset ?");
+                }
+                return super.getInitialUserInput(editor, caretPosition);
+            }
+		});
+
+		autoComplete.setListCellRenderer( new DefaultListCellRenderer() {
+		
+		    public Component getListCellRendererComponent(javax.swing.JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) 
+		    {
+		        final Component result = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+		        final Symbol symbol = (Symbol) value;
+		        setText( symbol.isLocalLabel() ? symbol.getLocalNamePart().value : symbol.name().value );
+		        return result;
+		    };
+		});
+		
+		autoComplete.setInitialPopupSize( new Dimension(250,200 ) );
+		autoComplete.setVisibleRowCount( 10 );
+		
 		editor.setFont( new Font(Font.MONOSPACED, Font.PLAIN, 12) );
 		editor.addCaretListener( new CaretListener() 
 		{
@@ -806,7 +985,6 @@ public class EditorPanel extends JPanel
 		    public void keyPressed(KeyEvent e) 
 		    {
 		        if ( e.getKeyCode() == KeyEvent.VK_CONTROL ) {
-		            System.out.println("key pressed");
 		            controlKeyPressed = true;
 		        }
 		    }
@@ -815,7 +993,6 @@ public class EditorPanel extends JPanel
 		    public void keyReleased(KeyEvent e) 
 		    {
                 if ( e.getKeyCode() == KeyEvent.VK_CONTROL ) {
-                    System.out.println("key released");
                     setHighlight( null );
                     controlKeyPressed = false;
                 }
@@ -824,7 +1001,6 @@ public class EditorPanel extends JPanel
 			@Override
 			public void keyTyped(KeyEvent e) 
 			{
-				System.out.println("Typed: "+e.getKeyChar()+" , modifiers: "+e.getModifiersEx()+" , "+KeyEvent.CTRL_DOWN_MASK);
 				if ( ( e.getModifiersEx() & KeyEvent.CTRL_DOWN_MASK ) != 0 ) 
 				{
 					final byte[] bytes = Character.toString( e.getKeyChar() ).getBytes();
@@ -1450,7 +1626,7 @@ public class EditorPanel extends JPanel
 						text = "reg: "+((RegisterNode) node).register.toString();
 					}
 
-					setText( text + " -" + ((ASTNode) node).getTextRegion() );
+					setText( text + " - " + ((ASTNode) node).getTextRegion() + " - merged: "+((ASTNode) node).getMergedTextRegion() );
 				}
 				return result;
 			}
@@ -1632,7 +1808,9 @@ public class EditorPanel extends JPanel
 
 		lastEditLocation = -1;
 		
+		autoComplete.detach();
 		editor.setDocument( createDocument() );
+		autoComplete.attachTo( editor );
 		editor.setText( source );
 		editor.setCaretPosition( 0 );
 	}

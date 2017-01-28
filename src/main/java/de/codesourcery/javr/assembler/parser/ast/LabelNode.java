@@ -68,4 +68,10 @@ public class LabelNode extends AbstractASTNode implements Resolvable
         symbol.setValue( context.currentAddress() );
         return true;
     }
+    
+    @Override
+    public String toString() 
+    {
+        return isGlobal() ? identifier+":" : "."+identifier;
+    }
 }

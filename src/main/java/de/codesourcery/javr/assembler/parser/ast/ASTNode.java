@@ -22,7 +22,6 @@ import java.util.function.Predicate;
 import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.parser.TextRegion;
-import de.codesourcery.javr.assembler.parser.ast.ASTNode.IASTVisitor;
 import de.codesourcery.javr.assembler.parser.ast.AbstractASTNode.IterationContext;
 
 /**
@@ -339,4 +338,11 @@ public interface ASTNode
      * @return merged region (may be NULL)
      */
     public TextRegion recalculateMergedRegion();
+    
+    /**
+     * Performs a backwards depth-first search starting at this node's predecessor.
+     * @param pred
+     * @return
+     */
+    public ASTNode searchBackwards(Predicate<ASTNode> pred);    
 }

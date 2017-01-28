@@ -189,7 +189,6 @@ public class MessageFrame extends JInternalFrame implements IWindow
     private void resizeColumns() 
     {
         SwingUtilities.invokeLater( () -> {
-        System.out.println("=====> Resizing table");
         for ( int i = 0 , len = errorTable.getModel().getColumnCount(); i < len ; i++) 
         {
             int maxWidth = stringWidth( errorTable.getColumnName( i ) );

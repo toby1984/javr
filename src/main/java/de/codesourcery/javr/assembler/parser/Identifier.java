@@ -62,6 +62,12 @@ public final class Identifier
         return new Identifier(globalPart+LOCAL_GLOBAL_LABEL_SEPARATOR+localPart,true);
     }
     
+    /**
+     * Returns a given identifier has the &lt;GLOBAL&gt.&lt;LOCAL&gt; syntax.
+     * 
+     * @param identifier
+     * @return
+     */
     public static boolean isLocalGlobalIdentifier(Identifier identifier ) {
         return identifier.value.contains( LOCAL_GLOBAL_LABEL_SEPARATOR );
     }
@@ -73,6 +79,14 @@ public final class Identifier
         }
         return new Identifier( localGlobal.value.split( Pattern.quote( LOCAL_GLOBAL_LABEL_SEPARATOR ) )[1] ); 
     }
+    
+    public static Identifier getGlobalIdentifierPart(Identifier localGlobal) 
+    {
+        if ( ! isLocalGlobalIdentifier( localGlobal ) ) {
+            throw new IllegalArgumentException("Not a local-global identifier: "+localGlobal);
+        }
+        return new Identifier( localGlobal.value.split( Pattern.quote( LOCAL_GLOBAL_LABEL_SEPARATOR ) )[0] ); 
+    }    
     
     public String getValue() {
         return value;

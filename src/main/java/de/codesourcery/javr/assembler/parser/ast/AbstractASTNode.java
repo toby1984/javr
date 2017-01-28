@@ -90,36 +90,25 @@ public abstract class AbstractASTNode implements ASTNode
     @Override
     public final ASTNode getNodeAtOffset(int offset) 
     {
-        TextRegion m = getMergedTextRegion();
+        final TextRegion m = getMergedTextRegion();
         if ( m == null || ! m.contains( offset ) )
         {
             return null;
         }
         
-        TextRegion bestMatch = m;
-        ASTNode result = this;
-        ASTNode current = this;
-        int i = 0;
-        while ( i < current.childCount() ) 
+        for ( int i = 0 , len = children.size() ; i < len ; i++ ) 
         {
-            if ( current.getTextRegion() != null && current.getTextRegion().contains( offset ) ) {
-                return current;
-            }
-            
-            ASTNode child = current.child(i);
-            final TextRegion tmp = child.getMergedTextRegion();
-            // if ( tmp.contains( offset ) && tmp.length() <= bestMatch.length() ) 
-            if ( tmp.contains( offset ) ) 
+            final ASTNode tmp = children.get(i).getNodeAtOffset( offset );
+            if ( tmp != null ) 
             {
-                result = child;
-                bestMatch = tmp;
-                current = child;
-                i=0;
-            } else {
-                i++;
+                return tmp;
             }
         }
-        return result;
+        
+        if ( getTextRegion() != null && getTextRegion().contains( offset ) ) {
+            return this;
+        }
+        return null;
     }    
     
     @Override
@@ -160,6 +149,40 @@ public abstract class AbstractASTNode implements ASTNode
         child.setParent( null );
         recalculateMergedRegion();
     }
+    
+    @Override
+    public final ASTNode searchBackwards(Predicate<ASTNode> pred) 
+    {
+        if ( hasNoParent() ) {
+            return null;
+        }
+        
+        final ASTNode[] result = new ASTNode[]{null};
+        
+        final IASTVisitor visitor = new IASTVisitor() 
+        {
+            @Override
+            public void visit(ASTNode node, IIterationContext ctx) 
+            {
+                if ( pred.test( node ) ) 
+                {
+                    result[0] = node;
+                    ctx.stop();
+                }
+            }
+        };
+        
+        final int idx = getParent().indexOf( this );
+        for ( int i = idx - 1 ; result[0] == null && i >= 0 ; i-- ) 
+        {
+            final ASTNode child = getParent().child( i );
+            child.visitDepthFirst( visitor );
+            if ( result[0] != null ) {
+                return result[0];
+            }
+        }
+        return getParent().searchBackwards( pred );
+    } 
     
     @Override
     public final StatementNode getStatement() 

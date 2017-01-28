@@ -107,7 +107,6 @@ public class SubstituteRegisterAliases implements Phase
                             {
                                 final Identifier identifier = ((IdentifierNode) node).name;
                                 context.globalSymbolTable().removeDeclared( identifier );
-                                System.out.println("=====> Substitute: "+identifier+" => "+reg);
                                 node.replaceWith( new RegisterNode( reg , parent.getTextRegion() ) );
                                 break;
                             }
