@@ -2,7 +2,19 @@
 
 A crude attempt at an editor & assembler/disassembler for Atmel microcontrollers (although not for the tiny ones)... very much a work in progress.
 Assembly/disassembly works pretty good now (verified by dog fooding and comparing generated disassembly with avr-objdump output and disassembling and re-compiling large amounts of data that cover every possible opcode). 
-Not all preprocessor / assembler directives are implemented yet and the editor is still quite crude (supports background compilation,disassemble,save,load,searching back & forth (using CTRL-k,CTRL-k CTRL-b) and navigating to a specific line number (CTRL-g)/your last edit as well as CTRL-clicking on identifiers to jump to their definition. I intend to add a rename refactoring and more goodies though (auto-indent and block editing are sorely needed as well as support for multi-line macros...)
+Not all preprocessor / assembler directives are implemented yet and the editor is still quite crude 
+
+The editor currently supports 
+
+- background compilation
+- disassemble,save,load
+- searching back & forth (using CTRL-k,CTRL-k CTRL-b) 
+- navigating to a specific line number (CTRL-g)
+- navigating to your last edit 
+- CTRL-clicking on identifiers to jump to their definition
+- CTRL-space auto-completion of identifiers
+
+I intend to add a rename refactoring and more goodies though (auto-indent and block editing are sorely needed as well as support for multi-line macros...)
 
 <img src="https://raw.githubusercontent.com/toby1984/javr/master/screenshot.png" width="640" height="480" />
 
@@ -71,6 +83,7 @@ Note that for reasons unknown to me the AVR assembler duplicates a lot of prepro
 
 ## To do
 
+- Compile source files individually (output ELF relocatable) and add linking step to reduce compilation times and allow C programs to be linked against the output
 - Add support for .org directive
 - Add parse error recovery
 - Add support for #else / #elseif
