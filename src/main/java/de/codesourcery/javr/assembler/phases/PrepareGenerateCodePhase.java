@@ -67,7 +67,13 @@ public class PrepareGenerateCodePhase extends GenerateCodePhase
         {
             final StatementNode stmt = (StatementNode) child;
             visitNode( context , stmt, fakeCtx ); 
-            stmt.resolve( context ); 
+            try {
+                stmt.resolve( context );
+            } catch(Exception e) {
+                if ( ! context.error( e.getMessage() , stmt ) ) {
+                    return;
+                }
+            }
             stmt.children().forEach( c -> generateCode( context , c, fakeCtx ) ); 
         }
         
@@ -151,7 +157,13 @@ public class PrepareGenerateCodePhase extends GenerateCodePhase
         for ( ASTNode child : ast.children() ) 
         {
             final StatementNode stmt = (StatementNode) child;
-            stmt.visitDepthFirst(visitor);
+            try {
+                stmt.visitDepthFirst(visitor);
+            } catch(Exception e) {
+                if ( ! context.error( e.getMessage() , stmt ) ) {
+                    return;
+                }
+            }
         }   
         
         // Check for unresolved symbols
