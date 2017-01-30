@@ -998,30 +998,145 @@ public class EditorPanel extends JPanel
                 }
 		    }
 		    
+		    private boolean isCtrlDown(KeyEvent e) 
+		    {
+		        return ( e.getModifiersEx() & KeyEvent.CTRL_DOWN_MASK ) != 0; 
+		    }
+		    
+            private boolean isAltDown(KeyEvent e) 
+            {
+                return ( e.getModifiersEx() & KeyEvent.ALT_DOWN_MASK ) != 0; 
+            }		    
+		    
+            /**
+             * Returns a {@link TextRegion} for the line that holds a given
+             * caret position.
+             * 
+             * Note that the returned region <b>include</b> the EOL character at the end of the line (if any).
+             * 
+             * @param caretPosition
+             * @return region describing the current line or <code>NULL</code> if the text editor is empty.
+             */
+            private TextRegion getLineAt(int caretPosition) 
+            {
+                final String text = editor.getText();
+                final int len = text.length();
+
+                if ( len == 0 || caretPosition > len ) {
+                    return null;
+                }
+                
+                final boolean atStartOfLine;
+                if ( caretPosition == 0 ) {
+                    atStartOfLine = true;
+                } else {
+                    atStartOfLine = text.charAt( caretPosition-1 ) == 'n';
+                }
+                
+                if ( atStartOfLine ) 
+                {
+                    // search ahead
+                    int end = caretPosition;
+                    while ( (end+1) < len ) 
+                    {
+                        end++;
+                        if ( text.charAt( end ) == '\n') {
+                            break;
+                        }
+                    }                    
+                    return new TextRegion(caretPosition , (end-caretPosition)+1 , 1 , 1);
+                }
+                
+                final boolean atEndOfLine;
+                if ( caretPosition < len ) {
+                    atEndOfLine = text.charAt( caretPosition ) == '\n';
+                } else {
+                    atEndOfLine = true;
+                    caretPosition--;
+                }
+                
+                if ( atEndOfLine ) 
+                { 
+                    // search backwards
+                    int start = caretPosition;
+                    while ( (start-1) >= 0 && text.charAt( start-1 ) != '\n' ) {
+                        start--;
+                    }
+                    return new TextRegion(start,(caretPosition-start)+1,1,1);
+                }
+                
+                // somewhere in-between, search forwards and backwards
+                int end = caretPosition;
+                while ( (end+1) < len ) 
+                {
+                    end++;
+                    if ( text.charAt( end ) == '\n') {
+                        break;
+                    }
+                }                 
+                int start = caretPosition;
+                while ( (start-1) >= 0 && text.charAt( start-1 ) != '\n' ) {
+                    start--;
+                }
+                return new TextRegion(start,(end-start)+1,1,1);
+            }
+            
 			@Override
 			public void keyTyped(KeyEvent e) 
 			{
-				if ( ( e.getModifiersEx() & KeyEvent.CTRL_DOWN_MASK ) != 0 ) 
+			    if ( isAltDown(e) ) {
+	                 final byte[] bytes = Character.toString( e.getKeyChar() ).getBytes();
+	                 System.out.println("Bytes: "+bytes.length+" , "+Integer.toHexString( bytes[0] ) );
+			    } 
+			    else if ( isCtrlDown(e) ) 
 				{
 					final byte[] bytes = Character.toString( e.getKeyChar() ).getBytes();
 					System.out.println("Bytes: "+bytes.length+" , "+Integer.toHexString( bytes[0] ) );
-					if ( e.getKeyChar() == 6 ) // CTRL-F
+					if ( e.getKeyChar() == 6 ) // CTRL-F ... search
 					{
 						toggleSearchWindow();
 					} 
-					else if ( e.getKeyChar() == 0x0b && searchHelper.canSearch() ) // CTRL-K 
+                    else if ( e.getKeyChar() == 0x12 ) // CTRL-R   ... delete to end of line
+                    {
+                        final TextRegion line = getLineAt( editor.getCaretPosition() );
+                        if ( line != null && editor.getText().charAt( line.start() ) != '\n' )
+                        {
+                            try 
+                            {
+                                editor.getDocument().remove( editor.getCaretPosition() , line.end() - editor.getCaretPosition() );
+                            } 
+                            catch (BadLocationException e1) {
+                                e1.printStackTrace();
+                            }
+                        }
+                    }
+                    else if ( e.getKeyChar() == 0x04 ) // CTRL-D   ... delete line
+                    {
+                        final TextRegion line = getLineAt( editor.getCaretPosition() );
+                        if ( line != null )
+                        {
+                            try 
+                            {
+                                editor.getDocument().remove( line.start() , line.length() );
+                            } 
+                            catch (BadLocationException e1) {
+                                e1.printStackTrace();
+                            }
+                        }
+                    }					
+					else if ( e.getKeyChar() == 0x0b && searchHelper.canSearch() ) // CTRL-K ... search forward
 					{
 						searchHelper.searchForward();
 					} 
-					else if ( e.getKeyChar() == 0x02 && searchHelper.canSearch() ) // CTRL-B
+					else if ( e.getKeyChar() == 0x02 && searchHelper.canSearch() ) // CTRL-B ... search backwards
 					{
 						searchHelper.searchBackward();
 					}                     
-					else if ( e.getKeyChar() == 0x07 ) // CTRL-G
+					else if ( e.getKeyChar() == 0x07 ) // CTRL-G ... goto line
 					{
 						gotoLine();
 					}                    
-					else if ( e.getKeyChar() == 0x0d ) // CTRL+S 
+					else if ( e.getKeyChar() == 0x0d ) // CTRL+S ... save 
 					{ 
 						try {
 							saveSource();
