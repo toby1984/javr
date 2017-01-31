@@ -63,6 +63,7 @@ public class ParseSourcePhase implements Phase
 
     public static void parse(ICompilationContext context,CompilationUnit unit,IConfigProvider provider) 
     {
+        Validate.notNull(unit, "compilation unit must not be NULL");
         final Scanner scanner = new Scanner( unit.getResource() );
         
         final IConfig config = provider.getConfig();

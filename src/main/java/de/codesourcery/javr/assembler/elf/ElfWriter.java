@@ -11,6 +11,8 @@ public class ElfWriter
 {
     public static final AtomicLong TMP_MARKER_ID = new AtomicLong(0);
     
+    private static final boolean DEBUG_PADDING = false;
+    
     private byte[] data = new byte[1024];
     private int currentOffset;
 
@@ -184,9 +186,7 @@ public class ElfWriter
     
     public void writeHalf(int value,Endianess endian) {
         
-        while ( ( currentOffset % 2 ) != 0 ) {
-            pad();
-        }
+        align(2);
         
         switch( endian ) 
         {
@@ -210,8 +210,19 @@ public class ElfWriter
         }
     }
     
+    public void align(int alignment) 
+    {
+        while ( ( currentOffset % alignment ) != 0 ) 
+        {
+            pad();
+        }
+    }
+    
     public void pad() 
     {
+        if ( DEBUG_PADDING ) {
+            System.out.println("** PAD 1 byte (offset before: "+currentOffset+" **");
+        }
         writeByte(0);
     }
     
@@ -221,9 +232,7 @@ public class ElfWriter
     
     public void writeWord(int value,Endianess endian) {
         
-        while ( ( currentOffset % 4 ) != 0 ) {
-            pad();
-        }
+        align(4);
         
         switch( endian ) 
         {

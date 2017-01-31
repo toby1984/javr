@@ -42,4 +42,6 @@ public interface Buffer
     public int getCurrentByteAddress();
     
     public InputStream createInputStream() throws IOException;
+    
+    public byte[] toByteArray() throws IOException;
 }

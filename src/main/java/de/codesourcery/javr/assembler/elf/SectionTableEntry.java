@@ -63,11 +63,17 @@ public class SectionTableEntry {
     public int sh_info;
     public int sh_addralign;
     public int sh_entsize;
+    
+    public SectionTableEntry linkedEntry; // currently only used for SHT_SYMTAB and SHT_DYNSYM to hold the section entry for the associated string table
+
+    @Override
+    public String toString()
+    {
+        return sh_type == null ? "<type is NULL?>" : sh_type.toString();
+    }
 
     public void write(ElfWriter writer) throws IOException 
     {
-        final String id = "section header entry #"+writer.file.getTableIndex( this )+", name '"+writer.file.getSectionName(this)+"' , type "+this.sh_type; 
-        System.out.println("Writing "+id+" starting at offset "+writer.currentOffset() );
         /*
         typedef struct {
         Elf32_Word sh_name; // 0
@@ -94,8 +100,19 @@ public class SectionTableEntry {
         writer.deferredWriteWord( (w,file) -> 
         file.getSectionDataSize(this, w) , Endianess.LITTLE );  //  size of the section data in bytes 
 
-        writer.writeWord(sh_link , Endianess.LITTLE );
-        writer.writeWord(sh_info , Endianess.LITTLE );
+        int link;
+        int info;
+        if ( sh_type == SectionType.SHT_SYMTAB || sh_type == SectionType.SHT_DYNSYM ) 
+        {
+            link = elfFile.getTableIndex( linkedEntry );
+            info = elfFile.symbolTable.getLastLocalSymbolIndex()+1;
+        } else {
+            link = sh_link;
+            info = sh_info;
+        }
+            
+        writer.writeWord( link , Endianess.LITTLE ); // sh_link
+        writer.writeWord( info , Endianess.LITTLE ); // sh_info
         writer.writeWord(sh_addralign , Endianess.LITTLE );
         writer.writeWord(sh_entsize , Endianess.LITTLE );
     }

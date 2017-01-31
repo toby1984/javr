@@ -40,6 +40,7 @@ java -jar target/javr.jar
 Note that for reasons unknown to me the AVR assembler duplicates a lot of preprocessor instructions as assembler directives ... I'm currently only implementing the preprocessor instructions
 
 - full ATmega88 instruction set
+- output to RAW / Intel HEX / ELF files (ELF output is very much a work-in-progress and lacks proper symbol output and most importantly, relocation info)
 - local labels ( watch out, currently not working properly when used in macros) 
   - Just write '.myLabel' instead of 'myLabel:' when declaring them ; referencing local labels works just like with global labels so no 'b' or 'f' suffixes are needed. Note that its illegal to declare a local label that has the same identifier as a global label ; otherwise I would've needed to use the ugly 'b'/'f' suffix solution to resolve the ambiguity)  
 - Expression correctly handles nested expressions and operator precedence for the following operators: 
@@ -83,8 +84,9 @@ Note that for reasons unknown to me the AVR assembler duplicates a lot of prepro
 
 ## To do
 
+- Improve ELF support (symbols are currently all tagged as functions) to be able to link against C programs written using avr-gcc) 
 - Compile source files individually (output ELF relocatable) and add linking step to reduce compilation times and allow C programs to be linked against the output
 - Add support for .org directive
-- Add parse error recovery
+- Better parse error recovery
 - Add support for #else / #elseif
 - Find a way for meaningful error reporting when expanding macros...

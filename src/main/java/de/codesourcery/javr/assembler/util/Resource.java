@@ -39,6 +39,10 @@ public interface Resource
     	return new FileResource( file , ENCODING_UTF );
     }
     
+    public static Resource forString(String resourceName,String resourceValue) {
+        return new StringResource(resourceName,resourceValue);
+    }
+    
     public InputStream createInputStream() throws IOException;
     
     public OutputStream createOutputStream() throws IOException;

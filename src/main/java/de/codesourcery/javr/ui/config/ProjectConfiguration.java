@@ -32,6 +32,7 @@ import de.codesourcery.javr.assembler.ResourceFactory;
 import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.Architecture;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
+import de.codesourcery.javr.assembler.arch.impl.ATMega328p;
 import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.util.FileResource;
 import de.codesourcery.javr.assembler.util.FileResourceFactory;
@@ -85,7 +86,7 @@ public class ProjectConfiguration implements ResourceFactory
     private String uploadCommand;
     private String outputName;
     private OutputFormat outputFormat = OutputFormat.INTEL_HEX;
-    private IArchitecture architecture = new ATMega88();
+    private IArchitecture architecture = new ATMega328p();
     private CompilerSettings compilerSettings = new CompilerSettings();
     private String compilationRoot = "main.asm";
     private String sourceFolder = "src";

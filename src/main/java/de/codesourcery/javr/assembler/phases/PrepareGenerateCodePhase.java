@@ -124,7 +124,8 @@ public class PrepareGenerateCodePhase extends GenerateCodePhase
                             if ( context.globalSymbolTable().isDefined( localVar ) ) 
                             {
                                 // rewrite IdentifierNode to refer to local label, 
-                                // and remove the global label 
+                                // and remove the global symbol that was created when we
+                                // didn't know that this is actually a local label
                                 final Symbol badGlobalSymbol = id.getSymbol();
                                 id.setName( localVar );
                                 final Symbol localSymbol = context.globalSymbolTable().get( localVar , Type.ADDRESS_LABEL );

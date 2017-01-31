@@ -68,8 +68,6 @@ public class ProgramTableEntry {
     }
     public void write(ElfWriter writer) 
     {
-
-        System.out.println("Writing program header entry "+p_type+" ("+p_type.value+") at offset "+writer.currentOffset());
         /*
 typedef struct {
     Elf32_Word p_type;   // 0    

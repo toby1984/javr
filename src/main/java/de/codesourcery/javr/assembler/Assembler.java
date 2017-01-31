@@ -49,6 +49,8 @@ public class Assembler
         Validate.notNull(config, "provider must not be NULL");
 
         final CompilationUnit unit = project.getCompileRoot();
+        Validate.notNull(unit, "project's compile root must not be NULL");
+        
         project.getGlobalSymbolTable().clear();
         unit.beforeCompilationStarts( project.getGlobalSymbolTable() );
 

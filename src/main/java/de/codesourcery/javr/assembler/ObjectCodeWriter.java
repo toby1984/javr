@@ -15,10 +15,9 @@
  */
 package de.codesourcery.javr.assembler;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
 
 /**
@@ -129,6 +128,17 @@ public class ObjectCodeWriter implements IObjectCodeWriter
                 return dataPtr;
             }
             return startAddress.getByteAddress()+dataPtr;
+        }
+
+        @Override
+        public byte[] toByteArray() throws IOException
+        {
+            final ByteArrayOutputStream codeOut = new ByteArrayOutputStream();
+            try ( InputStream in = createInputStream() ) 
+            {
+                IOUtils.copy( in , codeOut );
+            }
+            return codeOut.toByteArray(); 
         }
     }
     

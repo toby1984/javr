@@ -128,7 +128,7 @@ public class Project implements IProject
                     {
                         final ByteArrayOutputStream program = new ByteArrayOutputStream();
                         bytesWritten = IOUtils.copy( in , program );
-                        new ElfFile().write( program.toByteArray() , out );  
+                        new ElfFile().write( program.toByteArray() , context.globalSymbolTable() , out );  
                     } else {
                         throw new RuntimeException("Unhandled output format: "+spec.format);
                     }
