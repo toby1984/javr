@@ -90,4 +90,9 @@ public class ObjectCodeWriterWrapper implements IObjectCodeWriter {
     public Address getCurrentAddress() {
         return delegate.getCurrentAddress();
     }
+
+    @Override
+    public Buffer getBuffer(Segment segment) {
+        return delegate.getBuffer(segment);
+    }
 }

@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.Address;
+import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.elf.ElfWriter.Endianess;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
@@ -77,23 +78,27 @@ public class ElfSymbolTable
         public SymbolType symbolType;
         public BindingType bindingType;
         public int sectionHeaderIndex;
+        public final Symbol symbol;
 
         public ElfSymbol(Symbol s) 
         {
+            this.symbol = s;
             this.nameIdx = file.symbolNames.add( name( s ) );
             this.value = valueOf( s );
             this.symbolType = SymbolType.STT_FUNC; // TODO: Maybe try to distinguish between functions and objects here ???
             switch( s.getType() ) 
             {
                 case ADDRESS_LABEL:
+                    this.bindingType = BindingType.STB_GLOBAL;                    
                     break;
                 case EQU:
+                    this.bindingType = BindingType.STB_LOCAL;
                     this.sectionHeaderIndex = ElfFile.SHN_ABS; // Flag as 'needs no relocation' TODO: This is not true if the expression involved addresses....
+                    this.symbolType = SymbolType.STT_NOTYPE;                    
                     break;
                 default:
                     throw new IllegalArgumentException("Don't know how to generate symbol table entry for "+s);
             }
-            this.bindingType = BindingType.STB_GLOBAL;
             this.size = 0; // TODO: Size is currently always set to zero.... change Symbol class so it can store the size of labelled object AND the type ( function or data structure / variable) 
         }
 
@@ -108,12 +113,13 @@ public class ElfSymbolTable
              * st_other |    0      |
              * st_shndx | SHN_UNDEF | No section
              */
-            nameIdx = 0;
-            value = 0;
-            size = 0;
-            symbolType = SymbolType.STT_NOTYPE;
+            this.nameIdx = 0;
+            this.value = 0;
+            this.size = 0;
+            this.symbolType = SymbolType.STT_NOTYPE;
             this.bindingType = null;
             this.sectionHeaderIndex = ElfFile.SHN_UNDEF;
+            this.symbol = null;
         }
 
         public int info() 
@@ -234,9 +240,33 @@ The symbols in a symbol table are written in the following order.
         // EXCEPT for the first one which must always have value SHN_UNDEF
         final int textSectionIdx = file.getTableIndex( file.textSegmentEntry );
         
+        final int dataSectionIdx;
+        if ( file.dataSegmentEntry != null ) {
+            dataSectionIdx = file.getTableIndex( file.dataSegmentEntry );
+        } else {
+            dataSectionIdx = -1;
+        }
+        
         final int startIdx = hasLocalSymbols ? 2 : 1; // if we have local symbols , symbol table entry #1 is occupied by STT_FILE symbol
         for ( int i = startIdx ; i < symbols.size() ; i++ ) {
-            symbols.get(i).sectionHeaderIndex = textSectionIdx;
+            
+            final ElfSymbol symbol = symbols.get(i);
+            final Segment segment = symbol.symbol.getSegment();
+            if ( segment != null )
+            {
+                if ( segment == Segment.FLASH ) {
+                    symbol.sectionHeaderIndex = textSectionIdx;
+                } 
+                else if ( segment == Segment.SRAM ) 
+                {
+                    if ( file.dataSegmentEntry == null ) {
+                        System.out.println("Symbol "+symbol.symbol+" is supposed to be in SRAM but SRAM section is empty?");
+                    }
+                    symbol.sectionHeaderIndex = dataSectionIdx;                    
+                } else {
+                    throw new RuntimeException("Internal error, there's no section for symbols in "+segment+". Offender:"+symbol.symbol);
+                }
+            }
         }
 
         for ( ElfSymbol s : symbols ) 

@@ -31,6 +31,7 @@ import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.CompilationUnit;
+import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.exceptions.DuplicateSymbolException;
 import de.codesourcery.javr.assembler.exceptions.UnknownSymbolException;
 import de.codesourcery.javr.assembler.parser.Identifier;
@@ -235,7 +236,7 @@ public class SymbolTable
         return internalGet( name ) != null;
     }    
     
-    public void defineSymbol(Symbol symbol) throws DuplicateSymbolException
+    public void defineSymbol(Symbol symbol,Segment segment) throws DuplicateSymbolException
     {
         Validate.notNull(symbol, "symbol must not be NULL");
         if ( ! symbol.hasType(Type.PREPROCESSOR_MACRO ) ) {
@@ -245,8 +246,11 @@ public class SymbolTable
         if ( existing != null && ! existing.hasType( Type.UNDEFINED ) ) {
             throw new DuplicateSymbolException( symbol , existing );
         }
+        if ( symbol.hasType( Type.ADDRESS_LABEL ) ) {
+            symbol.setSegment( segment );
+        }
         if ( parent != null ) {
-            parent.defineSymbol( symbol );
+            parent.defineSymbol( symbol , segment );
         }
         putSymbol(symbol);
     }

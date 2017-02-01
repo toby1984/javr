@@ -120,4 +120,12 @@ public interface IObjectCodeWriter
      * @return
      */
     public Address getCurrentAddress();
+    
+    /**
+     * Returns the buffer for a given segment.
+     * 
+     * @param segment
+     * @return
+     */
+    public Buffer getBuffer(Segment segment);
 }

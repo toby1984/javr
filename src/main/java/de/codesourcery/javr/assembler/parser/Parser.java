@@ -31,6 +31,7 @@ import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Instruction;
 import de.codesourcery.javr.assembler.Register;
+import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.exceptions.DuplicateSymbolException;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
@@ -605,12 +606,15 @@ public class Parser
                 }
                 throw new ParseException("Expected an identifier",lexer.peek());
             case "dseg":
+                context.setSegment( Segment.SRAM );
                 previousGlobalLabel = null;
                 return new DirectiveNode(Directive.DSEG , tok2.region() );
             case "eseg":
+                context.setSegment( Segment.EEPROM );
                 previousGlobalLabel = null;
                 return new DirectiveNode(Directive.ESEG , tok2.region() );
             case "cseg": 
+                context.setSegment( Segment.FLASH );
                 previousGlobalLabel = null;
                 return new DirectiveNode(Directive.CSEG , tok2.region() );
             case "db":
@@ -657,7 +661,7 @@ public class Parser
     private void defineSymbol(ASTNode node,final Symbol symbol) throws DuplicateSymbolException 
     {
         try {
-            context.currentSymbolTable().defineSymbol( symbol );
+            context.currentSymbolTable().defineSymbol( symbol , context.currentSegment() );
         } 
         catch(DuplicateSymbolException e) 
         {

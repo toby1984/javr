@@ -20,6 +20,7 @@ import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.CompilationUnit;
+import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
@@ -41,6 +42,7 @@ public final class Symbol
     private Object value;
     private TextRegion textRegion;
     private boolean isReferenced;
+    private Segment segment;
     
     public static enum Type 
     {
@@ -232,5 +234,25 @@ public final class Symbol
     public boolean isUndefined() 
     {
         return ! isDefined();
-    }    
+    }
+    
+    /**
+     * Sets the segment this symbol resides in.
+     * 
+     * @param segment
+     */
+    public void setSegment(Segment segment) 
+    {
+        Validate.notNull(segment, "segment must not be NULL");
+        this.segment = segment;
+    }
+    
+    /**
+     * Returns the segment this symbol resides in.
+     * 
+     * @return segment or <code>NULL</code> if this symbol is not related to any segment  in particular
+     */
+    public Segment getSegment() {
+        return segment;
+    }
 }

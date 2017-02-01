@@ -27,6 +27,8 @@ public interface Buffer
 {
     public boolean isEmpty();
     
+    public boolean isNotEmpty();
+    
     public Segment getSegment();
 
     public void writeByte(int byteToWrite);

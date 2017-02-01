@@ -15,7 +15,10 @@
  */
 package de.codesourcery.javr.assembler;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
@@ -44,6 +47,11 @@ public class ObjectCodeWriter implements IObjectCodeWriter
         {
             Validate.notNull(segment,"segment must not be NULL");
             this.segment = segment;
+        }
+        
+        @Override
+        public boolean isNotEmpty() {
+            return ! isEmpty();
         }
         
         @Override
@@ -143,7 +151,7 @@ public class ObjectCodeWriter implements IObjectCodeWriter
     }
     
     public ObjectCodeWriter() {
-        currentBuffer = codeBuffer;
+        reset();
     }
     
     @Override
@@ -164,6 +172,7 @@ public class ObjectCodeWriter implements IObjectCodeWriter
         return getBuffer(segment).getStartAddress();
     }
     
+    @Override
     public Buffer getBuffer(Segment segment) 
     {
         Validate.notNull(segment, "segment must not be NULL");

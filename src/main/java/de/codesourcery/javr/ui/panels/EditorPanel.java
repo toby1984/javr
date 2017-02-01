@@ -103,6 +103,7 @@ import de.codesourcery.javr.assembler.CompilerSettings;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.IObjectCodeWriter;
 import de.codesourcery.javr.assembler.ObjectCodeWriter;
+import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
@@ -638,11 +639,11 @@ public class EditorPanel extends JPanel
 
 		@Override
 		public int getColumnCount() {
-			return 5;
+			return 6;
 		}
 
 		private void assertValidColumn(int columnIndex) {
-			if ( columnIndex < 0 || columnIndex > 4 ) {
+			if ( columnIndex < 0 || columnIndex > 5 ) {
 				throw new RuntimeException("Invalid column: "+columnIndex);
 			}
 		}
@@ -655,10 +656,12 @@ public class EditorPanel extends JPanel
 				case 1:
 					return "Type";
 				case 2:
-					return "Value";
+				    return "Segment";
 				case 3:
-				    return "Node";
+					return "Value";
 				case 4:
+				    return "Node";
+				case 5:
 				    return "Compilation unit";
 				default:
 					throw new RuntimeException("Invalid column: "+columnIndex);
@@ -686,12 +689,15 @@ public class EditorPanel extends JPanel
 					return symbol.name().value;
 				case 1:
 					return symbol.getType().toString();
-				case 2:
+                case 2:
+                    final Segment segment = symbol.getSegment();
+                    return segment == null ? "--" : segment.toString();					
+				case 3:
 					final Object value = symbol.getValue(); 
 					return value == null ? "<no value>" : value.toString();
-				case 3:
-				    return symbol.getNode() == null ? null : symbol.getNode().toString();
 				case 4:
+				    return symbol.getNode() == null ? null : symbol.getNode().toString();
+				case 5:
 				    return symbol.getCompilationUnit().getResource().toString();
 				default:
 					throw new RuntimeException("Invalid column: "+columnIndex);                 
@@ -1421,7 +1427,6 @@ public class EditorPanel extends JPanel
 		    final IObjectCodeWriter writer = new ObjectCodeWriter();
             final SymbolTable globalSymbolTable = new SymbolTable( SymbolTable.GLOBAL ); // fake global symbol table so we don't fail parsing because of duplicate symbols already in the real one
 			final ICompilationContext context = new CompilationContext( tmpUnit , globalSymbolTable , writer , project , compilerSettings , project.getConfig() );
-
             ParseSourcePhase.parseWithoutIncludes( context, tmpUnit , project );
 		} 
 		catch(Exception e) {

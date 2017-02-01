@@ -597,7 +597,7 @@ public class PreprocessingLexer implements Lexer
                     final Symbol symbol = new Symbol(macroId,Symbol.Type.PREPROCESSOR_MACRO,compilationContext.currentCompilationUnit(),null);
                     symbol.setValue( new MacroDefinition( argumentNames , macroBody ) );
                     symbol.setTextRegion( macroName.region() );
-                    symbols().defineSymbol( symbol );
+                    symbols().defineSymbol( symbol , compilationContext.currentSegment() );
                 }
                 skipToNextLine();
                 continue;

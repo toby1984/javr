@@ -3,7 +3,10 @@ package de.codesourcery.javr.assembler.elf;
 import java.io.*;
 import java.util.*;
 
+import org.apache.commons.lang3.Validate;
+
 import de.codesourcery.javr.assembler.*;
+import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.arch.impl.ATMega328p;
 import de.codesourcery.javr.assembler.elf.ProgramTableEntry.SegmentFlag;
 import de.codesourcery.javr.assembler.elf.ProgramTableEntry.SegmentType;
@@ -47,6 +50,9 @@ public class ElfFile
     public static final String MARKER_TEXT_START = "text_start";
     public static final String MARKER_TEXT_END = "text_end";
     
+    public static final String MARKER_DATA_START = "data_start";
+    public static final String MARKER_DATA_END = "data_end";
+    
     public static final String MARKER_SECTION_SYMBOL_NAMES_TABLE_START = "section_symbol_names_table_start";
     public static final String MARKER_SECTION_SYMBOL_NAMES_TABLE_END = "section_symbol_names_table_end";
     
@@ -55,6 +61,7 @@ public class ElfFile
     
     
     public final ElfHeader header = new ElfHeader(this);
+    
     public final List<SectionTableEntry> sectionTableEntries = new ArrayList<>();
     
     public final List<ProgramTableEntry> programHeaders = new ArrayList<>();
@@ -63,68 +70,22 @@ public class ElfFile
     
     public final StringTable symbolNames = new StringTable();
     
-    public final SectionTableEntry sectionNamesEntry;
+    public SectionTableEntry sectionNamesEntry;
     
-    public final SectionTableEntry textSegmentEntry;
+    public SectionTableEntry textSegmentEntry;
     
-    public final SectionTableEntry symNamesEntry;
+    public SectionTableEntry dataSegmentEntry;
     
-    public final SectionTableEntry symTab;
+    public SectionTableEntry symNamesEntry;
     
-    public final ElfSymbolTable symbolTable = new ElfSymbolTable(this);
+    public SectionTableEntry symTab;
+    
+    public ElfSymbolTable symbolTable = new ElfSymbolTable(this);
     
     private ProgramTableEntry textSegment;
     
-    public ElfFile() 
+    public ElfFile()
     {
-        /*
-    [ 1] .text             PROGBITS        00000000 000074 00000e 00  AX  0   0  2
-  [ 2] .data             PROGBITS        00800060 000082 000000 00  WA  0   0  1
-  [ 3] .comment          PROGBITS        00000000 000082 000011 01  MS  0   0  1
-  [ 4] .shstrtab         STRTAB          00000000 000093 000030 00      0   0  1
-  [ 5] .symtab           SYMTAB          00000000 0000c4 000170 10      6  10  4
-  [ 6] .strtab           STRTAB          00000000 000234 0000dd 00      0   0  1       
-         */
-        // setup sections
-        final SectionTableEntry nullEntry = new SectionTableEntry(this);
-        nullEntry.sh_type = SectionType.SHT_NULL;
-        sectionTableEntries.add( nullEntry );
-        
-        sectionNamesEntry = new SectionTableEntry(this);
-        sectionNamesEntry.setType( SpecialSection.SHSTRTAB );
-        sectionNamesEntry.sh_addralign = 1;
-        sectionNamesEntry.sh_name = sectionNames.add( SpecialSection.SHSTRTAB.name );
-        
-        // .text segment
-        textSegmentEntry = new SectionTableEntry(this);
-        textSegmentEntry.setType( SpecialSection.TEXT );
-        textSegmentEntry.sh_addralign = 2;
-        textSegmentEntry.sh_name = sectionNames.add( SpecialSection.TEXT.name );
-
-        // .symtab segment
-        symNamesEntry = new SectionTableEntry(this);
-        
-        symTab = new SectionTableEntry(this);
-        symTab.setType( SpecialSection.SYMTAB );
-        symTab.sh_name = sectionNames.add( SpecialSection.SYMTAB.name );
-        symTab.sh_addralign = 4;
-        symTab.linkedEntry = symNamesEntry;
-        symTab.sh_entsize = ElfSymbolTable.SYMBOL_TABLE_ENTRY_SIZE;
-        
-        // symbol name table
-        symNamesEntry.setType( SpecialSection.STRTAB );
-        symNamesEntry.sh_addralign = 1;
-        symNamesEntry.sh_name = sectionNames.add( SpecialSection.STRTAB.name );
-        
-        sectionTableEntries.addAll( Arrays.asList( textSegmentEntry , sectionNamesEntry , symTab , symNamesEntry ) );
-        
-        // setup program headers
-        textSegment = new ProgramTableEntry(this);
-        textSegment.p_type = SegmentType.PT_LOAD;
-        textSegment.addFlags(SegmentFlag.PF_X , SegmentFlag.PF_R );
-        textSegment.p_align = 2;
-        
-        programHeaders.add( textSegment );
     }
     
     public static void main(String[] args) throws FileNotFoundException, IOException 
@@ -153,13 +114,18 @@ public class ElfFile
         
         final String outputFile = "/home/tobi/tmp/my.elf";
         try ( FileOutputStream out = new FileOutputStream( outputFile ) ) {
-            new ElfFile().write( text , project.getGlobalSymbolTable(), out );
+            new ElfFile().write( project.getArchitecture() , writer , project.getGlobalSymbolTable(), out );
         }
         System.out.println("Wrote to "+outputFile);
     }
     
-    public int write(byte[] program , SymbolTable globalSymbolTable, OutputStream out) throws IOException 
+    public int write(IArchitecture arch, IObjectCodeWriter objWriter , SymbolTable globalSymbolTable, OutputStream out) throws IOException 
     {
+        Validate.notNull(objWriter, "objWriter must not be NULL");
+        Validate.notNull(globalSymbolTable , "globalSymbolTable  must not be NULL");
+        Validate.notNull(out, "out must not be NULL");
+        
+        setupSections( arch , objWriter );
         symbolTable.addSymbols( globalSymbolTable );
         
         final ElfWriter writer = new ElfWriter(this);
@@ -208,8 +174,20 @@ public class ElfFile
         
         writer.align(2);
         writer.createMarker( MARKER_TEXT_START );
-        writer.writeBytes( program );
+        writer.writeBytes( objWriter.getBuffer(Segment.FLASH).toByteArray() );
         writer.createMarker( MARKER_TEXT_END );
+        
+        /**********************
+         * Write .data section
+         *********************/
+        
+        if ( objWriter.getBuffer( Segment.SRAM ).isNotEmpty() ) 
+        {
+            writer.align(2);
+            writer.createMarker( MARKER_DATA_START );
+            writer.writeBytes( objWriter.getBuffer(Segment.SRAM).toByteArray() );
+            writer.createMarker( MARKER_DATA_END );
+        }
         
         /**********************
          * Write symbol table
@@ -299,6 +277,9 @@ public class ElfFile
         if ( section == textSegmentEntry ) {
             return getPayloadOffset( textSegment , writer );
         }
+        if ( section == dataSegmentEntry ) {
+            return writer.getMarker( MARKER_DATA_START ).offset;
+        }        
         if ( section == symTab ) {
             return writer.getMarker( MARKER_SECTION_SYMBOL_TABLE_START ).offset;
         }
@@ -321,6 +302,11 @@ public class ElfFile
         }
         if ( section == textSegmentEntry ) {
             return getPayloadSize( textSegment , writer );
+        }        
+        if ( section == dataSegmentEntry ) {
+            final int start = writer.getMarker( MARKER_DATA_START ).offset;
+            final int end = writer.getMarker( MARKER_DATA_END ).offset;
+            return end-start;
         }        
         if ( section == symTab ) 
         {
@@ -347,4 +333,74 @@ public class ElfFile
     public int getSectionCount() {
         return sectionTableEntries.size();
     }
+    
+    
+    private void setupSections(IArchitecture arch, IObjectCodeWriter objWriter) 
+    {
+        /*
+    [ 1] .text             PROGBITS        00000000 000074 00000e 00  AX  0   0  2
+  [ 2] .data             PROGBITS        00800060 000082 000000 00  WA  0   0  1
+  [ 3] .comment          PROGBITS        00000000 000082 000011 01  MS  0   0  1
+  [ 4] .shstrtab         STRTAB          00000000 000093 000030 00      0   0  1
+  [ 5] .symtab           SYMTAB          00000000 0000c4 000170 10      6  10  4
+  [ 6] .strtab           STRTAB          00000000 000234 0000dd 00      0   0  1       
+         */
+        // setup sections
+        final SectionTableEntry nullEntry = new SectionTableEntry(this);
+        nullEntry.sh_type = SectionType.SHT_NULL;
+        sectionTableEntries.add( nullEntry );
+        
+        // .text segment
+        textSegmentEntry = new SectionTableEntry(this);
+        textSegmentEntry.setType( SpecialSection.TEXT );
+        textSegmentEntry.sh_addralign = 2;
+        textSegmentEntry.sh_name = sectionNames.add( SpecialSection.TEXT.name );
+
+        sectionTableEntries.add( textSegmentEntry );
+        
+        // .data segment        
+        if ( objWriter.getBuffer( Segment.SRAM).isNotEmpty() ) {
+            dataSegmentEntry = new SectionTableEntry(this);
+            dataSegmentEntry.setType( SpecialSection.DATA );
+            dataSegmentEntry.sh_addralign = 2;
+            dataSegmentEntry.sh_addr = 0x800000 + arch.getSRAMStartAddress();
+            dataSegmentEntry.sh_name = sectionNames.add( SpecialSection.DATA.name );
+            sectionTableEntries.add( dataSegmentEntry );
+        }
+        
+        // .shrstrtab names
+        sectionNamesEntry = new SectionTableEntry(this);
+        sectionNamesEntry.setType( SpecialSection.SHSTRTAB );
+        sectionNamesEntry.sh_addralign = 1;
+        sectionNamesEntry.sh_name = sectionNames.add( SpecialSection.SHSTRTAB.name );
+        
+        sectionTableEntries.add( sectionNamesEntry );
+                
+        // .symtab segment
+        symNamesEntry = new SectionTableEntry(this);
+        
+        symTab = new SectionTableEntry(this);
+        symTab.setType( SpecialSection.SYMTAB );
+        symTab.sh_name = sectionNames.add( SpecialSection.SYMTAB.name );
+        symTab.sh_addralign = 4;
+        symTab.linkedEntry = symNamesEntry;
+        symTab.sh_entsize = ElfSymbolTable.SYMBOL_TABLE_ENTRY_SIZE;
+        
+        sectionTableEntries.add( symTab );
+        
+        // symbol name table
+        symNamesEntry.setType( SpecialSection.STRTAB );
+        symNamesEntry.sh_addralign = 1;
+        symNamesEntry.sh_name = sectionNames.add( SpecialSection.STRTAB.name );
+        sectionTableEntries.add( symNamesEntry );
+        
+        // setup program headers
+        textSegment = new ProgramTableEntry(this);
+        textSegment.p_type = SegmentType.PT_LOAD;
+        textSegment.addFlags(SegmentFlag.PF_X , SegmentFlag.PF_R );
+        textSegment.p_align = 2;
+        
+        programHeaders.add( textSegment );
+    }
+    
 }

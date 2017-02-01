@@ -107,7 +107,7 @@ public class Project implements IProject
                     LOG.info("finish(): Not writing file, project configuration has no output spec for segment "+s);
                     continue;
                 }
-                final Buffer buffer = ((ObjectCodeWriter) delegate).getBuffer( s );
+                final Buffer buffer = delegate.getBuffer( s );
                 if ( buffer.isEmpty() ) 
                 {
                     LOG.info("finish(): Not writing file, compilation produced no data for segment "+s);
@@ -128,7 +128,9 @@ public class Project implements IProject
                     {
                         final ByteArrayOutputStream program = new ByteArrayOutputStream();
                         bytesWritten = IOUtils.copy( in , program );
-                        new ElfFile().write( program.toByteArray() , context.globalSymbolTable() , out );  
+                        if ( s == Segment.FLASH ) { // TODO: Slightly hacky ... ELF file contains both Segment.FLASH & Segment.SRAM so we'll only write once here
+                            new ElfFile().write( getArchitecture() , delegate , context.globalSymbolTable() , out );
+                        }
                     } else {
                         throw new RuntimeException("Unhandled output format: "+spec.format);
                     }
@@ -140,7 +142,12 @@ public class Project implements IProject
                     final int segSize = getArchitecture().getSegmentSize( s );
                     final float percentage = 100.0f*(bytesWritten/(float) segSize);
                     final DecimalFormat DF = new DecimalFormat("#####0.00");
-                    final String msg = s+": Wrote "+bytesWritten+" bytes ("+DF.format(percentage)+" %) to "+spec.resource;
+                    final String msg;
+                    if ( spec.format == OutputFormat.ELF && s == Segment.SRAM ) {
+                        msg = s+": "+bytesWritten+" bytes used ("+DF.format(percentage)+" %)";
+                    } else {
+                        msg = s+": Wrote "+bytesWritten+" bytes ("+DF.format(percentage)+" %) to "+spec.resource;
+                    }
                     context.message( CompilationMessage.info( context.currentCompilationUnit() , msg ) );                    
                 }
                 LOG.info("finish(): Wrote "+bytesWritten+" bytes to "+spec.resource+" in format "+spec.format);
