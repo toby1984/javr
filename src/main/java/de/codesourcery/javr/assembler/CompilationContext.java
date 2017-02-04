@@ -16,22 +16,18 @@
 package de.codesourcery.javr.assembler;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.IdentityHashMap;
-import java.util.Map;
 import java.util.Stack;
 
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.arch.IArchitecture;
-import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Resource;
-import de.codesourcery.javr.ui.IProject;
 import de.codesourcery.javr.ui.config.IConfig;
 
 public final class CompilationContext implements ICompilationContext 

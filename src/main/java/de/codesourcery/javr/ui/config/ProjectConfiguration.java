@@ -33,7 +33,6 @@ import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.Architecture;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.arch.impl.ATMega328p;
-import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.util.FileResource;
 import de.codesourcery.javr.assembler.util.FileResourceFactory;
 import de.codesourcery.javr.assembler.util.Resource;
@@ -47,7 +46,8 @@ public class ProjectConfiguration implements ResourceFactory
     {
         RAW,
         INTEL_HEX,
-        ELF;
+        ELF_EXECUTABLE,
+        ELF_RELOCATABLE
     }
     
     public static final class OutputSpec 
@@ -132,7 +132,7 @@ public class ProjectConfiguration implements ResourceFactory
             {
                 case INTEL_HEX: fileEnding = ".hex"; break;
                 case RAW: fileEnding = ".raw"; break;
-                case ELF: fileEnding = ".elf" ; break;
+                case ELF_EXECUTABLE: fileEnding = ".elf" ; break;
                 default:
                     throw new RuntimeException("Unhandled file format: "+outputFormat);
             }

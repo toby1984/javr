@@ -4,9 +4,15 @@ import java.io.IOException;
 
 import de.codesourcery.javr.assembler.elf.ElfWriter.Endianess;
 import de.codesourcery.javr.assembler.elf.SectionTableEntry.SpecialSection;
+import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputFormat;
 
-public class ElfHeader {
+public class ElfHeader 
+{
 
+    // ELF header file types
+    private static final int FILE_TYPE_RELOCATABLE = 1;
+    private static final int FILE_TYPE_EXECUTABLE = 2;
+    
     public final ElfFile elfFile;
     
     public ElfHeader(ElfFile file) {
@@ -63,14 +69,21 @@ Elf32_Half     e_shstrndx; // 46
         writer.writeByte( 0x01 ); // eident[EI_VERSION] => ELF v1
         writer.pad( 9 );
         
-        writer.writeHalf( 0x02 , Endianess.LITTLE ); // 16: e_type => executable file
+        if ( elfFile.type == OutputFormat.ELF_EXECUTABLE ) {
+            writer.writeHalf( FILE_TYPE_EXECUTABLE , Endianess.LITTLE ); // 16: e_type
+        } else if ( elfFile.type == OutputFormat.ELF_EXECUTABLE ) {
+            writer.writeHalf( FILE_TYPE_RELOCATABLE, Endianess.LITTLE ); // 16: e_type 
+        } else {
+            throw new RuntimeException("Internal error,unhandled output type "+elfFile.type);
+        }
+        
         writer.writeHalf( 0x53 , Endianess.LITTLE ); // 18: e_machine => AVR
         writer.writeWord( 0x01 , Endianess.LITTLE);  // 20: e_version
         writer.writeWord( 0 , Endianess.LITTLE); // 24: e_entry => address of program entry point
         
-        writer.deferredWriteWord( (w,file) -> w.getMarker( ElfFile.MARKER_PROGRAM_HEADER_TABLE_START).offset , Endianess.LITTLE); // 28: e_phoff => program header table offset
+        writer.deferredWriteWord( (w,file) -> w.getMarker( ElfFile.MarkerName.PROGRAM_HEADER_TABLE_START).offset , Endianess.LITTLE); // 28: e_phoff => program header table offset
         
-        writer.deferredWriteWord( ElfFile.MARKER_SECTION_TABLE_START , Endianess.LITTLE ); // 32: e_shoff => section header table offset
+        writer.deferredWriteWord( ElfFile.MarkerName.SECTION_TABLE_START , Endianess.LITTLE ); // 32: e_shoff => section header table offset
         writer.writeWord( 0x00 , Endianess.LITTLE ); // 36: e_flags
         writer.writeHalf( 52 , Endianess.LITTLE);  // 40: e_ehsize => ELF header size
         writer.writeHalf( ProgramTableEntry.SIZE_IN_BYTES , Endianess.LITTLE);  // 42: Elf32_Half     e_phentsize;  // size of ONE entry in the program header table

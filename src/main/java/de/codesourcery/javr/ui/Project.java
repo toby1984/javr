@@ -46,7 +46,6 @@ import de.codesourcery.javr.assembler.ObjectCodeWriter;
 import de.codesourcery.javr.assembler.ObjectCodeWriterWrapper;
 import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
-import de.codesourcery.javr.assembler.arch.impl.ATMega88;
 import de.codesourcery.javr.assembler.elf.ElfFile;
 import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.LexerImpl;
@@ -124,12 +123,12 @@ public class Project implements IProject
                     {
                         bytesWritten = IOUtils.copy( in , out );
                     } 
-                    else if ( spec.format == OutputFormat.ELF ) 
+                    else if ( spec.format == OutputFormat.ELF_EXECUTABLE || spec.format == OutputFormat.ELF_RELOCATABLE ) 
                     {
                         final ByteArrayOutputStream program = new ByteArrayOutputStream();
                         bytesWritten = IOUtils.copy( in , program );
-                        if ( s == Segment.FLASH ) { // TODO: Slightly hacky ... ELF file contains both Segment.FLASH & Segment.SRAM so we'll only write once here
-                            new ElfFile().write( getArchitecture() , delegate , context.globalSymbolTable() , out );
+                        if ( s == Segment.FLASH ) {
+                            new ElfFile( spec.format ).write( getArchitecture() , delegate , context.globalSymbolTable() , out );
                         }
                     } else {
                         throw new RuntimeException("Unhandled output format: "+spec.format);
@@ -143,7 +142,7 @@ public class Project implements IProject
                     final float percentage = 100.0f*(bytesWritten/(float) segSize);
                     final DecimalFormat DF = new DecimalFormat("#####0.00");
                     final String msg;
-                    if ( spec.format == OutputFormat.ELF && s == Segment.SRAM ) {
+                    if ( spec.format == OutputFormat.ELF_EXECUTABLE && s == Segment.SRAM ) {
                         msg = s+": "+bytesWritten+" bytes used ("+DF.format(percentage)+" %)";
                     } else {
                         msg = s+": Wrote "+bytesWritten+" bytes ("+DF.format(percentage)+" %) to "+spec.resource;

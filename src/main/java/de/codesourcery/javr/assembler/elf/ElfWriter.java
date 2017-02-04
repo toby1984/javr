@@ -91,6 +91,11 @@ public class ElfWriter
         return createMarker( "tmp."+TMP_MARKER_ID.incrementAndGet());
     }
     
+    public Marker createMarker(ElfFile.MarkerName marker) 
+    {
+        return createMarker( marker.name );
+    }
+    
     public Marker createMarker(String name) 
     {
         if ( markers.containsKey( name ) ) {
@@ -107,6 +112,11 @@ public class ElfWriter
         {
             write.perform( this , file );
         }
+    }
+    
+    public Marker getMarker(ElfFile.MarkerName marker)
+    {
+        return getMarker( marker.name );
     }
     
     public Marker getMarker(String name) 
@@ -159,6 +169,11 @@ public class ElfWriter
         writeHalf(0,endian);  // placeholder value        
         deferredWrites.add( (writer, file) -> tmp.writeHalf( s.getValue( writer , file ) , endian) );
     }  
+    
+    public void deferredWriteWord(ElfFile.MarkerName markerName,Endianess endian) 
+    {
+        deferredWriteWord( markerName.name , endian );
+    }      
     
     public void deferredWriteWord(String markerName,Endianess endian) 
     {

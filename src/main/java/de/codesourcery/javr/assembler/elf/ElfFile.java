@@ -1,11 +1,22 @@
 package de.codesourcery.javr.assembler.elf;
 
-import java.io.*;
-import java.util.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.NoSuchElementException;
 
 import org.apache.commons.lang3.Validate;
 
-import de.codesourcery.javr.assembler.*;
+import de.codesourcery.javr.assembler.Assembler;
+import de.codesourcery.javr.assembler.CompilationUnit;
+import de.codesourcery.javr.assembler.IObjectCodeWriter;
+import de.codesourcery.javr.assembler.ObjectCodeWriter;
+import de.codesourcery.javr.assembler.ResourceFactory;
+import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.arch.impl.ATMega328p;
 import de.codesourcery.javr.assembler.elf.ProgramTableEntry.SegmentFlag;
@@ -16,6 +27,7 @@ import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.FileResourceFactory;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.ui.Project;
+import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputFormat;
 
 public class ElfFile 
 {
@@ -37,28 +49,30 @@ public class ElfFile
      */
     public static final int SHN_UNDEF = 0;
     
-    public static final String MARKER_HEADER_START = "fileheader_start";
-    public static final String MARKER_HEADER_END = "fileheader_end";
-    
-    public static final String MARKER_SECTION_TABLE_START = "section_table";
-    public static final String MARKER_SECTION_NAME_STRING_TABLE_START = "section_name_string_table_start";
-    public static final String MARKER_SECTION_NAME_STRING_TABLE_END = "section_name_string_table_end";
-    
-    public static final String MARKER_PROGRAM_HEADER_TABLE_START = "program_header_start";
-    public static final String MARKER_PROGRAM_HEADER_TABLE_END = "program_header_end";
-    
-    public static final String MARKER_TEXT_START = "text_start";
-    public static final String MARKER_TEXT_END = "text_end";
-    
-    public static final String MARKER_DATA_START = "data_start";
-    public static final String MARKER_DATA_END = "data_end";
-    
-    public static final String MARKER_SECTION_SYMBOL_NAMES_TABLE_START = "section_symbol_names_table_start";
-    public static final String MARKER_SECTION_SYMBOL_NAMES_TABLE_END = "section_symbol_names_table_end";
-    
-    public static final String MARKER_SECTION_SYMBOL_TABLE_START = "section_symbol_table_start";
-    public static final String MARKER_SECTION_SYMBOL_TABLE_END = "section_symbol_table_end";
-    
+    public static enum MarkerName 
+    {
+        HEADER_START("fileheader_start"),
+        HEADER_END("fileheader_end"),
+        SECTION_TABLE_START("section_table"),
+        SECTION_NAME_STRING_TABLE_START("section_name_string_table_start"),
+        SECTION_NAME_STRING_TABLE_END("section_name_string_table_end"),
+        PROGRAM_HEADER_TABLE_START("program_header_start"),
+        PROGRAM_HEADER_TABLE_END("program_header_end"),
+        TEXT_START("text_start"),
+        TEXT_END("text_end"),
+        DATA_START("data_start"),
+        DATA_END("data_end"),
+        SECTION_SYMBOL_NAMES_TABLE_START("section_symbol_names_table_start"),
+        SECTION_SYMBOL_NAMES_TABLE_END("section_symbol_names_table_end"),
+        SECTION_SYMBOL_TABLE_START("section_symbol_table_start"),
+        SECTION_SYMBOL_TABLE_END("section_symbol_table_end");
+        
+        public final String name;
+        
+        private MarkerName(String name) {
+            this.name= name;
+        }
+    }
     
     public final ElfHeader header = new ElfHeader(this);
     
@@ -84,8 +98,12 @@ public class ElfFile
     
     private ProgramTableEntry textSegment;
     
-    public ElfFile()
+    public final OutputFormat type;
+    
+    public ElfFile(OutputFormat type)
     {
+        Validate.notNull(type, "type must not be NULL");
+        this.type = type;
     }
     
     public static void main(String[] args) throws FileNotFoundException, IOException 
@@ -114,45 +132,55 @@ public class ElfFile
         
         final String outputFile = "/home/tobi/tmp/my.elf";
         try ( FileOutputStream out = new FileOutputStream( outputFile ) ) {
-            new ElfFile().write( project.getArchitecture() , writer , project.getGlobalSymbolTable(), out );
+            new ElfFile(OutputFormat.ELF_EXECUTABLE).write( project.getArchitecture() , writer , project.getGlobalSymbolTable(), out );
         }
         System.out.println("Wrote to "+outputFile);
     }
     
-    public int write(IArchitecture arch, IObjectCodeWriter objWriter , SymbolTable globalSymbolTable, OutputStream out) throws IOException 
+    /**
+     * Write ELF file.
+     * 
+     * @param arch
+     * @param objWriter
+     * @param symbols
+     * @param out
+     * @return
+     * @throws IOException
+     */
+    public int write(IArchitecture arch, IObjectCodeWriter objWriter , SymbolTable symbols, OutputStream out) throws IOException 
     {
         Validate.notNull(objWriter, "objWriter must not be NULL");
-        Validate.notNull(globalSymbolTable , "globalSymbolTable  must not be NULL");
+        Validate.notNull(symbols , "symbols must not be NULL");
         Validate.notNull(out, "out must not be NULL");
         
         setupSections( arch , objWriter );
-        symbolTable.addSymbols( globalSymbolTable );
+        symbolTable.addSymbols( symbols );
         
         final ElfWriter writer = new ElfWriter(this);
         
         /**********************
          * Write file header
          *********************/
-        writer.createMarker( MARKER_HEADER_START );
+        writer.createMarker( MarkerName.HEADER_START );
         header.write( writer );
-        writer.createMarker( MARKER_HEADER_END );
+        writer.createMarker( MarkerName.HEADER_END );
 
         /************************
          * Write program header table
          ***********************/
         
-        writer.createMarker( MARKER_PROGRAM_HEADER_TABLE_START );
+        writer.createMarker( MarkerName.PROGRAM_HEADER_TABLE_START );
         for ( ProgramTableEntry entry : programHeaders ) 
         {
             entry.write( writer );
         }
-        writer.createMarker( MARKER_PROGRAM_HEADER_TABLE_END);
+        writer.createMarker( MarkerName.PROGRAM_HEADER_TABLE_END);
         
         /*****************
          * Write section header
          ****************/
 
-        writer.createMarker(MARKER_SECTION_TABLE_START);
+        writer.createMarker(MarkerName.SECTION_TABLE_START);
         
         for ( SectionTableEntry entry : sectionTableEntries ) 
         {
@@ -163,19 +191,18 @@ public class ElfFile
          * Write section name string table
          *****************/
         
-        writer.createMarker( MARKER_SECTION_NAME_STRING_TABLE_START );
+        writer.createMarker( MarkerName.SECTION_NAME_STRING_TABLE_START );
         sectionNames.write( writer );
-        writer.createMarker( MARKER_SECTION_NAME_STRING_TABLE_END );
-        
+        writer.createMarker( MarkerName.SECTION_NAME_STRING_TABLE_END );
         
         /**********************
          * Write .text payload
          *********************/
         
         writer.align(2);
-        writer.createMarker( MARKER_TEXT_START );
+        writer.createMarker( MarkerName.TEXT_START );
         writer.writeBytes( objWriter.getBuffer(Segment.FLASH).toByteArray() );
-        writer.createMarker( MARKER_TEXT_END );
+        writer.createMarker( MarkerName.TEXT_END );
         
         /**********************
          * Write .data section
@@ -184,9 +211,9 @@ public class ElfFile
         if ( objWriter.getBuffer( Segment.SRAM ).isNotEmpty() ) 
         {
             writer.align(2);
-            writer.createMarker( MARKER_DATA_START );
+            writer.createMarker( MarkerName.DATA_START );
             writer.writeBytes( objWriter.getBuffer(Segment.SRAM).toByteArray() );
-            writer.createMarker( MARKER_DATA_END );
+            writer.createMarker( MarkerName.DATA_END );
         }
         
         /**********************
@@ -194,17 +221,17 @@ public class ElfFile
          *********************/     
         
         writer.align( 4 );
-        writer.createMarker( MARKER_SECTION_SYMBOL_TABLE_START );        
+        writer.createMarker( MarkerName.SECTION_SYMBOL_TABLE_START );        
         symbolTable.write( writer );
-        writer.createMarker( MARKER_SECTION_SYMBOL_TABLE_END );
+        writer.createMarker( MarkerName.SECTION_SYMBOL_TABLE_END );
         
         /**********************
          * Write symbol names table
          *********************/
         
-        writer.createMarker( MARKER_SECTION_SYMBOL_NAMES_TABLE_START );        
+        writer.createMarker( MarkerName.SECTION_SYMBOL_NAMES_TABLE_START );        
         symbolNames.write( writer );
-        writer.createMarker( MARKER_SECTION_SYMBOL_NAMES_TABLE_END );         
+        writer.createMarker( MarkerName.SECTION_SYMBOL_NAMES_TABLE_END );         
         
         /********************
          * Execute deferred writes
@@ -219,7 +246,7 @@ public class ElfFile
         return fileData.length;
     }
 
-    public int getTableIndex(SectionTableEntry entry) 
+    int getTableIndex(SectionTableEntry entry) 
     {
         if ( entry == null ) {
             throw new IllegalArgumentException("entry must not be NULL");
@@ -231,12 +258,12 @@ public class ElfFile
         return result;
     }
     
-    public String getSectionName(SectionTableEntry header) 
+    String getSectionName(SectionTableEntry header) 
     {
         return sectionNames.getStringAtByteOffset( header.sh_name );
     }
     
-    public SectionTableEntry getSectionByName(String name) 
+    SectionTableEntry getSectionByName(String name) 
     {
         for ( SectionTableEntry hdr : sectionTableEntries ) 
         {
@@ -247,29 +274,29 @@ public class ElfFile
         return null;
     }
     
-    public int getPayloadOffset(ProgramTableEntry entry,ElfWriter writer) {
+    int getPayloadOffset(ProgramTableEntry entry,ElfWriter writer) {
         if ( entry == textSegment ) 
         {
-            return writer.getMarker( MARKER_TEXT_START ).offset;
+            return writer.getMarker( MarkerName.TEXT_START ).offset;
         }
         throw new RuntimeException("Internal error, don't know how to handle program header "+entry);
     }
     
-    public int getPayloadSize(ProgramTableEntry entry,ElfWriter writer) 
+    int getPayloadSize(ProgramTableEntry entry,ElfWriter writer) 
     {
         if ( entry == textSegment ) 
         {
-            final int start = writer.getMarker( MARKER_TEXT_START ).offset;
-            final int end = writer.getMarker( MARKER_TEXT_END ).offset;
+            final int start = writer.getMarker( MarkerName.TEXT_START ).offset;
+            final int end = writer.getMarker( MarkerName.TEXT_END ).offset;
             return end - start;
         }
         throw new RuntimeException("Internal error, don't know how to handle program header "+entry);  
     }
     
-    public int getSectionDataOffset(SectionTableEntry section ,ElfWriter writer) 
+    int getSectionDataOffset(SectionTableEntry section ,ElfWriter writer) 
     {
         if ( section == sectionNamesEntry ) {
-            return writer.getMarker( MARKER_SECTION_NAME_STRING_TABLE_START ).offset;
+            return writer.getMarker( MarkerName.SECTION_NAME_STRING_TABLE_START ).offset;
         }
         if ( section.sh_type == SectionType.SHT_NULL ) {
             return 0;
@@ -278,47 +305,46 @@ public class ElfFile
             return getPayloadOffset( textSegment , writer );
         }
         if ( section == dataSegmentEntry ) {
-            return writer.getMarker( MARKER_DATA_START ).offset;
+            return writer.getMarker( MarkerName.DATA_START ).offset;
         }        
         if ( section == symTab ) {
-            return writer.getMarker( MARKER_SECTION_SYMBOL_TABLE_START ).offset;
+            return writer.getMarker( MarkerName.SECTION_SYMBOL_TABLE_START ).offset;
         }
         if ( section == symNamesEntry) {
-            return writer.getMarker( MARKER_SECTION_SYMBOL_NAMES_TABLE_START ).offset;
+            return writer.getMarker( MarkerName.SECTION_SYMBOL_NAMES_TABLE_START ).offset;
         }        
         throw new RuntimeException("Internal error, don't know how to handle section '"+getSectionName(section)+"'");
     }
     
-    public int getSectionDataSize(SectionTableEntry section,ElfWriter writer) 
+    private int getDistance(ElfWriter writer,MarkerName start,MarkerName end) 
+    {
+        final int startAdr = writer.getMarker( start ).offset;
+        final int endAdr = writer.getMarker( end ).offset;
+        return endAdr-startAdr;
+    }
+    
+    int getSectionDataSize(SectionTableEntry section,ElfWriter writer) 
     {
         if ( section == null ) {
             throw new NoSuchElementException("Unknown section '"+getSectionName(section)+"'");
         }
         if ( section == sectionNamesEntry )
         {
-            int start = writer.getMarker( MARKER_SECTION_NAME_STRING_TABLE_START ).offset;
-            int end = writer.getMarker( MARKER_SECTION_NAME_STRING_TABLE_END ).offset;
-            return end-start;
+            return getDistance(writer, MarkerName.SECTION_NAME_STRING_TABLE_START , MarkerName.SECTION_NAME_STRING_TABLE_END );
         }
         if ( section == textSegmentEntry ) {
             return getPayloadSize( textSegment , writer );
         }        
         if ( section == dataSegmentEntry ) {
-            final int start = writer.getMarker( MARKER_DATA_START ).offset;
-            final int end = writer.getMarker( MARKER_DATA_END ).offset;
-            return end-start;
+            return getDistance(writer,MarkerName.DATA_START , MarkerName.DATA_END );
         }        
         if ( section == symTab ) 
         {
-            final int start = writer.getMarker( MARKER_SECTION_SYMBOL_TABLE_START ).offset;
-            final int end = writer.getMarker( MARKER_SECTION_SYMBOL_TABLE_END ).offset;
-            return end-start;
+            return getDistance(writer, MarkerName.SECTION_SYMBOL_TABLE_START , MarkerName.SECTION_SYMBOL_TABLE_END );
         }
         if ( section == symNamesEntry ) 
         {
-            final int start = writer.getMarker( MARKER_SECTION_SYMBOL_NAMES_TABLE_START ).offset;
-            final int end = writer.getMarker( MARKER_SECTION_SYMBOL_NAMES_TABLE_END ).offset;
-            return end-start;
+            return getDistance(writer, MarkerName.SECTION_SYMBOL_NAMES_TABLE_START , MarkerName.SECTION_SYMBOL_NAMES_TABLE_END );
         }        
         if ( section.sh_type == SectionType.SHT_NULL ) {
             return 0;
@@ -326,11 +352,11 @@ public class ElfFile
         throw new RuntimeException("Internal error, don't know how to handle section '"+getSectionName(section)+"'");
     }
     
-    public int getProgramHeaderCount() {
+    int getProgramHeaderCount() {
         return programHeaders.size();
     }
     
-    public int getSectionCount() {
+    int getSectionCount() {
         return sectionTableEntries.size();
     }
     
@@ -402,5 +428,4 @@ public class ElfFile
         
         programHeaders.add( textSegment );
     }
-    
 }
