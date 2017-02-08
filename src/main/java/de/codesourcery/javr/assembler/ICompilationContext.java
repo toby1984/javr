@@ -16,6 +16,7 @@
 package de.codesourcery.javr.assembler;
 
 import de.codesourcery.javr.assembler.arch.IArchitecture;
+import de.codesourcery.javr.assembler.elf.Relocation;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
@@ -63,6 +64,10 @@ public interface ICompilationContext
     public void allocateWord();
     
     public void allocateBytes(int numberOfBytes);    
+    
+    public boolean isGenerateRelocations();
+    
+    public void addRelocation(Relocation reloc);
     
     // error handling
     /**

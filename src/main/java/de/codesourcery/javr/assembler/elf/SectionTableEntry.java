@@ -5,6 +5,8 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.apache.commons.lang3.Validate;
+
 import de.codesourcery.javr.assembler.elf.ElfWriter.Endianess;
 
 public class SectionTableEntry {
@@ -22,6 +24,17 @@ public class SectionTableEntry {
 
         private Flag(int value) {
             this.value = value;
+        }
+    }
+    
+    public static final class SectionHeaderInfoAndLink 
+    {
+        public int sh_info;
+        public int sh_link;
+        
+        public SectionHeaderInfoAndLink(int sh_info, int sh_link) {
+            this.sh_info = sh_info;
+            this.sh_link = sh_link;
         }
     }
 
@@ -64,8 +77,6 @@ public class SectionTableEntry {
     public int sh_addralign;
     public int sh_entsize;
     
-    public SectionTableEntry linkedEntry; // currently only used for SHT_SYMTAB and SHT_DYNSYM to hold the section entry for the associated string table
-
     @Override
     public String toString()
     {
@@ -100,19 +111,10 @@ public class SectionTableEntry {
         writer.deferredWriteWord( (w,file) -> 
         file.getSectionDataSize(this, w) , Endianess.LITTLE );  //  size of the section data in bytes 
 
-        int link;
-        int info;
-        if ( sh_type == SectionType.SHT_SYMTAB || sh_type == SectionType.SHT_DYNSYM ) 
-        {
-            link = elfFile.getTableIndex( linkedEntry );
-            info = elfFile.symbolTable.getLastLocalSymbolIndex()+1;
-        } else {
-            link = sh_link;
-            info = sh_info;
-        }
+        final SectionHeaderInfoAndLink infoAndLink = elfFile.getSectionHeaderInfoAndLink( this );
             
-        writer.writeWord( link , Endianess.LITTLE ); // sh_link
-        writer.writeWord( info , Endianess.LITTLE ); // sh_info
+        writer.writeWord( infoAndLink.sh_link , Endianess.LITTLE ); // sh_link
+        writer.writeWord( infoAndLink.sh_info , Endianess.LITTLE ); // sh_info
         writer.writeWord(sh_addralign , Endianess.LITTLE );
         writer.writeWord(sh_entsize , Endianess.LITTLE );
     }
@@ -135,7 +137,7 @@ public class SectionTableEntry {
         NOTE("note", SectionType.SHT_NOTE ),
         PLT("plt", SectionType.SHT_PROGBITS),
         RELNAME("relname", SectionType.SHT_REL),
-        RELANAME("relaname", SectionType.SHT_RELA),
+        RELANAME("rela.text", SectionType.SHT_RELA),
         RODATA("rodata", SectionType.SHT_PROGBITS, Flag.SHF_ALLOC),
         SHSTRTAB("shstrtab", SectionType.SHT_STRTAB  ),
         STRTAB("strtab",  SectionType.SHT_STRTAB),
@@ -165,5 +167,11 @@ public class SectionTableEntry {
 
     public SectionTableEntry(ElfFile elfFile) {
         this.elfFile = elfFile;
+    }
+    
+    public boolean hasType( SectionType t) 
+    {
+        Validate.notNull(t, "t must not be NULL");
+        return this.sh_type.equals( t );
     }
 }

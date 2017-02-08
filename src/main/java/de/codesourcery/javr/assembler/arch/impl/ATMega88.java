@@ -39,48 +39,48 @@ public class ATMega88 extends AbstractAchitecture
         final InstructionEncoding adc = insn("adc",   "0001 11rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER ); 
         
         final InstructionEncoding add = insn("add",   "0000 11rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER );  
-        insn("adiw",  "1001 0110 KKdd KKKK" , ArgumentType.COMPOUND_REGISTERS_R24_TO_R30 , ArgumentType.SIX_BIT_CONSTANT );
+        insn("adiw",  "1001 0110 KKdd KKKK" , ArgumentType.COMPOUND_REGISTERS_R24_TO_R30 , ArgumentType.SIX_BIT_CONSTANT ).mayNeedRelocation();
         final InstructionEncoding and = insn("and",   "0010 00rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER );
-        final InstructionEncoding andi = insn("andi",  "0111 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT );
+        final InstructionEncoding andi = insn("andi",  "0111 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT ).mayNeedRelocation();
         insn("asr",   "1001 010d dddd 0101" , ArgumentType.SINGLE_REGISTER );
         insn("bclr",  "1001 0100 1ddd 1000" , ArgumentType.THREE_BIT_CONSTANT );
         insn("bld",   "1111 100d dddd 0sss" , ArgumentType.SINGLE_REGISTER , ArgumentType.THREE_BIT_CONSTANT );
         
-        insn("brbs",  "1111 00ss ssss sddd" , ArgumentType.THREE_BIT_CONSTANT , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
-        insn("brhs",  "1111 00kk kkkk k101" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        insn("brbs",  "1111 00ss ssss sddd" , ArgumentType.THREE_BIT_CONSTANT , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ).mayNeedRelocation();
+        insn("brhs",  "1111 00kk kkkk k101" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ).mayNeedRelocation();
         
-        final InstructionEncoding brcc = insn("brcc",  "1111 01kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
-        final InstructionEncoding brcs = insn("brcs",  "1111 00kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        final InstructionEncoding brcc = insn("brcc",  "1111 01kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ).mayNeedRelocation();
+        final InstructionEncoding brcs = insn("brcs",  "1111 00kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ).mayNeedRelocation();
         insn("break", "1001 0101 1001 1000" );
-        insn("breq",  "1111 00kk kkkk k001" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
-        insn("brbc",  "1111 01ss ssss sddd" , ArgumentType.THREE_BIT_CONSTANT , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
-        insn("brge",  "1111 01kk kkkk k100" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
-        insn("brhc",  "1111 01kk kkkk k101" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
-        insn("brid",  "1111 01kk kkkk k111" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
-        insn("brie",  "1111 00kk kkkk k111" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        insn("breq",  "1111 00kk kkkk k001" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ).mayNeedRelocation();
+        insn("brbc",  "1111 01ss ssss sddd" , ArgumentType.THREE_BIT_CONSTANT , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ).mayNeedRelocation();
+        insn("brge",  "1111 01kk kkkk k100" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET).mayNeedRelocation();
+        insn("brhc",  "1111 01kk kkkk k101" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET).mayNeedRelocation();
+        insn("brid",  "1111 01kk kkkk k111" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET).mayNeedRelocation();
+        insn("brie",  "1111 00kk kkkk k111" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET).mayNeedRelocation();
         
-        final InstructionEncoding brlo = insn("brlo",  "1111 00kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        final InstructionEncoding brlo = insn("brlo",  "1111 00kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ).mayNeedRelocation();
         brlo.aliasOf( brcs );
         brcs.aliasOf( brlo );
         
-        insn("brlt",  "1111 00kk kkkk k100" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
-        insn("brmi",  "1111 00kk kkkk k010" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        insn("brlt",  "1111 00kk kkkk k100" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ).mayNeedRelocation();
+        insn("brmi",  "1111 00kk kkkk k010" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ).mayNeedRelocation();
         
-        insn("brne",  "1111 01kk kkkk k001" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
-        insn("brpl",  "1111 01kk kkkk k010" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
-        final InstructionEncoding brsh = insn("brsh",  "1111 01kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ).disasmMnemonic("brcc");
+        insn("brne",  "1111 01kk kkkk k001" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ).mayNeedRelocation();
+        insn("brpl",  "1111 01kk kkkk k010" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ).mayNeedRelocation();
+        final InstructionEncoding brsh = insn("brsh",  "1111 01kk kkkk k000" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ).disasmMnemonic("brcc").mayNeedRelocation();
         brsh.aliasOf( brcc );
         brcc.aliasOf( brsh);
-        insn("brtc",  "1111 01kk kkkk k110" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
-        insn("brts",  "1111 00kk kkkk k110" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
-        insn("brvc",  "1111 01kk kkkk k011" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
-        insn("brvs",  "1111 00kk kkkk k011" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET );
+        insn("brtc",  "1111 01kk kkkk k110" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ).mayNeedRelocation();
+        insn("brts",  "1111 00kk kkkk k110" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ).mayNeedRelocation();
+        insn("brvc",  "1111 01kk kkkk k011" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ).mayNeedRelocation();
+        insn("brvs",  "1111 00kk kkkk k011" , ArgumentType.SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET ).mayNeedRelocation();
         insn("bset",  "1001 0100 0sss 1000" , ArgumentType.THREE_BIT_CONSTANT );
         insn("bst",   "1111 101d dddd 0sss" , ArgumentType.SINGLE_REGISTER , ArgumentType.THREE_BIT_CONSTANT );
         
-        insn("call",  "1001 010k kkkk 111k kkkk kkkk kkkk kkkk" , ArgumentType.TWENTYTWO_BIT_FLASH_MEM_ADDRESS );
+        insn("call",  "1001 010k kkkk 111k kkkk kkkk kkkk kkkk" , ArgumentType.TWENTYTWO_BIT_FLASH_MEM_ADDRESS ).mayNeedRelocation();
         
-        insn("cbi",   "1001 1000 dddd dsss" , ArgumentType.FIVE_BIT_IO_REGISTER_CONSTANT , ArgumentType.THREE_BIT_CONSTANT );
+        insn("cbi",   "1001 1000 dddd dsss" , ArgumentType.FIVE_BIT_IO_REGISTER_CONSTANT , ArgumentType.THREE_BIT_CONSTANT ).mayNeedRelocation();
         final InstructionEncoding cbr = insn("cbr",   "0111 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT ).srcTransform( value -> 
         {
           return ~value &0xff; // CBR is implemented as AND with inverted src value     
@@ -145,9 +145,9 @@ public class ATMega88 extends AbstractAchitecture
         insn("fmulsu", "0000 0011 1ddd 1rrr" , ArgumentType.R16_TO_R23, ArgumentType.R16_TO_R23);
         insn("icall",  "1001 0101 0000 1001" );
         insn("ijmp",   "1001 0100 0000 1001" );
-        insn("in",     "1011 0ssd dddd ssss" , ArgumentType.SINGLE_REGISTER, ArgumentType.SIX_BIT_IO_REGISTER_CONSTANT );
+        insn("in",     "1011 0ssd dddd ssss" , ArgumentType.SINGLE_REGISTER, ArgumentType.SIX_BIT_IO_REGISTER_CONSTANT ).mayNeedRelocation();
         insn("inc",    "1001 010d dddd 0011" , ArgumentType.SINGLE_REGISTER );
-        insn("jmp",    "1001 010k kkkk 110k kkkk kkkk kkkk kkkk" , ArgumentType.TWENTYTWO_BIT_FLASH_MEM_ADDRESS );
+        insn("jmp",    "1001 010k kkkk 110k kkkk kkkk kkkk kkkk" , ArgumentType.TWENTYTWO_BIT_FLASH_MEM_ADDRESS ).mayNeedRelocation();
         insn("lac",    "1001 001r rrrr 0110" , ArgumentType.Z_REGISTER , ArgumentType.SINGLE_REGISTER  ).disasmImplicitDestination("Z");
         insn("las",    "1001 001r rrrr 0101" , ArgumentType.Z_REGISTER , ArgumentType.SINGLE_REGISTER  ).disasmImplicitDestination("Z");
         insn("lat",    "1001 001r rrrr 0111" , ArgumentType.Z_REGISTER , ArgumentType.SINGLE_REGISTER  ).disasmImplicitDestination("Z");
@@ -229,9 +229,9 @@ public class ATMega88 extends AbstractAchitecture
         
         add( new EncodingEntry( lddSelector , lddY , lddZ ) );
         
-        insn("ldi",    "1110 ssss dddd ssss" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT );
+        insn("ldi",    "1110 ssss dddd ssss" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT ).mayNeedRelocation();
         aliasMnemonic("ser","ldi");        
-        insn( "lds" , "1001 000d dddd 0000 kkkk kkkk kkkk kkkk" , ArgumentType.SINGLE_REGISTER, ArgumentType.SIXTEEN_BIT_SRAM_MEM_ADDRESS);
+        insn( "lds" , "1001 000d dddd 0000 kkkk kkkk kkkk kkkk" , ArgumentType.SINGLE_REGISTER, ArgumentType.SIXTEEN_BIT_SRAM_MEM_ADDRESS).mayNeedRelocation();
         
         // LPM
         final InstructionEncoding lpmNoArgs = new InstructionEncoding( "lpm" , new InstructionEncoder( "1001 0101 1100 1000" ) , ArgumentType.NONE, ArgumentType.NONE);
@@ -285,10 +285,10 @@ public class ATMega88 extends AbstractAchitecture
         insn("out",   "1011 1dds ssss dddd" , ArgumentType.SIX_BIT_IO_REGISTER_CONSTANT, ArgumentType.SINGLE_REGISTER );
         insn("pop",   "1001 000d dddd 1111" , ArgumentType.SINGLE_REGISTER);
         insn("push",  "1001 001d dddd 1111" , ArgumentType.SINGLE_REGISTER );
-        insn("rcall", "1101 kkkk kkkk kkkk" , ArgumentType.TWELVE_BIT_SIGNED_JUMP_OFFSET );
+        insn("rcall", "1101 kkkk kkkk kkkk" , ArgumentType.TWELVE_BIT_SIGNED_JUMP_OFFSET ).mayNeedRelocation();
         insn("ret",   "1001 0101 0000 1000");
         insn("reti",  "1001 0101 0001 1000");
-        insn("rjmp",  "1100 kkkk kkkk kkkk" , ArgumentType.TWELVE_BIT_SIGNED_JUMP_OFFSET );
+        insn("rjmp",  "1100 kkkk kkkk kkkk" , ArgumentType.TWELVE_BIT_SIGNED_JUMP_OFFSET ).mayNeedRelocation();
         final InstructionEncoding rol = insn("rol",   "0001 11dd dddd dddd" , ArgumentType.SINGLE_REGISTER );
         
         final DisassemblySelector adcOrRol = new SameOperandsDisassemblySelector(rol,adc);
@@ -297,15 +297,15 @@ public class ATMega88 extends AbstractAchitecture
         
         insn("ror",   "1001 010d dddd 0111" , ArgumentType.SINGLE_REGISTER );
         insn("sbc",   "0000 10rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER );
-        insn("sbci",  "0100 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT );
-        insn("sbi",   "1001 1010 dddd dsss" , ArgumentType.FIVE_BIT_IO_REGISTER_CONSTANT, ArgumentType.THREE_BIT_CONSTANT );
-        insn("sbic",  "1001 1001 dddd dsss" , ArgumentType.FIVE_BIT_IO_REGISTER_CONSTANT, ArgumentType.THREE_BIT_CONSTANT );
-        insn("sbis",  "1001 1011 dddd dsss" , ArgumentType.FIVE_BIT_IO_REGISTER_CONSTANT, ArgumentType.THREE_BIT_CONSTANT );
+        insn("sbci",  "0100 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT ).mayNeedRelocation();
+        insn("sbi",   "1001 1010 dddd dsss" , ArgumentType.FIVE_BIT_IO_REGISTER_CONSTANT, ArgumentType.THREE_BIT_CONSTANT ).mayNeedRelocation();
+        insn("sbic",  "1001 1001 dddd dsss" , ArgumentType.FIVE_BIT_IO_REGISTER_CONSTANT, ArgumentType.THREE_BIT_CONSTANT ).mayNeedRelocation();
+        insn("sbis",  "1001 1011 dddd dsss" , ArgumentType.FIVE_BIT_IO_REGISTER_CONSTANT, ArgumentType.THREE_BIT_CONSTANT ).mayNeedRelocation();
         
-        insn("sbiw",  "1001 0111 KKdd KKKK" , ArgumentType.COMPOUND_REGISTERS_R24_TO_R30, ArgumentType.SIX_BIT_CONSTANT );
+        insn("sbiw",  "1001 0111 KKdd KKKK" , ArgumentType.COMPOUND_REGISTERS_R24_TO_R30, ArgumentType.SIX_BIT_CONSTANT ).mayNeedRelocation();
         
-        final InstructionEncoding ori = insn("ori",   "0110 ssss dddd ssss" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT);
-        final InstructionEncoding sbr = insn("sbr",   "0110 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT ).disasmMnemonic("ori");
+        final InstructionEncoding ori = insn("ori",   "0110 ssss dddd ssss" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT).mayNeedRelocation();
+        final InstructionEncoding sbr = insn("sbr",   "0110 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT ).disasmMnemonic("ori").mayNeedRelocation();
         sbr.aliasOf( ori );
         ori.aliasOf( sbr );
         insn("sbrc",  "1111 110d dddd 0sss" , ArgumentType.SINGLE_REGISTER , ArgumentType.THREE_BIT_CONSTANT );
@@ -426,11 +426,11 @@ public class ATMega88 extends AbstractAchitecture
         aliasMnemonic("std","st");
         
         // STS
-        insn( "sts" , "1001 001s ssss 0000 dddd dddd dddd dddd" , ArgumentType.SIXTEEN_BIT_SRAM_MEM_ADDRESS, ArgumentType.SINGLE_REGISTER );
+        insn( "sts" , "1001 001s ssss 0000 dddd dddd dddd dddd" , ArgumentType.SIXTEEN_BIT_SRAM_MEM_ADDRESS, ArgumentType.SINGLE_REGISTER ).mayNeedRelocation();
         
         // end 
         insn("sub",  "0001 10rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER );
-        insn("subi", "0101 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT );
+        insn("subi", "0101 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT ).mayNeedRelocation();
         insn("swap", "1001 010d dddd 0010" , ArgumentType.SINGLE_REGISTER );
         InstructionEncoding tst = insn("tst",  "0010 00dd dddd dddd" , ArgumentType.SINGLE_REGISTER );
         

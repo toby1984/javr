@@ -6,7 +6,9 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 import org.apache.commons.lang3.Validate;
@@ -19,14 +21,17 @@ import de.codesourcery.javr.assembler.ResourceFactory;
 import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
 import de.codesourcery.javr.assembler.arch.impl.ATMega328p;
+import de.codesourcery.javr.assembler.elf.ElfWriter.Endianess;
 import de.codesourcery.javr.assembler.elf.ProgramTableEntry.SegmentFlag;
 import de.codesourcery.javr.assembler.elf.ProgramTableEntry.SegmentType;
+import de.codesourcery.javr.assembler.elf.SectionTableEntry.SectionHeaderInfoAndLink;
 import de.codesourcery.javr.assembler.elf.SectionTableEntry.SectionType;
 import de.codesourcery.javr.assembler.elf.SectionTableEntry.SpecialSection;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.FileResourceFactory;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.ui.Project;
+import de.codesourcery.javr.ui.config.ProjectConfiguration;
 import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputFormat;
 
 public class ElfFile 
@@ -49,6 +54,8 @@ public class ElfFile
      */
     public static final int SHN_UNDEF = 0;
     
+    public static final int RELOCATION_SECTION_ENTRY_SIZE = 0x0c;
+    
     public static enum MarkerName 
     {
         HEADER_START("fileheader_start"),
@@ -58,6 +65,8 @@ public class ElfFile
         SECTION_NAME_STRING_TABLE_END("section_name_string_table_end"),
         PROGRAM_HEADER_TABLE_START("program_header_start"),
         PROGRAM_HEADER_TABLE_END("program_header_end"),
+        DATA_RELOCATIONS_START("data_relocations_start"),
+        TEXT_RELOCATIONS_START("text_relocations_start"),
         TEXT_START("text_start"),
         TEXT_END("text_end"),
         DATA_START("data_start"),
@@ -77,28 +86,26 @@ public class ElfFile
     public final ElfHeader header = new ElfHeader(this);
     
     public final List<SectionTableEntry> sectionTableEntries = new ArrayList<>();
-    
     public final List<ProgramTableEntry> programHeaders = new ArrayList<>();
     
     public final StringTable sectionNames = new StringTable();
-    
     public final StringTable symbolNames = new StringTable();
     
     public SectionTableEntry sectionNamesEntry;
-    
     public SectionTableEntry textSegmentEntry;
-    
     public SectionTableEntry dataSegmentEntry;
-    
     public SectionTableEntry symNamesEntry;
-    
     public SectionTableEntry symTab;
+    
+    private final Map<Segment,SectionTableEntry> relocationEntries = new HashMap<>();
     
     public ElfSymbolTable symbolTable = new ElfSymbolTable(this);
     
     private ProgramTableEntry textSegment;
     
     public final OutputFormat type;
+    
+    private IObjectCodeWriter objectCodeWriter;
     
     public ElfFile(OutputFormat type)
     {
@@ -108,16 +115,34 @@ public class ElfFile
     
     public static void main(String[] args) throws FileNotFoundException, IOException 
     {
-        final String src = "main:  ldi r16,0xff\n";
+        final String src = ""
+                + "mydelay: ldi r16,0xff\n"
+                + ".loop  dec r16\n"
+                + "brne loop\n"
+                + "ret\n";
         final File baseDir = new File(".");
+        final OutputFormat outputFormat = OutputFormat.ELF_RELOCATABLE;
         
         final Assembler asm = new Assembler();
         final Resource res = Resource.forString("dummy", src );
         final CompilationUnit root = new CompilationUnit( res );
         
         final Project project = new Project( root );
-        project.setCompileRoot( root );
         project.setArchitecture( new ATMega328p() );
+        
+        /*
+         * TODO: Hacky... Project class assumes that sources are in local filesystem so Project#setConfiguration(IProjectConfiguration)
+         * TODO: will actually try to resolve the root compilation unit from the filesystem , overwriting
+         * TODO: the compilation root we previously set when calling new Project( compilationRoot) 
+         */
+        ProjectConfiguration copy = project.getConfiguration(); 
+        copy.setOutputFormat( outputFormat );
+        project.setConfiguration( copy ); // compilationRoot get
+        
+        // discard compilation root from filesystem and try again... 
+        final CompilationUnit oldRoot = project.getCompileRoot();
+        project.setCompileRoot( root );
+        project.removeCompilationUnit( oldRoot );
         
         final ObjectCodeWriter writer = new ObjectCodeWriter();
         
@@ -132,7 +157,7 @@ public class ElfFile
         
         final String outputFile = "/home/tobi/tmp/my.elf";
         try ( FileOutputStream out = new FileOutputStream( outputFile ) ) {
-            new ElfFile(OutputFormat.ELF_EXECUTABLE).write( project.getArchitecture() , writer , project.getGlobalSymbolTable(), out );
+            new ElfFile(outputFormat).write( project.getArchitecture() , writer , project.getGlobalSymbolTable(), out );
         }
         System.out.println("Wrote to "+outputFile);
     }
@@ -153,7 +178,10 @@ public class ElfFile
         Validate.notNull(symbols , "symbols must not be NULL");
         Validate.notNull(out, "out must not be NULL");
         
+        this.objectCodeWriter = objWriter;
+        
         setupSections( arch , objWriter );
+        
         symbolTable.addSymbols( symbols );
         
         final ElfWriter writer = new ElfWriter(this);
@@ -169,12 +197,15 @@ public class ElfFile
          * Write program header table
          ***********************/
         
-        writer.createMarker( MarkerName.PROGRAM_HEADER_TABLE_START );
-        for ( ProgramTableEntry entry : programHeaders ) 
-        {
-            entry.write( writer );
+        if ( type == OutputFormat.ELF_EXECUTABLE) 
+        {         
+            writer.createMarker( MarkerName.PROGRAM_HEADER_TABLE_START );
+            for ( ProgramTableEntry entry : programHeaders ) 
+            {
+                entry.write( writer );
+            }
+            writer.createMarker( MarkerName.PROGRAM_HEADER_TABLE_END);
         }
-        writer.createMarker( MarkerName.PROGRAM_HEADER_TABLE_END);
         
         /*****************
          * Write section header
@@ -203,6 +234,55 @@ public class ElfFile
         writer.createMarker( MarkerName.TEXT_START );
         writer.writeBytes( objWriter.getBuffer(Segment.FLASH).toByteArray() );
         writer.createMarker( MarkerName.TEXT_END );
+        
+        /**********************
+         * Write relocation section headers
+         *********************/
+        
+        if ( type == OutputFormat.ELF_RELOCATABLE) 
+        {
+            for ( Segment s : Segment.values() ) 
+            {
+                final List<Relocation> relocs = objWriter.getRelocations( s ); 
+                if ( ! relocs.isEmpty() ) 
+                {
+                    final MarkerName marker;
+                    if ( s == Segment.FLASH ) {
+                        marker = MarkerName.TEXT_RELOCATIONS_START;
+                    } else if ( s == Segment.SRAM ) {
+                        marker = MarkerName.DATA_RELOCATIONS_START;
+                    } else {
+                        throw new RuntimeException("Internal error,unhandled segment: "+s);
+                    }
+                    
+                    writer.align(4);                    
+                    writer.createMarker( marker );
+                    for ( Relocation r : relocs ) 
+                    {
+                        /* typedef struct 
+                         * {
+                         *     Elf32_Addr  r_offset;
+                         *     Elf32_Word  r_info;
+                         *     Elf32_Sword r_addend;
+                         * } Elf32_Rela
+                         */
+                        writer.writeWord( r.locationOffset , Endianess.LITTLE );
+                        final int symbolTableIdx;
+                        if ( r.symbol.isLocalLabel() ) { // avr-gcc does relocations of local labels always relative to their segment 
+                            if ( r.symbol.getSegment() != Segment.FLASH ) { // we currently only support local labels within the text segment
+                                throw new RuntimeException("Internal error, relocation of local symbol that is not in .text segment ");
+                            }
+                            symbolTableIdx = symbolTable.indexOf( symbolTable.textSectionSymbol );
+                        } else {
+                            symbolTableIdx = symbolTable.indexOf( r.symbol );
+                        }
+                        final int typeAndSymbolIdx = symbolTableIdx<<8 | r.kind.elfId;
+                        writer.writeWord( typeAndSymbolIdx , Endianess.LITTLE );
+                        writer.writeWord( r.addend , Endianess.LITTLE );
+                    }
+                }
+            }
+        }
         
         /**********************
          * Write .data section
@@ -312,7 +392,23 @@ public class ElfFile
         }
         if ( section == symNamesEntry) {
             return writer.getMarker( MarkerName.SECTION_SYMBOL_NAMES_TABLE_START ).offset;
-        }        
+        }     
+        if ( section.hasType( SectionType.SHT_RELA ) ) 
+        {
+            final MarkerName marker;
+            final Segment s = getSegmentForRelocation( section );
+            switch( s ) {
+                case FLASH:
+                    marker = MarkerName.TEXT_RELOCATIONS_START;
+                    break;
+                case SRAM:
+                    marker = MarkerName.DATA_RELOCATIONS_START;
+                    break;
+                default:
+                    throw new RuntimeException("Unhandled segment: "+s);
+            }
+            return writer.getMarker( marker ).offset;
+        }
         throw new RuntimeException("Internal error, don't know how to handle section '"+getSectionName(section)+"'");
     }
     
@@ -349,6 +445,15 @@ public class ElfFile
         if ( section.sh_type == SectionType.SHT_NULL ) {
             return 0;
         }        
+        if ( section.hasType( SectionType.SHT_RELA ) ) 
+        {
+            final Segment segment = getSegmentForRelocation( section );
+            final List<Relocation> relocs = objectCodeWriter.getRelocations( segment );
+            if ( relocs.isEmpty() ) {
+                throw new RuntimeException("Internal error, called for segment with no relocations ?");
+            }
+            return relocs.size() * RELOCATION_SECTION_ENTRY_SIZE;
+        }
         throw new RuntimeException("Internal error, don't know how to handle section '"+getSectionName(section)+"'");
     }
     
@@ -360,6 +465,42 @@ public class ElfFile
         return sectionTableEntries.size();
     }
     
+    SectionHeaderInfoAndLink getSectionHeaderInfoAndLink(SectionTableEntry entry) 
+    {
+        Validate.notNull(entry, "entry must not be NULL");
+        final int link;
+        final int info;
+        if ( entry == symTab ) 
+        {
+            link = getTableIndex( symNamesEntry );
+            info = symbolTable.getLastLocalSymbolIndex()+1;   
+        } 
+        else if ( entry.hasType( SectionType.SHT_RELA ) ) 
+        {
+            link = getTableIndex( symTab );
+            
+            final Segment segment = getSegmentForRelocation( entry );
+            if ( segment == Segment.FLASH ) {
+                info = getTableIndex( textSegmentEntry );
+            } else if ( segment == Segment.SRAM ) {
+                info = getTableIndex( dataSegmentEntry );
+            } else {
+                throw new RuntimeException("Internal error,unhandled segment: "+segment);
+            }
+        } else {
+            link = entry.sh_link;
+            info = entry.sh_info;
+        }        
+        return new SectionHeaderInfoAndLink(info,link);
+    }
+    
+    Segment getSegmentForRelocation(SectionTableEntry entry) 
+    {
+        if ( ! entry.hasType( SectionType.SHT_RELA ) ) {
+            throw new IllegalArgumentException("Method must only be called for relocation section table entries");
+        }
+        return relocationEntries.entrySet().stream().filter( e -> e.getValue() == entry ).map( e -> e.getKey() ).findFirst().get();
+    }
     
     private void setupSections(IArchitecture arch, IObjectCodeWriter objWriter) 
     {
@@ -383,6 +524,38 @@ public class ElfFile
         textSegmentEntry.sh_name = sectionNames.add( SpecialSection.TEXT.name );
 
         sectionTableEntries.add( textSegmentEntry );
+        
+        if ( type == OutputFormat.ELF_RELOCATABLE ) 
+        {
+            for ( Segment s : Segment.values() ) 
+            {
+                if ( objWriter.getRelocations( s ).isEmpty() ) 
+                {
+                    continue;
+                }
+                final SectionTableEntry relocationEntry  = new SectionTableEntry(this);
+                relocationEntries.put( s , relocationEntry );
+                
+                relocationEntry.setType( SpecialSection.RELANAME );
+                relocationEntry.sh_addralign = 4;
+                final String segName;
+                switch ( s ) {
+                    case FLASH:
+                        segName = ".rela.text";
+                        break;
+                    case SRAM:
+                        segName = ".rela.data";
+                        break;
+                    default:
+                        throw new RuntimeException("Internal error, relocation entries for segment "+s+" ?");
+                }
+                relocationEntry.sh_name = sectionNames.add( segName );
+                relocationEntry.sh_entsize = RELOCATION_SECTION_ENTRY_SIZE;
+                // TODO: readelf output shows flag 'INFO' but I couldn't find the binary value for this flag (not in regular ELF spec)
+                // relocationEntry.sh_flags.add( Flag.INFO );
+                sectionTableEntries.add( relocationEntry );
+            }
+        }
         
         // .data segment        
         if ( objWriter.getBuffer( Segment.SRAM).isNotEmpty() ) {
@@ -409,7 +582,6 @@ public class ElfFile
         symTab.setType( SpecialSection.SYMTAB );
         symTab.sh_name = sectionNames.add( SpecialSection.SYMTAB.name );
         symTab.sh_addralign = 4;
-        symTab.linkedEntry = symNamesEntry;
         symTab.sh_entsize = ElfSymbolTable.SYMBOL_TABLE_ENTRY_SIZE;
         
         sectionTableEntries.add( symTab );
@@ -421,11 +593,13 @@ public class ElfFile
         sectionTableEntries.add( symNamesEntry );
         
         // setup program headers
-        textSegment = new ProgramTableEntry(this);
-        textSegment.p_type = SegmentType.PT_LOAD;
-        textSegment.addFlags(SegmentFlag.PF_X , SegmentFlag.PF_R );
-        textSegment.p_align = 2;
-        
-        programHeaders.add( textSegment );
+        if ( type == OutputFormat.ELF_EXECUTABLE ) {        
+            textSegment = new ProgramTableEntry(this);
+            textSegment.p_type = SegmentType.PT_LOAD;
+            textSegment.addFlags(SegmentFlag.PF_X , SegmentFlag.PF_R );
+            textSegment.p_align = 2;
+            
+            programHeaders.add( textSegment );
+        }
     }
 }

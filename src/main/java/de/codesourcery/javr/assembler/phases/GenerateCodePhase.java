@@ -19,6 +19,7 @@ import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.ICompilationContext;
+import de.codesourcery.javr.assembler.elf.Relocation;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
@@ -80,7 +81,9 @@ public class GenerateCodePhase extends AbstractPhase
                         LOG.debug("generateCode(): Allocating "+bytes+" at "+context.currentAddress()+" segment for "+node);
                     }
                     context.allocateBytes( bytes );
-                } else {
+                } 
+                else 
+                {
                     if ( LOG.isDebugEnabled() ) {
                         LOG.debug("generateCode(): Compiling instruction at "+context.currentAddress()+" segment for "+node);
                     }                    

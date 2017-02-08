@@ -15,11 +15,16 @@
  */
 package de.codesourcery.javr.assembler.parser.ast;
 
+import java.util.Objects;
+
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Instruction;
+import de.codesourcery.javr.assembler.parser.OperatorType;
 import de.codesourcery.javr.assembler.parser.TextRegion;
+import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 public class InstructionNode extends NodeWithMemoryLocation implements Resolvable
 {
@@ -38,6 +43,85 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
         return new InstructionNode( this.instruction.createCopy() , getTextRegion().createCopy() );
     }
     
+    private ASTNode unwrapExpression(ASTNode node) 
+    {
+        ASTNode result = node;
+        while( result instanceof ExpressionNode) 
+        {
+            result = result.child(0);
+        }
+        return result;
+    }
+    
+    private boolean isAddressIdentifierNode(ASTNode node,SymbolTable symbolTable) 
+    {
+        if ( node instanceof IdentifierNode) 
+        {
+            return ((IdentifierNode) node).refersToAddressSymbol( symbolTable );
+        }
+        return false;
+    }
+
+    public Symbol getSymbolNeedingRelocation(ASTNode node, ICompilationContext context) 
+    {
+        final SymbolTable symbolTable = context.currentSymbolTable();
+        final Symbol[] result = { null };
+        
+        final IASTVisitor visitor = new IASTVisitor() 
+        {
+            @Override
+            public void visit(ASTNode node, IIterationContext ctx) 
+            {
+                // deal with special cases 
+                if ( node instanceof OperatorNode) 
+                {
+                    final OperatorNode op = (OperatorNode) node;
+                    // subtraction between addresses in same segment doesn't need relocation
+                    if ( op.getOperatorType() == OperatorType.BINARY_MINUS ) 
+                    {
+                        final ASTNode child0 = unwrapExpression( op.child(0) );
+                        final ASTNode child1 = unwrapExpression( op.child(1) );
+                        if ( isAddressIdentifierNode(child0 , symbolTable) && isAddressIdentifierNode( child1 , symbolTable) ) 
+                        {
+                            // (label1-label2) expressions don't need relocation
+                            ctx.dontGoDeeper();
+                        }
+                    } 
+                    else if ( op.getOperatorType() == OperatorType.UNARY_MINUS ) // 0 - address doesn't need special case 
+                    {
+                        final ASTNode child0 = unwrapExpression( op.child(0) );
+                        if ( isAddressIdentifierNode( child0 , symbolTable ) ) 
+                        {
+                            final IdentifierNode id = (IdentifierNode) child0;
+                            if ( ! id.safeGetSymbol().getSegment().equals( context.currentSegment() ) ) {
+                                throw new RuntimeException("Not relocatable, symbol needs to be in same section as instruction");
+                            }
+                            ctx.dontGoDeeper();
+                        }
+                    }
+                } 
+                else if ( isAddressIdentifierNode( node , symbolTable ) )
+                {
+                    final Symbol symbol = ((IdentifierNode) node).safeGetSymbol();
+                    if ( result[0] == null ) 
+                    {
+                        result[0] = symbol;
+                    } else {
+                        if ( ! result[0].name().equals( symbol.name() ) ||
+                             ! result[0].hasType( symbol.getType() ) ||
+                             ! Objects.equals( result[0].getSegment() , symbol.getSegment() ) ||
+                             ! result[0].getCompilationUnit().hasSameResourceAs( symbol.getCompilationUnit() ) ) 
+                        {
+                            throw new RuntimeException("Expression is not relocatable as it refers to more than one symbol: First: "+result[0]+", offender: "+symbol);
+                        }
+                    }
+                }
+            }
+        };
+        node.visitBreadthFirst( visitor );
+        return result[0];
+    }
+     
     public ASTNode src() {
         return child(1);
     }

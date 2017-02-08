@@ -19,9 +19,13 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.Validate;
+
+import de.codesourcery.javr.assembler.elf.Relocation;
 
 /**
  * Default object code writer.
@@ -42,6 +46,8 @@ public class ObjectCodeWriter implements IObjectCodeWriter
         public Address startAddress;
         public byte[] data = new byte[1024];
         public int dataPtr = 0;
+        
+        private final List<Relocation> relocations = new ArrayList<>();
         
         public ByteArrayBuffer(Segment segment) 
         {
@@ -148,6 +154,19 @@ public class ObjectCodeWriter implements IObjectCodeWriter
             }
             return codeOut.toByteArray(); 
         }
+
+        @Override
+        public void addRelocation(Relocation reloc) {
+            if ( reloc == null ) {
+                throw new IllegalArgumentException("reloc must not be NULL");
+            }
+            this.relocations.add(reloc);
+        }
+
+        @Override
+        public List<Relocation> getRelocations() {
+            return relocations;
+        }
     }
     
     public ObjectCodeWriter() {
@@ -239,5 +258,15 @@ public class ObjectCodeWriter implements IObjectCodeWriter
     @Override
     public Segment getCurrentSegment() {
         return currentBuffer.getSegment();
+    }
+
+    @Override
+    public void addRelocation(Relocation reloc) {
+        currentBuffer.addRelocation( reloc );
+    }
+
+    @Override
+    public List<Relocation> getRelocations(Segment segment) {
+        return getBuffer( segment ).getRelocations();
     }
 }

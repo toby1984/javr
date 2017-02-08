@@ -31,16 +31,26 @@ import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Register;
 import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.InstructionEncoder.Transform;
+import de.codesourcery.javr.assembler.elf.Relocation;
+import de.codesourcery.javr.assembler.parser.OperatorType;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
+import de.codesourcery.javr.assembler.parser.ast.ExpressionNode;
+import de.codesourcery.javr.assembler.parser.ast.FunctionCallNode;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
+import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
+import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
+import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 public abstract class AbstractAchitecture implements IArchitecture 
 {
     private static final Logger LOG = Logger.getLogger(AbstractAchitecture.class);
 
+    private static final Integer ZERO = Integer.valueOf(0);
+    
     private static final long VALUE_UNAVAILABLE= 0xdeadabcdbeefdeadL;
     
     public static enum ArgumentType 
@@ -75,7 +85,6 @@ public abstract class AbstractAchitecture implements IArchitecture
         // absolute addresses
         TWENTYTWO_BIT_FLASH_MEM_ADDRESS(false), // device-dependent, covers whole address range
         SIXTEEN_BIT_SRAM_MEM_ADDRESS(false), // device-dependent, covers whole address range
-        SEVEN_BIT_SRAM_MEM_ADDRESS(false),
         // signed jump offsets
         SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET(false),
         TWELVE_BIT_SIGNED_JUMP_OFFSET(false),
@@ -93,7 +102,8 @@ public abstract class AbstractAchitecture implements IArchitecture
         
         private ArgumentType(boolean registerRef) {
             this.requiresRegisterRef = registerRef;
-        }
+        }        
+
         public boolean requiresRegisterReference() {
             return requiresRegisterRef;
         }
@@ -194,6 +204,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         public String disasmImplicitDestination;
         public String disasmImplicitSource;
         public String disasmMnemonic;
+        public boolean mayNeedRelocation;
         
         public InstructionEncoding(String mnemonic,InstructionEncoder enc,ArgumentType dstType,ArgumentType srcType) 
         {
@@ -230,6 +241,11 @@ public abstract class AbstractAchitecture implements IArchitecture
         public InstructionEncoding disasmImplicitDestination(String disasmImplicitDestination) {
             Validate.notBlank(disasmImplicitDestination, "disasmImplicitDestination must not be NULL or blank");
             this.disasmImplicitDestination = disasmImplicitDestination;
+            return this;
+        }
+        
+        public InstructionEncoding mayNeedRelocation() {
+            this.mayNeedRelocation = true;
             return this;
         }
         
@@ -569,40 +585,39 @@ public abstract class AbstractAchitecture implements IArchitecture
             return false;
         }        
         
-        final boolean failOnAddressOutOfBounds = context.getCompilationSettings().isFailOnAddressOutOfRange();
         boolean result = true;
         if ( encoding.dstType != ArgumentType.NONE ) {
-            result &= ( getDstValue( dstArgument , encoding.dstType , context ,true , failOnAddressOutOfBounds) != VALUE_UNAVAILABLE );
+            result &= ( getDstValue( dstArgument , encoding.dstType , context ,true ) != VALUE_UNAVAILABLE );
         }
         if ( encoding.srcType != ArgumentType.NONE ) {
-            result &= ( getSrcValue( srcArgument , encoding.srcType , context ,true , failOnAddressOutOfBounds) != VALUE_UNAVAILABLE );
+            result &= ( getSrcValue( srcArgument , encoding.srcType , context ,true ) != VALUE_UNAVAILABLE );
         }
         return result;
     }
 
     @Override
-    public void compile(InstructionNode node, ICompilationContext context) 
+    public void compile(InstructionNode insn, ICompilationContext context) 
     {
-        final String mnemonic = node.instruction.getMnemonic();
+        final String mnemonic = insn.instruction.getMnemonic();
         
         final EncodingEntry variants;
         if (  mnemonic.equalsIgnoreCase("lsl" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for LSL ... 
         {
             variants = lookupInstruction( "add" );
             // turn "LSL rX" into "ADD rX,rX"
-            node = (InstructionNode) node.createCopy( true );
-            if ( node.childCount() == 1 ) 
+            insn = (InstructionNode) insn.createCopy( true );
+            if ( insn.childCount() == 1 ) 
             {
-                node.addChild( node.child(0).createCopy( true ) );
+                insn.addChild( insn.child(0).createCopy( true ) );
             }
         } else if (  mnemonic.equalsIgnoreCase("tst" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for TST ... 
             {
             variants = lookupInstruction( "and" );
             // turn "TST rX" into "AND rX,rX"
-            node = (InstructionNode) node.createCopy( true );
-            if ( node.childCount() == 1 ) 
+            insn = (InstructionNode) insn.createCopy( true );
+            if ( insn.childCount() == 1 ) 
             {
-                node.addChild( node.child(0).createCopy( true ) );
+                insn.addChild( insn.child(0).createCopy( true ) );
             }            
         } else {
             variants = lookupInstruction( mnemonic );
@@ -610,19 +625,19 @@ public abstract class AbstractAchitecture implements IArchitecture
         
         ASTNode dstArgument = null;
         ASTNode srcArgument = null;
-        switch( node.childCount() ) 
+        switch( insn.childCount() ) 
         {
             case 0: 
                 break;
-            case 2: srcArgument = node.child(1);
+            case 2: srcArgument = insn.child(1);
             //      $$FALL-THROUGH$$
-            case 1: dstArgument = node.child(0); 
+            case 1: dstArgument = insn.child(0); 
                 break;
             default:
         }
         final int argCount = ( dstArgument != null ? 1 : 0 ) + (srcArgument != null ? 1 : 0 );        
         
-        final InstructionEncoding encoding = variants.getEncoding( node );
+        final InstructionEncoding encoding = variants.getEncoding( insn );
         int expectedArgumentCount = encoding.getArgumentCountFromPattern();
         if ( encoding.hasImplicitSourceArgument() ) 
         {
@@ -638,14 +653,41 @@ public abstract class AbstractAchitecture implements IArchitecture
             throw new RuntimeException( encoding.mnemonic+" expects "+encoding.getArgumentCountFromPattern()+" arguments but got "+argCount);
         }
         
-        final boolean failOnAddressOutOfBounds = context.getCompilationSettings().isFailOnAddressOutOfRange();        
-        final int dstValue = (int) getDstValue( dstArgument , encoding.dstType , context , false , failOnAddressOutOfBounds );
-        final int srcValue = (int) getSrcValue( srcArgument , encoding.srcType , context , false , failOnAddressOutOfBounds );
-
+        final int dstValue;
+        final int srcValue;
+        if ( encoding.mayNeedRelocation && context.isGenerateRelocations() ) 
+        {
+            // 8-bit AVRs will only require relocation of either the src or destination but not both arguments
+            Symbol symbolNeedingRelocation = null;
+           
+            if ( srcArgument != null && ( symbolNeedingRelocation = insn.getSymbolNeedingRelocation( srcArgument , context ) ) != null ) 
+            {
+                dstValue = (int) getDstValue( dstArgument , encoding.dstType , context , false );                
+                srcValue = 0;
+                final Relocation reloc = getRelocation(encoding,insn,srcArgument,encoding.srcType,symbolNeedingRelocation,context);
+                context.addRelocation( reloc );
+            } 
+            else if (dstArgument != null && ( symbolNeedingRelocation = insn.getSymbolNeedingRelocation( dstArgument , context ) ) != null  ) {
+                dstValue = 0;
+                srcValue = (int) getSrcValue( srcArgument , encoding.srcType , context , false );  
+                final Relocation reloc = getRelocation(encoding,insn,dstArgument,encoding.dstType,symbolNeedingRelocation,context );
+                context.addRelocation( reloc );
+            } else {
+                dstValue = (int) getDstValue( dstArgument , encoding.dstType , context , false );                     
+                srcValue = (int) getSrcValue( srcArgument , encoding.srcType , context , false );  
+            }
+        } 
+        else 
+        {
+            dstValue = (int) getDstValue( dstArgument , encoding.dstType , context , false );
+            srcValue = (int) getSrcValue( srcArgument , encoding.srcType , context , false );            
+        }
+        
         final int instruction = encoding.encode( dstValue , srcValue );
         if ( LOG.isDebugEnabled() ) {
-            debugAssembly(node, encoding, dstValue, srcValue, instruction); // TODO: Remove debug code
+            debugAssembly(insn, encoding, dstValue, srcValue, instruction); // TODO: Remove debug code
         }
+        
         switch( encoding.getInstructionLengthInBytes() ) {
             case 2:
                 context.writeWord( instruction );
@@ -658,7 +700,169 @@ public abstract class AbstractAchitecture implements IArchitecture
                 throw new RuntimeException("Unsupported instruction word length: "+encoding.getInstructionLengthInBytes()+" bytes");
         }
     }
-
+    
+    private Relocation getRelocation(InstructionEncoding encoding, InstructionNode node, ASTNode argument,ArgumentType argType,Symbol symbolNeedingRelocation,ICompilationContext context) 
+    {
+        final Relocation result = new Relocation( symbolNeedingRelocation );
+        result.locationOffset = node.getMemoryLocation().getByteAddress();
+        
+        final long tmp = toIntValue( ((IValueNode) argument).getValue() );
+        if ( tmp == VALUE_UNAVAILABLE ) 
+        {
+            throw new RuntimeException("Internal error, don't know how to turn node value "+((IValueNode) argument).getValue()+" into an int ?");
+        }
+        int addend = (int) tmp;
+        
+//        final long tmp2 = toIntValue( symbolNeedingRelocation.getValue() );
+//        if ( tmp2 == VALUE_UNAVAILABLE ) 
+//        {
+//            throw new RuntimeException("Internal error, don't know how to turn node value "+symbolNeedingRelocation.getValue()+" into an int ?");
+//        }        
+//        final int symbolValue = (int) tmp2;
+//        
+//        addend = addend - symbolValue;
+        
+        final int expressionTypeBitMask = classifyExpression( argument , context.currentSymbolTable() );
+        final Relocation.Kind kind;
+        switch( argType ) 
+        {
+            // // andi // cbr // cpi // ldi // sbci // ori,sbr // subi
+            case EIGHT_BIT_CONSTANT:
+                kind = Relocation.Kind.get8BitLDIRelocation( expressionTypeBitMask );
+                break;
+            // I/O registers: // cbi,sbi,sbic,sbis
+            case FIVE_BIT_IO_REGISTER_CONSTANT:
+                kind = Relocation.Kind.R_AVR_PORT5;
+                break;
+            // in,out
+            case SIX_BIT_IO_REGISTER_CONSTANT:
+                kind = Relocation.Kind.R_AVR_PORT6;
+                break;      
+            // conditional branches
+            case SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET:
+                // addend = node.getMemoryLocation().getByteAddress();                
+                kind = Relocation.Kind.R_AVR_7_PCREL;
+                break;
+             // lds,sts
+            case SIXTEEN_BIT_SRAM_MEM_ADDRESS:
+                kind = Relocation.Kind.R_AVR_16;
+                break;
+            // rcall / rjmp
+            case TWELVE_BIT_SIGNED_JUMP_OFFSET:
+                // addend = node.getMemoryLocation().getByteAddress();
+                kind = Relocation.Kind.R_AVR_13_PCREL;
+                break;
+            // call / jmp
+            case TWENTYTWO_BIT_FLASH_MEM_ADDRESS:
+                kind = Relocation.Kind.R_AVR_CALL;
+                break;
+            default:
+                throw new RuntimeException("Internal error,unhandled instruction argument type: "+argType);
+        }
+        result.addend = addend;
+        result.kind = kind;
+        return result;
+    }
+    
+    private long toIntValue(Object value) 
+    {
+        int result;
+        if ( value instanceof Number) {
+            result = ((Number) value).intValue();
+        } 
+        else if ( value instanceof Address) 
+        {
+            result = ((Address) value).getByteAddress();
+        } else {
+            return VALUE_UNAVAILABLE;
+        }
+        return result;
+    }
+    
+    private int classifyExpression(ASTNode argument,SymbolTable symbolTable) 
+    {
+        int result = 0;
+        ASTNode toInspect = maybeUnwrapExpression(argument);
+        if ( argument instanceof FunctionCallNode) {
+            final FunctionCallNode fn = (FunctionCallNode) argument;
+            if ( fn.functionName.equals( FunctionCallNode.BUILDIN_FUNCTION_HIGH ) ) {
+                result |= Relocation.EXPR_FLAG_HI;
+                toInspect = maybeUnwrapExpression( fn.child(0) );                
+            } else if ( fn.functionName.equals( FunctionCallNode.BUILDIN_FUNCTION_LOW ) ) {
+                result |= Relocation.EXPR_FLAG_LO;
+                toInspect = maybeUnwrapExpression( fn.child(0) );
+            } else {
+                throw new RuntimeException("Internal error,unknown function: "+fn);
+            }
+        }
+        if ( toInspect instanceof OperatorNode) 
+        {
+            final OperatorNode op = (OperatorNode) toInspect;
+            if ( op.type == OperatorType.PLUS || op.type == OperatorType.BINARY_MINUS) {
+                // ok, plus and minus are operations we know how to relocate
+            } 
+            else if ( op.type == OperatorType.SHIFT_RIGHT ) 
+            {
+                final ASTNode rhs = maybeUnwrapExpression( op.child(1) );
+                // check RHS of >> 
+                if ( rhs instanceof IValueNode ) 
+                {
+                    // TODO: we should actually make sure that the RHS does not refer to any address symbols...
+                    Object value = ((IValueNode) rhs).getValue();
+                    if ( value instanceof Number == false ) {
+                        throw new RuntimeException("Internal error - expression has value '"+value+"' which is not a constant ?");                        
+                    }
+                    if ( ((Number) value).intValue() != 1 ) {
+                        throw new RuntimeException("Non-relocatable right-shift operator ; only shift by 1 is supported");
+                    }
+                    result |= Relocation.EXPR_FLAG_PM; // division by 2
+                } else {
+                    throw new RuntimeException("Non-relocatable right-shift operator,argument does not resolve to a IValueNode");
+                }
+                // check LHS of expression , only <address> or -<address> are supported
+                final ASTNode lhs = maybeUnwrapExpression( op.child(0) );
+                if ( lhs instanceof IdentifierNode && ((IdentifierNode) lhs).refersToAddressSymbol( symbolTable ) ) 
+                {
+                    // <adr>
+                } 
+                else if ( isNegatedAddress( lhs , symbolTable ) ) // -<adr> 
+                {
+                    result |= Relocation.EXPR_FLAG_NEG; 
+                } else {
+                    throw new RuntimeException("Internal error, LHS of right-shift operator does not refer to an address symbol ?"); 
+                }
+            } 
+            else if ( isNegatedAddress( op , symbolTable ) )
+            {
+                result |= Relocation.EXPR_FLAG_NEG;
+            } 
+            else {
+                throw new RuntimeException("Internal error, not a recognized relocatable expression");
+            }
+        }
+        return result;
+    }
+    
+    private boolean isNegatedAddress(ASTNode node, SymbolTable symbolTable) 
+    {
+        ASTNode op = maybeUnwrapExpression( node );
+        if ( op instanceof OperatorNode && ((OperatorNode) op).type == OperatorType.UNARY_MINUS ) 
+        {
+            final ASTNode child = maybeUnwrapExpression( op.child(0) );
+            return child instanceof IdentifierNode && ((IdentifierNode) child).refersToAddressSymbol( symbolTable );
+        }
+        return false;
+    }
+    
+    private ASTNode maybeUnwrapExpression(ASTNode node) 
+    {
+        ASTNode toInspect = node;
+        while ( toInspect instanceof ExpressionNode ) {
+            toInspect = toInspect.child(0);
+        }
+        return toInspect;
+    }
+    
     private void debugAssembly(InstructionNode node,final InstructionEncoding encoding, final int dstValue,final int srcValue, final int instruction) 
     {
         final String hex;
@@ -701,22 +905,22 @@ public abstract class AbstractAchitecture implements IArchitecture
         return hex2.toString();
     }
     
-    private long getSrcValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase,boolean failOnAddressOutOfBounds) 
+    private long getSrcValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase) 
     {
         try 
         {
-            return getValue(node,type,context,calledInResolvePhase,failOnAddressOutOfBounds);
+            return getValue(node,type,context,calledInResolvePhase);
         } 
         catch(Exception e) {
             throw new RuntimeException("SRC operand: "+e.getMessage(),e);
         }
     }
     
-    private long getDstValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase,boolean failOnAddressOutOfBounds) 
+    private long getDstValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase) 
     {
         try 
         {
-            return getValue(node,type,context,calledInResolvePhase,failOnAddressOutOfBounds);
+            return getValue(node,type,context,calledInResolvePhase);
         } 
         catch(Exception e) {
             throw new RuntimeException("DST operand: "+e.getMessage(),e);
@@ -777,11 +981,13 @@ public abstract class AbstractAchitecture implements IArchitecture
      * @return argument value or {@link #VALUE_UNAVAILABLE} if for some reason the value could not be determined.
      *           Messages will be added to the {@link ICompilationContext#error(String, ASTNode) context} as needed.
      */
-    private long getValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase,boolean failOnAddressOutOfBounds) 
+    private long getValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase)
     {
         if ( type == ArgumentType.NONE ) {
             return 0;
         }
+        
+        final boolean failOnAddressOutOfBounds = context.getCompilationSettings().isFailOnAddressOutOfRange();
         
         final boolean isValueNode = node instanceof IValueNode; 
         final int result;
@@ -792,15 +998,11 @@ public abstract class AbstractAchitecture implements IArchitecture
             if ( value == null && calledInResolvePhase ) {
                 return VALUE_UNAVAILABLE;
             }
-            if ( value instanceof Number) {
-                result = ((Number) value).intValue();
-            } 
-            else if ( value instanceof Address) 
-            {
-                result = ((Address) value).getByteAddress();
-            } else {
+            final long tmp = toIntValue( ((IValueNode) node).getValue() );
+            if ( tmp == VALUE_UNAVAILABLE ) {
                 return fail("Operand needs to evaluate to a number but was "+value,node,context);
             }
+            result = (int) tmp;
         } 
         else if ( node instanceof RegisterNode) 
         {
@@ -994,22 +1196,22 @@ public abstract class AbstractAchitecture implements IArchitecture
                     warn(msg,node,context);
                 }                
                 return result; 
-            case SEVEN_BIT_SRAM_MEM_ADDRESS:       
-                if ( ! isValueNode ) {
-                    return fail("Operand needs to be an 7-bit SRAM address",node,context);
-                } 
-                if ( ! fitsInBitfield( result , 7 ) ) {
-                    return fail("Operand out of 7-bit range (SRAM address): "+result,node,context);
-                }
-                if ( ! isValidSRAMAdress( result ) ) 
-                {
-                    final String msg = "SRAM address out of range (0..."+(getSegmentSize(Segment.SRAM)-1)+"): "+result;
-                    if ( failOnAddressOutOfBounds ) { 
-                        return fail(msg,node,context);
-                    }
-                    warn(msg,node,context);
-                }
-                return result;
+//            case SEVEN_BIT_SRAM_MEM_ADDRESS:       
+//                if ( ! isValueNode ) {
+//                    return fail("Operand needs to be an 7-bit SRAM address",node,context);
+//                } 
+//                if ( ! fitsInBitfield( result , 7 ) ) {
+//                    return fail("Operand out of 7-bit range (SRAM address): "+result,node,context);
+//                }
+//                if ( ! isValidSRAMAdress( result ) ) 
+//                {
+//                    final String msg = "SRAM address out of range (0..."+(getSegmentSize(Segment.SRAM)-1)+"): "+result;
+//                    if ( failOnAddressOutOfBounds ) { 
+//                        return fail(msg,node,context);
+//                    }
+//                    warn(msg,node,context);
+//                }
+//                return result;
             case SIXTEEN_BIT_SRAM_MEM_ADDRESS:
                 if ( ! isValueNode ) {
                     return fail("Operand needs to be an 16-bit SRAM address",node,context);
@@ -1340,7 +1542,6 @@ public abstract class AbstractAchitecture implements IArchitecture
             case SIX_BIT_IO_REGISTER_CONSTANT:
             case EIGHT_BIT_CONSTANT:
             // absolute addresses
-            case SEVEN_BIT_SRAM_MEM_ADDRESS:
             case SIXTEEN_BIT_SRAM_MEM_ADDRESS:
             case TWENTYTWO_BIT_FLASH_MEM_ADDRESS:
             // relative addresses
@@ -1368,9 +1569,6 @@ public abstract class AbstractAchitecture implements IArchitecture
                             return "0x"+Integer.toHexString( currentByteAddress + byteOffset ); // always print addresses as bytes
                         }
                         return "."+ ( (byteOffset >= 0 ) ? "+"+byteOffset : ""+byteOffset );
-                    case SEVEN_BIT_SRAM_MEM_ADDRESS:  
-                        bitCount = 7 ;
-                        break;
                     case TWENTYTWO_BIT_FLASH_MEM_ADDRESS:
                         bitCount = 22;
                         value <<= 1; // word -> byte address
@@ -1529,5 +1727,5 @@ public abstract class AbstractAchitecture implements IArchitecture
             throw new RuntimeException("Alias already exists: "+alias+" -> "+alternativeMnemonics.get(alias) );
         }
         alternativeMnemonics.put( alias , realDeal );
-    }
+    }    
 }

@@ -47,7 +47,16 @@ public class ProjectConfiguration implements ResourceFactory
         RAW,
         INTEL_HEX,
         ELF_EXECUTABLE,
-        ELF_RELOCATABLE
+        ELF_RELOCATABLE 
+        {
+            public boolean supportsRelocation() {
+                return true;
+            }            
+        };
+        
+        public boolean supportsRelocation() {
+            return false;
+        }
     }
     
     public static final class OutputSpec 
@@ -132,7 +141,8 @@ public class ProjectConfiguration implements ResourceFactory
             {
                 case INTEL_HEX: fileEnding = ".hex"; break;
                 case RAW: fileEnding = ".raw"; break;
-                case ELF_EXECUTABLE: fileEnding = ".elf" ; break;
+                case ELF_EXECUTABLE: fileEnding = ".out" ; break;
+                case ELF_RELOCATABLE: fileEnding = ".o" ; break;                
                 default:
                     throw new RuntimeException("Unhandled file format: "+outputFormat);
             }

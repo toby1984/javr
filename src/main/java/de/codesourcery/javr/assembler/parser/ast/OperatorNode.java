@@ -24,7 +24,6 @@ import de.codesourcery.javr.assembler.parser.TextRegion;
 public class OperatorNode extends AbstractASTNode implements IValueNode , Resolvable
 {
     public OperatorType type;
-    
     private Object value;
 
     public OperatorNode(OperatorType type,TextRegion region) 
@@ -38,6 +37,14 @@ public class OperatorNode extends AbstractASTNode implements IValueNode , Resolv
     protected OperatorNode createCopy() {
         return new OperatorNode(this.type , getTextRegion().createCopy() );
     }
+    
+    public ASTNode lhs() {
+        return child(0);
+    }
+    
+    public ASTNode rhs() {
+        return child(0);
+    }    
     
     public OperatorType getOperatorType() {
         return type;

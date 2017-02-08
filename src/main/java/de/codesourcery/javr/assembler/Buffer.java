@@ -17,6 +17,9 @@ package de.codesourcery.javr.assembler;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
+
+import de.codesourcery.javr.assembler.elf.Relocation;
 
 /**
  * A buffer for a specific {@link Segment} used by the {@link IObjectCodeWriter}.
@@ -46,4 +49,8 @@ public interface Buffer
     public InputStream createInputStream() throws IOException;
     
     public byte[] toByteArray() throws IOException;
+    
+    public void addRelocation(Relocation reloc);
+    
+    public List<Relocation> getRelocations();
 }

@@ -44,6 +44,29 @@ public final class Symbol
     private boolean isReferenced;
     private Segment segment;
     
+    public Symbol createShallowCopy() {
+        return new Symbol(this);
+    }
+    
+    /**
+     * Creates a <b>SHALLOW</b> copy of another symbol.
+     * 
+     * Both symbols will share the same references to objects
+     * they depend on.
+     * 
+     * @param other
+     */
+    public Symbol(Symbol other) {
+        this.name = other.name;
+        this.node = other.node;
+        this.compilationUnit = other.compilationUnit;
+        this.type = other.type;
+        this.value = other.value;
+        this.textRegion = other.textRegion;
+        this.isReferenced = other.isReferenced;
+        this.segment = other.segment;
+    }
+    
     public static enum Type 
     {
         /**
