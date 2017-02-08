@@ -16,8 +16,11 @@
 package de.codesourcery.javr.assembler;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.apache.commons.lang3.Validate;
+
+import de.codesourcery.javr.assembler.elf.Relocation;
 
 /**
  * Adapter class to make implementing delegating {@link IObjectCodeWriter} 
@@ -94,5 +97,15 @@ public class ObjectCodeWriterWrapper implements IObjectCodeWriter {
     @Override
     public Buffer getBuffer(Segment segment) {
         return delegate.getBuffer(segment);
+    }
+
+    @Override
+    public void addRelocation(Relocation reloc) {
+        delegate.addRelocation(reloc);
+    }
+
+    @Override
+    public List<Relocation> getRelocations(Segment segment) {
+        return delegate.getRelocations( segment );
     }
 }

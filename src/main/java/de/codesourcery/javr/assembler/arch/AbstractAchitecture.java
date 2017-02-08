@@ -31,11 +31,18 @@ import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Register;
 import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.InstructionEncoder.Transform;
+import de.codesourcery.javr.assembler.elf.Relocation;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
+import de.codesourcery.javr.assembler.parser.ast.FunctionCallNode;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
+import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
+import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
+import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.Symbol.Type;
+import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 public abstract class AbstractAchitecture implements IArchitecture 
 {
@@ -93,7 +100,8 @@ public abstract class AbstractAchitecture implements IArchitecture
         
         private ArgumentType(boolean registerRef) {
             this.requiresRegisterRef = registerRef;
-        }
+        }        
+
         public boolean requiresRegisterReference() {
             return requiresRegisterRef;
         }
@@ -194,6 +202,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         public String disasmImplicitDestination;
         public String disasmImplicitSource;
         public String disasmMnemonic;
+        public Relocation.Kind reloc=Relocation.Kind.R_AVR_NONE;
         
         public InstructionEncoding(String mnemonic,InstructionEncoder enc,ArgumentType dstType,ArgumentType srcType) 
         {
@@ -230,6 +239,11 @@ public abstract class AbstractAchitecture implements IArchitecture
         public InstructionEncoding disasmImplicitDestination(String disasmImplicitDestination) {
             Validate.notBlank(disasmImplicitDestination, "disasmImplicitDestination must not be NULL or blank");
             this.disasmImplicitDestination = disasmImplicitDestination;
+            return this;
+        }
+        
+        public InstructionEncoding reloc(Relocation.Kind kind) {
+            this.reloc = kind;
             return this;
         }
         
@@ -581,7 +595,7 @@ public abstract class AbstractAchitecture implements IArchitecture
     }
 
     @Override
-    public void compile(InstructionNode node, ICompilationContext context) 
+    public Relocation compile(InstructionNode node, ICompilationContext context) 
     {
         final String mnemonic = node.instruction.getMnemonic();
         
@@ -639,13 +653,27 @@ public abstract class AbstractAchitecture implements IArchitecture
         }
         
         final boolean failOnAddressOutOfBounds = context.getCompilationSettings().isFailOnAddressOutOfRange();        
-        final int dstValue = (int) getDstValue( dstArgument , encoding.dstType , context , false , failOnAddressOutOfBounds );
-        final int srcValue = (int) getSrcValue( srcArgument , encoding.srcType , context , false , failOnAddressOutOfBounds );
+        int dstValue = (int) getDstValue( dstArgument , encoding.dstType , context , false , failOnAddressOutOfBounds );
+        int srcValue = (int) getSrcValue( srcArgument , encoding.srcType , context , false , failOnAddressOutOfBounds );
 
+        Relocation reloc=null;
+        if ( context.isGenerateRelocations() ) 
+        {
+            if ( srcArgument != null && node.srcNeedsRelocation( context.currentSymbolTable() ) ) {
+                srcValue = 0;
+                reloc = getRelocation(encoding,node,srcArgument);
+            }
+            if ( dstArgument != null && node.dstNeedsRelocation( context.currentSymbolTable() ) ) {
+                dstValue = 0;
+                reloc = getRelocation(encoding,node,dstArgument);
+            }
+        }
+        
         final int instruction = encoding.encode( dstValue , srcValue );
         if ( LOG.isDebugEnabled() ) {
             debugAssembly(node, encoding, dstValue, srcValue, instruction); // TODO: Remove debug code
         }
+        
         switch( encoding.getInstructionLengthInBytes() ) {
             case 2:
                 context.writeWord( instruction );
@@ -657,6 +685,80 @@ public abstract class AbstractAchitecture implements IArchitecture
             default:
                 throw new RuntimeException("Unsupported instruction word length: "+encoding.getInstructionLengthInBytes()+" bytes");
         }
+        return reloc;
+    }
+    
+    private Relocation getSrcRelocation(InstructionEncoding encoding,InstructionNode node,ASTNode srcExpr) 
+    {
+        Relocation.Kind kind = null;
+        switch ( encoding.srcType ) 
+        {
+            case EIGHT_BIT_CONSTANT:
+                break;
+            case FIVE_BIT_IO_REGISTER_CONSTANT:
+                break;
+            case FOUR_BIT_CONSTANT:
+                break;
+            case SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET:
+                break;
+            case SEVEN_BIT_SRAM_MEM_ADDRESS:
+                break;
+            case SIXTEEN_BIT_SRAM_MEM_ADDRESS:
+                break;
+            case SIX_BIT_CONSTANT:
+                break;
+            case TWELVE_BIT_SIGNED_JUMP_OFFSET:
+                break;
+            case TWENTYTWO_BIT_FLASH_MEM_ADDRESS:
+                break;
+            default:
+                throw new RuntimeException("Internal error, unhandled encoding type: "+encoding.srcType);
+        }
+        return null;
+//            switch( encoding.relocationKind ) 
+//            {
+//                case R_AVR_13_PCREL: // relocation always required (
+//                    
+//                    // rjmp
+//                    // rcall
+//                    
+//                    
+//                    break;
+//                case R_AVR_7_PCREL: // relocation always required
+//                    
+//                    // brcc
+//                    break;
+//                    
+//                case R_AVR_16:
+//                    // LDS r16, label
+//                    break;
+//                case R_AVR_16_PM: // word-wise addressing , object code contains adr/2
+//                    break;
+//                case R_AVR_CALL: // relocation always required, CALL instruction
+//                    
+//                    // call
+//                    // jmp 
+//                    
+//                    break;
+//                case R_AVR_HI8_LDI:
+//                    break;
+//                case R_AVR_HI8_LDI_NEG:
+//                    break;
+//                case R_AVR_HI8_LDI_PM: // word-wise addressing , object code contains adr/2
+//                    break;
+//                case R_AVR_HI8_LDI_PM_NEG: // word-wise addressing , object code contains adr/2
+//                    break;
+//                case R_AVR_LO8_LDI:
+//                    break;
+//                case R_AVR_LO8_LDI_NEG:
+//                    break;
+//                case R_AVR_LO8_LDI_PM: // word-wise addressing , object code contains adr/2
+//                    break;
+//                case R_AVR_LO8_LDI_PM_NEG: // word-wise addressing , object code contains adr/2
+//                    break;
+//                case R_AVR_NONE:
+//                    return null;
+//        }
     }
 
     private void debugAssembly(InstructionNode node,final InstructionEncoding encoding, final int dstValue,final int srcValue, final int instruction) 

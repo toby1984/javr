@@ -23,6 +23,7 @@ import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.arch.IArchitecture;
+import de.codesourcery.javr.assembler.elf.Relocation;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
@@ -41,6 +42,8 @@ public final class CompilationContext implements ICompilationContext
     private final IObjectCodeWriter objectCodeWriter;
     
     private final ResourceFactory resourceFactory;
+    
+    private boolean generateLocations;
     
     private final IConfig config;        
     
@@ -267,5 +270,19 @@ public final class CompilationContext implements ICompilationContext
     @Override
     public String toString() {
         return "Compilation context "+super.toString()+" - current unit: "+currentCompilationUnit+", unit stack size: "+this.compilationUnits.size();
+    }
+
+    @Override
+    public boolean isGenerateRelocations() {
+        return generateLocations;
+    }
+
+    @Override
+    public void addRelocation(Relocation reloc) {
+        objectCodeWriter.addRelocation( reloc );
+    }
+    
+    public void setGenerateRelocations(boolean yesNo) {
+        this.generateLocations = yesNo;
     }
 }

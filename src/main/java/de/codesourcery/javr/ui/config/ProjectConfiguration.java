@@ -47,7 +47,16 @@ public class ProjectConfiguration implements ResourceFactory
         RAW,
         INTEL_HEX,
         ELF_EXECUTABLE,
-        ELF_RELOCATABLE
+        ELF_RELOCATABLE 
+        {
+            public boolean supportsRelocation() {
+                return true;
+            }            
+        };
+        
+        public boolean supportsRelocation() {
+            return false;
+        }
     }
     
     public static final class OutputSpec 

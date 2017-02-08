@@ -20,6 +20,9 @@ import org.apache.commons.lang3.Validate;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Instruction;
 import de.codesourcery.javr.assembler.parser.TextRegion;
+import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.SymbolTable;
+import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 
 public class InstructionNode extends NodeWithMemoryLocation implements Resolvable
 {
@@ -36,6 +39,43 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
     @Override
     protected InstructionNode createCopy() {
         return new InstructionNode( this.instruction.createCopy() , getTextRegion().createCopy() );
+    }
+    
+    public boolean srcNeedsRelocation(SymbolTable table) {
+        return needsRelocation( src() , table );
+    }
+    
+    public boolean dstNeedsRelocation(SymbolTable table) {
+        return needsRelocation( dst() , table );
+    }    
+    
+    private boolean needsRelocation(ASTNode subTree,SymbolTable symbolTable) 
+    {
+        if ( subTree instanceof FunctionCallNode) 
+        {
+            final FunctionCallNode fn = (FunctionCallNode) subTree;
+            if ( fn.functionName.equals( FunctionCallNode.BUILDIN_FUNCTION_HIGH ) || fn.functionName.equals( FunctionCallNode.BUILDIN_FUNCTION_LOW ) )
+            {
+                return true;
+            } 
+        } 
+        else if ( subTree instanceof IdentifierNode) 
+        {
+            final IdentifierNode id = (IdentifierNode) subTree;
+            final Symbol symbol = symbolTable.get( id.name );
+            if ( symbol.hasType( Type.ADDRESS_LABEL ) ) 
+            {
+                return true;
+            }
+        }
+        for ( ASTNode child : subTree.children() ) 
+        {
+            boolean tmp = needsRelocation( child , symbolTable );
+            if ( tmp ) {
+                return true;
+            }
+        }
+        return false;
     }
     
     public ASTNode src() {

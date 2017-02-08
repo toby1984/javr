@@ -17,8 +17,10 @@ package de.codesourcery.javr.assembler.arch;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Segment;
+import de.codesourcery.javr.assembler.elf.Relocation;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
+import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputFormat;
 
 /**
  * Microcontroller architecture.
@@ -135,8 +137,11 @@ public interface IArchitecture
      * 
      * @see ICompilationContext#writeByte(int)
      * @see ICompilationContext#writeWord(int)
+     * 
+     * @return Relocation info or <code>null</code> if this instruction does not need relocation <b>or</b>
+     * the currently active {@link OutputFormat} does not support relocation 
      */
-    public void compile(InstructionNode node,ICompilationContext context);
+    public Relocation compile(InstructionNode node,ICompilationContext context);
  
     /**
      * Disassembles a raw object file.

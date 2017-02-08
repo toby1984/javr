@@ -55,6 +55,7 @@ public class Assembler
         unit.beforeCompilationStarts( project.getGlobalSymbolTable() );
 
         this.compilationContext = new CompilationContext( unit , project.getGlobalSymbolTable() , codeWriter , rf , compilerSettings , config.getConfig() );
+        this.compilationContext.setGenerateRelocations( project.getConfiguration().getOutputFormat().supportsRelocation());
         
         final List<Phase> phases = new ArrayList<>();
         phases.add( new ParseSourcePhase(config) );

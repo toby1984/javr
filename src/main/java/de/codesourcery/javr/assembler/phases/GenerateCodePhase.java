@@ -80,7 +80,9 @@ public class GenerateCodePhase extends AbstractPhase
                         LOG.debug("generateCode(): Allocating "+bytes+" at "+context.currentAddress()+" segment for "+node);
                     }
                     context.allocateBytes( bytes );
-                } else {
+                } 
+                else 
+                {
                     if ( LOG.isDebugEnabled() ) {
                         LOG.debug("generateCode(): Compiling instruction at "+context.currentAddress()+" segment for "+node);
                     }                    

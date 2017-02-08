@@ -16,6 +16,9 @@
 package de.codesourcery.javr.assembler;
 
 import java.io.IOException;
+import java.util.List;
+
+import de.codesourcery.javr.assembler.elf.Relocation;
 
 /**
  * Responsible for writing object code.
@@ -98,6 +101,20 @@ public interface IObjectCodeWriter
      * @throws IOException
      */
     public void finish(ICompilationContext context,boolean success) throws IOException;
+    
+    /**
+     * Add relocation info to the current segment.
+     * 
+     * @param reloc
+     */
+    public void addRelocation(Relocation reloc);
+    
+    /**
+     * Returns all relocation infos related to the current segment.
+     * 
+     * @return
+     */
+    public List<Relocation> getRelocations(Segment segment);
     
     /**
      * Returns the start address for a given segment.
