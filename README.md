@@ -74,6 +74,42 @@ Note that for reasons unknown to me the AVR assembler duplicates a lot of prepro
 - .org directive
 - local labels in macros
 
+## Known differences to 'official' AVR assembler syntax
+
+- The assembler internally treats all label addresses as byte addresses and unlike the AVR assembler doesn't need special voodoo when a label is within the .cseg segment
+ 
+  The following code 
+
+.cseg
+    
+    ldi ZH,HIGH( label << 1 )
+    ldi ZL,LOW( label << 1 )
+    lpm r16,Z
+
+label: .db 0x01,0x02,0x03,0x04
+    
+    needs to be written as
+
+.cseg
+   
+    ldi ZH,HIGH( label )
+    ldi ZL,LOW( label )
+    lpm r16,Z 
+
+label: .db 0x01,0x02,0x03,0x04
+
+    I don't know why the AVR people chose to make things more complicated , the ISA documentation clearly states that LPM treats the Z register as holding a _BYTE_ address.
+
+- You can do forward/backward references to local labels without having to add suffixes like 'f' or 'b' to the name , so stuff like the following compiles fine:
+
+main:
+      cpi r17,0x20
+      breq skip
+      ldi r16,0x0f
+.loop dec r16
+      brne loop
+.skip
+
 ## Known issues
 
 - Syntax coloring is off when using MSDOS-style line endings (won't fix this since it is related to the fact that Swing text components internally convert all EOL sequences to '\n' but my parser uses the 'true' text offsets)
