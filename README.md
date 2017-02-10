@@ -78,37 +78,37 @@ Note that for reasons unknown to me the AVR assembler duplicates a lot of prepro
 
 - The assembler internally treats all label addresses as byte addresses and unlike the AVR assembler doesn't need special voodoo when a label is within the .cseg segment
  
-  The following code 
+The following code 
 
-.cseg
+    .cseg
     
     ldi ZH,HIGH( label << 1 )
     ldi ZL,LOW( label << 1 )
     lpm r16,Z
 
-label: .db 0x01,0x02,0x03,0x04
+    label: .db 0x01,0x02,0x03,0x04
     
-    needs to be written as
+needs to be written as
 
-.cseg
+    .cseg
    
     ldi ZH,HIGH( label )
     ldi ZL,LOW( label )
     lpm r16,Z 
 
-label: .db 0x01,0x02,0x03,0x04
+    label: .db 0x01,0x02,0x03,0x04
 
-    I don't know why the AVR people chose to make things more complicated , the ISA documentation clearly states that LPM treats the Z register as holding a _BYTE_ address.
+I don't know why the AVR people chose to make things more complicated , the ISA documentation clearly states that LPM treats the Z register as holding a _BYTE_ address.
 
 - You can do forward/backward references to local labels without having to add suffixes like 'f' or 'b' to the name , so stuff like the following compiles fine:
 
-main:
-      cpi r17,0x20
-      breq skip
-      ldi r16,0x0f
-.loop dec r16
-      brne loop
-.skip
+    main:
+     cpi r17,0x20
+     breq skip
+     ldi r16,0x0f
+    .loop dec r16
+     brne loop
+    .skip
 
 ## Known issues
 
