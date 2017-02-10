@@ -40,7 +40,7 @@ java -jar target/javr.jar
 Note that for reasons unknown to me the AVR assembler duplicates a lot of preprocessor instructions as assembler directives ... I'm currently only implementing the preprocessor instructions
 
 - full ATmega88 instruction set
-- output to RAW / Intel HEX / ELF files (ELF output is very much a work-in-progress and lacks proper symbol output and most importantly, relocation info)
+- output to RAW / Intel HEX / ELF (executable/relocatable) files (ELF output is still very much a work-in-progress)
 - local labels ( watch out, currently not working properly when used in macros) 
   - Just write '.myLabel' instead of 'myLabel:' when declaring them ; referencing local labels works just like with global labels so no 'b' or 'f' suffixes are needed. Note that its illegal to declare a local label that has the same identifier as a global label ; otherwise I would've needed to use the ugly 'b'/'f' suffix solution to resolve the ambiguity)  
 - Expression correctly handles nested expressions and operator precedence for the following operators: 
@@ -74,22 +74,12 @@ Note that for reasons unknown to me the AVR assembler duplicates a lot of prepro
 - .org directive
 - local labels in macros
 
-## Known differences to 'official' AVR assembler syntax
+## Differences to 'official' AVR assembler syntax
 
-- The assembler internally treats all label addresses as byte addresses and unlike the AVR assembler doesn't need special voodoo when a label is within the .cseg segment
+- the LPM instruction treats the Z register as holding a _byte_ address while SPM treams it as holding a WORD address.
  
-The following code 
-
-    .cseg
-    
-    ldi ZH,HIGH( label << 1 )
-    ldi ZL,LOW( label << 1 )
-    lpm r16,Z
-
-    label: .db 0x01,0x02,0x03,0x04
-    
-needs to be written as
-
+This assembler internally treats all addresses as byte addresses (even in .cseg) so when using LPM you have to write
+  
     .cseg
    
     ldi ZH,HIGH( label )
@@ -98,7 +88,15 @@ needs to be written as
 
     label: .db 0x01,0x02,0x03,0x04
 
-I don't know why the AVR people chose to make things more complicated , the ISA documentation clearly states that LPM treats the Z register as holding a _BYTE_ address.
+but with SPM you need to write
+
+    .cseg
+   
+    ldi ZH,HIGH( label>>1 )
+    ldi ZL,LOW( label>>1 )
+    spm Z+
+
+    label: .db 0x01,0x02,0x03,0x04
 
 - You can do forward/backward references to local labels without having to add suffixes like 'f' or 'b' to the name , so stuff like the following compiles fine:
 
