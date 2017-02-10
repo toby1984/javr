@@ -1,12 +1,21 @@
 package de.codesourcery.javr.assembler.elf;
 
+import org.apache.commons.lang3.Validate;
+
+import de.codesourcery.javr.assembler.symbols.Symbol;
+
 public class Relocation
 {
-    public Kind kind;
-    public int addend;
-    public int offset;
+    public final Kind kind;
+    public final int addend;
+    public final int offset;
+    public final Symbol symbol;
 
-    public Relocation(Kind kind, int offset, int addend) {
+    public Relocation(Symbol symbol,Kind kind, int offset, int addend) 
+    {
+        Validate.notNull(symbol, "symbol must not be NULL");
+        Validate.notNull(kind, "kind must not be NULL");
+        this.symbol = symbol;
         this.kind = kind;
         this.offset = offset;
         this.addend = addend;
@@ -59,3 +68,4 @@ public class Relocation
             this.elfId = elfId;
         }
     }
+}

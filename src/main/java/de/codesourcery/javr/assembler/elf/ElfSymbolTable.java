@@ -3,6 +3,7 @@ package de.codesourcery.javr.assembler.elf;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.Validate;
@@ -278,5 +279,24 @@ The symbols in a symbol table are written in the following order.
             writer.writeByte( 0 ); //     unsignedchar  st_other;
             writer.writeHalf( s.sectionHeaderIndex , Endianess.LITTLE ); // Elf32_Half    st_shndx; (index of section header entry this symbol belongs to) 
         }
+    }
+    
+    /**
+     * Returns the index of a given symbol in this table.
+     * 
+     * @param expected
+     * @return
+     * @throws NoSuchElementException if the symbol is not in this table. 
+     */
+    public int indexOf(Symbol expected) {
+        
+        for ( int idx = 1 , len = symbols.size() ; idx < len ; idx++)
+        {
+            final Symbol actual = symbols.get(idx).symbol;
+            if ( actual.name().equals( expected.name() ) ) {
+                return idx;
+            }
+        }
+        throw new NoSuchElementException("This symbol table does not contain symbol "+expected);
     }
 }
