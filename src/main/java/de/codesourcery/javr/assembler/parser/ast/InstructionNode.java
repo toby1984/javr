@@ -15,11 +15,14 @@
  */
 package de.codesourcery.javr.assembler.parser.ast;
 
+import java.util.Optional;
+
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Instruction;
 import de.codesourcery.javr.assembler.parser.TextRegion;
+import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
 import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.symbols.Symbol.Type;
@@ -51,31 +54,24 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
     
     private boolean needsRelocation(ASTNode subTree,SymbolTable symbolTable) 
     {
-        if ( subTree instanceof FunctionCallNode) 
+        final boolean[] referencesLabel = {false};
+        final IASTVisitor visitor = new IASTVisitor() 
         {
-            final FunctionCallNode fn = (FunctionCallNode) subTree;
-            if ( fn.functionName.equals( FunctionCallNode.BUILDIN_FUNCTION_HIGH ) || fn.functionName.equals( FunctionCallNode.BUILDIN_FUNCTION_LOW ) )
+            @Override
+            public void visit(ASTNode node, IIterationContext ctx) 
             {
-                return true;
-            } 
-        } 
-        else if ( subTree instanceof IdentifierNode) 
-        {
-            final IdentifierNode id = (IdentifierNode) subTree;
-            final Symbol symbol = symbolTable.get( id.name );
-            if ( symbol.hasType( Type.ADDRESS_LABEL ) ) 
-            {
-                return true;
+                if ( node instanceof IdentifierNode) 
+                {
+                    final IdentifierNode n = (IdentifierNode) node;
+                    final Symbol symbol = symbolTable.get( n.name );
+                    if ( symbol.hasType( Type.ADDRESS_LABEL ) ) {
+                        ctx.stop();
+                    }
+                }
             }
-        }
-        for ( ASTNode child : subTree.children() ) 
-        {
-            boolean tmp = needsRelocation( child , symbolTable );
-            if ( tmp ) {
-                return true;
-            }
-        }
-        return false;
+        };
+        subTree.visitBreadthFirst( visitor );
+        return referencesLabel[0];
     }
     
     public ASTNode src() {

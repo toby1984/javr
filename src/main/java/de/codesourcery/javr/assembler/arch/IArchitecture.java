@@ -141,7 +141,7 @@ public interface IArchitecture
      * @return Relocation info or <code>null</code> if this instruction does not need relocation <b>or</b>
      * the currently active {@link OutputFormat} does not support relocation 
      */
-    public Relocation compile(InstructionNode node,ICompilationContext context);
+    public void compile(InstructionNode node,ICompilationContext context);
  
     /**
      * Disassembles a raw object file.

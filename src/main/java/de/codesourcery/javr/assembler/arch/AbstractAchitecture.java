@@ -202,7 +202,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         public String disasmImplicitDestination;
         public String disasmImplicitSource;
         public String disasmMnemonic;
-        public Relocation.Kind reloc=Relocation.Kind.R_AVR_NONE;
+        public boolean mayNeedRelocation;
         
         public InstructionEncoding(String mnemonic,InstructionEncoder enc,ArgumentType dstType,ArgumentType srcType) 
         {
@@ -242,8 +242,8 @@ public abstract class AbstractAchitecture implements IArchitecture
             return this;
         }
         
-        public InstructionEncoding reloc(Relocation.Kind kind) {
-            this.reloc = kind;
+        public InstructionEncoding mayNeedRelocation() {
+            this.mayNeedRelocation = true;
             return this;
         }
         
@@ -583,19 +583,18 @@ public abstract class AbstractAchitecture implements IArchitecture
             return false;
         }        
         
-        final boolean failOnAddressOutOfBounds = context.getCompilationSettings().isFailOnAddressOutOfRange();
         boolean result = true;
         if ( encoding.dstType != ArgumentType.NONE ) {
-            result &= ( getDstValue( dstArgument , encoding.dstType , context ,true , failOnAddressOutOfBounds) != VALUE_UNAVAILABLE );
+            result &= ( getDstValue( dstArgument , encoding.dstType , context ,true ) != VALUE_UNAVAILABLE );
         }
         if ( encoding.srcType != ArgumentType.NONE ) {
-            result &= ( getSrcValue( srcArgument , encoding.srcType , context ,true , failOnAddressOutOfBounds) != VALUE_UNAVAILABLE );
+            result &= ( getSrcValue( srcArgument , encoding.srcType , context ,true ) != VALUE_UNAVAILABLE );
         }
         return result;
     }
 
     @Override
-    public Relocation compile(InstructionNode node, ICompilationContext context) 
+    public void compile(InstructionNode node, ICompilationContext context) 
     {
         final String mnemonic = node.instruction.getMnemonic();
         
@@ -652,20 +651,20 @@ public abstract class AbstractAchitecture implements IArchitecture
             throw new RuntimeException( encoding.mnemonic+" expects "+encoding.getArgumentCountFromPattern()+" arguments but got "+argCount);
         }
         
-        final boolean failOnAddressOutOfBounds = context.getCompilationSettings().isFailOnAddressOutOfRange();        
-        int dstValue = (int) getDstValue( dstArgument , encoding.dstType , context , false , failOnAddressOutOfBounds );
-        int srcValue = (int) getSrcValue( srcArgument , encoding.srcType , context , false , failOnAddressOutOfBounds );
+        int dstValue = (int) getDstValue( dstArgument , encoding.dstType , context , false );
+        int srcValue = (int) getSrcValue( srcArgument , encoding.srcType , context , false );
 
-        Relocation reloc=null;
-        if ( context.isGenerateRelocations() ) 
+        if ( encoding.mayNeedRelocation && context.isGenerateRelocations() ) 
         {
             if ( srcArgument != null && node.srcNeedsRelocation( context.currentSymbolTable() ) ) {
                 srcValue = 0;
-                reloc = getRelocation(encoding,node,srcArgument);
-            }
-            if ( dstArgument != null && node.dstNeedsRelocation( context.currentSymbolTable() ) ) {
+                final Relocation reloc = getRelocation(encoding,node,srcArgument,encoding.srcType);
+                context.addRelocation( reloc );
+            } 
+            else if ( dstArgument != null && node.dstNeedsRelocation( context.currentSymbolTable() ) ) {
                 dstValue = 0;
-                reloc = getRelocation(encoding,node,dstArgument);
+                final Relocation reloc = getRelocation(encoding,node,dstArgument,encoding.dstType );
+                context.addRelocation( reloc );
             }
         }
         
@@ -685,82 +684,73 @@ public abstract class AbstractAchitecture implements IArchitecture
             default:
                 throw new RuntimeException("Unsupported instruction word length: "+encoding.getInstructionLengthInBytes()+" bytes");
         }
-        return reloc;
     }
     
-    private Relocation getSrcRelocation(InstructionEncoding encoding,InstructionNode node,ASTNode srcExpr) 
+    private Relocation getRelocation(InstructionEncoding encoding, InstructionNode node, ASTNode argument,ArgumentType argType) 
     {
-        Relocation.Kind kind = null;
-        switch ( encoding.srcType ) 
-        {
+        switch( argType ) {
+            case COMPOUND_REGISTERS_R24_TO_R30:
+                break;
+            case COMPOUND_REGISTER_FOUR_BITS:
+                break;
             case EIGHT_BIT_CONSTANT:
                 break;
             case FIVE_BIT_IO_REGISTER_CONSTANT:
                 break;
             case FOUR_BIT_CONSTANT:
                 break;
+            case NONE:
+                break;
+            case R0_TO_R15:
+                break;
+            case R16_TO_R23:
+                break;
+            case R16_TO_R31:
+                break;
             case SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET:
                 break;
             case SEVEN_BIT_SRAM_MEM_ADDRESS:
+                break;
+            case SINGLE_REGISTER:
                 break;
             case SIXTEEN_BIT_SRAM_MEM_ADDRESS:
                 break;
             case SIX_BIT_CONSTANT:
                 break;
+            case SIX_BIT_IO_REGISTER_CONSTANT:
+                break;
+            case THREE_BIT_CONSTANT:
+                break;
             case TWELVE_BIT_SIGNED_JUMP_OFFSET:
                 break;
             case TWENTYTWO_BIT_FLASH_MEM_ADDRESS:
                 break;
-            default:
-                throw new RuntimeException("Internal error, unhandled encoding type: "+encoding.srcType);
+            case X_REGISTER:
+                break;
+            case X_REGISTER_POST_INCREMENT:
+                break;
+            case X_REGISTER_PREDECREMENT:
+                break;
+            case Y_REGISTER:
+                break;
+            case Y_REGISTER_POST_INCREMENT:
+                break;
+            case Y_REGISTER_PREDECREMENT:
+                break;
+            case Y_REGISTER_SIX_BIT_DISPLACEMENT:
+                break;
+            case Z_REGISTER:
+                break;
+            case Z_REGISTER_POST_INCREMENT:
+                break;
+            case Z_REGISTER_PREDECREMENT:
+                break;
+            case Z_REGISTER_SIX_BIT_DISPLACEMENT:
+                break;
         }
-        return null;
-//            switch( encoding.relocationKind ) 
-//            {
-//                case R_AVR_13_PCREL: // relocation always required (
-//                    
-//                    // rjmp
-//                    // rcall
-//                    
-//                    
-//                    break;
-//                case R_AVR_7_PCREL: // relocation always required
-//                    
-//                    // brcc
-//                    break;
-//                    
-//                case R_AVR_16:
-//                    // LDS r16, label
-//                    break;
-//                case R_AVR_16_PM: // word-wise addressing , object code contains adr/2
-//                    break;
-//                case R_AVR_CALL: // relocation always required, CALL instruction
-//                    
-//                    // call
-//                    // jmp 
-//                    
-//                    break;
-//                case R_AVR_HI8_LDI:
-//                    break;
-//                case R_AVR_HI8_LDI_NEG:
-//                    break;
-//                case R_AVR_HI8_LDI_PM: // word-wise addressing , object code contains adr/2
-//                    break;
-//                case R_AVR_HI8_LDI_PM_NEG: // word-wise addressing , object code contains adr/2
-//                    break;
-//                case R_AVR_LO8_LDI:
-//                    break;
-//                case R_AVR_LO8_LDI_NEG:
-//                    break;
-//                case R_AVR_LO8_LDI_PM: // word-wise addressing , object code contains adr/2
-//                    break;
-//                case R_AVR_LO8_LDI_PM_NEG: // word-wise addressing , object code contains adr/2
-//                    break;
-//                case R_AVR_NONE:
-//                    return null;
-//        }
+        throw new RuntimeException("Internal error,unhandled instruction argument type: "+argType);
     }
-
+    
     private void debugAssembly(InstructionNode node,final InstructionEncoding encoding, final int dstValue,final int srcValue, final int instruction) 
     {
         final String hex;
@@ -803,22 +793,22 @@ public abstract class AbstractAchitecture implements IArchitecture
         return hex2.toString();
     }
     
-    private long getSrcValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase,boolean failOnAddressOutOfBounds) 
+    private long getSrcValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase) 
     {
         try 
         {
-            return getValue(node,type,context,calledInResolvePhase,failOnAddressOutOfBounds);
+            return getValue(node,type,context,calledInResolvePhase);
         } 
         catch(Exception e) {
             throw new RuntimeException("SRC operand: "+e.getMessage(),e);
         }
     }
     
-    private long getDstValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase,boolean failOnAddressOutOfBounds) 
+    private long getDstValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase) 
     {
         try 
         {
-            return getValue(node,type,context,calledInResolvePhase,failOnAddressOutOfBounds);
+            return getValue(node,type,context,calledInResolvePhase);
         } 
         catch(Exception e) {
             throw new RuntimeException("DST operand: "+e.getMessage(),e);
@@ -879,11 +869,13 @@ public abstract class AbstractAchitecture implements IArchitecture
      * @return argument value or {@link #VALUE_UNAVAILABLE} if for some reason the value could not be determined.
      *           Messages will be added to the {@link ICompilationContext#error(String, ASTNode) context} as needed.
      */
-    private long getValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase,boolean failOnAddressOutOfBounds) 
+    private long getValue( ASTNode node, ArgumentType type, ICompilationContext context,boolean calledInResolvePhase)
     {
         if ( type == ArgumentType.NONE ) {
             return 0;
         }
+        
+        final boolean failOnAddressOutOfBounds = context.getCompilationSettings().isFailOnAddressOutOfRange();
         
         final boolean isValueNode = node instanceof IValueNode; 
         final int result;
