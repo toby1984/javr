@@ -27,7 +27,6 @@ import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.Address;
-import de.codesourcery.javr.assembler.ExpressionEvaluator;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Register;
 import de.codesourcery.javr.assembler.Segment;
@@ -44,7 +43,6 @@ import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 import de.codesourcery.javr.assembler.symbols.Symbol;
-import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 public abstract class AbstractAchitecture implements IArchitecture 
@@ -660,17 +658,19 @@ public abstract class AbstractAchitecture implements IArchitecture
         if ( encoding.mayNeedRelocation && context.isGenerateRelocations() ) 
         {
             // 8-bit AVRs will only require relocation of either the src or destination but not both arguments
-            if ( srcArgument != null && insn.srcNeedsRelocation( context ) ) 
+            Symbol symbolNeedingRelocation = null;
+           
+            if ( srcArgument != null && ( symbolNeedingRelocation = insn.getSymbolNeedingRelocation( srcArgument , context ) ) != null ) 
             {
                 dstValue = (int) getDstValue( dstArgument , encoding.dstType , context , false );                
                 srcValue = 0;
-                final Relocation reloc = getRelocation(encoding,insn,srcArgument,encoding.srcType,context);
+                final Relocation reloc = getRelocation(encoding,insn,srcArgument,encoding.srcType,symbolNeedingRelocation,context);
                 context.addRelocation( reloc );
             } 
-            else if ( dstArgument != null && insn.dstNeedsRelocation( context ) ) {
+            else if (dstArgument != null && ( symbolNeedingRelocation = insn.getSymbolNeedingRelocation( dstArgument , context ) ) != null  ) {
                 dstValue = 0;
                 srcValue = (int) getSrcValue( srcArgument , encoding.srcType , context , false );  
-                final Relocation reloc = getRelocation(encoding,insn,dstArgument,encoding.dstType,context );
+                final Relocation reloc = getRelocation(encoding,insn,dstArgument,encoding.dstType,symbolNeedingRelocation,context );
                 context.addRelocation( reloc );
             } else {
                 dstValue = (int) getDstValue( dstArgument , encoding.dstType , context , false );                     
@@ -701,14 +701,28 @@ public abstract class AbstractAchitecture implements IArchitecture
         }
     }
     
-    private Relocation getRelocation(InstructionEncoding encoding, InstructionNode node, ASTNode argument,ArgumentType argType,ICompilationContext context) 
+    private Relocation getRelocation(InstructionEncoding encoding, InstructionNode node, ASTNode argument,ArgumentType argType,Symbol symbolNeedingRelocation,ICompilationContext context) 
     {
-        final Relocation result = new Relocation();
+        final Relocation result = new Relocation( symbolNeedingRelocation );
         result.locationOffset = node.getMemoryLocation().getByteAddress();
         
-        int addend = calculateRelocationAddend( argument , context );
-        final int expressionTypeBitMask = classifyExpression( argument , context.currentSymbolTable() );
+        final long tmp = toIntValue( ((IValueNode) argument).getValue() );
+        if ( tmp == VALUE_UNAVAILABLE ) 
+        {
+            throw new RuntimeException("Internal error, don't know how to turn node value "+((IValueNode) argument).getValue()+" into an int ?");
+        }
+        int addend = (int) tmp;
         
+//        final long tmp2 = toIntValue( symbolNeedingRelocation.getValue() );
+//        if ( tmp2 == VALUE_UNAVAILABLE ) 
+//        {
+//            throw new RuntimeException("Internal error, don't know how to turn node value "+symbolNeedingRelocation.getValue()+" into an int ?");
+//        }        
+//        final int symbolValue = (int) tmp2;
+//        
+//        addend = addend - symbolValue;
+        
+        final int expressionTypeBitMask = classifyExpression( argument , context.currentSymbolTable() );
         final Relocation.Kind kind;
         switch( argType ) 
         {
@@ -726,7 +740,7 @@ public abstract class AbstractAchitecture implements IArchitecture
                 break;      
             // conditional branches
             case SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET:
-                addend = addend - node.getMemoryLocation().getByteAddress();                
+                // addend = node.getMemoryLocation().getByteAddress();                
                 kind = Relocation.Kind.R_AVR_7_PCREL;
                 break;
              // lds,sts
@@ -735,7 +749,7 @@ public abstract class AbstractAchitecture implements IArchitecture
                 break;
             // rcall / rjmp
             case TWELVE_BIT_SIGNED_JUMP_OFFSET:
-                addend = addend - node.getMemoryLocation().getByteAddress();
+                // addend = node.getMemoryLocation().getByteAddress();
                 kind = Relocation.Kind.R_AVR_13_PCREL;
                 break;
             // call / jmp
@@ -750,36 +764,19 @@ public abstract class AbstractAchitecture implements IArchitecture
         return result;
     }
     
-    private int calculateRelocationAddend(ASTNode argument,ICompilationContext context) 
+    private long toIntValue(Object value) 
     {
-        if ( argument instanceof IValueNode == false ) {
-            throw new RuntimeException("Internal error, cannot calculate relocation addend from a non-value AST node");
-        }
-        
-        final ExpressionEvaluator eval = new ExpressionEvaluator(context) 
+        int result;
+        if ( value instanceof Number) {
+            result = ((Number) value).intValue();
+        } 
+        else if ( value instanceof Address) 
         {
-            @Override
-            protected Symbol resolveSymbol(IdentifierNode in) 
-            {
-                Symbol symbol = in.getSymbol();
-                if ( symbol.hasType( Type.ADDRESS_LABEL ) ) 
-                {
-                    symbol = symbol.createShallowCopy();
-                    symbol.setValue( ZERO );
-                }
-                return symbol;
-            }
-        };
-        
-        if ( argument instanceof IValueNode) 
-        {
-            final Object value = eval.evaluate( (IValueNode) argument);
-            if ( value instanceof Number) {
-                return ((Number) value).intValue();
-            }
-            throw new RuntimeException("Internal error, value of expression is not a Number but "+value+" ?");
+            result = ((Address) value).getByteAddress();
+        } else {
+            return VALUE_UNAVAILABLE;
         }
-        throw new RuntimeException("Internal error, instruction argument is not a value ?");
+        return result;
     }
     
     private int classifyExpression(ASTNode argument,SymbolTable symbolTable) 
@@ -801,7 +798,10 @@ public abstract class AbstractAchitecture implements IArchitecture
         if ( toInspect instanceof OperatorNode) 
         {
             final OperatorNode op = (OperatorNode) toInspect;
-            if ( op.type == OperatorType.SHIFT_RIGHT ) 
+            if ( op.type == OperatorType.PLUS || op.type == OperatorType.BINARY_MINUS) {
+                // ok, plus and minus are operations we know how to relocate
+            } 
+            else if ( op.type == OperatorType.SHIFT_RIGHT ) 
             {
                 final ASTNode rhs = maybeUnwrapExpression( op.child(1) );
                 // check RHS of >> 
@@ -998,15 +998,11 @@ public abstract class AbstractAchitecture implements IArchitecture
             if ( value == null && calledInResolvePhase ) {
                 return VALUE_UNAVAILABLE;
             }
-            if ( value instanceof Number) {
-                result = ((Number) value).intValue();
-            } 
-            else if ( value instanceof Address) 
-            {
-                result = ((Address) value).getByteAddress();
-            } else {
+            final long tmp = toIntValue( ((IValueNode) node).getValue() );
+            if ( tmp == VALUE_UNAVAILABLE ) {
                 return fail("Operand needs to evaluate to a number but was "+value,node,context);
             }
+            result = (int) tmp;
         } 
         else if ( node instanceof RegisterNode) 
         {

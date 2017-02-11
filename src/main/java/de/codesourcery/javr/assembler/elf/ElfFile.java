@@ -31,6 +31,7 @@ import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.FileResourceFactory;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.ui.Project;
+import de.codesourcery.javr.ui.config.ProjectConfiguration;
 import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputFormat;
 
 public class ElfFile 
@@ -114,16 +115,34 @@ public class ElfFile
     
     public static void main(String[] args) throws FileNotFoundException, IOException 
     {
-        final String src = "main:  ldi r16,0xff\n";
+        final String src = ""
+                + "mydelay: ldi r16,0xff\n"
+                + ".loop  dec r16\n"
+                + "brne loop\n"
+                + "ret\n";
         final File baseDir = new File(".");
+        final OutputFormat outputFormat = OutputFormat.ELF_RELOCATABLE;
         
         final Assembler asm = new Assembler();
         final Resource res = Resource.forString("dummy", src );
         final CompilationUnit root = new CompilationUnit( res );
         
         final Project project = new Project( root );
-        project.setCompileRoot( root );
         project.setArchitecture( new ATMega328p() );
+        
+        /*
+         * TODO: Hacky... Project class assumes that sources are in local filesystem so Project#setConfiguration(IProjectConfiguration)
+         * TODO: will actually try to resolve the root compilation unit from the filesystem , overwriting
+         * TODO: the compilation root we previously set when calling new Project( compilationRoot) 
+         */
+        ProjectConfiguration copy = project.getConfiguration(); 
+        copy.setOutputFormat( outputFormat );
+        project.setConfiguration( copy ); // compilationRoot get
+        
+        // discard compilation root from filesystem and try again... 
+        final CompilationUnit oldRoot = project.getCompileRoot();
+        project.setCompileRoot( root );
+        project.removeCompilationUnit( oldRoot );
         
         final ObjectCodeWriter writer = new ObjectCodeWriter();
         
@@ -138,7 +157,7 @@ public class ElfFile
         
         final String outputFile = "/home/tobi/tmp/my.elf";
         try ( FileOutputStream out = new FileOutputStream( outputFile ) ) {
-            new ElfFile(OutputFormat.ELF_EXECUTABLE).write( project.getArchitecture() , writer , project.getGlobalSymbolTable(), out );
+            new ElfFile(outputFormat).write( project.getArchitecture() , writer , project.getGlobalSymbolTable(), out );
         }
         System.out.println("Wrote to "+outputFile);
     }

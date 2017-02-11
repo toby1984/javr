@@ -15,19 +15,15 @@
  */
 package de.codesourcery.javr.assembler.parser.ast;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Objects;
 
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Instruction;
-import de.codesourcery.javr.assembler.Segment;
-import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.OperatorType;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.symbols.Symbol;
-import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 public class InstructionNode extends NodeWithMemoryLocation implements Resolvable
@@ -46,14 +42,6 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
     protected InstructionNode createCopy() {
         return new InstructionNode( this.instruction.createCopy() , getTextRegion().createCopy() );
     }
-    
-    public boolean srcNeedsRelocation(ICompilationContext context) {
-        return needsRelocation( src() , context );
-    }
-    
-    public boolean dstNeedsRelocation(ICompilationContext context) {
-        return needsRelocation( dst() , context );
-    }    
     
     private ASTNode unwrapExpression(ASTNode node) 
     {
@@ -74,10 +62,11 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
         return false;
     }
 
-    private boolean needsRelocation(ASTNode subTree,ICompilationContext context) 
+    public Symbol getSymbolNeedingRelocation(ASTNode node, ICompilationContext context) 
     {
         final SymbolTable symbolTable = context.currentSymbolTable();
-        final Set<Segment> segments = new HashSet<>();
+        final Symbol[] result = { null };
+        
         final IASTVisitor visitor = new IASTVisitor() 
         {
             @Override
@@ -92,7 +81,7 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
                     {
                         final ASTNode child0 = unwrapExpression( op.child(0) );
                         final ASTNode child1 = unwrapExpression( op.child(1) );
-                        if ( isAddressIdentifierNode(child0 , symbolTable) || isAddressIdentifierNode( child1 , symbolTable) ) 
+                        if ( isAddressIdentifierNode(child0 , symbolTable) && isAddressIdentifierNode( child1 , symbolTable) ) 
                         {
                             // (label1-label2) expressions don't need relocation
                             ctx.dontGoDeeper();
@@ -114,21 +103,25 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
                 else if ( isAddressIdentifierNode( node , symbolTable ) )
                 {
                     final Symbol symbol = ((IdentifierNode) node).safeGetSymbol();
-                    final Segment segment = symbol.getSegment();
-                    if ( segment == null ) {
-                        throw new RuntimeException("Symbol "+symbol+" has NULL segment ?");
-                    }
-                    segments.add( segment ); 
-                    if ( segments.size() > 1 ) {
-                        throw new RuntimeException("Expression is not relocatable: Involves symbols from different sections");
+                    if ( result[0] == null ) 
+                    {
+                        result[0] = symbol;
+                    } else {
+                        if ( ! result[0].name().equals( symbol.name() ) ||
+                             ! result[0].hasType( symbol.getType() ) ||
+                             ! Objects.equals( result[0].getSegment() , symbol.getSegment() ) ||
+                             ! result[0].getCompilationUnit().hasSameResourceAs( symbol.getCompilationUnit() ) ) 
+                        {
+                            throw new RuntimeException("Expression is not relocatable as it refers to more than one symbol: First: "+result[0]+", offender: "+symbol);
+                        }
                     }
                 }
             }
         };
-        subTree.visitBreadthFirst( visitor );
-        return ! segments.isEmpty();
+        node.visitBreadthFirst( visitor );
+        return result[0];
     }
-    
+     
     public ASTNode src() {
         return child(1);
     }

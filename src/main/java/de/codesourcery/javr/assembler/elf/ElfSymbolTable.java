@@ -83,6 +83,7 @@ public class ElfSymbolTable
 
         public ElfSymbol(Symbol s) 
         {
+            Validate.notNull(s, "symbol must not be NULL");
             this.symbol = s;
             this.nameIdx = file.symbolNames.add( name( s ) );
             this.value = valueOf( s );
@@ -290,9 +291,15 @@ The symbols in a symbol table are written in the following order.
      */
     public int indexOf(Symbol expected) {
         
+        Validate.notNull(expected, "expected must not be NULL");
+        
         for ( int idx = 1 , len = symbols.size() ; idx < len ; idx++)
         {
-            final Symbol actual = symbols.get(idx).symbol;
+            final ElfSymbol elfSymbol = symbols.get(idx);
+            final Symbol actual = elfSymbol.symbol;
+            if ( actual == null ) {
+                throw new RuntimeException("Internal error,ELF symbol at index "+idx+" has no symbol assigned ? Offender: "+elfSymbol);
+            }
             if ( actual.name().equals( expected.name() ) ) {
                 return idx;
             }

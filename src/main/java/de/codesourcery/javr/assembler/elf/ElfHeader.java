@@ -71,7 +71,7 @@ Elf32_Half     e_shstrndx; // 46
         
         if ( elfFile.type == OutputFormat.ELF_EXECUTABLE ) {
             writer.writeHalf( FILE_TYPE_EXECUTABLE , Endianess.LITTLE ); // 16: e_type
-        } else if ( elfFile.type == OutputFormat.ELF_EXECUTABLE ) {
+        } else if ( elfFile.type == OutputFormat.ELF_RELOCATABLE) {
             writer.writeHalf( FILE_TYPE_RELOCATABLE, Endianess.LITTLE ); // 16: e_type 
         } else {
             throw new RuntimeException("Internal error,unhandled output type "+elfFile.type);

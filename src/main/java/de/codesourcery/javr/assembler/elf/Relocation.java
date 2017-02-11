@@ -1,6 +1,9 @@
 package de.codesourcery.javr.assembler.elf;
 
+import org.apache.commons.lang3.Validate;
+
 import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 
 public class Relocation
 {
@@ -138,5 +141,18 @@ public class Relocation
                     return R_AVR_LDI;
             }
         }
+    }
+
+    public Relocation(Symbol s) 
+    {
+        Validate.notNull(s, "symbol must not be NULL");
+        if ( ! s.hasType( Type.ADDRESS_LABEL ) ) {
+            throw new IllegalArgumentException("Symbol must be an address label");
+        }
+        this.symbol = s;
+    }
+    @Override
+    public String toString() {
+        return "Relocation [kind=" + kind + ", addend=" + addend + ", locationOffset=" + locationOffset + ", symbol="+ symbol + "]";
     }
 }
