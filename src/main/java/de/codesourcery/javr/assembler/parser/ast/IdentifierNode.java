@@ -21,11 +21,12 @@ import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.Symbol.Type;
+import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 public class IdentifierNode extends AbstractASTNode implements IValueNode,Resolvable {
 
     public Identifier name;
-
     private Symbol symbol;
     
     public IdentifierNode(Identifier id,TextRegion region) {
@@ -37,6 +38,12 @@ public class IdentifierNode extends AbstractASTNode implements IValueNode,Resolv
     @Override
     public String getAsString() {
         return name.value;
+    }
+    
+    public boolean refersToAddressSymbol(SymbolTable table) 
+    {
+        final Symbol symbol = table.get( name );
+        return symbol.hasType( Type.ADDRESS_LABEL ); 
     }
     
     @Override
@@ -66,6 +73,21 @@ public class IdentifierNode extends AbstractASTNode implements IValueNode,Resolv
         this.symbol = symbol;
     }
     
+    /**
+     * Returns the symbol associated with this identifier node or
+     * throws an exception if this node is not associated with any symbol yet.
+     * 
+     * @param in
+     * @return
+     */
+    public Symbol safeGetSymbol() 
+    {
+        if ( symbol == null ) {
+            throw new RuntimeException("Node "+this+" has NULL symbol ?");
+        }
+        return symbol;
+    }
+    
     public Symbol getSymbol() {
         return symbol;
     }
@@ -73,12 +95,14 @@ public class IdentifierNode extends AbstractASTNode implements IValueNode,Resolv
     @Override
     public boolean resolve(ICompilationContext context) 
     {
-        if ( symbol == null ) {
+        // always resolve again, this is (ab-)used by the relocation 
+        // addend calculation
+        // if ( symbol == null ) {
             symbol = context.currentSymbolTable().maybeGet( name ).orElse( null );
             if ( symbol != null ) {
                 symbol.markAsReferenced();
             }
-        }
+        // }
         return symbol != null;
     }
 }

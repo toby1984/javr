@@ -15,7 +15,17 @@
  */
 package de.codesourcery.javr.assembler.parser.ast;
 
+/**
+ * AST node that resembles a value.
+ *
+ * @author tobias.gierke@code-sourcery.de
+ */
 public interface IValueNode extends ASTNode
 {
+    /**
+     * Returns this node's value.
+     * 
+     * @return
+     */
     public Object getValue();
 }

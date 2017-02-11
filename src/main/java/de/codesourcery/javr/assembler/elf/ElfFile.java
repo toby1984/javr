@@ -244,7 +244,7 @@ public class ElfFile
                          *     Elf32_Sword r_addend;
                          * } Elf32_Rela
                          */
-                        writer.writeWord( r.offset , Endianess.LITTLE );
+                        writer.writeWord( r.locationOffset , Endianess.LITTLE );
                         final int symbolTableIdx = symbolTable.indexOf( r.symbol );
                         final int typeAndSymbolIdx = symbolTableIdx<<8 | r.kind.elfId;
                         writer.writeWord( typeAndSymbolIdx , Endianess.LITTLE );

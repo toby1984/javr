@@ -15,17 +15,20 @@
  */
 package de.codesourcery.javr.assembler.parser.ast;
 
-import java.util.Optional;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Instruction;
+import de.codesourcery.javr.assembler.Segment;
+import de.codesourcery.javr.assembler.parser.Identifier;
+import de.codesourcery.javr.assembler.parser.OperatorType;
 import de.codesourcery.javr.assembler.parser.TextRegion;
-import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
 import de.codesourcery.javr.assembler.symbols.Symbol;
-import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.symbols.Symbol.Type;
+import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 public class InstructionNode extends NodeWithMemoryLocation implements Resolvable
 {
@@ -44,34 +47,86 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
         return new InstructionNode( this.instruction.createCopy() , getTextRegion().createCopy() );
     }
     
-    public boolean srcNeedsRelocation(SymbolTable table) {
-        return needsRelocation( src() , table );
+    public boolean srcNeedsRelocation(ICompilationContext context) {
+        return needsRelocation( src() , context );
     }
     
-    public boolean dstNeedsRelocation(SymbolTable table) {
-        return needsRelocation( dst() , table );
+    public boolean dstNeedsRelocation(ICompilationContext context) {
+        return needsRelocation( dst() , context );
     }    
     
-    private boolean needsRelocation(ASTNode subTree,SymbolTable symbolTable) 
+    private ASTNode unwrapExpression(ASTNode node) 
     {
-        final boolean[] referencesLabel = {false};
+        ASTNode result = node;
+        while( result instanceof ExpressionNode) 
+        {
+            result = result.child(0);
+        }
+        return result;
+    }
+    
+    private boolean isAddressIdentifierNode(ASTNode node,SymbolTable symbolTable) 
+    {
+        if ( node instanceof IdentifierNode) 
+        {
+            return ((IdentifierNode) node).refersToAddressSymbol( symbolTable );
+        }
+        return false;
+    }
+
+    private boolean needsRelocation(ASTNode subTree,ICompilationContext context) 
+    {
+        final SymbolTable symbolTable = context.currentSymbolTable();
+        final Set<Segment> segments = new HashSet<>();
         final IASTVisitor visitor = new IASTVisitor() 
         {
             @Override
             public void visit(ASTNode node, IIterationContext ctx) 
             {
-                if ( node instanceof IdentifierNode) 
+                // deal with special cases 
+                if ( node instanceof OperatorNode) 
                 {
-                    final IdentifierNode n = (IdentifierNode) node;
-                    final Symbol symbol = symbolTable.get( n.name );
-                    if ( symbol.hasType( Type.ADDRESS_LABEL ) ) {
-                        ctx.stop();
+                    final OperatorNode op = (OperatorNode) node;
+                    // subtraction between addresses in same segment doesn't need relocation
+                    if ( op.getOperatorType() == OperatorType.BINARY_MINUS ) 
+                    {
+                        final ASTNode child0 = unwrapExpression( op.child(0) );
+                        final ASTNode child1 = unwrapExpression( op.child(1) );
+                        if ( isAddressIdentifierNode(child0 , symbolTable) || isAddressIdentifierNode( child1 , symbolTable) ) 
+                        {
+                            // (label1-label2) expressions don't need relocation
+                            ctx.dontGoDeeper();
+                        }
+                    } 
+                    else if ( op.getOperatorType() == OperatorType.UNARY_MINUS ) // 0 - address doesn't need special case 
+                    {
+                        final ASTNode child0 = unwrapExpression( op.child(0) );
+                        if ( isAddressIdentifierNode( child0 , symbolTable ) ) 
+                        {
+                            final IdentifierNode id = (IdentifierNode) child0;
+                            if ( ! id.safeGetSymbol().getSegment().equals( context.currentSegment() ) ) {
+                                throw new RuntimeException("Not relocatable, symbol needs to be in same section as instruction");
+                            }
+                            ctx.dontGoDeeper();
+                        }
+                    }
+                } 
+                else if ( isAddressIdentifierNode( node , symbolTable ) )
+                {
+                    final Symbol symbol = ((IdentifierNode) node).safeGetSymbol();
+                    final Segment segment = symbol.getSegment();
+                    if ( segment == null ) {
+                        throw new RuntimeException("Symbol "+symbol+" has NULL segment ?");
+                    }
+                    segments.add( segment ); 
+                    if ( segments.size() > 1 ) {
+                        throw new RuntimeException("Expression is not relocatable: Involves symbols from different sections");
                     }
                 }
             }
         };
         subTree.visitBreadthFirst( visitor );
-        return referencesLabel[0];
+        return ! segments.isEmpty();
     }
     
     public ASTNode src() {

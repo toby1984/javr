@@ -44,8 +44,6 @@ public class CurrentAddressNode extends AbstractASTNode implements IValueNode , 
     @Override
     public boolean resolve(ICompilationContext context) {
         value = context.currentAddress();
-//        new Exception("CurrentAddressNode#resolveValue()").printStackTrace();
-//        System.err.println( "resolveValue(): "+getParent().toString()+" => "+value);
         return true;
     }
 }
