@@ -10,6 +10,7 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.Segment;
+import de.codesourcery.javr.assembler.elf.ElfSymbolTable.ElfSymbol;
 import de.codesourcery.javr.assembler.elf.ElfWriter.Endianess;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
@@ -33,12 +34,9 @@ public class ElfSymbolTable
     
     private final List<ElfSymbol> symbols = new ArrayList<>();
     
-    // flag indicating whether this table contains local symbols ; if yes,
-    // the second entry in this table always points to a symbol that has
-    // the compilation unit's name as its name
-    private boolean hasLocalSymbols;
-    
     private final ElfFile file;
+    
+    public ElfSymbol textSectionSymbol;
 
     protected static enum BindingType 
     {
@@ -180,47 +178,39 @@ public class ElfSymbolTable
 
     public void addSymbols(SymbolTable table) 
     {
-        /*
-The symbols in a symbol table are written in the following order.
-
-    Index 0 in any symbol table is used to represent undefined symbols. This first entry in a symbol table is always completely zeroed. The symbol type is therefore STT_NOTYPE.
-
-    If the symbol table contains any local symbols, the second entry of the symbol table is an STT_FILE symbol giving the name of the file.
-
-    Section symbols of type STT_SECTION.
-
-    Register symbols of type STT_REGISTER.
-
-    Global symbols that have been reduced to local scope.
-
-    For each input file that supplies local symbols, a STT_FILE symbol giving the name of the input file, followed by the symbols in question.
-
-    The global symbols immediately follow the local symbols in the symbol table. The first global symbol is identified by the symbol table sh_info value. Local and global symbols are always kept separate in this manner, and cannot be mixed together.
+        /* The symbols in a symbol table are written in the following order:
+         * 
+         * 1.) Index 0 in any symbol table is used to represent undefined symbols. This first entry in a symbol table is always completely zeroed. The symbol type is therefore STT_NOTYPE.
+         * 
+         * 2.) If the symbol table contains any local symbols, the second entry of the symbol table is an STT_FILE symbol giving the name of the file.
+         * 
+         * 3.) Section symbols of type STT_SECTION.
+         * 
+         * 4.) Register symbols of type STT_REGISTER.
+         * 
+         * 5.) Global symbols that have been reduced to local scope.
+         * 
+         * 6.) For each input file that supplies local symbols, a STT_FILE symbol giving the name of the input file, followed by the symbols in question.
+         * 
+         * The global symbols immediately follow the local symbols in the symbol table. 
+         * The first global symbol is identified by the symbol table sh_info value. 
+         * Local and global symbols are always kept separate in this manner, and cannot be mixed together.
          */
-        final List<Symbol> symbols = table.getAllSymbolsUnsorted().stream().filter( s -> s.hasType(Type.ADDRESS_LABEL) || s.hasType(Type.EQU ) ).collect( Collectors.toList() );
-        hasLocalSymbols = symbols.stream().anyMatch( s -> s.isLocalLabel() );
+        final List<Symbol> globalSymbols = table.getAllSymbolsUnsorted().stream().filter( s -> s.hasType(Type.ADDRESS_LABEL) && ! s.isLocalLabel() ).collect( Collectors.toList() );
         
-        if ( hasLocalSymbols ) 
-        {
-            ElfSymbol sym = new ElfSymbol();
-            sym.bindingType = BindingType.STB_LOCAL;
-            sym.nameIdx = file.symbolNames.add( "dummy.c" ); // TODO: Add the real filename here
-            sym.sectionHeaderIndex = file.getTableIndex( file.textSegmentEntry );
-            sym.symbolType = SymbolType.STT_FILE;
-            this.symbols.add( sym );
-        }
+        // add local SECTION symbol for .text segment at index #1
+        textSectionSymbol= new ElfSymbol();
+        textSectionSymbol.bindingType = BindingType.STB_LOCAL;
+        textSectionSymbol.nameIdx = 0;
+        textSectionSymbol.sectionHeaderIndex = file.getTableIndex( file.textSegmentEntry );
+        textSectionSymbol.symbolType = SymbolType.STT_SECTION;
+        this.symbols.add( textSectionSymbol );            
         
-        // add global symbols before local symbols
-        symbols.stream().filter( sym -> sym.hasType( Symbol.Type.EQU ) || sym.isGlobalLabel() ).forEach( s ->
+        // add global symbols
+        globalSymbols.forEach( s ->
         {
             this.symbols.add( new ElfSymbol( s ) );
         });
-        
-        // add global symbols before local symbols
-        symbols.stream().filter( sym -> sym.isLocalLabel() ).forEach( s ->
-        {
-            this.symbols.add( new ElfSymbol( s ) );
-        });        
     }
     
     public int getLastLocalSymbolIndex() 
@@ -248,9 +238,7 @@ The symbols in a symbol table are written in the following order.
         } else {
             dataSectionIdx = -1;
         }
-        
-        final int startIdx = hasLocalSymbols ? 2 : 1; // if we have local symbols , symbol table entry #1 is occupied by STT_FILE symbol
-        for ( int i = startIdx ; i < symbols.size() ; i++ ) {
+        for ( int i = 2 ; i < symbols.size() ; i++ ) {
             
             final ElfSymbol symbol = symbols.get(i);
             final Segment segment = symbol.symbol.getSegment();
@@ -296,12 +284,27 @@ The symbols in a symbol table are written in the following order.
         for ( int idx = 1 , len = symbols.size() ; idx < len ; idx++)
         {
             final ElfSymbol elfSymbol = symbols.get(idx);
+            if ( elfSymbol.symbolType == SymbolType.STT_SECTION ) {
+                continue;
+            }
             final Symbol actual = elfSymbol.symbol;
             if ( actual == null ) {
                 throw new RuntimeException("Internal error,ELF symbol at index "+idx+" has no symbol assigned ? Offender: "+elfSymbol);
             }
             if ( actual.name().equals( expected.name() ) ) {
                 return idx;
+            }
+        }
+        throw new NoSuchElementException("This symbol table does not contain symbol "+expected);
+    }
+
+    public int indexOf(ElfSymbol expected) 
+    {
+        Validate.notNull(expected, "expected must not be NULL");
+        for ( int i = 0, len = symbols.size() ; i < len ; i++ ) 
+        {
+            if ( symbols.get(i) == expected ) {
+                return i;
             }
         }
         throw new NoSuchElementException("This symbol table does not contain symbol "+expected);

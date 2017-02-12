@@ -197,12 +197,15 @@ public class ElfFile
          * Write program header table
          ***********************/
         
-        writer.createMarker( MarkerName.PROGRAM_HEADER_TABLE_START );
-        for ( ProgramTableEntry entry : programHeaders ) 
-        {
-            entry.write( writer );
+        if ( type == OutputFormat.ELF_EXECUTABLE) 
+        {         
+            writer.createMarker( MarkerName.PROGRAM_HEADER_TABLE_START );
+            for ( ProgramTableEntry entry : programHeaders ) 
+            {
+                entry.write( writer );
+            }
+            writer.createMarker( MarkerName.PROGRAM_HEADER_TABLE_END);
         }
-        writer.createMarker( MarkerName.PROGRAM_HEADER_TABLE_END);
         
         /*****************
          * Write section header
@@ -264,7 +267,15 @@ public class ElfFile
                          * } Elf32_Rela
                          */
                         writer.writeWord( r.locationOffset , Endianess.LITTLE );
-                        final int symbolTableIdx = symbolTable.indexOf( r.symbol );
+                        final int symbolTableIdx;
+                        if ( r.symbol.isLocalLabel() ) { // avr-gcc does relocations of local labels always relative to their segment 
+                            if ( r.symbol.getSegment() != Segment.FLASH ) { // we currently only support local labels within the text segment
+                                throw new RuntimeException("Internal error, relocation of local symbol that is not in .text segment ");
+                            }
+                            symbolTableIdx = symbolTable.indexOf( symbolTable.textSectionSymbol );
+                        } else {
+                            symbolTableIdx = symbolTable.indexOf( r.symbol );
+                        }
                         final int typeAndSymbolIdx = symbolTableIdx<<8 | r.kind.elfId;
                         writer.writeWord( typeAndSymbolIdx , Endianess.LITTLE );
                         writer.writeWord( r.addend , Endianess.LITTLE );
@@ -582,11 +593,13 @@ public class ElfFile
         sectionTableEntries.add( symNamesEntry );
         
         // setup program headers
-        textSegment = new ProgramTableEntry(this);
-        textSegment.p_type = SegmentType.PT_LOAD;
-        textSegment.addFlags(SegmentFlag.PF_X , SegmentFlag.PF_R );
-        textSegment.p_align = 2;
-        
-        programHeaders.add( textSegment );
+        if ( type == OutputFormat.ELF_EXECUTABLE ) {        
+            textSegment = new ProgramTableEntry(this);
+            textSegment.p_type = SegmentType.PT_LOAD;
+            textSegment.addFlags(SegmentFlag.PF_X , SegmentFlag.PF_R );
+            textSegment.p_align = 2;
+            
+            programHeaders.add( textSegment );
+        }
     }
 }

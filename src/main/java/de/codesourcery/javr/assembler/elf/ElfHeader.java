@@ -81,10 +81,16 @@ Elf32_Half     e_shstrndx; // 46
         writer.writeWord( 0x01 , Endianess.LITTLE);  // 20: e_version
         writer.writeWord( 0 , Endianess.LITTLE); // 24: e_entry => address of program entry point
         
-        writer.deferredWriteWord( (w,file) -> w.getMarker( ElfFile.MarkerName.PROGRAM_HEADER_TABLE_START).offset , Endianess.LITTLE); // 28: e_phoff => program header table offset
+        // 28: e_phoff => program header table offset        
+        if ( elfFile.type == OutputFormat.ELF_EXECUTABLE ) {
+            writer.deferredWriteWord( (w,file) -> w.getMarker( ElfFile.MarkerName.PROGRAM_HEADER_TABLE_START).offset , Endianess.LITTLE); 
+        } else {
+            writer.writeWord( 0 , Endianess.LITTLE );
+        }
         
         writer.deferredWriteWord( ElfFile.MarkerName.SECTION_TABLE_START , Endianess.LITTLE ); // 32: e_shoff => section header table offset
-        writer.writeWord( 0x00 , Endianess.LITTLE ); // 36: e_flags
+//        writer.writeWord( 0x85 , Endianess.LITTLE ); // 36: e_flags => AVR5 , link-relax 
+        writer.writeWord( 0x05 , Endianess.LITTLE ); // 36: e_flags => AVR5
         writer.writeHalf( 52 , Endianess.LITTLE);  // 40: e_ehsize => ELF header size
         writer.writeHalf( ProgramTableEntry.SIZE_IN_BYTES , Endianess.LITTLE);  // 42: Elf32_Half     e_phentsize;  // size of ONE entry in the program header table
         writer.deferredWriteHalf( (w,file) -> file.getProgramHeaderCount() , Endianess.LITTLE );  // 44: Elf32_Half     e_phnum;  // number of entries in program header table

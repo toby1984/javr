@@ -293,13 +293,14 @@ public class IDEMain
         {
             return projects.get(0);
         } 
-        String projName = null;
-        do {
-            projName = (String) JOptionPane.showInputDialog( null , "Choose project" , "Choose project" , JOptionPane.QUESTION_MESSAGE , null, 
+         String projName = (String) JOptionPane.showInputDialog( null , "Choose project" , "Choose project" , JOptionPane.QUESTION_MESSAGE , null, 
                     projects.stream().map( p -> p.getConfiguration().getProjectName() ).collect( Collectors.toList() ).toArray( new String[0] ) , null );
-        } while ( StringUtils.isBlank( projName ) );
-        final String finalProjName = projName;
-        return projects.stream().filter( p-> p.getConfiguration().getProjectName().equals(finalProjName) ).findFirst().get();
+        if ( StringUtils.isBlank( projName ) ) 
+        {
+            System.out.println("No project selected, terminating.");
+            System.exit(1);
+        }
+        return projects.stream().filter( p-> p.getConfiguration().getProjectName().equals(projName) ).findFirst().get();
     }
 
     public static void fail(Exception e) 
