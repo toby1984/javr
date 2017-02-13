@@ -49,8 +49,6 @@ public abstract class AbstractAchitecture implements IArchitecture
 {
     private static final Logger LOG = Logger.getLogger(AbstractAchitecture.class);
 
-    private static final Integer ZERO = Integer.valueOf(0);
-    
     private static final long VALUE_UNAVAILABLE= 0xdeadabcdbeefdeadL;
     
     public static enum ArgumentType 
@@ -711,16 +709,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         {
             throw new RuntimeException("Internal error, don't know how to turn node value "+((IValueNode) argument).getValue()+" into an int ?");
         }
-        int addend = (int) tmp;
-        
-//        final long tmp2 = toIntValue( symbolNeedingRelocation.getValue() );
-//        if ( tmp2 == VALUE_UNAVAILABLE ) 
-//        {
-//            throw new RuntimeException("Internal error, don't know how to turn node value "+symbolNeedingRelocation.getValue()+" into an int ?");
-//        }        
-//        final int symbolValue = (int) tmp2;
-//        
-//        addend = addend - symbolValue;
+        int addend = (int) ( symbolNeedingRelocation.isLocalLabel() ? tmp : 0 );
         
         final int expressionTypeBitMask = classifyExpression( argument , context.currentSymbolTable() );
         final Relocation.Kind kind;
