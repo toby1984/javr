@@ -6,6 +6,7 @@
 
 ; I/O pins
 #define TRIGGER_PIN 0
+#define IR_PIN 1
 #define SCOPE_PIN 2
 #define DISPLAY_RESET_PIN 4
 #define SUCCESS_LED 6
@@ -20,6 +21,10 @@
 
 #define ERROR_LED_ON  sbi PORTD, ERROR_LED
 #define ERROR_LED_OFF cbi PORTD, ERROR_LED
+
+#define IR_READ_SUCCESS 0
+#define IR_READ_NO_SIGNAL 1
+#define IR_READ_OVERFLOW 2
 
 #define DISPLAY_I2C_ADDR %01111000
 #define DISPLAY_WIDTH_IN_PIXEL 128
@@ -81,7 +86,6 @@ jmp onirq ; Store program memory ready
 ; ========================
 init:
 ; clear status register
-          cli
 	eor r1,r1
 	out 0x3f,r1
 ; initialize stack pointer
@@ -90,116 +94,148 @@ init:
 	out 0x3d,r28	; SPL 
 	out 0x3e,r29	; SPH
 ; call main program
-.again	rcall main
+.again	rcall main2
 	rcall wait_for_button  
           rjmp again
 onirq:
-	jmp 0x00
+          ERROR_LED_ON
+	ldi r16,0xff
+          rcall msleep
+	ldi r16,0xff
+          rcall msleep
+	ERROR_LED_OFF
+	ldi r16,0xff
+	rcall msleep
+	ldi r16,0xff
+          rcall msleep
+          rjmp onirq
+
 ; ==========================
 ; main program starts here
 ; ==========================
-main:
+main2:
           rcall reset
                
 	ldi r16, CMD_DISPLAY_ON
 	rcall send_command
-          brcs error	
 
 	ldi r19,0xff ; clear all pages
 	rcall clear_pages ; SCRATCHED: r0,r1,r16,r17,r18,r19,r31:r30
 
-	rcall send_framebuffer
-	brcs error
-
-	ldi r16,0
-	sts dirtyregions,r16
-	sts previousdirtyregions,r16
-
-          rcall wait_for_button      
-
-; ============================
-; blit sprite from FLASH into framebuffer
-; INPUT: r19 - Destination X position (pixel)
-; INPUT: r20 - Destination Y position (pixel)
-; INPUT: r21 - Sprite width (pixel)
-; INPUT: r22 - Sprite height (pixel)
-; INPUT: r31:r30 - Ptr to start of sprite in FLASH
-; SCRATCHED: r0,r1,r16,r17,r18,r19,r22,r23,r26,r27,r28,r29,r30,r31
-; ============================
-
-	ldi r16,10
-	sts spritex,r16
-	sts spritey,r16
-	ldi r16,1
-	sts spritedx,r16
-	sts spritedy,r16
-.loop
-	ldi r16,0
-	sts dirtyregions,r16
-
-	lds r19,spritex 
-	lds r16,spritedx
-	add r19,r16
-	cpi r19,1
-	breq invx
-	cpi r19,127-16
-	breq invx
-	rjmp noxborder
-.invx
-	com r16
-.noxborder
-	sts spritex,r19
-	sts spritedx,r16	
-
-; Y axis
-	lds r20,spritey
-	lds r16,spritedy
-	add r20,r16
-	cpi r20,1
-	breq invy
-	cpi r20,63-16
-	breq invy
-	rjmp noyborder
-.invy
-	com r16
-.noyborder
-	sts spritey,r20
-	sts spritedy,r16	
-	
-	ldi r21, 16
-	ldi r22, 16
-	ldi r31,HIGH(sprite1)
-	ldi r30,LOW(sprite1)
-;	rcall blit_sprite
-
-; ----------- TODO: DEBUG start
-; Draws a 1-pixel wide line.
-; INPUT: x1 - r16
-; INPUT: y1 - r17
-; INPUT: x2 - r18
-; INPUT: y2 - r19
-; SCRATCHED r0,r1,r20-r26,r27,r28,r30,r31
-
-          ldi r16,120 ;x0
-          ldi r17,50 ; y0 
-          ldi r18,30 ; x1
-          ldi r19,10 ; y1
-          rcall draw_line
-
-          ldi r16,0xff
-          sts dirtyregions,r16
-; ----------- TODO: DEBUG end
-
-	SCOPE_PIN_OFF
-; ----------- TODO: DEBUG start
-	ldi r16,0
+	eor r16,r16
 	sts cursorx,r16
 	sts cursory,r16
-	lds r16,dirtyregions
-	rcall popcnt
-	rcall write_dec
-; ----------- TODO: DEBUG end
 
+.again
+	ldi r16,0xff
+	sts dirtyregions,r16
+
+	rcall clear_histogram
+
+	ldi r27,HIGH(txt_waiting)
+	ldi r26,LOW(txt_waiting)
+	rcall write_flash_string
+
+	rcall send_framebuffer ; clear display ram
+
+.read_more
+	rcall ir_read
+
+	cpi r17, IR_READ_SUCCESS
+	brne somethingwrong
+
+	rcall update_histogram
+
+	rjmp read_more
+
+.somethingwrong
+	cpi r17, IR_READ_OVERFLOW
+	breq read_overflow
+; no signal
+	lds r16,hist_count
+	tst r16
+	breq no_signal
+
+	SUCCESS_LED_ON
+
+	lds r16, hist_count
+	rcall write_dec
+	rcall send_framebuffer ; clear display ram
+
+	rjmp again ; TODO: <<<<<<<<<<<< REMOVE DEBUG CODE
+
+	rcall print_histogram
+
+	ldi r27,HIGH(txt_pulses_received)
+	ldi r26,LOW(txt_pulses_received)
+	rcall write_flash_string
+	
+	lds r16, hist_count
+	rcall write_dec
+
+	rcall send_framebuffer ; clear display ram
+
+	rcall wait_for_button
+
+	rjmp again
+
+.no_signal
+	ldi r27,HIGH(txt_error_no_signal)
+	ldi r26,LOW(txt_error_no_signal)
+	rjmp cont_error
+.read_overflow
+	ERROR_LED_ON
+	ldi r27,HIGH(txt_error_overflow)
+	ldi r26,LOW(txt_error_overflow)
+.cont_error
+	rcall write_flash_string
+	rcall send_framebuffer ; clear display ram
+	rjmp again
+
+; ===
+; update histogram
+; INPUT: r16 - measured time
+; SCRATCHED: r16,r30,r31
+; ===
+update_histogram:
+	lsr r16
+	lsr r16
+	lsr r16	
+	lsr r16 ; 256 / 16 
+	ldi r31,HIGH(histogram)
+	ldi r30,LOW(histogram)
+	add r30,r16
+	eor r16,r16
+	adc r31,r16
+	ld r16,Z	
+	inc r16
+	st Z,r16
+	lds r30,hist_count
+	inc r30
+	sts hist_count,r30
+	ret
+; ==== 
+; clear histogram
+; SCRATCHED: r16,r30,r31
+; ====
+clear_histogram:	
+	ldi r31,HIGH(histogram)
+	ldi r30,LOW(histogram)
+	eor r17,r17
+	sts hist_count , r17
+	ldi r16,16 ; clear 16 bytes
+.clr
+	st Z+,r17
+	dec r16
+	brne clr
+	ret
+
+; ===============
+; Sends all dirty regions to the display
+; and prepares for the next redraw
+; SCRATCHED: r0,r1,r16,r17,r18,r19,r20,r21,r29:r28,r31:r30
+; ===============
+update_display:
 	lds r20,previousdirtyregions 
 	lds r21,dirtyregions
 	sts previousdirtyregions,r21 ; previousdirtyregions = dirtyregions
@@ -211,18 +247,120 @@ main:
 
 	lds r19,previousdirtyregions
 	rcall clear_pages
-
-	SCOPE_PIN_ON
-
-;	rjmp loop
-
-          SUCCESS_LED_ON
-          rjmp back
+	ret
 .error        
-	ERROR_LED_ON
-.back	rcall wait_for_button  
+	ERROR_LED_ON 
 	ret
 
+; ================
+; Write the histogram to the display
+; SCRATCHED:
+; ================
+print_histogram:
+
+	ldi r27,HIGH(histogram)
+	ldi r26,LOW(histogram)
+	eor r25,r25
+.loop
+	mov r16,r25
+	ld r17,X+
+	push r25
+	rcall print_histogram_bar
+	pop r25
+	inc r25
+	cpi r25,16
+	brne loop
+	ret
+
+; ================
+; Prints a single histogram bar
+; INPUT: r16 - bar to print (0..15)
+; INPUT: r17 - bar height (0...255)
+; SCRATCHED: r0,r1,r16,r18,r19,r20,r21,r22,r23,r24,r28,r29,r30,r31
+; ================          
+print_histogram_bar:
+.def barno = r16
+.def barheight = r17
+.def tmp = r18
+.def tmp2 = r19
+.def tmp3 = r23
+.def tmp4 = r24
+.def mask = r20
+.def rowcount = r21
+.def colcounter = r22
+	ldi tmp,8
+	mul barno,tmp ; r1:r0 = barno * 8
+	ldi r31,HIGH(framebuffer)
+	ldi r30,LOW(framebuffer)
+	add r30,r0
+	adc r31,r1 ; r1:r0 = framebuffer + ( barno * 8 )
+; add Y offset to framebuffer ptr
+		
+	lsr barheight ; tmp = barheight / 2  = 0...127
+	lsr barheight ; tmp = barheight / 4  = 0...63 => pixel coordinates
+	
+	mov tmp,barheight
+	lsr tmp
+	lsr tmp
+	lsr tmp ; tmp = barheight / 8  = 0...8	
+	mov rowcount,tmp
+	ldi tmp2,8
+	sub tmp2,tmp ; tmp2 = 7 - (barheight/8)
+	ldi tmp,128
+	mul tmp,tmp2 ; r1:r0 = (7-(barheight/8)) * 128
+	add r30,r0
+	adc r31,r1
+; calculate mask
+	mov tmp3,rowcount
+	lsl tmp3
+	lsl tmp3	
+	lsl tmp3 ; tmp = row count * 8
+	mov tmp2,barheight
+	sub tmp2,tmp3 ; tmp2 = barheight - ( barheight / 8) * 8 = remainder
+.def remainder = r19
+	ldi mask,0xff
+	breq no_mask_needed
+; create mask
+.mask_loop lsl mask
+	dec remainder
+	brne mask_loop	
+.no_mask_needed
+	movw r29:r28,r31:r30 ; backup row ptr
+	ldi colcounter,8
+	ldi tmp,128
+	eor tmp2,tmp2
+; draw first row
+.first_row
+	ld r16,Z
+	or r16,mask
+	st Z+,r16
+	dec colcounter
+	brne first_row
+	dec rowcount
+	breq done
+	movw r31:r30,r29:r28
+	add r30,tmp ; advance to next row
+	adc r31,tmp2 ; + carry
+	movw r29:r28,r31:r30 ; backup row ptr
+; draw remaining rows
+.remaining	
+	ldi mask,0xff
+	ldi colcounter,8
+.loop
+	st Z+,mask
+	dec colcounter
+	brne loop
+	dec rowcount
+	breq done	
+	movw r31:r30,r29:r28
+	add r30,tmp ; advance to next row
+	adc r31,tmp2
+	movw r29:r28,r31:r30 ; backup row ptr
+	rjmp remaining
+.done
+	ldi r16,0xff
+	sts dirtyregions,r16
+	ret		
 ; ====
 ; reset system
 ; RETURN: Carry clear => succes , Carry set => failure
@@ -234,7 +372,9 @@ reset:
 	sbi DDRD,SCOPE_PIN ; set to output
 	sbi DDRD,ERROR_LED ; set to output
 	sbi DDRD,SUCCESS_LED ; set to output
+
 	cbi DDRB,TRIGGER_PIN ; set to input
+          cbi DDRB,IR_PIN ; IR sensor => input
 
 ;          setup TWI rate
           lds r16,TWSR
@@ -285,7 +425,7 @@ wait_for_button:
 	rcall msleep
 .wait_released
           sbic PINB , TRIGGER_PIN
-          rjmp wait_released
+          rjmp wait_pressed
 .wait_pressed
           sbis PINB , TRIGGER_PIN
           rjmp wait_pressed
@@ -293,6 +433,86 @@ wait_for_button:
 	rcall msleep
           ret
 
+; ==========
+; Waits for low -> hi transition on IR pin
+; and measures how long the signal stayed high
+; OUTPUT: r16 - time the IR pin stayed high (counted in timer #0 ticks=
+; OUTPUT: r17 - error code ( 0 = no error, 1 = 1-second timeout elapsed while waiting for start transition, 2 = signal stayed high too long (more than 255 timer #0 tickets)
+; SCRATCHED: r16,r17,r18
+;===========
+ir_read:
+	ERROR_LED_ON
+	ldi r17,IR_READ_NO_SIGNAL ; error code: 1-second timeout elapsed while waiting
+	rcall start_timer1
+
+.wait_for_low	
+	sbic TIFR1,0 ; skip next instruction if timer #1 did not overflow
+	rjmp timeout
+	sbic PINB,IR_PIN
+	rjmp wait_for_low
+	
+	rcall start_timer1
+
+.wait_for_high
+	sbic TIFR1,0 ; skip next instruction if timer #1 did not overflow
+	rjmp timeout
+	sbis PINB,IR_PIN
+	rjmp wait_for_high
+
+	ldi r17,IR_READ_OVERFLOW ; error code: 1-second timeout elapsed while waiting
+	rcall start_timer1
+	rcall start_timer0
+
+.wait_for_low2
+	sbic TIFR0,0 ; skip next instruction if timer #0 did not overflow
+	rjmp timeout
+	sbic PINB,IR_PIN
+	rjmp wait_for_low2
+; success
+          lds r18,TCNT0 ; read timer #0
+.no_error
+	ldi r17,IR_READ_SUCCESS	
+.timeout	
+	mov r16,r18
+
+	ERROR_LED_OFF
+	ret
+
+; ======
+; Start timer #0 with clk/1024 frequency
+; SCRATCHED: r16
+; ===== 
+start_timer0:
+; setup timer
+	eor r16,r16	
+	sts TCCR0B,r16 ; stop timer
+	sbi TIFR0,0 ; clear overflow flag
+; set timer to zero	
+	sts TCNT0,r16	
+; reset prescaler
+;          ldi r16,0x01
+;	sts GTCCR , r16
+; start timer by setting prescaler: 0000_0xyz ; 101 = clk/1024 , 110 = clk/256, 011 = clk/64 , 010 = clk/8 ; 001 = clk/1
+	ldi r16,%101
+	sts TCCR0B, r16
+	ret
+
+; ======
+; Start timer #1 with clk/256 frequency
+; SCRATCHED: r16
+; ===== 
+start_timer1:
+; setup timer
+	eor r16,r16	
+	sts TCCR1B,r16 ; stop timer #1
+; set timer to zero	
+	sts TCNT1H,r16
+	sts TCNT1L,r16 ; // writing low register loads timer	
+; start timer by setting prescaler: 0000_0xyz ; 101 = clk/1024 , 100 = clk/256, 011 = clk/64 , 010 = clk/8 ; 001 = clk/1
+	ldi r16,%100          
+	sts TCCR1B, r16
+	sbi TIFR1,0 ; clear overflow flag
+	ret
 ; ====
 ; send command.
 ; INPUT: r16 - command table entry index 
@@ -566,8 +786,63 @@ send_single_command:
 	sec
 	ret	
 
+; ====
+; Print 16-bit value as hexadecimal
+; INPUT: r17:r16 - value to write
+; SCRATCHED: r0,r1,r2,r3,r16, r17, r18,r19, r20 , r21, r29,r28,r30 ,r31
+; ====
+write_hex_16bit:	
+	push r16
+	mov r16,r17
+	rcall write_hex_8bit
+	pop r16
+	rcall write_hex_8bit	
+	ret
+
+; ====
+; Print byte value as hexadecimal
+; INPUT: r16 - number to write
+; SCRATCHED: r0,r1,r2,r3,r16, r17, r18,r19, r20 , r21, r29,r28,r30 ,r31
+; ====
+write_hex_8bit:	
+	ldi r31,HIGH(stringbuffer)
+	ldi r30,LOW(stringbuffer)
+.def lo = r16
+.def hi = r17
+.def tmp = r18
+.def tmp2 = r19
+	mov hi,lo
+          lsr hi
+          lsr hi
+          lsr hi
+          lsr hi
+	ldi tmp,0x0f
+	and lo,tmp
+          and hi,tmp          
+          
+	ldi tmp, '0'
+          add lo,tmp
+          add hi,tmp
+
+          ldi tmp2 , 'a'-'0'-10
+
+          cpi lo , '9'+1
+          brlo lower
+	add lo,tmp2	
+.lower	cpi hi, '9'+1
+	brlo lower2
+	add hi,tmp2
+.lower2 
+          st Z+,hi
+          st Z+,lo
+          lac Z,tmp
+	ldi r27,HIGH(stringbuffer)
+	ldi r26,LOW(stringbuffer)	
+	rcall write_sram_string
+	ret
+
 ; ========
-; Write decimal number
+; Print decimal number (8-bit input only)
 ; INPUT: r16 - number to write
 ; SCRATCHED: r0,r1,r16,r19,r20,r26,r27,r31,r30
 ; ========	
@@ -1335,7 +1610,15 @@ charset_mapping:
     .db 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
     .db 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00
 
+txt_waiting: .db "waiting",10,0
+txt_error_no_signal: .db "no",32,"signal",10,0
+txt_error_overflow: .db "signal",32,"too",32,"long",10,0
+txt_pulses_received: .db "pulses",32,"received:",32,0
+
 .dseg
+
+histogram: .byte 16
+
 ; current cursor position
 cursorx: .byte 1
 cursory: .byte 1
@@ -1347,12 +1630,10 @@ previousdirtyregions: .byte 1
 
 
 ; buffer used by write_dec (3 digits + 0 byte)
-stringbuffer: .byte 4
+stringbuffer: .byte 6
 rnd: .byte 4
-; sprite coordinates
-spritex: .byte 1
-spritey: .byte 1
-spritedx: .byte 1
-spritedy: .byte 1
 
 framebuffer: .byte 1024
+
+
+hist_count: .byte 1
