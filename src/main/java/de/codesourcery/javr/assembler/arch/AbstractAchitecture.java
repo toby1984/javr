@@ -658,14 +658,14 @@ public abstract class AbstractAchitecture implements IArchitecture
             // 8-bit AVRs will only require relocation of either the src or destination but not both arguments
             Symbol symbolNeedingRelocation = null;
            
-            if ( srcArgument != null && ( symbolNeedingRelocation = insn.getSymbolNeedingRelocation( srcArgument , context ) ) != null ) 
+            if ( srcArgument != null && ( symbolNeedingRelocation = InstructionNode.getSymbolNeedingRelocation( srcArgument , context ) ) != null ) 
             {
                 dstValue = (int) getDstValue( dstArgument , encoding.dstType , context , false );                
                 srcValue = 0;
                 final Relocation reloc = getRelocation(encoding,insn,srcArgument,encoding.srcType,symbolNeedingRelocation,context);
                 context.addRelocation( reloc );
             } 
-            else if (dstArgument != null && ( symbolNeedingRelocation = insn.getSymbolNeedingRelocation( dstArgument , context ) ) != null  ) {
+            else if (dstArgument != null && ( symbolNeedingRelocation = InstructionNode.getSymbolNeedingRelocation( dstArgument , context ) ) != null  ) {
                 dstValue = 0;
                 srcValue = (int) getSrcValue( srcArgument , encoding.srcType , context , false );  
                 final Relocation reloc = getRelocation(encoding,insn,dstArgument,encoding.dstType,symbolNeedingRelocation,context );

@@ -19,6 +19,7 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Segment;
+import de.codesourcery.javr.assembler.elf.Relocation;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.symbols.Symbol;
@@ -210,4 +211,29 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
         }
         return false;
     }    
+    
+    public void addRelocations(ICompilationContext context) 
+    {
+        if ( context.isGenerateRelocations() && is( Directive.INIT_WORDS ) ) 
+        {
+            int offset = context.currentOffset();
+            for ( ASTNode child : children() ) 
+            {
+                final Symbol symbol = InstructionNode.getSymbolNeedingRelocation( child , context );
+                if ( symbol != null ) 
+                {
+                    final Relocation reloc = new Relocation( symbol );
+                    reloc.addend = 0;
+                    reloc.locationOffset = offset;
+                    if ( context.currentSegment() == Segment.FLASH ) {
+                        reloc.kind = Relocation.Kind.R_AVR_16_PM;
+                    } else {
+                        reloc.kind = Relocation.Kind.R_AVR_16;
+                    }
+                    context.addRelocation( reloc );
+                }
+                offset += 2;
+            }
+        }
+    }
 }

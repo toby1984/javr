@@ -151,6 +151,7 @@ public class Relocation
         }
         this.symbol = s;
     }
+    
     @Override
     public String toString() {
         return "Relocation [kind=" + kind + ", addend=" + addend + ", locationOffset=" + locationOffset + ", symbol="+ symbol + "]";

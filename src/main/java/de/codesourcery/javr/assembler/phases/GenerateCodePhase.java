@@ -142,12 +142,20 @@ public class GenerateCodePhase extends AbstractPhase
             {
                 case INIT_BYTES:
                 case INIT_WORDS:
-                    foundMemDirective = true;
-                    if ( ! isInResolvePhase && ! previousDataSymbols.isEmpty() )
+                    if ( ! isInResolvePhase ) 
                     {
-                        final int size = ((DirectiveNode) node).getSizeInBytes();
-                        previousDataSymbols.forEach( s -> s.incObjectSize( size ) );
+                        foundMemDirective = true;
+                        if ( ! previousDataSymbols.isEmpty() )
+                        {
+                            final int size = ((DirectiveNode) node).getSizeInBytes();
+                            previousDataSymbols.forEach( s -> s.incObjectSize( size ) );
+                        }
+                        
+                        if ( directive == Directive.INIT_WORDS && context.isGenerateRelocations() ) {
+                            ((DirectiveNode) node).addRelocations( context );
+                        }
                     }
+
                     for ( ASTNode child : node.children() ) 
                     {
                         Object value = ((IValueNode) child).getValue();

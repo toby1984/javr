@@ -43,7 +43,7 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
         return new InstructionNode( this.instruction.createCopy() , getTextRegion().createCopy() );
     }
     
-    private ASTNode unwrapExpression(ASTNode node) 
+    private static ASTNode unwrapExpression(ASTNode node) 
     {
         ASTNode result = node;
         while( result instanceof ExpressionNode) 
@@ -53,7 +53,7 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
         return result;
     }
     
-    private boolean isAddressIdentifierNode(ASTNode node,SymbolTable symbolTable) 
+    private static boolean isAddressIdentifierNode(ASTNode node,SymbolTable symbolTable) 
     {
         if ( node instanceof IdentifierNode) 
         {
@@ -62,7 +62,7 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
         return false;
     }
 
-    public Symbol getSymbolNeedingRelocation(ASTNode node, ICompilationContext context) 
+    public static Symbol getSymbolNeedingRelocation(ASTNode node, ICompilationContext context) 
     {
         final SymbolTable symbolTable = context.currentSymbolTable();
         final Symbol[] result = { null };

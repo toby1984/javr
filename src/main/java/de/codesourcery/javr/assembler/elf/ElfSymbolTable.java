@@ -91,14 +91,11 @@ public class ElfSymbolTable
                 case ADDRESS_LABEL:
                     this.bindingType = BindingType.STB_GLOBAL;
                     switch( s.getObjectType() ) {
-                        case DATA:
-                            this.symbolType = SymbolType.STT_OBJECT;      
-                            break;
                         case FUNCTION:
                             this.symbolType = SymbolType.STT_FUNC;
                             break;
                         default:
-                            throw new RuntimeException("Internal error, ADDRESS symbol with no object type: "+s);
+                            this.symbolType = SymbolType.STT_OBJECT;
                     }
                     break;
                 case EQU:
