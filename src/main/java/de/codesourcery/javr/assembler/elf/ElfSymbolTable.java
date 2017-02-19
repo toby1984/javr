@@ -15,6 +15,7 @@ import de.codesourcery.javr.assembler.elf.ElfWriter.Endianess;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.Symbol.ObjectType;
 import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
@@ -85,11 +86,20 @@ public class ElfSymbolTable
             this.symbol = s;
             this.nameIdx = file.symbolNames.add( name( s ) );
             this.value = valueOf( s );
-            this.symbolType = SymbolType.STT_FUNC; // TODO: Maybe try to distinguish between functions and objects here ???
             switch( s.getType() ) 
             {
                 case ADDRESS_LABEL:
-                    this.bindingType = BindingType.STB_GLOBAL;                    
+                    this.bindingType = BindingType.STB_GLOBAL;
+                    switch( s.getObjectType() ) {
+                        case DATA:
+                            this.symbolType = SymbolType.STT_OBJECT;      
+                            break;
+                        case FUNCTION:
+                            this.symbolType = SymbolType.STT_FUNC;
+                            break;
+                        default:
+                            throw new RuntimeException("Internal error, ADDRESS symbol with no object type: "+s);
+                    }
                     break;
                 case EQU:
                     this.bindingType = BindingType.STB_LOCAL;
@@ -99,7 +109,7 @@ public class ElfSymbolTable
                 default:
                     throw new IllegalArgumentException("Don't know how to generate symbol table entry for "+s);
             }
-            this.size = 0; // TODO: Size is currently always set to zero.... change Symbol class so it can store the size of labelled object AND the type ( function or data structure / variable) 
+            this.size = symbol.getObjectSize();
         }
 
         public ElfSymbol() 

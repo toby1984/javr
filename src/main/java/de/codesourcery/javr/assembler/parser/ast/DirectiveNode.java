@@ -15,11 +15,10 @@
  */
 package de.codesourcery.javr.assembler.parser.ast;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
-import de.codesourcery.javr.assembler.exceptions.ParseException;
+import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.symbols.Symbol;
@@ -136,16 +135,17 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
         }
     }
     
-    public boolean resolveSize(ICompilationContext context)
+    private boolean resolveSize(ICompilationContext context)
     {
-        if ( ! hasMemoryLocation() ) {
-            return true;
-        }
         switch( this.directive ) 
         {
             case INIT_BYTES: sizeInBytes = childCount(); break;
             case INIT_WORDS: sizeInBytes = childCount()*2; break;
             case RESERVE:
+                if ( context.currentSegment() == Segment.FLASH ) {
+                    context.error(".byte cannot be used in .text segment",this);
+                    return false;
+                }
                 final IValueNode child = (IValueNode) child(0); 
                 if ( child instanceof Resolvable) {
                     if ( ! ((Resolvable) child).resolve( context ) ) {
@@ -156,10 +156,12 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
                 if ( value != null ) 
                 {
                     final int size = value.intValue();
-                    if ( size < 0 ) {
-                        throw new ParseException("Expected a positive number but got "+size,getTextRegion().start());
+                    if ( size >= 0 ) {
+                        sizeInBytes = size;
+                        return true;
                     }
-                    return true;
+                    context.error("Expected a positive number but got "+size,child);
+                    return false;
                 }
                 return value != null;
             default:
@@ -172,7 +174,7 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
     public int getSizeInBytes() throws IllegalStateException 
     {
         if ( ! hasMemoryLocation() ) {
-            throw new IllegalStateException( "This statement is not associated with a memory location" );
+            throw new IllegalStateException( "This statement is not yet associated with a memory location" );
         }
         return sizeInBytes;
     }
@@ -180,24 +182,31 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
     @Override
     public boolean resolve(ICompilationContext context) 
     {
-        if ( directive == Directive.EQU ) 
+        switch( directive ) 
         {
-            // child 0 is EquLabelNode
-            final Identifier identifier = ((EquLabelNode) child(0)).name;
-            final ASTNode child1 = child(1);
-            // chidl 1 is expression
-            final boolean valueResolved;
-            if ( child1 instanceof Resolvable) {
-                valueResolved = ((Resolvable) child1).resolve( context );
-            } else {
-                valueResolved = true;
-            }
-            if ( valueResolved )
-            {
-                context.currentSymbolTable().get( identifier ).setValue( ((IValueNode) child(1)).getValue() , Symbol.Type.EQU ); 
-            } else {
-                context.error("Failed to resolve value",child1);
-            }
+            case EQU:
+                // child 0 is EquLabelNode
+                final Identifier identifier = ((EquLabelNode) child(0)).name;
+                final ASTNode child1 = child(1);
+                // chidl 1 is expression
+                final boolean valueResolved;
+                if ( child1 instanceof Resolvable) {
+                    valueResolved = ((Resolvable) child1).resolve( context );
+                } else {
+                    valueResolved = true;
+                }
+                if ( valueResolved )
+                {
+                    context.currentSymbolTable().get( identifier ).setValue( ((IValueNode) child(1)).getValue() , Symbol.Type.EQU ); 
+                } else {
+                    context.error("Failed to resolve value",child1);
+                }
+                break;
+            case INIT_BYTES:
+            case INIT_WORDS:
+            case RESERVE:
+                return resolveSize( context );
+            default:
         }
         return false;
     }    

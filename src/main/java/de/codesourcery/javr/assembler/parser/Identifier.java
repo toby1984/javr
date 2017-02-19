@@ -17,10 +17,7 @@ package de.codesourcery.javr.assembler.parser;
 
 import java.util.regex.Pattern;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
-
-import de.codesourcery.javr.assembler.Register;
 
 /**
  * A valid identifier.

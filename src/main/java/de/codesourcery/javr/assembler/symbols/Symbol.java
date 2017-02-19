@@ -43,6 +43,8 @@ public final class Symbol
     private TextRegion textRegion;
     private boolean isReferenced;
     private Segment segment;
+    private ObjectType objectType=ObjectType.UNDEFINED;
+    private int objectSize;
     
     public Symbol createShallowCopy() {
         return new Symbol(this);
@@ -65,6 +67,13 @@ public final class Symbol
         this.textRegion = other.textRegion;
         this.isReferenced = other.isReferenced;
         this.segment = other.segment;
+        this.objectType = other.objectType;
+        this.objectSize = other.objectSize;
+    }
+    
+    public static enum ObjectType 
+    {
+        FUNCTION,DATA,UNDEFINED;
     }
     
     public static enum Type 
@@ -277,5 +286,80 @@ public final class Symbol
      */
     public Segment getSegment() {
         return segment;
+    }
+    
+    /**
+     * Returns the type of object this label refers to (if applicable).
+     * 
+     * Currently only labels of type {@link Symbol.Type#ADDRESS_LABEL} have
+     * an objec type set.
+     * 
+     * @return
+     */
+    public ObjectType getObjectType() {
+        return objectType;
+    }
+    
+    /**
+     * Returns whether this symbol has a given object type.
+     * 
+     * @param type
+     * @return
+     * @see #getObjectType()
+     * @see #setObjectType(ObjectType)
+     */
+    public boolean hasObjectType(ObjectType type) {
+        return type.equals( this.objectType );
+    }
+    
+    /**
+     * Set the type of object this label refers to.
+     * 
+     * Currently only labels of type {@link Symbol.Type#ADDRESS_LABEL} have
+     * an objec type set. 
+     * 
+     * @param objectType
+     * @throws UnsupportedOperationException If trying to call this method on a symbol that is not an address symbol.
+     * @see #getObjectType()
+     * @see #hasObjectType(ObjectType)
+     */
+    public void setObjectType(ObjectType objectType) {
+        Validate.notNull(objectType, "objectType must not be NULL");
+        if ( ! hasType( Type.ADDRESS_LABEL ) ) {
+            throw new UnsupportedOperationException("Only address labels may have an object type set");
+        }
+        this.objectType = objectType;
+    }
+    
+    /**
+     * Returns the size in bytes of the object associated with this label (if applicable)
+     * 
+     * This value is only available for symbols with object type {@link ObjectType#DATA}.
+     * 
+     * @return size in bytes or zero
+     * @see #incObjectSize(int)
+     */
+    public int getObjectSize() {
+        return objectSize;
+    }
+    
+    /**
+     * Increments the size in bytes of the object associated with this label (if applicable).
+     * 
+     * This method must only be called on symbols with object type {@link ObjectType#DATA}.
+     * 
+     * @return size in bytes or zero
+     * @throws UnsupportedOperationException when trying to assign a size to any symbol that does have object type {@link ObjectType#DATA}.
+     * @see #getObjectSize()
+     */    
+    public void incObjectSize(int incInBytes) 
+    {
+        if ( ! hasObjectType( ObjectType.DATA ) ) {
+            throw new UnsupportedOperationException("Currently only symbols that refer to DATA may have a size assigned"); 
+        }
+        if ( incInBytes < 0 ) {
+            throw new IllegalArgumentException("Size must be >= 0, was: "+incInBytes);
+        }
+        this.objectSize += incInBytes;
     }
 }

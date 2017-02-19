@@ -15,11 +15,13 @@
  */
 package de.codesourcery.javr.assembler.phases;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.ICompilationContext;
-import de.codesourcery.javr.assembler.elf.Relocation;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
@@ -29,6 +31,10 @@ import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
+import de.codesourcery.javr.assembler.parser.ast.LabelNode;
+import de.codesourcery.javr.assembler.parser.ast.StatementNode;
+import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.Symbol.ObjectType;
 
 /**
  * Performs the actual code generation.
@@ -40,6 +46,9 @@ public class GenerateCodePhase extends AbstractPhase
     private static final Logger LOG = Logger.getLogger(GenerateCodePhase.class);
     
     private final boolean isInResolvePhase;
+    
+    private boolean foundMemDirective;
+    private final List<Symbol> previousDataSymbols = new ArrayList<>();
     
     public GenerateCodePhase() {
         this("generate_code",false);
@@ -70,9 +79,29 @@ public class GenerateCodePhase extends AbstractPhase
     {
         visitNode( context , node , ctx );
 
+        if ( ! isInResolvePhase ) 
+        {
+            if ( node instanceof LabelNode) 
+            {
+                final Symbol s = ((LabelNode) node).getSymbol();
+                if ( s.hasObjectType( ObjectType.DATA ) ) 
+                {
+                    if ( foundMemDirective ) 
+                    {
+                        if ( ! previousDataSymbols.isEmpty() ) {
+                            previousDataSymbols.clear();
+                        }
+                        foundMemDirective = false;
+                    }
+                    previousDataSymbols.add( s );
+                }
+            } 
+        }
+        
         if ( node instanceof InstructionNode ) 
         {
-            try {            
+            try 
+            {            
                 if ( isInResolvePhase ) 
                 {
                     context.getArchitecture().validate( (InstructionNode) node , context );
@@ -113,6 +142,12 @@ public class GenerateCodePhase extends AbstractPhase
             {
                 case INIT_BYTES:
                 case INIT_WORDS:
+                    foundMemDirective = true;
+                    if ( ! isInResolvePhase && ! previousDataSymbols.isEmpty() )
+                    {
+                        final int size = ((DirectiveNode) node).getSizeInBytes();
+                        previousDataSymbols.forEach( s -> s.incObjectSize( size ) );
+                    }
                     for ( ASTNode child : node.children() ) 
                     {
                         Object value = ((IValueNode) child).getValue();
@@ -178,6 +213,12 @@ public class GenerateCodePhase extends AbstractPhase
                     {
                         case EEPROM:
                         case SRAM:
+                            foundMemDirective = true;
+                            if ( ! isInResolvePhase && ! previousDataSymbols.isEmpty() )
+                            {
+                                final int size = ((DirectiveNode) node).getSizeInBytes();
+                                previousDataSymbols.forEach( s -> s.incObjectSize( size ) );
+                            }                        
                             final Number value = (Number) ((IValueNode) node.child(0)).getValue();
                             context.allocateBytes( value.intValue() );
                             break;

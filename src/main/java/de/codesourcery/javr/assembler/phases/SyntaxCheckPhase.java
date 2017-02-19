@@ -15,6 +15,9 @@
  */
 package de.codesourcery.javr.assembler.phases;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.parser.ast.AST;
@@ -25,6 +28,7 @@ import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
+import de.codesourcery.javr.assembler.symbols.Symbol.ObjectType;
 
 /**
  * Performs semantic checks on the AST.
@@ -45,16 +49,28 @@ public class SyntaxCheckPhase implements Phase
         
         final IASTVisitor visitor = new IASTVisitor() 
         {
+            private final List<LabelNode> previousAddressLabels = new ArrayList<>();
             private LabelNode previousGlobalLabel;
             
+            private void markPreviousSymbols(ObjectType type) 
+            {
+                if ( ! previousAddressLabels.isEmpty() ) {
+                    previousAddressLabels.forEach( ln -> ln.getSymbol().setObjectType( type ) );
+                    previousAddressLabels.clear();
+                }
+            }
             @Override
             public void visit(ASTNode node, IIterationContext ctx) 
             {
                 if ( node instanceof LabelNode ) 
                 {
-                    if ( ((LabelNode) node).isGlobal() ) {
+                    previousAddressLabels.add( (LabelNode) node );
+                    if ( ((LabelNode) node).isGlobal() ) 
+                    {
                         previousGlobalLabel = (LabelNode) node;
-                    } else if ( previousGlobalLabel == null ) {
+                    } 
+                    else if ( previousGlobalLabel == null ) 
+                    {
                         if ( ! context.error("Local label without preceding global label" , node ) ) {
                             ctx.stop();
                         }
@@ -62,6 +78,7 @@ public class SyntaxCheckPhase implements Phase
                 } 
                 else if ( node instanceof InstructionNode) 
                 {
+                    markPreviousSymbols( ObjectType.FUNCTION );
                     if ( context.currentSegment() != Segment.FLASH ) 
                     {
                         if ( ! context.error("Instructions need to be placed in CODE segment",node) ) {
@@ -101,6 +118,7 @@ public class SyntaxCheckPhase implements Phase
                            break;                       
                        case INIT_BYTES:
                        case INIT_WORDS:
+                           markPreviousSymbols( ObjectType.DATA );
                            break;
                        case RESERVE:
                            if( context.currentSegment() != Segment.SRAM && context.currentSegment() != Segment.EEPROM ) 
@@ -109,6 +127,7 @@ public class SyntaxCheckPhase implements Phase
                                    ctx.stop();
                                }
                            }
+                           markPreviousSymbols( ObjectType.DATA );
                            break;
                        case EQU: // currently ignored
                        case DEVICE: // currently ignored

@@ -25,9 +25,7 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
-import de.codesourcery.javr.assembler.parser.ast.IdentifierDefNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
-import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 
 /**
  * Abstract base-class for compiler phases that handles common AST nodes.

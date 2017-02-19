@@ -56,6 +56,10 @@ public class LabelNode extends AbstractASTNode implements Resolvable
         return isGlobal() ? identifier.value+":" : "."+identifier.value;
     }
     
+    public Symbol getSymbol() {
+        return symbol;
+    }
+    
     public void setSymbol(Symbol symbol) 
     {
         Validate.notNull(symbol, "symbol must not be NULL");

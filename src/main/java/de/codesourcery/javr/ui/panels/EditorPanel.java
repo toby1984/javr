@@ -639,11 +639,11 @@ public class EditorPanel extends JPanel
 
 		@Override
 		public int getColumnCount() {
-			return 6;
+			return 8;
 		}
 
 		private void assertValidColumn(int columnIndex) {
-			if ( columnIndex < 0 || columnIndex > 5 ) {
+			if ( columnIndex < 0 || columnIndex > 7 ) {
 				throw new RuntimeException("Invalid column: "+columnIndex);
 			}
 		}
@@ -654,14 +654,18 @@ public class EditorPanel extends JPanel
 				case 0:
 					return "Name";
 				case 1:
-					return "Type";
-				case 2:
-				    return "Segment";
-				case 3:
-					return "Value";
+					return "Symbol Type";
+                case 2:
+                    return "Object Type";		
+                case 3:
+                    return "Object Size";                       
 				case 4:
-				    return "Node";
+				    return "Segment";
 				case 5:
+					return "Value";
+				case 6:
+				    return "Node";
+				case 7:
 				    return "Compilation unit";
 				default:
 					throw new RuntimeException("Invalid column: "+columnIndex);
@@ -690,14 +694,18 @@ public class EditorPanel extends JPanel
 				case 1:
 					return symbol.getType().toString();
                 case 2:
+                    return symbol.getObjectType().toString();
+                case 3:
+                    return Integer.toString( symbol.getObjectSize() );
+                case 4:
                     final Segment segment = symbol.getSegment();
                     return segment == null ? "--" : segment.toString();					
-				case 3:
+				case 5:
 					final Object value = symbol.getValue(); 
 					return value == null ? "<no value>" : value.toString();
-				case 4:
+				case 6:
 				    return symbol.getNode() == null ? null : symbol.getNode().toString();
-				case 5:
+				case 7:
 				    return symbol.getCompilationUnit().getResource().toString();
 				default:
 					throw new RuntimeException("Invalid column: "+columnIndex);                 
