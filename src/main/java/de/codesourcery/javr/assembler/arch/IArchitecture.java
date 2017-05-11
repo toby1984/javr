@@ -100,6 +100,21 @@ public interface IArchitecture
     public boolean isValidMnemonic(String s);
     
     /**
+     * Returns the number of explicit arguments a given instruction AST node requires.
+     *
+     * Depending on the instruction this method may fail if the AST node has 
+     * not had all of it's symbols etc. resolved.
+     * 
+     * Some mnemonics have implicit arguments, these are <b>not</b> counted
+     * by this method.
+     * 
+     * @param node
+     * @return argument count 
+     * @see #isValidMnemonic(String)
+     */
+    public int getExplicitArgumentCount(InstructionNode node);
+    
+    /**
      * Returns the 'real' start address of the SRAM (register file + I/O register + etc.)
      * @return
      */

@@ -1074,29 +1074,31 @@ public class Parser
         if ( tok.is( TokenType.SEMICOLON ) || tok.isOperator("/" ) ) 
         {
             final StringBuilder buffer = new StringBuilder();
-
+            final TextRegion region = lexer.peek().region();     
+            buffer.append( lexer.next().value );
             boolean isMultiLineComment = false;
             if ( tok.isOperator("/" ) ) 
             {
-                lexer.next();
                 final Token tok2 = lexer.peek();
                 if ( tok2.isOperator("/") ) { // single-line comment
-                    buffer.append( tok.value );
+                    // ok
+                    buffer.append( "/" );
+                    region.merge( lexer.next().region() );
                 } 
                 else if ( tok2.isOperator("*") ) { // multi-line comment
-                    buffer.append( tok.value );
-                    buffer.append( lexer.next().value );
+                    buffer.append( "*" );
+                    region.merge( lexer.next().region() );
                     isMultiLineComment = true;
                 }
                 else 
                 {
                     throw new ParseException( "C-style comment needs //" , tok);
                 }
-            }
+            } 
+       
             lexer.setIgnoreWhitespace( false );
             try 
             {
-                final TextRegion region = lexer.peek().region();
                 while ( ! lexer.eof() ) 
                 {
                     if ( lexer.peek(TokenType.EOL ) ) 

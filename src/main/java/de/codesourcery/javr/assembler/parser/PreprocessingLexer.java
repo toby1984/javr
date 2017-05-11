@@ -168,6 +168,7 @@ public class PreprocessingLexer implements Lexer
     private Lexer popLexer() 
     {
         final Lexer result = lexerStack.pop();
+        result.setIgnoreWhitespace( true );
         currentLexer = lexerStack.isEmpty() ? null : lexerStack.peek();
         compilationContext.popCompilationUnit();  
         return result;
@@ -176,16 +177,7 @@ public class PreprocessingLexer implements Lexer
     @Override
     public boolean eof() 
     {
-        if ( ! tokens.isEmpty() && isIgnoreWhitespace ) 
-        {
-            tokens.removeIf( Token::isWhitespace );
-        }
-                
-        if ( tokens.isEmpty() ) 
-        {
-            parse();
-        }
-        return tokens.get(0).isEOF();
+        return peek().isEOF();
     }
 
     private Token adjustOffset(Token token) 
@@ -787,6 +779,30 @@ public class PreprocessingLexer implements Lexer
         }
     }
 
+    private void skipWhitespace() 
+    {
+        while ( lexer().peek().isWhitespace() ) 
+        {
+            consume();
+        }
+    }	
+
+    private void skipToNextLine() 
+    {
+        while(true) {
+            Token tok = lexer().peek();
+            if ( tok.isEOL() ) 
+            {
+                consume();
+                return;
+            }
+            if ( tok.isEOF() ) {
+                return;
+            }
+            consume();
+        }
+    }		
+    
     @Override
     public Token next() 
     {
@@ -820,60 +836,52 @@ public class PreprocessingLexer implements Lexer
             }
             tokens.clear();
         }
-    }
-
-    private void skipWhitespace() 
-    {
-        while ( lexer().peek().isWhitespace() ) 
-        {
-            consume();
-        }
-    }	
-
-    private void skipToNextLine() 
-    {
-        while(true) {
-            Token tok = lexer().peek();
-            if ( tok.isEOL() ) 
-            {
-                consume();
-                return;
-            }
-            if ( tok.isEOF() ) {
-                return;
-            }
-            consume();
-        }
-    }		
+    }    
 
     @Override
     public Token peek() 
     {
-        if ( tokens.isEmpty() ) 
-        {
-            parse();
-        }
-        int i = 0;
+        return internalPeek(false);
+    }
+    
+    private Token internalPeek(boolean consumeToken) 
+    {
         while ( true ) 
         {
-            final boolean isWhitespace = tokens.get(i).isWhitespace();
-            if ( ! isWhitespace || ! isIgnoreWhitespace )  {
-                return tokens.get(i);
-            }
-            // advance to next non-whitespace token
-            for ( int len = tokens.size() ; i < len ; i++ ) 
+            if ( tokens.isEmpty() ) 
+            {
+                parse();
+            }  
+            for ( int i = 0 , len = tokens.size() ; i < len ; i++ ) 
             {
                 final Token tok = tokens.get(i);
-                if ( ! tok.isWhitespace() ) 
+                if ( ! tok.isWhitespace() || ! isIgnoreWhitespace ) 
                 {
-                    if ( DEBUG ) {
+                    if ( consumeToken ) 
+                    {
+                        if ( DEBUG ) {
+                            System.out.println("NEXT: "+tok);
+                        }
+                        final int toRemove = 1+i;
+                        for ( int x = 0 ; x < toRemove ; x++ ) 
+                        {
+                            tokens.remove(0);
+                        }
+                    } else if ( DEBUG ) {
                         System.out.println("PEEK: "+tok);
                     }
                     return tok;
                 }
+                if ( isIgnoreWhitespace ) 
+                {
+                    tokens.remove( 0 );
+                    i--;
+                    len--;
+                }
             }
-            parse();
-        }
+            // found only whitespace tokens, try again
+            tokens.clear();
+        }        
     }
 
     @Override

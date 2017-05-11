@@ -1699,6 +1699,13 @@ public abstract class AbstractAchitecture implements IArchitecture
         return result;
     }
     
+    @Override
+    public int getExplicitArgumentCount(InstructionNode node)
+    {
+        final EncodingEntry entry = lookupInstruction( node.instruction.getMnemonic(), true );
+        return entry.getEncoding( node ).getArgumentCountFromPattern();
+    }
+    
     protected final void aliasMnemonic(String alias,String realDeal) 
     {
         Validate.notBlank(alias, "alias must not be NULL or blank");

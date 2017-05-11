@@ -26,8 +26,10 @@ import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.LexerImpl;
 import de.codesourcery.javr.assembler.parser.OperatorType;
 import de.codesourcery.javr.assembler.parser.Parser;
+import de.codesourcery.javr.assembler.parser.PreprocessingLexer;
 import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.parser.ast.AST;
+import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.CharacterLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.CommentNode;
 import de.codesourcery.javr.assembler.parser.ast.CurrentAddressNode;
@@ -67,6 +69,33 @@ public class ParserTest
         assertNotNull(ast);
         assertFalse( ast.hasChildren() );
         assertEquals( 0 ,  ast.childCount() );        
+    }
+    
+    @Test
+    public void testParseCommentAfterEQUWithPreprocessingLexer() 
+    {
+        final String asm = ".equ    EICRA   = 0x69  ; MEMORY MAPPED"; 
+        
+        AST ast = parseWithPreprocessor( asm );
+        ast.visitBreadthFirst( (node,ctx) -> 
+        {
+            System.out.println("GOT: "+node.getClass().getSimpleName());
+        });
+        assertNotNull(ast);
+        assertEquals(1 , ast.childCount() );
+        
+        final ASTNode stmt = ast.child(0);
+        assertEquals( StatementNode.class     , stmt.getClass() );
+        assertEquals( 2 , stmt.childCount() );
+        
+        final ASTNode directive = stmt.child(0);
+        assertEquals( DirectiveNode.class     , directive.getClass() );
+        assertEquals( EquLabelNode.class      , directive.child(0).getClass() );
+        assertEquals( NumberLiteralNode.class , directive.child(1).getClass() );
+        
+        final ASTNode commentNode = stmt.child(1);
+        assertEquals( CommentNode.class       , commentNode.getClass() );
+        assertEquals("; MEMORY MAPPED" , ((CommentNode) commentNode).value );
     }
     
     @Test
@@ -1215,6 +1244,19 @@ public class ParserTest
     // helper functions
     private AST parse(String s) 
     {
+        return parse(s,false);
+    }
+    
+    private AST parseWithPreprocessor(String s) 
+    {
+        return parse(s,true);
+    }
+    
+    private AST parse(String s,boolean usePreProcessingLexer) 
+    {
+        if ( usePreProcessingLexer && ! s.endsWith("\n")) {
+            s += "\n";
+        }
         final Parser p = new Parser(arch);
         final StringResource resource = new StringResource("dummy", s);
         final CompilationUnit unit = new CompilationUnit( resource );
@@ -1237,8 +1279,14 @@ public class ParserTest
         };
         
         compilationContext = new CompilationContext( project.getCompileRoot() , project.getGlobalSymbolTable() , writer , project ,new CompilerSettings(), config );
-//        PreprocessingLexer l = new PreprocessingLexer( new LexerImpl(new Scanner(resource) ) , ctx );
-//        return p.parse( ctx, unit , l );
-        return p.parse( compilationContext, unit , new LexerImpl(new Scanner(resource) ) );
+        
+        final Lexer lexer;
+        if ( usePreProcessingLexer ) 
+        {
+            lexer = new PreprocessingLexer( new LexerImpl(new Scanner(resource) ) , compilationContext );
+        } else {
+            lexer = new LexerImpl(new Scanner(resource) );
+        }
+        return p.parse( compilationContext, unit , lexer );
     }
 }

@@ -48,6 +48,52 @@ public class StatementNode extends AbstractASTNode implements Resolvable {
         return ! findLabels().isEmpty();
     }
     
+    public boolean isLabelLineOnly() 
+    {
+        return hasOnlyNode( LabelNode.class );
+    }
+    
+    private <T extends ASTNode> boolean hasOnlyNode(Class<T> clazz) {
+        if ( hasNoChildren() ) {
+            return false;
+        }
+        for ( int i = 0 , len = childCount() ; i < len ; i++ ) 
+        {
+            if ( ! clazz.isAssignableFrom( child(i).getClass() ) ) 
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    public boolean isCommentOnlyLine() 
+    {
+        return hasOnlyNode( CommentNode.class );
+    }
+    
+    public boolean hasPreprocessorNode() 
+    {
+        for ( int i = 0 , len = childCount() ; i < len ; i++ ) 
+        {
+            if ( child(i) instanceof PreprocessorNode ) {
+                return true;
+            }
+        }
+        return false;
+    }    
+    
+    public boolean hasDirective() 
+    {
+        for ( int i = 0 , len = childCount() ; i < len ; i++ ) 
+        {
+            if ( child(i) instanceof DirectiveNode ) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
     public List<LabelNode> findLabels() 
     {
         final List<LabelNode> results = new ArrayList<>();

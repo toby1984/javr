@@ -110,7 +110,8 @@
           <finalName>javr</finalName>
           <archive>
             <manifest>
-              <mainClass>de.codesourcery.javr.Main</mainClass>
+              <mainClass>de.codesourcery.javr.assembler.Disassembler</mainClass>
+              <!-- <mainClass>de.codesourcery.javr.Main</mainClass> -->
             </manifest>
           </archive>
           <descriptors>

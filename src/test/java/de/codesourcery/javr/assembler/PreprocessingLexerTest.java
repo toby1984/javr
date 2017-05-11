@@ -39,6 +39,7 @@ import de.codesourcery.javr.assembler.parser.PreprocessingLexer;
 import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.parser.Token;
 import de.codesourcery.javr.assembler.parser.TokenType;
+import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.FileResourceFactory;
@@ -53,6 +54,7 @@ public class PreprocessingLexerTest extends TestCase
     private ResourceFactory resFactory = FileResourceFactory.createInstance(new File("/"));
     private final List<CompilationMessage> messages = new ArrayList<>();
     private final Stack<CompilationUnit> unitStack = new Stack<>();
+    private final Stack<Segment> segmentStack = new Stack<>();
 
     private Function<Resource,CompilationUnit> unitFactory = res -> {
         throw new RuntimeException("method not implemented: getOrCreateCompilationUnit()");
@@ -64,6 +66,7 @@ public class PreprocessingLexerTest extends TestCase
         resFactory = FileResourceFactory.createInstance(new File("/"));
         messages.clear();
         unitStack.clear();
+        segmentStack.clear();
         unitFactory = res -> {
             throw new RuntimeException("method not implemented: getOrCreateCompilationUnit()");
         };
@@ -81,6 +84,7 @@ public class PreprocessingLexerTest extends TestCase
         {
             Validate.notNull(unit, "unit must not be NULL");
             unitStack.push(unit);
+            segmentStack.push(Segment.FLASH);
             return true;
         }
 
@@ -88,6 +92,7 @@ public class PreprocessingLexerTest extends TestCase
         public void popCompilationUnit() 
         {
             unitStack.pop();
+            segmentStack.pop();
         }
 
         @Override
@@ -127,12 +132,13 @@ public class PreprocessingLexerTest extends TestCase
 
         @Override
         public Segment currentSegment() {
-            throw new RuntimeException("method not implemented: currentSegment");
+            return segmentStack.peek();
         }
 
         @Override
         public void setSegment(Segment s) {
-            throw new RuntimeException("method not implemented: currentSegment");
+            segmentStack.pop();
+            segmentStack.push(s);
         }
 
         @Override
@@ -403,7 +409,19 @@ public class PreprocessingLexerTest extends TestCase
         assertToken(TokenType.EOF,"",21,tokens);
         assertFalse( tokens.hasNext() );
     }	
-
+    
+    public void testParseCharacterLiteral() 
+    {
+        final Iterator<Token> tokens = lex("lsl 'x'\n");
+        assertToken(TokenType.TEXT,"lsl",0,tokens);
+        assertToken(TokenType.SINGLE_QUOTE,"'",4,tokens);
+        assertToken(TokenType.TEXT,"x",5,tokens);
+        assertToken(TokenType.SINGLE_QUOTE,"'",6,tokens);
+        assertTokenType(TokenType.EOL,7,tokens);
+        assertTokenType(TokenType.EOF,8,tokens);
+        assertFalse( tokens.hasNext() );
+    }   
+    
     public void testExpandDefineWithShortValue() 
     {
         final Iterator<Token> tokens = lex("#define TEST X\n"
@@ -512,7 +530,15 @@ public class PreprocessingLexerTest extends TestCase
         assertToken(TokenType.EOF,"",29,tokens);
         assertFalse( tokens.hasNext() );
     }    
-
+    
+    private void assertTokenType(TokenType t,int offset,Iterator<Token> it) 
+    {
+        final Token tok = it.next();
+        if ( tok.type != t || tok.offset != offset ) {
+            fail("expected token type "+t+" @ offset "+offset+" but got token type "+tok.type+" @ offset "+tok.offset);
+        }
+    }
+    
     private void assertToken(TokenType t,String value,int offset,Iterator<Token> it) 
     {
         final Token tok = it.next();
@@ -527,6 +553,7 @@ public class PreprocessingLexerTest extends TestCase
         final StringResource resource = new StringResource("dummy",s);
         final CompilationUnit unit = new CompilationUnit( resource );
         unitStack.push(unit);
+        segmentStack.push(Segment.FLASH);
         
         final LexerImpl delegate = new LexerImpl( new Scanner(resource ) );
         final Lexer lexer = new PreprocessingLexer( delegate , fakeContext );

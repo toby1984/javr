@@ -23,6 +23,7 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.Insets;
 import java.awt.Point;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyAdapter;
@@ -59,6 +60,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.JTextPane;
 import javax.swing.JToolBar;
@@ -103,6 +105,7 @@ import de.codesourcery.javr.assembler.CompilerSettings;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.IObjectCodeWriter;
 import de.codesourcery.javr.assembler.ObjectCodeWriter;
+import de.codesourcery.javr.assembler.PrettyPrinter;
 import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
 import de.codesourcery.javr.assembler.parser.Identifier;
@@ -1333,6 +1336,15 @@ public class EditorPanel extends JPanel
 		result.add( button("Symbols" , ev -> this.toggleSymbolTableWindow() ) );
 		result.add( button("Upload to uC" , ev -> this.uploadToController() ) );
 		
+		result.add( button("PrettyPrint" , ev -> 
+		{
+		    if ( ! isPrettyPrintShown() ) {
+		        showPrettyPrint();
+		    } else {
+		        hidePrettyPrint();
+		    }
+        } ) );
+		
 		result.add( new JLabel("Cursor pos:" ) );
 		result.add( cursorPositionLabel );
 		return result;
@@ -1341,6 +1353,88 @@ public class EditorPanel extends JPanel
 	private final CaretPositionTracker caretTracker;
 	
 	private int lastEditLocation = -1;
+	
+	private PrettyPrintWindow prettyPrintWindow;
+	
+	private final class PrettyPrintWindow extends JFrame {
+	    
+	    private JTextArea textArea = new JTextArea();
+	    
+	    public void astChanged() 
+	    {
+	        final PrettyPrinter printer = new PrettyPrinter();
+	        try {
+	            final String source = printer.prettyPrint( getCompilationUnit().getAST() );
+	            textArea.setText( source );
+	        } 
+	        catch(Exception e) 
+	        {
+	            final ByteArrayOutputStream out = new ByteArrayOutputStream();
+	            try ( PrintWriter pw = new PrintWriter( out ) ) {
+	                e.printStackTrace( pw );
+	            }
+	            final String stacktrace = new String( out.toByteArray() );
+                textArea.setText( stacktrace );
+	        }
+	        textArea.setCaretPosition( 0 );
+	    }
+	    
+	    public PrettyPrintWindow() 
+	    {
+	        super("Pretty print");
+	        setMinimumSize( new Dimension(400,200 ) );
+	        
+	        getContentPane().setLayout( new GridBagLayout() );
+	        
+	        textArea.setEditable( false );
+	        
+	        GridBagConstraints cnstrs = new GridBagConstraints();
+	        cnstrs.fill = GridBagConstraints.BOTH;
+	        cnstrs.gridx = 0;
+	        cnstrs.gridy = 0;
+	        cnstrs.gridheight = 1;
+	        cnstrs.gridwidth = 1;
+	        cnstrs.weightx = 1;
+	        cnstrs.weighty = 1;
+	        cnstrs.insets = new Insets(0,0,0,0);
+	        getContentPane().add( new JScrollPane( textArea ) , cnstrs );
+	        pack();
+	        setVisible( true );
+            textArea.setFont( new Font( Font.MONOSPACED , getFont().getStyle() , getFont().getSize() ) );	        
+	        setDefaultCloseOperation( JFrame.DO_NOTHING_ON_CLOSE );
+	        addWindowListener( new WindowAdapter() 
+	        {
+	            @Override
+	            public void windowClosing(WindowEvent e) 
+	            {
+	                prettyPrintWindow = null;
+	                dispose();
+	            }
+            });
+	    }
+	}
+	
+	private boolean isPrettyPrintShown() {
+	    return prettyPrintWindow != null;
+	}
+	
+	private void hidePrettyPrint() 
+	{
+	    if ( isPrettyPrintShown() ) 
+	    {
+	        prettyPrintWindow.dispose();
+	    }
+	}
+	
+	private void showPrettyPrint() 
+	{
+	    if ( ! isPrettyPrintShown() ) 
+	    {
+	        prettyPrintWindow = new PrettyPrintWindow();
+	    }
+	    prettyPrintWindow.astChanged();
+	    prettyPrintWindow.toFront();
+	}
     
     private void gotoLastEditLocation() 
     {
@@ -1474,6 +1568,10 @@ public class EditorPanel extends JPanel
 		
 		currentUnit.addMessage( CompilationMessage.info(currentUnit,"Compilation "+success+" ("+assembleTime+") on "+df.format( ZonedDateTime.now() ) ) );
 
+		if ( isPrettyPrintShown() ) {
+		    showPrettyPrint();
+		}
+		
         final List<CompilationMessage> allMessages = root.getMessages(true);
         
         // create warnings for symbols defined in this unit but not used anywhere

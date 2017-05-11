@@ -227,17 +227,18 @@ outer:
     /* (non-Javadoc)
 	 * @see de.codesourcery.javr.assembler.parser.LexerIf#setIgnoreWhitespace(boolean)
 	 */
-    public void setIgnoreWhitespace(boolean ignoreWhitespace) 
+    public void setIgnoreWhitespace(boolean newSetting) 
     {
+        final boolean oldSetting = this.ignoreWhitespace;
+        
         if ( DEBUG ) {
-            System.out.println("setIgnoreWhitespace(): ignore="+this.ignoreWhitespace+" => ignore="+ignoreWhitespace);
+            System.out.println("setIgnoreWhitespace(): ignore="+oldSetting+" => ignore="+newSetting);
         }
-        if ( this.ignoreWhitespace == ignoreWhitespace ) {
+        if ( oldSetting == newSetting ) {
         	return;
         }
-        if ( this.ignoreWhitespace && ! ignoreWhitespace ) 
+        if ( oldSetting && ! newSetting )  // change: ignore whitespace -> do not ignore whitespace
         {
-        	// change: ignore whitespace -> do not ignore
             if ( ! tokens.isEmpty() ) 
             {
                 int offset = tokens.get(0).offset;
@@ -254,7 +255,7 @@ outer:
         	// change: do not ignore whitespace -> ignore whitespace
         	tokens.removeIf( tok -> tok.is(TokenType.WHITESPACE ) );
         }
-        this.ignoreWhitespace = ignoreWhitespace;
+        this.ignoreWhitespace = newSetting;
     }
     
     public boolean isIgnoreWhitespace() {
