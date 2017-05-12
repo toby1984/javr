@@ -2,6 +2,15 @@
 
 export QUIET="1"
 
+# cleanup from last run
+function cleanup() {
+    echo "Cleaning up..."
+    rm random* avr-as.log javr.log a.out 2>/dev/null
+}
+cleanup
+
+trap cleanup SIGINT
+
 # create random data
 dd if=/dev/urandom of=random bs=1k count=16
 

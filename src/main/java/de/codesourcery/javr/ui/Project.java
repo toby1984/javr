@@ -373,7 +373,7 @@ public class Project implements IProject
         this.architecture = newConfig.getArchitecture();
         this.projectConfig = newConfig.createCopy();
     }
-
+    
     @Override
     public Resource resolveResource(String child) throws IOException 
     {

@@ -238,11 +238,10 @@ public class CmdLine
 
         try 
         {
-            final Project project = new Project( unit );
-            final ProjectConfiguration projectConfiguration = project.getConfiguration();
+            final ProjectConfiguration projectConfiguration = new ProjectConfiguration();
             projectConfiguration.setCompilerSettings( compilerSettings );
-            project.setConfiguration( projectConfiguration );
-            project.setCompileRoot( unit );
+
+            final Project project = new Project( unit , projectConfiguration );
             asm.compile( project , writer , rf , ()-> config );
             printMessages(unit);
         } 
