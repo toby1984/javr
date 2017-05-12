@@ -90,11 +90,13 @@ public class IDEMain
                 {
                     listeners.forEach( l -> 
                     {
+                        System.out.println("project-closed: calling "+l);
                         SwingUtilities.invokeLater( () -> l.projectClosed( oldProject ) );
                     });                        
                 }
                 listeners.forEach( l -> 
                 {
+                    System.out.println("project-opened: calling "+l);
                     SwingUtilities.invokeLater( () -> l.projectOpened( newProject ) );
                 });
             }
@@ -124,6 +126,11 @@ public class IDEMain
             {
                 listeners.remove( l );
             }                
+        }
+
+        @Override
+        public File getWorkspaceDir() {
+            return workspaceDir;
         }
     };
     
@@ -342,6 +349,8 @@ public class IDEMain
         projectProvider.setProject( currentProject );
         
         final TopLevelWindow topLevel = new TopLevelWindow( projectProvider , applicationConfigProvider );
+        projectProvider.setProject( currentProject );
+        
         applicationConfigProvider.getApplicationConfig().apply( topLevel );
     }
 

@@ -24,6 +24,9 @@ import java.util.function.Function;
 import javax.swing.JInternalFrame;
 import javax.swing.JPopupMenu;
 
+import de.codesourcery.javr.ui.IProject;
+import de.codesourcery.javr.ui.IProjectProvider;
+import de.codesourcery.javr.ui.IProjectProvider.IProjectListener;
 import de.codesourcery.javr.ui.panels.FileSystemBrowser;
 import de.codesourcery.javr.ui.panels.FileSystemBrowser.DirNode;
 
@@ -31,10 +34,23 @@ public class NavigatorFrame extends JInternalFrame implements IWindow
 {
     private final FileSystemBrowser browser;
     
-    public NavigatorFrame(File file) {
-        super( file.getAbsolutePath() );
-        this.browser = new FileSystemBrowser( file );
+    public NavigatorFrame(IProjectProvider provider) 
+    {
+        super( "Filesystem" );
         
+        this.browser = new FileSystemBrowser( provider.getProject().getConfiguration().getBaseDir() );
+        
+        provider.addProjectListener( new IProjectListener() {
+            
+            @Override
+            public void projectOpened(IProject project) {
+                browser.setFolder( project.getConfiguration().getBaseDir() );
+            }
+            
+            @Override
+            public void projectClosed(IProject project) {
+            }
+        });
         final GridBagConstraints cnstrs = new GridBagConstraints();
         cnstrs.fill = GridBagConstraints.BOTH;
         cnstrs.weightx = 1; cnstrs.weighty = 1;

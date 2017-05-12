@@ -67,66 +67,65 @@ import de.codesourcery.javr.ui.panels.FileSystemBrowser.DirNode;
 public class TopLevelWindow implements IWindow
 {
     private static final Logger LOG = Logger.getLogger(TopLevelWindow.class);
-    
+
     private IApplicationConfigProvider applicationConfigProvider;
     private IProjectProvider projectProvider;
-    
+
     private NavigatorFrame navigator;
     private EditorFrame editorFrame;
-    
+
     private final JDesktopPane desktopPane = new JDesktopPane();
     private final JFrame topLevelFrame = new JFrame();
     private final MessageFrame messageFrame = new MessageFrame("Messages");
     private final OutlineFrame outlineFrame = new OutlineFrame();
-    
-    private File lastOpenedProject = new File("/home/tobi/atmel/asm/testproject.properties");
+
     private File lastDisassembledFile = new File("/home/tobi/atmel/asm/random.raw");
     private File lastSourceFile = new File("/home/tobi/atmel/asm/random.raw.javr.asm");
-    
+
     private final CaretPositionTracker caretTracker = new CaretPositionTracker();
-    
+
     private IProjectListener listener = new IProjectListener()
     {
-        
+
         @Override
         public void projectOpened(IProject project)
         {
             project.addProjectChangeListener( outlineFrame );    
             outlineFrame.setCompilationUnit( project.getCompileRoot() );            
         }
-        
+
         @Override
         public void projectClosed(IProject project)
         {
-            project.removeProjectChangeListener( outlineFrame );
         }
     };
-    
+
     public TopLevelWindow(IProjectProvider provider,IApplicationConfigProvider applicationConfigProvider) throws IOException 
     {
         Validate.notNull(applicationConfigProvider, "applicationConfigProvider must not be NULL");
         Validate.notNull(provider, "provider must not be NULL");
-        
+
         provider.addProjectListener( listener );
+        listener.projectOpened( provider.getProject() );
         this.applicationConfigProvider = applicationConfigProvider;
         this.projectProvider = provider;
-        
+
         addWindows( desktopPane );
-        
+
         outlineFrame.setDoubleClickListener( symbol -> 
         {
-        	try 
-        	{
-				final EditorPanel editor = editorFrame.openEditor( projectProvider.getProject() , symbol.getCompilationUnit() );
-				editor.setSelection( symbol.getTextRegion() );
-			} catch (IOException e1) {
-				LOG.error("Failed to open compilation unit for symbol "+symbol,e1);
-			}
+            try 
+            {
+                final EditorPanel editor = editorFrame.openEditor( projectProvider.getProject() , symbol.getCompilationUnit() );
+                editor.setSelection( symbol.getTextRegion() );
+            } catch (IOException e1) {
+                LOG.error("Failed to open compilation unit for symbol "+symbol,e1);
+            }
         });
-        
+
         topLevelFrame.setJMenuBar( createMenu(topLevelFrame) );
         topLevelFrame.setDefaultCloseOperation( JFrame.DISPOSE_ON_CLOSE );
-        
+
         topLevelFrame.addWindowListener( new WindowAdapter() 
         {
             @Override
@@ -150,7 +149,7 @@ public class TopLevelWindow implements IWindow
         applicationConfigProvider.getApplicationConfig().apply( navigator );           
         applicationConfigProvider.getApplicationConfig().apply( outlineFrame );        
     }
-    
+
     public void quit() 
     {
         LOG.info("quit(): Shutting down...");
@@ -172,18 +171,18 @@ public class TopLevelWindow implements IWindow
             System.exit(0);
         }        
     }
-    
+
     private void addMenuItem(JPopupMenu menu,String label,Runnable action) {
         final JMenuItem item1 = new JMenuItem( label );
         item1.addActionListener( ev -> action.run() );
         menu.add( item1 );
     }
-    
+
     private IProject currentProject() 
     {
         return projectProvider.getProject();
     }
-    
+
     public void openFile(File file)
     {
         try 
@@ -198,7 +197,7 @@ public class TopLevelWindow implements IWindow
             IDEMain.fail( e );
         }
     }
-    
+
     private void addItem(JMenu menu,String label,ThrowingRunnable eventHandler) 
     {
         final JMenuItem item = new JMenuItem( label );
@@ -220,8 +219,8 @@ public class TopLevelWindow implements IWindow
         addWindow(pane,messageFrame);
         addWindow(pane,editorFrame);
         addWindow(pane,outlineFrame);
-        navigator = new NavigatorFrame( currentProject.getConfiguration().getBaseDir() );
-        
+        navigator = new NavigatorFrame( projectProvider );
+
         navigator.setMenuSupplier( dirNode -> 
         {
             if ( dirNode != null ) 
@@ -231,7 +230,7 @@ public class TopLevelWindow implements IWindow
                 {
                     final DirNode parentNode = dirNode.file.isDirectory() ? dirNode :dirNode.parent;
                     final File parent = parentNode.file;
-                    
+
                     int index = 0;
                     File newFile = new File( parent , "new_directory" );
                     while ( newFile.exists() ) 
@@ -250,12 +249,12 @@ public class TopLevelWindow implements IWindow
                 addMenuItem(menu,"Delete" , () -> 
                 {
                     final File toDelete = dirNode.file;
-                	final List<File> files = new ArrayList<>();                    
+                    final List<File> files = new ArrayList<>();                    
                     try 
                     {
-						if ( toDelete.isDirectory() ) 
-						{
-							Files.list( toDelete.toPath() ).filter( p -> Files.isRegularFile( p ) ).forEach( p -> files.add( p.toFile() ) );
+                        if ( toDelete.isDirectory() ) 
+                        {
+                            Files.list( toDelete.toPath() ).filter( p -> Files.isRegularFile( p ) ).forEach( p -> files.add( p.toFile() ) );
                             FileUtils.deleteDirectory( toDelete );
                         } else {
                             if ( ! toDelete.delete() ) {
@@ -268,24 +267,24 @@ public class TopLevelWindow implements IWindow
                         IDEMain.fail(e);
                         return;
                     }          
-					try 
-					{
-						for ( File f : files ) 
-						{
-							final Resource resource = Resource.file( f );
-							final IProject project = currentProject();
-							final Optional<CompilationUnit> existing = project.maybeGetCompilationUnit( resource );
-							existing.ifPresent( unit -> 
-							{
-								if ( editorFrame.closeEditor( unit, true ) ) 
-								{
-									existing.ifPresent( project::removeCompilationUnit );
-								} 
-							});
-						}
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
+                    try 
+                    {
+                        for ( File f : files ) 
+                        {
+                            final Resource resource = Resource.file( f );
+                            final IProject project = currentProject();
+                            final Optional<CompilationUnit> existing = project.maybeGetCompilationUnit( resource );
+                            existing.ifPresent( unit -> 
+                            {
+                                if ( editorFrame.closeEditor( unit, true ) ) 
+                                {
+                                    existing.ifPresent( project::removeCompilationUnit );
+                                } 
+                            });
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                     navigator.fileRemoved( toDelete );
                 });
                 addMenuItem(menu,"Open" , () -> 
@@ -297,10 +296,10 @@ public class TopLevelWindow implements IWindow
                 });
                 addMenuItem(menu,"New source file" , () -> 
                 {
-                    
+
                     final DirNode parentNode = dirNode.file.isDirectory() ? dirNode :dirNode.parent;
                     final File parent = parentNode.file;
-                    
+
                     int index = 0;
                     File newFile = new File( parent , "new_file.asm" );
                     while ( newFile.exists() ) 
@@ -332,10 +331,10 @@ public class TopLevelWindow implements IWindow
                 openFile( file );
             }
         });
-        
+
         addWindow( pane,navigator );
     }    
-    
+
     private void addWindow(JDesktopPane pane, JInternalFrame frame) 
     {
         frame.setResizable(true);
@@ -344,14 +343,14 @@ public class TopLevelWindow implements IWindow
         frame.setVisible( true );
         pane.add( frame );
     }
-    
+
     private void editProjectConfiguration() 
     {
         final JDialog dialog = new JDialog( (Frame) null, "Edit project configuration", true );
         dialog.getContentPane().add( new ProjectConfigWindow( currentProject().getConfiguration() ) 
         {
             private final IProject project = currentProject();
-            
+
             @Override
             protected void onSave(ProjectConfiguration config) 
             {
@@ -359,7 +358,7 @@ public class TopLevelWindow implements IWindow
                 LOG.info("editProjectConfiguration(): Saving configuration to "+configFile.getAbsolutePath());
                 try ( FileOutputStream out = new FileOutputStream( configFile ) ) 
                 {
-                	project.setConfiguration( config );
+                    project.setConfiguration( config );
                     config.save( out );
                 } catch(Exception e) {
                     IDEMain.fail(e);
@@ -385,28 +384,34 @@ public class TopLevelWindow implements IWindow
         final JMenu menu = new JMenu("File");
         result.add( menu );
 
-        addItem( menu , "Open project" , () -> doWithFile( "Open project" , true , lastOpenedProject, file -> 
+        addItem( menu , "Open project" , () -> 
         {
-            final File realFile;
-            if ( file.isDirectory() ) 
+            final ThrowingConsumer<File> handler = file ->
             {
-                realFile = new File( file , IProject.PROJECT_FILE );
-            } else {
-                IDEMain.fail("You need to select a project directory");
-                return;
-            }
-            try ( FileInputStream in = new FileInputStream( file ) )
-            {
-                LOG.info("Opening project configuration "+file.getAbsolutePath());
-                final ProjectConfiguration config = ProjectConfiguration.load( file.getParentFile() , in );
-                lastOpenedProject = file;
-                projectProvider.setProject( new Project( new CompilationUnit( new StringResource("unnamed", "" ) ) , config ) );
-            } 
-            catch(Exception e) 
-            {
-                IDEMain.fail("Failed ro read project configuration from "+realFile.getAbsolutePath(),e);
-            }
-        }));
+                final File realFile;
+                if ( file.isDirectory() ) 
+                {
+                    realFile = new File( file , IProject.PROJECT_FILE );
+                } else {
+                    IDEMain.fail("You need to select a project directory");
+                    return;
+                }
+                try ( FileInputStream in = new FileInputStream( realFile ) )
+                {
+                    LOG.info("Opening project configuration "+realFile.getAbsolutePath());
+                    final ProjectConfiguration config = ProjectConfiguration.load( realFile.getParentFile() , in );
+                    final CompilationUnit unit = new CompilationUnit( config.getCompilationRootResource() );
+                    projectProvider.setProject( new Project( unit , config ) );
+                } 
+                catch(Exception e) 
+                {
+                    IDEMain.fail("Failed ro read project configuration from "+realFile.getAbsolutePath(),e);
+                }
+            };
+            
+            final File selectedFile = projectProvider.getWorkspaceDir();
+            doWithFile( "Open project" , true , selectedFile , handler);
+        });
 
         addItem( menu , "Edit project configuration" , () -> editProjectConfiguration() );        
 
@@ -450,7 +455,7 @@ public class TopLevelWindow implements IWindow
         settings.printAddresses = true;
         settings.resolveRelativeAddresses = true;
         settings.printCompoundRegistersAsLower=false;
-        
+
         final IProject project = currentProject();
         String disassembly = project.getArchitecture().disassemble( data , data.length , settings );
         disassembly = "; disassembled "+data.length+" bytes from "+file.getAbsolutePath()+"\n"+disassembly;
@@ -459,11 +464,10 @@ public class TopLevelWindow implements IWindow
         final CompilationUnit unit = new CompilationUnit(res);
         editorFrame.setProject( project , unit );        
     }
-    
+
     public static void doWithFile(String title,boolean openDialog,File file , ThrowingConsumer<File> handler) throws Exception  
     {   
         doWithFile(title,openDialog,file,new ThrowingFunction<File,Void>() {
-
             @Override
             public Void apply(File obj) throws Exception {
                 handler.apply( obj );
@@ -474,9 +478,14 @@ public class TopLevelWindow implements IWindow
 
     public static <T> T doWithFile(String title,boolean openDialog,File file , ThrowingFunction<File,T> handler) throws Exception 
     {
-        final JFileChooser chooser = new JFileChooser();
+        final JFileChooser chooser;
+        if ( file.isDirectory() ) {
+            chooser = new JFileChooser( file );
+        } else {
+            chooser = new JFileChooser();
+        }
         chooser.setDialogTitle( title );
-        if ( file != null ) {
+        if ( file != null && ! file.isDirectory() ) {
             chooser.setSelectedFile( file );
         }
         chooser.setFileSelectionMode( JFileChooser.FILES_AND_DIRECTORIES );

@@ -604,7 +604,18 @@ public abstract class AbstractAchitecture implements IArchitecture
         final String mnemonic = insn.instruction.getMnemonic();
 
         final EncodingEntry variants;
-        if (  mnemonic.equalsIgnoreCase("lsl" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for LSL ... 
+        
+        if (  mnemonic.equalsIgnoreCase("clr" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for LSL ... 
+        {
+            variants = lookupInstruction( "eor" );
+            // turn "CLR rX" into "EOR rX,rX"
+            insn = (InstructionNode) insn.createCopy( true );
+            if ( insn.childCount() == 1 ) 
+            {
+                insn.addChild( insn.child(0).createCopy( true ) );
+            }
+        } 
+        else if (  mnemonic.equalsIgnoreCase("lsl" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for LSL ... 
         {
             variants = lookupInstruction( "add" );
             // turn "LSL rX" into "ADD rX,rX"
@@ -613,7 +624,8 @@ public abstract class AbstractAchitecture implements IArchitecture
             {
                 insn.addChild( insn.child(0).createCopy( true ) );
             }
-        } else if (  mnemonic.equalsIgnoreCase("tst" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for TST ... 
+        } 
+        else if (  mnemonic.equalsIgnoreCase("tst" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for TST ... 
         {
             variants = lookupInstruction( "and" );
             // turn "TST rX" into "AND rX,rX"

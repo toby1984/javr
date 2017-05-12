@@ -403,7 +403,10 @@ public class Project implements IProject
 	@Override
 	public void addProjectChangeListener(IProjectChangeListener listener) {
 		Validate.notNull(listener, "listener must not be NULL");
-		projectListeners.add(listener);
+		if ( ! projectListeners.contains( listener ) ) 
+		{
+		    projectListeners.add(listener);
+		}
 	}
 
     private void invokeProjectListeners(Consumer<IProjectChangeListener> callback) 

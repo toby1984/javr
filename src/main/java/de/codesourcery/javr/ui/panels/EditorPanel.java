@@ -146,7 +146,7 @@ import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour;
 import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour.DefaultAutoCompleteCallback;
 import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour.InitialUserInput;
 
-public class EditorPanel extends JPanel
+public abstract class EditorPanel extends JPanel
 {
 	private static final Logger LOG = Logger.getLogger(EditorFrame.class);
 
@@ -1001,7 +1001,10 @@ public class EditorPanel extends JPanel
 		    @Override
 		    public void keyPressed(KeyEvent e) 
 		    {
-		        if ( e.getKeyCode() == KeyEvent.VK_CONTROL ) {
+		        if ( isCtrlDown( e ) && e.getKeyCode() == KeyEvent.VK_W ) {
+		            EditorPanel.this.close( true );
+		        } 
+		        else if ( e.getKeyCode() == KeyEvent.VK_CONTROL ) {
 		            controlKeyPressed = true;
 		        }
 		    }
@@ -1485,9 +1488,10 @@ public class EditorPanel extends JPanel
 
 		final Resource resource = currentUnit.getResource();
 		LOG.info("saveSource(): Saving source to "+currentUnit.getResource());
-		try ( OutputStream out = resource.createOutputStream() ) 
+		try ( OutputStream out = currentUnit.getResource().createOutputStream() ) 
 		{
-			out.write( text.getBytes( resource.getEncoding() ) );
+			final byte[] bytes = text.getBytes( resource.getEncoding() );
+            out.write( bytes );
 		}
 	}
 
@@ -2059,8 +2063,14 @@ public class EditorPanel extends JPanel
 		final Container parent = getParent();
 		parent.remove( this );
 		parent.revalidate();
-		return true;
+		try {
+		    return true;
+		} finally {
+		    afterRemove();
+		}
 	}
+	
+	protected abstract void afterRemove();
 	
 	public IProject getProject() {
         return project;

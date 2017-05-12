@@ -64,7 +64,7 @@ public class StringResource implements Resource {
 
     @Override
     public String toString() {
-        return res.toString();
+        return res.toString()+" (String)";
     }
     
     @Override

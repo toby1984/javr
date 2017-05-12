@@ -219,7 +219,7 @@ public class Parser
                 final StatementNode stmt = parseStatement();
                 if ( stmt == null ) 
                 {
-                    throw new ParseException("Not a valid statement",lexer.peek());
+                    throw new ParseException("Not a valid statement (if this is an instruction, make sure the target architecture supports it)",lexer.peek());
                 }
                 if ( stmt.hasChildren() ) {
                     ast.addChild( stmt );

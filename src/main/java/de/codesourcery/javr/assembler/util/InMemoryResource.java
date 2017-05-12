@@ -170,7 +170,7 @@ public class InMemoryResource implements Resource
     
     @Override
     public String toString() {
-        return name;
+        return name+" (in-memory)";
     }
     
     @Override

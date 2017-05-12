@@ -48,7 +48,10 @@ import javax.swing.tree.TreePath;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
-public class FileSystemBrowser extends JPanel 
+import de.codesourcery.javr.ui.IProject;
+import de.codesourcery.javr.ui.IProjectProvider.IProjectListener;
+
+public class FileSystemBrowser extends JPanel
 {
 	private static final Logger LOG = Logger.getLogger(FileSystemBrowser.class);
 
@@ -148,12 +151,22 @@ public class FileSystemBrowser extends JPanel
 
 		private final List<TreeModelListener> listeners = new ArrayList<>();
 
-		private final DirNode root;
+		private DirNode root;
 
-		public MyTreeModel(DirNode root) {
-			Validate.notNull(root, "root must not be NULL");
-
-			this.root = root;
+		public MyTreeModel(File root) {
+			setRoot( root );
+		}
+		
+		public void setRoot(File file) {
+		    Validate.notNull(file, "root must not be NULL");
+            setRoot( new DirNode( file , null ) );
+		}
+		
+		private void setRoot(DirNode root) {
+		    this.root = root;
+		    final TreeModelEvent event = new TreeModelEvent(this,new Object[]{ root } );
+            notifyListeners( l -> l.treeStructureChanged( event ) );
+            reload();
 		}
 		
 		public void subtreeChanged(DirNode node) 
@@ -196,7 +209,11 @@ public class FileSystemBrowser extends JPanel
             return new ArrayList<>();
 		}
 		
-		public void fetchChildren(DirNode node) 
+		public void reload() {
+		    fetchChildren( getRoot() );
+		}
+		
+		private void fetchChildren(DirNode node) 
 		{
 			if (node.dataFetched ) {
 				return;
@@ -392,9 +409,7 @@ public class FileSystemBrowser extends JPanel
 
 		Validate.notNull(directory, "directory must not be NULL");
 		this.root = directory;
-		final DirNode root = new DirNode( directory , null );
-		this.treeModel = new MyTreeModel( root );
-		treeModel.fetchChildren( root );
+		this.treeModel = new MyTreeModel( directory );
 		this.tree.setModel( treeModel );
 	}
 	

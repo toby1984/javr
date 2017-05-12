@@ -116,7 +116,13 @@ public class EditorFrame extends JInternalFrame implements IWindow
  	
 	private EditorPanel createEditor(IProject project,CompilationUnit compUnit) throws IOException
 	{
-	    return new EditorPanel(project, this , compUnit,appConfigProvider,messageFrame,caretTracker);
+	    return new EditorPanel(project, this , compUnit,appConfigProvider,messageFrame,caretTracker) {
+	        @Override
+	        protected void afterRemove() 
+	        {
+	            editors.remove( this );
+	        }
+	    };
 	}
 	
 	private EditorPanel currentEditor() 

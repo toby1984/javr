@@ -15,15 +15,18 @@
  */
 package de.codesourcery.javr.ui;
 
+import java.io.File;
+
 public interface IProjectProvider
 {
     public interface IProjectListener 
     {
-        
         public void projectOpened(IProject project);
         
         public void projectClosed(IProject project);
     }
+    
+    public File getWorkspaceDir();
     
     public void setProject(IProject project);
     
