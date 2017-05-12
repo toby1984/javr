@@ -154,7 +154,7 @@ public final class CompilationContext implements ICompilationContext
     }        
     
     @Override
-    public ICompilationSettings getCompilationSettings() {
+    public ICompilerSettings getCompilationSettings() {
         return compilerSettings;
     }
 

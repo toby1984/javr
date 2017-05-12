@@ -102,37 +102,6 @@ public class ATMega88 extends AbstractAchitecture
         insn("cpi",    "0011 KKKK dddd KKKK" , ArgumentType.R16_TO_R31 , ArgumentType.EIGHT_BIT_CONSTANT);
         insn("cpse",   "0001 00rd dddd rrrr" , ArgumentType.SINGLE_REGISTER , ArgumentType.SINGLE_REGISTER);
         insn("dec",    "1001 010d dddd 1010" , ArgumentType.SINGLE_REGISTER);
-        insn("des",    "1001 0100 KKKK 1011" , ArgumentType.FOUR_BIT_CONSTANT);
-        insn("eicall", "1001 0101 0001 1001" );
-        insn("eijmp",  "1001 0100 0001 1001" );
-        
-        // ELPM
-        final InstructionEncoding elpmNoArgs = new InstructionEncoding( "elpm" , new InstructionEncoder( "1001 0101 1101 1000" ) , ArgumentType.NONE, ArgumentType.NONE);
-        final InstructionEncoding elpmOnlyZ = new InstructionEncoding( "elpm" , new InstructionEncoder(  "1001 000d dddd 0110" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER).disasmImplicitSource("Z");
-        final InstructionEncoding elpmZWithPostIncrement = new InstructionEncoding( "elpm" , new InstructionEncoder( "1001 000d dddd 0111" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.Z_REGISTER).disasmImplicitSource("Z+");
-        
-        final InstructionSelector elpmSelector = new InstructionSelector() {
-
-            @Override
-            public InstructionEncoding pick(InstructionNode node, List<InstructionEncoding> candidates) 
-            {
-                if ( node.hasNoChildren() ) {
-                    return elpmNoArgs;
-                }
-                final RegisterNode reg = (RegisterNode) node.child(1);
-                if ( reg.register.isPreDecrement() ) {
-                    throw new RuntimeException("Pre-decrement is not supported by ELPM");
-                }
-                return reg.register.isPostIncrement() ? elpmZWithPostIncrement : elpmOnlyZ;
-            }
-
-            @Override
-            public int getMaxInstructionLengthInBytes(InstructionNode node,List<InstructionEncoding> candidates, boolean estimate) 
-            {
-                return pick( node ,candidates ).getInstructionLengthInBytes();
-            }
-        };
-        add( new EncodingEntry( elpmSelector , elpmNoArgs , elpmZWithPostIncrement , elpmOnlyZ ) );
         
         final InstructionEncoding eor = insn("eor",    "0010 01rd dddd rrrr" , ArgumentType.SINGLE_REGISTER, ArgumentType.SINGLE_REGISTER);
         
@@ -148,9 +117,6 @@ public class ATMega88 extends AbstractAchitecture
         insn("in",     "1011 0ssd dddd ssss" , ArgumentType.SINGLE_REGISTER, ArgumentType.SIX_BIT_IO_REGISTER_CONSTANT ).mayNeedRelocation();
         insn("inc",    "1001 010d dddd 0011" , ArgumentType.SINGLE_REGISTER );
         insn("jmp",    "1001 010k kkkk 110k kkkk kkkk kkkk kkkk" , ArgumentType.TWENTYTWO_BIT_FLASH_MEM_ADDRESS ).mayNeedRelocation();
-        insn("lac",    "1001 001r rrrr 0110" , ArgumentType.Z_REGISTER , ArgumentType.SINGLE_REGISTER  ).disasmImplicitDestination("Z");
-        insn("las",    "1001 001r rrrr 0101" , ArgumentType.Z_REGISTER , ArgumentType.SINGLE_REGISTER  ).disasmImplicitDestination("Z");
-        insn("lat",    "1001 001r rrrr 0111" , ArgumentType.Z_REGISTER , ArgumentType.SINGLE_REGISTER  ).disasmImplicitDestination("Z");
         
         // LD Rd,-(X|Y|Z)+
         final InstructionEncoding ldOnlyX = new InstructionEncoding( "ld" , new InstructionEncoder( "1001 000d dddd 1100" ) , ArgumentType.SINGLE_REGISTER, ArgumentType.X_REGISTER ).disasmImplicitSource("X");
@@ -393,7 +359,7 @@ public class ATMega88 extends AbstractAchitecture
                         if ( reg.register.isPreDecrement() ) {
                             return stXWithPreDecrement;
                         }
-                        return reg.register.isPostIncrement() ? stXWithPostIncrement : stOnlyX;                        
+                        return reg.register.isPostIncrement() ? stXWithPostIncrement : stOnlyX;
                     case Register.REG_Y:
                         if ( reg.hasChildren() ) {
                             return stYWithDisplacement;
@@ -439,7 +405,6 @@ public class ATMega88 extends AbstractAchitecture
         and.disassemblySelector( tstOrAnd );
         
         insn("wdr",  "1001 0101 1010 1000");
-        insn("xch",  "1001 001r rrrr 0100" , ArgumentType.Z_REGISTER , ArgumentType.SINGLE_REGISTER ).disasmImplicitDestination("Z");
     }
  
     public Architecture getType() {

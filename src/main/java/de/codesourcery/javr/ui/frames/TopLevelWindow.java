@@ -54,6 +54,8 @@ import de.codesourcery.javr.ui.IDEMain.ThrowingConsumer;
 import de.codesourcery.javr.ui.IDEMain.ThrowingFunction;
 import de.codesourcery.javr.ui.IDEMain.ThrowingRunnable;
 import de.codesourcery.javr.ui.IProject;
+import de.codesourcery.javr.ui.IProjectProvider;
+import de.codesourcery.javr.ui.IProjectProvider.IProjectListener;
 import de.codesourcery.javr.ui.Project;
 import de.codesourcery.javr.ui.ProjectConfigWindow;
 import de.codesourcery.javr.ui.config.IApplicationConfig;
@@ -67,7 +69,7 @@ public class TopLevelWindow implements IWindow
     private static final Logger LOG = Logger.getLogger(TopLevelWindow.class);
     
     private IApplicationConfigProvider applicationConfigProvider;
-    private IProject project;
+    private IProjectProvider projectProvider;
     
     private NavigatorFrame navigator;
     private EditorFrame editorFrame;
@@ -83,11 +85,31 @@ public class TopLevelWindow implements IWindow
     
     private final CaretPositionTracker caretTracker = new CaretPositionTracker();
     
-    public TopLevelWindow(IProject project,IApplicationConfigProvider applicationConfigProvider) throws IOException 
+    private IProjectListener listener = new IProjectListener()
+    {
+        
+        @Override
+        public void projectOpened(IProject project)
+        {
+            project.addProjectChangeListener( outlineFrame );    
+            outlineFrame.setCompilationUnit( project.getCompileRoot() );            
+        }
+        
+        @Override
+        public void projectClosed(IProject project)
+        {
+            project.removeProjectChangeListener( outlineFrame );
+        }
+    };
+    
+    public TopLevelWindow(IProjectProvider provider,IApplicationConfigProvider applicationConfigProvider) throws IOException 
     {
         Validate.notNull(applicationConfigProvider, "applicationConfigProvider must not be NULL");
+        Validate.notNull(provider, "provider must not be NULL");
+        
+        provider.addProjectListener( listener );
         this.applicationConfigProvider = applicationConfigProvider;
-        this.project = project;
+        this.projectProvider = provider;
         
         addWindows( desktopPane );
         
@@ -95,7 +117,7 @@ public class TopLevelWindow implements IWindow
         {
         	try 
         	{
-				final EditorPanel editor = editorFrame.openEditor( project , symbol.getCompilationUnit() );
+				final EditorPanel editor = editorFrame.openEditor( projectProvider.getProject() , symbol.getCompilationUnit() );
 				editor.setSelection( symbol.getTextRegion() );
 			} catch (IOException e1) {
 				LOG.error("Failed to open compilation unit for symbol "+symbol,e1);
@@ -127,9 +149,6 @@ public class TopLevelWindow implements IWindow
         applicationConfigProvider.getApplicationConfig().apply( messageFrame );
         applicationConfigProvider.getApplicationConfig().apply( navigator );           
         applicationConfigProvider.getApplicationConfig().apply( outlineFrame );        
-        
-        project.addProjectChangeListener( outlineFrame );
-        outlineFrame.setCompilationUnit( project.getCompileRoot() );
     }
     
     public void quit() 
@@ -160,10 +179,16 @@ public class TopLevelWindow implements IWindow
         menu.add( item1 );
     }
     
+    private IProject currentProject() 
+    {
+        return projectProvider.getProject();
+    }
+    
     public void openFile(File file)
     {
         try 
         {
+            final IProject project = currentProject();
             final CompilationUnit unit = project.getCompilationUnit( new FileResource( file , Resource.ENCODING_UTF ) );
             editorFrame.openEditor( project , unit );
         } 
@@ -190,11 +215,12 @@ public class TopLevelWindow implements IWindow
 
     private void addWindows(JDesktopPane pane) throws IOException 
     {
-        editorFrame = new EditorFrame( project , project.getCompileRoot() , applicationConfigProvider, messageFrame , caretTracker );
+        final IProject currentProject = currentProject();
+        editorFrame = new EditorFrame( currentProject , currentProject.getCompileRoot() , applicationConfigProvider, messageFrame , caretTracker );
         addWindow(pane,messageFrame);
         addWindow(pane,editorFrame);
         addWindow(pane,outlineFrame);
-        navigator = new NavigatorFrame( project.getConfiguration().getBaseDir() );
+        navigator = new NavigatorFrame( currentProject.getConfiguration().getBaseDir() );
         
         navigator.setMenuSupplier( dirNode -> 
         {
@@ -247,6 +273,7 @@ public class TopLevelWindow implements IWindow
 						for ( File f : files ) 
 						{
 							final Resource resource = Resource.file( f );
+							final IProject project = currentProject();
 							final Optional<CompilationUnit> existing = project.maybeGetCompilationUnit( resource );
 							existing.ifPresent( unit -> 
 							{
@@ -321,8 +348,10 @@ public class TopLevelWindow implements IWindow
     private void editProjectConfiguration() 
     {
         final JDialog dialog = new JDialog( (Frame) null, "Edit project configuration", true );
-        dialog.getContentPane().add( new ProjectConfigWindow( project.getConfiguration() ) 
+        dialog.getContentPane().add( new ProjectConfigWindow( currentProject().getConfiguration() ) 
         {
+            private final IProject project = currentProject();
+            
             @Override
             protected void onSave(ProjectConfiguration config) 
             {
@@ -371,7 +400,7 @@ public class TopLevelWindow implements IWindow
                 LOG.info("Opening project configuration "+file.getAbsolutePath());
                 final ProjectConfiguration config = ProjectConfiguration.load( file.getParentFile() , in );
                 lastOpenedProject = file;
-                this.project = new Project( new CompilationUnit( new StringResource("unnamed", "" ) ) , config );
+                projectProvider.setProject( new Project( new CompilationUnit( new StringResource("unnamed", "" ) ) , config ) );
             } 
             catch(Exception e) 
             {
@@ -389,7 +418,7 @@ public class TopLevelWindow implements IWindow
 
         final ThrowingRunnable eventHandler = () -> 
         {
-            final File srcFolder = new File( project.getConfiguration().getSourceFolder() ); 
+            final File srcFolder = new File( currentProject().getConfiguration().getSourceFolder() ); 
             if ( ! srcFolder.exists() ) 
             {
                 srcFolder.mkdirs();
@@ -403,6 +432,7 @@ public class TopLevelWindow implements IWindow
         addItem( menu , "Save source" , eventHandler);  
         addItem( menu , "Load source" , () -> doWithFile( "Load source" , true , lastSourceFile, file -> 
         {
+            final IProject project = currentProject();
             final CompilationUnit unit = project.getCompilationUnit( new FileResource(file , Resource.ENCODING_UTF ) );
             editorFrame.setProject( project , unit );
             lastSourceFile = file;
@@ -420,6 +450,8 @@ public class TopLevelWindow implements IWindow
         settings.printAddresses = true;
         settings.resolveRelativeAddresses = true;
         settings.printCompoundRegistersAsLower=false;
+        
+        final IProject project = currentProject();
         String disassembly = project.getArchitecture().disassemble( data , data.length , settings );
         disassembly = "; disassembled "+data.length+" bytes from "+file.getAbsolutePath()+"\n"+disassembly;
 

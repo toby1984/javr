@@ -106,7 +106,8 @@ public class Disassembler {
                         }
                         else if ( out == System.out ) 
                         {
-                            if ( ! file.exists() && ! file.getParentFile().exists() ) 
+                            final File parentFile = file.getParentFile();
+                            if ( parentFile != null && ! parentFile.exists() ) 
                             {
                                 throw new RuntimeException("ERROR: Parent directory does not exist: "+file.getParentFile());
                             }
@@ -170,6 +171,7 @@ public class Disassembler {
         settings.printAddresses = true;
         settings.resolveRelativeAddresses = false;
         settings.printCompoundRegistersAsLower=true;
+        settings.byteOpcode = ".byte";
         return settings;
     }    
 

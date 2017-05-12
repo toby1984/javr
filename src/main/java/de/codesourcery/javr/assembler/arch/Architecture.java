@@ -17,6 +17,7 @@ package de.codesourcery.javr.assembler.arch;
 
 import de.codesourcery.javr.assembler.arch.impl.ATMega328p;
 import de.codesourcery.javr.assembler.arch.impl.ATMega88;
+import de.codesourcery.javr.assembler.arch.impl.ATXmega;
 
 /**
  * Enumeration of all supported architectures.
@@ -36,6 +37,12 @@ public enum Architecture
         @Override
         public IArchitecture createImplementation() {
             return new ATMega328p();
+        }
+    },
+    XMEGA("xmega") {
+        @Override
+        public IArchitecture createImplementation() {
+            return new ATXmega();
         }
     };
     

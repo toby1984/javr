@@ -42,12 +42,14 @@ import de.codesourcery.javr.assembler.parser.Lexer;
 import de.codesourcery.javr.assembler.parser.LexerImpl;
 import de.codesourcery.javr.assembler.parser.Parser;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
+import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.util.FileResource;
 import de.codesourcery.javr.assembler.util.FileResourceFactory;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.ui.Project;
 import de.codesourcery.javr.ui.config.IConfig;
+import de.codesourcery.javr.ui.config.ProjectConfiguration;
 import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputFormat;
 import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputSpec;
 
@@ -55,9 +57,12 @@ public class CmdLine
 {
     private static final Logger LOG = Logger.getLogger(CmdLine.class);
     
+    private boolean verbose = false;
+    private boolean hideWarnings = false;
+    
     public static void main(String[] args) 
     {
-        System.exit( run(args) );
+        System.exit( new CmdLine().run(args) );
     }
     
     private static int printHelp() 
@@ -65,14 +70,16 @@ public class CmdLine
         System.out.println();
         System.out.println("Usage:\n [-v] [-h] <source file>\n\n");
         System.out.println("Assembles the source file for an ATMega88.\n");
-        System.out.println("-h/--help          => show help");
-        System.out.println("-v                 => verbose output");
-        System.out.println("--max-errors <num> => sets the maximum number of errors that is permitted before compilation is aborted");
-        System.out.println("-f <intel|raw>     => output format (intel hex or raw binary)");
+        System.out.println("-h/--help             => show help");
+        System.out.println("-v                    => verbose output");
+        System.out.println("--ignore-segment-size => compile even if output size exceeds the architecture limits");
+        System.out.println("--max-errors <num>    => sets the maximum number of errors that is permitted before compilation is aborted");
+        System.out.println("-f <intel|raw>        => output format (intel hex or raw binary)");
+        System.out.println("--hide-warnings       => do not print warning messages");
         return 1;
     }
 
-    private static void setupConsoleAppender() 
+    private void setupConsoleAppender() 
     {
         final ConsoleAppender console = new ConsoleAppender(); 
         
@@ -84,7 +91,7 @@ public class CmdLine
         Logger.getRootLogger().addAppender(console);
     }
     
-    public static int run(String[] arguments) 
+    public int run(String[] arguments) 
     {
         setupConsoleAppender();
         
@@ -100,17 +107,38 @@ public class CmdLine
             return printHelp();
         }
         
-        final boolean verbose = args.stream().anyMatch( a -> "-v".equals( a ) );
+        verbose = args.stream().anyMatch( a -> "-v".equals( a ) );
         
         final Set<String> argsSeen = new HashSet<>();
         OutputFormat outputFormat = null;
+        
+        final CompilerSettings compilerSettings = new CompilerSettings();
         for ( int i = 0 ; i < args.size() ; i++ ) 
         {
             final String arg = args.get(i);
             final String nextArg = (i+1) < args.size() ? args.get(i+1) : null;
             final boolean hasMoreArgs = StringUtils.isNotBlank( nextArg );
             int argsToRemove = 0;
-            if ( "-f".equals( arg ) ) 
+            if ( "--ignore-segment-size".equals( arg ) ) {
+                if ( argsSeen.contains( arg ) ) 
+                {
+                    return error("Duplicate command-line argument '"+arg+"'");
+                }
+                argsSeen.add( arg );
+                compilerSettings.setFailOnAddressOutOfRange( false );
+                argsToRemove = 1;
+            } 
+            else if ( "--hide-warnings".equals( arg ) ) 
+            {
+                if ( argsSeen.contains( arg ) ) 
+                {
+                    return error("Duplicate command-line argument '"+arg+"'");
+                }
+                argsSeen.add( arg );
+                hideWarnings = true;
+                argsToRemove = 1;
+            }             
+            else if ( "-f".equals( arg ) ) 
             {
                 if ( ! hasMoreArgs ) {
                     return error("-f option needs an argument");
@@ -138,7 +166,7 @@ public class CmdLine
                 }
                 argsSeen.add( arg );
                 try {
-                    asm.getCompilerSettings().setMaxErrors( Integer.parseInt( nextArg.trim() ) );
+                    compilerSettings.setMaxErrors( Integer.parseInt( nextArg.trim() ) );
                 } catch(NumberFormatException e) {
                     return error("Invalid command-line, expected a number but got '"+nextArg.trim()+"'");
                 }
@@ -208,10 +236,13 @@ public class CmdLine
             }
         };
 
-        final Project project = new Project( unit );
-        
         try 
         {
+            final Project project = new Project( unit );
+            final ProjectConfiguration projectConfiguration = project.getConfiguration();
+            projectConfiguration.setCompilerSettings( compilerSettings );
+            project.setConfiguration( projectConfiguration );
+            project.setCompileRoot( unit );
             asm.compile( project , writer , rf , ()-> config );
             printMessages(unit);
         } 
@@ -223,7 +254,7 @@ public class CmdLine
         return 0;
     }
     
-    private static void printMessages(CompilationUnit unit) 
+    private void printMessages(CompilationUnit unit) 
     {
         final List<CompilationMessage> messages = unit.getMessages( true );
         messages.sort(  CompilationMessage.compareSeverityDescending() );
@@ -241,6 +272,10 @@ public class CmdLine
             }
             final String position = msg.region != null ? "offset "+msg.region.start() : "<unknown location>"; 
             final String text = prefix+" - "+position+" - "+msg.message;
+            
+            if ( msg.severity == Severity.WARNING && hideWarnings ) {
+                continue;
+            }
             if ( severe ) {
                 System.err.println( text );
             } else {

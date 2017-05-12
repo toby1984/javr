@@ -44,6 +44,7 @@ public interface IArchitecture
          * into the disassembly output. 
          */
         public boolean printAddresses;
+        
         /**
          * The start address that should be assumed.
          */
@@ -60,6 +61,13 @@ public interface IArchitecture
          * be printed using only the lower register number.
          */
         public boolean printCompoundRegistersAsLower;
+        
+        /**
+         * Opcode used to output raw byte values 
+         * when encountering bytes that cannot be disassembled
+         * into valid instructions.
+         */
+        public String byteOpcode = ".db";
         
         /**
          * Whether relative branch/jump offsets should

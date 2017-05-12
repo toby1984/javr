@@ -15,9 +15,9 @@
  */
 package de.codesourcery.javr.assembler;
 
-import de.codesourcery.javr.assembler.ICompilationContext.ICompilationSettings;
+import de.codesourcery.javr.assembler.ICompilationContext.ICompilerSettings;
 
-public class CompilerSettings implements ICompilationSettings {
+public class CompilerSettings implements ICompilerSettings {
 
     private int maxErrors = 100;
     
@@ -27,7 +27,7 @@ public class CompilerSettings implements ICompilationSettings {
     }
     
     public CompilerSettings(CompilerSettings other) {
-        this.failOnAddressOutOfRange = other.failOnAddressOutOfRange;
+        populateFrom( other );
     }
     
     public CompilerSettings createCopy() {
@@ -44,6 +44,17 @@ public class CompilerSettings implements ICompilationSettings {
     public CompilerSettings setFailOnAddressOutOfRange(boolean failOnAddressOutOfRange) {
         this.failOnAddressOutOfRange = failOnAddressOutOfRange;
         return this;
+    }
+    
+    /**
+     * Copy the values of this instance from another.
+     * 
+     * @param other
+     */
+    public void populateFrom(ICompilerSettings other) 
+    {
+        this.failOnAddressOutOfRange = other.isFailOnAddressOutOfRange();
+        this.maxErrors = other.getMaxErrors();
     }
     
     /**

@@ -32,11 +32,26 @@ import de.codesourcery.javr.assembler.util.Resource;
  */
 public interface ICompilationContext
 {
-    public interface ICompilationSettings 
+    public interface ICompilerSettings 
     {
         public boolean isFailOnAddressOutOfRange();
         
-        public ICompilationSettings setFailOnAddressOutOfRange(boolean failOnAddressOutOfRange);
+        public ICompilerSettings setFailOnAddressOutOfRange(boolean failOnAddressOutOfRange);
+        
+        /**
+         * Returns the max. number of error messages permitted before compilation is aborted.
+         * 
+         * @return
+         */
+        public int getMaxErrors();
+        
+        /**
+         * Sets the max. number of error messages permitted before compilation is aborted.
+         *      
+         * @param maxErrors
+         * @return this instance (for chaining)     
+         */
+        public ICompilerSettings setMaxErrors(int maxErrors);        
     }
     
     public void setStartAddress(int address);
@@ -106,7 +121,7 @@ public interface ICompilationContext
     // misc
     public ResourceFactory getResourceFactory();
     
-    public ICompilationSettings getCompilationSettings();
+    public ICompilerSettings getCompilationSettings();
     
     public CompilationUnit currentCompilationUnit();
     

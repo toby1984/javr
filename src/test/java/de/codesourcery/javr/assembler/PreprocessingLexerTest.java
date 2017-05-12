@@ -101,7 +101,7 @@ public class PreprocessingLexerTest extends TestCase
         }
 
         @Override
-        public ICompilationSettings getCompilationSettings() {
+        public ICompilerSettings getCompilationSettings() {
             throw new RuntimeException("method not implemented: getCompilationSettings");
         }
 

@@ -53,6 +53,30 @@ public final class Register
         return postIncrement;
     }
     
+    private static void assertValidRegisterNo(int registerNo) {
+        if ( registerNo < 0 || registerNo > 31 ) {
+            throw new IllegalArgumentException("register number of-of-range, r"+registerNo+" does not exist");
+        } 
+    }
+    
+    public static boolean isPartOfXRegister(int registerNo) 
+    {
+        assertValidRegisterNo(registerNo);
+        return registerNo == REG_X || registerNo == REG_X+1;
+    }
+    
+    public static boolean isPartOfYRegister(int registerNo) 
+    {
+        assertValidRegisterNo(registerNo);
+        return registerNo == REG_Y || registerNo == REG_Y+1;
+    }
+    
+    public static boolean isPartOfZRegister(int registerNo) 
+    {
+        assertValidRegisterNo(registerNo);
+        return registerNo == REG_Z || registerNo == REG_Z+1;
+    }    
+    
     public boolean isPreDecrement() 
     {
         return preDecrement;

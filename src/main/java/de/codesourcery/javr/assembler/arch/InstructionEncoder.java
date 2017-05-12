@@ -351,7 +351,7 @@ public class InstructionEncoder
      * @param value
      * @return Operand values, values for missing operands are returned as <code>null</code> values.
      */
-    public List<Integer> decode(int value) 
+    public List<Integer> decode(int value) // FIXME: Performance - return a byte[] array here instead.... 
     {
         final List<Integer> result = new ArrayList<>();
         if ( dstEncoding != NOP ) {

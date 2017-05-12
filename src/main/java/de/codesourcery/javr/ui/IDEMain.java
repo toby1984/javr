@@ -36,6 +36,7 @@ import javax.swing.SwingUtilities;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.CompilationUnit;
@@ -70,8 +71,62 @@ public class IDEMain
 
     private File workspaceDir;
     private IApplicationConfigProvider applicationConfigProvider;
-    private IProject currentProject;
 
+    private final IProjectProvider projectProvider = new IProjectProvider() {
+
+        private volatile IProject currentProject;        
+        private final List<IProjectListener> listeners = new ArrayList<>();
+        
+        @Override
+        public void setProject(IProject newProject)
+        {
+            Validate.notNull(newProject, "project must not be NULL");
+            final IProject oldProject = currentProject;
+            final boolean projectChanged = oldProject != newProject;
+            if ( projectChanged ) 
+            {
+                currentProject = newProject;
+                if ( projectChanged ) 
+                {
+                    listeners.forEach( l -> 
+                    {
+                        SwingUtilities.invokeLater( () -> l.projectClosed( oldProject ) );
+                    });                        
+                }
+                listeners.forEach( l -> 
+                {
+                    SwingUtilities.invokeLater( () -> l.projectOpened( newProject ) );
+                });
+            }
+        }
+
+        @Override
+        public IProject getProject()
+        {
+            return currentProject;
+        }
+
+        @Override
+        public void addProjectListener(IProjectListener l)
+        {
+            Validate.notNull(l, "listener must not be NULL");
+            synchronized(listeners) 
+            {
+                listeners.add( l );
+            }
+        }
+
+        @Override
+        public void removeProjectCloseListener(IProjectListener l)
+        {
+            Validate.notNull(l, "listener must not be NULL");
+            synchronized(listeners) 
+            {
+                listeners.remove( l );
+            }                
+        }
+    };
+    
     public static IDEMain getInstance() {
         return INSTANCE;
     }
@@ -172,7 +227,7 @@ public class IDEMain
         return result;
     }
 
-    private File getWorkspaceDir() throws Exception 
+    private File getWorkspaceDir() throws IOException 
     {
         final File workspaceFile = getWorkspaceFile();
         File workspaceDir = null;
@@ -206,7 +261,11 @@ public class IDEMain
         {
             do 
             {
-                workspaceDir = TopLevelWindow.doWithFile( "Choose workspace directory" , true , new File( getWorkingDir() ) , file -> file );
+                try {
+                    workspaceDir = TopLevelWindow.doWithFile( "Choose workspace directory" , true , new File( getWorkingDir() ) , file -> file );
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
                 if ( workspaceDir == null ) 
                 {
                     System.err.println("Aborting, no workspace directory selected by user");
@@ -222,12 +281,14 @@ public class IDEMain
         LOG.info("run(): Workspace dir: "+workspaceDir);
         return workspaceDir;        
     }
-
+    
     private IProject createNewProject(File workspaceDir) throws FileNotFoundException, IOException 
     {
         final ProjectConfiguration config = new ProjectConfiguration();
         final File projDir = new File( workspaceDir , config.getProjectName() );
-        projDir.mkdirs();
+        if ( ! projDir.mkdirs() ) {
+            throw new IOException("Failed to create folder "+projDir.getAbsolutePath());
+        }
         config.setBaseDir( projDir );
 
         int i = 1;
@@ -272,12 +333,15 @@ public class IDEMain
 
         projects.addAll( findProjects( workspaceDir ) );
 
-        currentProject = selectProjectToOpen( workspaceDir );
+        final IProject currentProject = selectProjectToOpen( workspaceDir );
         LOG.info("run(): Opening project "+currentProject.getConfiguration().getBaseDir().getAbsolutePath());
         assertCompilationRootExists( currentProject ); // required so that editor can display something to the user
 
-        final TopLevelWindow topLevel = new TopLevelWindow( currentProject , applicationConfigProvider );
-
+        // FIXME: Setting the project here before anybody had a chance to register themselves
+        // FIXME: as a IProjectListener is obviously a problem....
+        projectProvider.setProject( currentProject );
+        
+        final TopLevelWindow topLevel = new TopLevelWindow( projectProvider , applicationConfigProvider );
         applicationConfigProvider.getApplicationConfig().apply( topLevel );
     }
 

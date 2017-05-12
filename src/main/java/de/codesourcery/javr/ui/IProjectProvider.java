@@ -13,8 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package de.codesourcery.javr.assembler.parser;
+package de.codesourcery.javr.ui;
 
-public class ASTVisitor {
-
+public interface IProjectProvider
+{
+    public interface IProjectListener 
+    {
+        
+        public void projectOpened(IProject project);
+        
+        public void projectClosed(IProject project);
+    }
+    
+    public void setProject(IProject project);
+    
+    public IProject getProject();
+    
+    public void addProjectListener(IProjectListener listener);
+    
+    public void removeProjectCloseListener(IProjectListener listener);
 }

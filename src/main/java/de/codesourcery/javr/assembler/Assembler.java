@@ -54,6 +54,7 @@ public class Assembler
         project.getGlobalSymbolTable().clear();
         unit.beforeCompilationStarts( project.getGlobalSymbolTable() );
 
+        this.compilerSettings.populateFrom( project.getConfiguration().getCompilerSettings() );
         this.compilationContext = new CompilationContext( unit , project.getGlobalSymbolTable() , codeWriter , rf , compilerSettings , config.getConfig() );
         this.compilationContext.setGenerateRelocations( project.getConfiguration().getOutputFormat().supportsRelocation());
         
