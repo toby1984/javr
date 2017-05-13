@@ -63,7 +63,7 @@ public class Relocation
     public static enum Kind 
     {
         R_AVR_NONE(0),
-        // absolute values (for example .byte directive in .data section)
+        // relocation of absolute address values (for example a ".dw" directive referencing a label)
         R_AVR_16(4),
         R_AVR_16_PM(5),      
         R_AVR_8(26),

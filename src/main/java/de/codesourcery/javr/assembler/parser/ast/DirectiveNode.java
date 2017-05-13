@@ -19,10 +19,12 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Segment;
+import de.codesourcery.javr.assembler.arch.AbstractAchitecture;
 import de.codesourcery.javr.assembler.elf.Relocation;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 
 public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
 {
@@ -220,10 +222,14 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
             for ( ASTNode child : children() ) 
             {
                 final Symbol symbol = InstructionNode.getSymbolNeedingRelocation( child , context );
-                if ( symbol != null ) 
+                if ( symbol != null && symbol.hasType( Type.ADDRESS_LABEL ) ) 
                 {
                     final Relocation reloc = new Relocation( symbol );
-                    reloc.addend = 0;
+                    final long tmp = AbstractAchitecture.toIntValue( symbol.getValue() );
+                    if ( tmp == AbstractAchitecture.VALUE_UNAVAILABLE ) {
+                        throw new RuntimeException("Internal error, failed to get value for "+symbol);
+                    }
+                    reloc.addend = (int) tmp;
                     reloc.locationOffset = offset;
                     if ( context.currentSegment() == Segment.FLASH ) {
                         reloc.kind = Relocation.Kind.R_AVR_16_PM;

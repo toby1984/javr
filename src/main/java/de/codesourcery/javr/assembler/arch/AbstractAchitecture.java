@@ -20,7 +20,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
@@ -50,7 +49,7 @@ public abstract class AbstractAchitecture implements IArchitecture
 {
     private static final Logger LOG = Logger.getLogger(AbstractAchitecture.class);
 
-    private static final long VALUE_UNAVAILABLE= 0xdeadabcdbeefdeadL;
+    public static final long VALUE_UNAVAILABLE= 0xdeadabcdbeefdeadL;
 
     public static enum ArgumentType 
     {
@@ -721,19 +720,26 @@ public abstract class AbstractAchitecture implements IArchitecture
         final Relocation result = new Relocation( symbolNeedingRelocation );
         result.locationOffset = node.getMemoryLocation().getByteAddress();
 
-        final long tmp = toIntValue( ((IValueNode) argument).getValue() );
-        if ( tmp == VALUE_UNAVAILABLE ) 
+        final int addend;
+        if ( symbolNeedingRelocation.isLocalLabel() ) 
         {
-            throw new RuntimeException("Internal error, don't know how to turn node value "+((IValueNode) argument).getValue()+" into an int ?");
+            // avr-gcc performs relocation of local symbols against the start of the current segment
+            final long localAdr = toIntValue( symbolNeedingRelocation.getValue() );
+            if ( localAdr == VALUE_UNAVAILABLE ) 
+            {
+                throw new RuntimeException("Internal error, don't know how to turn symbol value "+symbolNeedingRelocation.getValue()+" into an int ?");
+            }            
+            addend = (int) localAdr;
+        } else {
+            addend = 0;
         }
-        int addend = (int) ( symbolNeedingRelocation.isLocalLabel() ? tmp : 0 );
 
-        final int expressionTypeBitMask = classifyExpression( argument , context.currentSymbolTable() );
         final Relocation.Kind kind;
         switch( argType ) 
         {
             // // andi // cbr // cpi // ldi // sbci // ori,sbr // subi
             case EIGHT_BIT_CONSTANT:
+                final int expressionTypeBitMask = classifyExpression( argument , context.currentSymbolTable() );                
                 kind = Relocation.Kind.get8BitLDIRelocation( expressionTypeBitMask );
                 break;
                 // I/O registers: // cbi,sbi,sbic,sbis
@@ -770,7 +776,7 @@ public abstract class AbstractAchitecture implements IArchitecture
         return result;
     }
 
-    private long toIntValue(Object value) 
+    public static long toIntValue(Object value) 
     {
         int result;
         if ( value instanceof Number) {
