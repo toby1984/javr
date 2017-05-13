@@ -283,9 +283,16 @@ public class ElfFile
                          */
                         writer.writeWord( r.locationOffset , Endianess.LITTLE );
                         final int symbolTableIdx;
-                        if ( r.symbol.isLocalLabel() ) { // avr-gcc does relocations of local labels always relative to their segment 
+                        if ( r.isDataRelocation ) {
+                            // FIXME: isDataRelocation is just a dirty hack...
+                            if ( r.symbol.getSegment() != Segment.FLASH ) {
+                                throw new RuntimeException("Never tested/not implemented - data relocation of symbol "+r.symbol+" that is not in .text segment ");
+                            }
+                            symbolTableIdx = symbolTable.indexOf( symbolTable.textSectionSymbol );
+                        } 
+                        else if ( r.symbol.isLocalLabel() ) { // avr-gcc does relocations of local labels always relative to their segment 
                             if ( r.symbol.getSegment() != Segment.FLASH ) { // we currently only support local labels within the text segment
-                                throw new RuntimeException("Internal error, relocation of local symbol that is not in .text segment ");
+                                throw new RuntimeException("Internal error, relocation of symbol "+r.symbol+" that is not in .text segment ?");
                             }
                             symbolTableIdx = symbolTable.indexOf( symbolTable.textSectionSymbol );
                         } else {

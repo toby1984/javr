@@ -229,13 +229,11 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
                     if ( tmp == AbstractAchitecture.VALUE_UNAVAILABLE ) {
                         throw new RuntimeException("Internal error, failed to get value for "+symbol);
                     }
-                    reloc.addend = (int) tmp;
+                    reloc.isDataRelocation = true;
+//                    reloc.addend = 0;
+                     reloc.addend = (int) (tmp);
                     reloc.locationOffset = offset;
-                    if ( context.currentSegment() == Segment.FLASH ) {
-                        reloc.kind = Relocation.Kind.R_AVR_16_PM;
-                    } else {
-                        reloc.kind = Relocation.Kind.R_AVR_16;
-                    }
+                    reloc.kind = Relocation.Kind.R_AVR_16;
                     context.addRelocation( reloc );
                 }
                 offset += 2;

@@ -39,6 +39,14 @@ public class Relocation
      * The symbol this relocation refers to
      */
     public Symbol symbol;
+    
+    /**
+     * FIXME: This is an ugly hack , find out what's the real fix.
+     * 
+     * Relocating labels within .word directives in the .text segment for some reason uses relocation kind R_AVR_16
+     * but with an addend relative to the start of the text segment instead being 0 and relocating relative to the symbol...
+     */
+    public boolean isDataRelocation=false;
 
     /**
      * LDI relocation type (bitmask value): HIGH(x)
@@ -64,11 +72,21 @@ public class Relocation
     {
         R_AVR_NONE(0),
         // relocation of absolute address values (for example a ".dw" directive referencing a label)
-        R_AVR_16(4),
-        R_AVR_16_PM(5),      
-        R_AVR_8(26),
-        R_AVR_8_LO8(27),
-        R_AVR_8_HI8(28),
+        R_AVR_16(4) {
+            @Override public boolean isAbsolute() { return true; }
+        },
+        R_AVR_16_PM(5) {
+            @Override public boolean isAbsolute() { return true; }
+        },      
+        R_AVR_8(26) {
+            @Override public boolean isAbsolute() { return true; }
+        },
+        R_AVR_8_LO8(27) {
+            @Override public boolean isAbsolute() { return true; }
+        },
+        R_AVR_8_HI8(28) {
+            @Override public boolean isAbsolute() { return true; }
+        },
         // conditional branches
         R_AVR_7_PCREL(2),
         R_AVR_13_PCREL(3),
@@ -128,6 +146,10 @@ public class Relocation
         private Kind(int elfId) {
             this.elfId = elfId;
             this.typeFlags = 0;
+        }
+        
+        public boolean isAbsolute() {
+            return false;
         }
         
         public static Kind get8BitLDIRelocation(int expressionTypeBitMask) 
