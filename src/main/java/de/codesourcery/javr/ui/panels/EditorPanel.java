@@ -1367,6 +1367,7 @@ public abstract class EditorPanel extends JPanel
 	    {
 	        final PrettyPrinter printer = new PrettyPrinter();
 	        try {
+	            printer.setGNUSyntax( true );
 	            final String source = printer.prettyPrint( getCompilationUnit().getAST() );
 	            textArea.setText( source );
 	        } 

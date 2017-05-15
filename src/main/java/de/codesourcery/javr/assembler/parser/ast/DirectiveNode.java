@@ -230,8 +230,7 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
                         throw new RuntimeException("Internal error, failed to get value for "+symbol);
                     }
                     reloc.isDataRelocation = true;
-//                    reloc.addend = 0;
-                     reloc.addend = (int) (tmp);
+                    reloc.addend = (int) (tmp);
                     reloc.locationOffset = offset;
                     reloc.kind = Relocation.Kind.R_AVR_16;
                     context.addRelocation( reloc );

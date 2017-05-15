@@ -158,6 +158,7 @@ public class GenerateCodePhase extends AbstractPhase
 
                     for ( ASTNode child : node.children() ) 
                     {
+                        final boolean needsRelocation = ! isInResolvePhase && context.isGenerateRelocations() ? InstructionNode.getSymbolNeedingRelocation(child , context ) != null : false;
                         Object value = ((IValueNode) child).getValue();
                         final int[] data;
                         if ( isInResolvePhase ) 
@@ -167,14 +168,18 @@ public class GenerateCodePhase extends AbstractPhase
                         } 
                         else 
                         {
-                            if ( value instanceof Number) 
+                            if ( needsRelocation ) {
+                                // FIXME: Always emitting zero here will break stuff like ".dw adr + 10"
+                                data = new int[] { 0 }; // relocation will add actual address to this value later
+                            } 
+                            else  if ( value instanceof Number) 
                             {
                                 data = new int[] { ((Number) value).intValue() };
                             } 
                             else if ( value instanceof Address ) 
                             {
                                 if ( directive == Directive.INIT_BYTES ) {
-                                    context.message( CompilationMessage.error( context.currentCompilationUnit() , "Storing 16-bit address as byte value would truncate it",node ) );
+                                    context.message( CompilationMessage.error( context.currentCompilationUnit() , "Storing 16-bit address as byte value will truncate it",node ) );
                                 }
                                 data = new int[] { ((Address) value).getByteAddress() };         
                             } 

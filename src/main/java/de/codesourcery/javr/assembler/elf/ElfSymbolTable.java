@@ -53,6 +53,7 @@ public class ElfSymbolTable
     private final ElfFile file;
     
     public ElfSymbol textSectionSymbol;
+    public ElfSymbol dataSectionSymbol;
 
     protected static enum BindingType 
     {
@@ -94,13 +95,16 @@ public class ElfSymbolTable
         public BindingType bindingType;
         public int sectionHeaderIndex;
         public final Symbol symbol;
+        public Segment segment;
 
         public ElfSymbol(Symbol s) 
         {
             Validate.notNull(s, "symbol must not be NULL");
+            Validate.notNull(s.getSegment(), "symbol must have non-null segment");
             this.symbol = s;
             this.nameIdx = file.symbolNames.add( name( s ) );
             this.value = valueOf( s );
+            this.segment = s.getSegment();
             switch( s.getType() ) 
             {
                 case ADDRESS_LABEL:
@@ -227,6 +231,17 @@ public class ElfSymbolTable
         textSectionSymbol.sectionHeaderIndex = file.getTableIndex( file.textSegmentEntry );
         textSectionSymbol.symbolType = SymbolType.STT_SECTION;
         this.symbols.add( textSectionSymbol );            
+
+        // add .data entry
+        if ( file.dataSegmentEntry != null ) 
+        {
+            dataSectionSymbol= new ElfSymbol();
+            dataSectionSymbol.bindingType = BindingType.STB_LOCAL;
+            dataSectionSymbol.nameIdx = 0;
+            dataSectionSymbol.sectionHeaderIndex = file.getTableIndex( file.dataSegmentEntry );
+            dataSectionSymbol.symbolType = SymbolType.STT_SECTION;
+            this.symbols.add( dataSectionSymbol );
+        }
         
         // add global symbols
         globalSymbols.forEach( s ->
@@ -263,7 +278,7 @@ public class ElfSymbolTable
         for ( int i = 2 ; i < symbols.size() ; i++ ) {
             
             final ElfSymbol symbol = symbols.get(i);
-            final Segment segment = symbol.symbol.getSegment();
+            final Segment segment = symbol.segment;
             if ( segment != null )
             {
                 if ( segment == Segment.FLASH ) {

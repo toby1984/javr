@@ -11,4 +11,7 @@ test: test.c
 	$(CC) $(OPTS) -o test test.c linkertest.flash.o
 
 clean:
-	rm test test.o test.bin 2>/dev/null
+	rm -f test test.o test.bin 2>/dev/null
+
+upload: binary
+	/usr/bin/avrdude -F -V -c arduino -p ATMEGA328P -P /dev/ttyACM0 -b 115200 -U flash:w:test
