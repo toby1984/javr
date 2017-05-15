@@ -32,7 +32,6 @@ import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
-import de.codesourcery.javr.assembler.parser.ast.StatementNode;
 import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.symbols.Symbol.ObjectType;
 
@@ -156,8 +155,10 @@ public class GenerateCodePhase extends AbstractPhase
                         }
                     }
 
+                    final boolean checkForRelocation =  directive == Directive.INIT_WORDS && ! isInResolvePhase && context.isGenerateRelocations();
                     for ( ASTNode child : node.children() ) 
                     {
+                        final boolean relocated = checkForRelocation && InstructionNode.getSymbolNeedingRelocation( child , context ) != null;
                         Object value = ((IValueNode) child).getValue();
                         final int[] data;
                         if ( isInResolvePhase ) 
@@ -169,14 +170,14 @@ public class GenerateCodePhase extends AbstractPhase
                         {
                             if ( value instanceof Number) 
                             {
-                                data = new int[] { ((Number) value).intValue() };
+                                data = new int[] { relocated ? 0 : ((Number) value).intValue() };
                             } 
                             else if ( value instanceof Address ) 
                             {
                                 if ( directive == Directive.INIT_BYTES ) {
                                     context.message( CompilationMessage.error( context.currentCompilationUnit() , "Storing 16-bit address as byte value would truncate it",node ) );
                                 }
-                                data = new int[] { ((Address) value).getByteAddress() };         
+                                data = new int[] { relocated ? 0 : ((Address) value).getByteAddress() };         
                             } 
                             else if ( value instanceof String ) 
                             {

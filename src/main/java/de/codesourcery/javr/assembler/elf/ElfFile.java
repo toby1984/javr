@@ -283,10 +283,10 @@ public class ElfFile
                          */
                         writer.writeWord( r.locationOffset , Endianess.LITTLE );
                         final int symbolTableIdx;
-                        if ( r.isDataRelocation ) {
-                            // FIXME: isDataRelocation is just a dirty hack...
-                            if ( r.symbol.getSegment() != Segment.FLASH ) {
-                                throw new RuntimeException("Never tested/not implemented - data relocation of symbol "+r.symbol+" that is not in .text segment ");
+                        if ( r.relocateRelativeToSegment != null ) 
+                        {
+                            if ( r.relocateRelativeToSegment != Segment.FLASH ) {
+                                throw new RuntimeException("Not implemented - relocation relative to start of segment "+r.relocateRelativeToSegment);
                             }
                             symbolTableIdx = symbolTable.indexOf( symbolTable.textSectionSymbol );
                         } 
@@ -542,7 +542,7 @@ public class ElfFile
         // .text segment
         textSegmentEntry = new SectionTableEntry(this);
         textSegmentEntry.setType( SpecialSection.TEXT );
-        textSegmentEntry.sh_addralign = 2;
+        textSegmentEntry.sh_addralign = 0; // <<< power-of-two = 2^0 = 1
         textSegmentEntry.sh_name = sectionNames.add( SpecialSection.TEXT.name );
 
         sectionTableEntries.add( textSegmentEntry );
@@ -559,7 +559,7 @@ public class ElfFile
                 relocationEntries.put( s , relocationEntry );
                 
                 relocationEntry.setType( SpecialSection.RELANAME );
-                relocationEntry.sh_addralign = 4;
+                relocationEntry.sh_addralign = 2; // <<< power-of-two = 2^2 = 4
                 final String segName;
                 switch ( s ) {
                     case FLASH:

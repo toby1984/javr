@@ -677,12 +677,12 @@ public abstract class AbstractAchitecture implements IArchitecture
             if ( srcArgument != null && ( symbolNeedingRelocation = InstructionNode.getSymbolNeedingRelocation( srcArgument , context ) ) != null ) 
             {
                 dstValue = (int) getDstValue( dstArgument , encoding.dstType , context , false );                
-                srcValue = 0;
+                srcValue = 0; // output zero address as linker calculates final address by adding the relocation addent to this value
                 final Relocation reloc = getRelocation(encoding,insn,srcArgument,encoding.srcType,symbolNeedingRelocation,context);
                 context.addRelocation( reloc );
             } 
             else if (dstArgument != null && ( symbolNeedingRelocation = InstructionNode.getSymbolNeedingRelocation( dstArgument , context ) ) != null  ) {
-                dstValue = 0;
+                dstValue = 0;  // output zero address as linker calculates final address by adding the relocation addent to this value
                 srcValue = (int) getSrcValue( srcArgument , encoding.srcType , context , false );  
                 final Relocation reloc = getRelocation(encoding,insn,dstArgument,encoding.dstType,symbolNeedingRelocation,context );
                 context.addRelocation( reloc );

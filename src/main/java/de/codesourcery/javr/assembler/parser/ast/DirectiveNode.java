@@ -229,9 +229,10 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
                     if ( tmp == AbstractAchitecture.VALUE_UNAVAILABLE ) {
                         throw new RuntimeException("Internal error, failed to get value for "+symbol);
                     }
-                    reloc.isDataRelocation = true;
-//                    reloc.addend = 0;
-                     reloc.addend = (int) (tmp);
+                    // avr-as seems to always generate this relocations relative to the start of the .text segment
+                    // instead of using addent=0 and relative to the symbol itself ...
+                    reloc.relocateRelativeToSegment = Segment.FLASH;
+                    reloc.addend = (int) (tmp);
                     reloc.locationOffset = offset;
                     reloc.kind = Relocation.Kind.R_AVR_16;
                     context.addRelocation( reloc );
