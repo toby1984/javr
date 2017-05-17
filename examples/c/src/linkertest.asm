@@ -196,11 +196,14 @@ i2c_setup:
         lds r24,TWSR
         andi r24,%11111100
         sts TWSR,r24 ; prescaler bits = 00 => factor 1x
-;       ldi r24,12 ; 400 kHz
+       ldi r24,12 ; 400 kHz
 ;       ldi r24,19 ; 300 kHz
 ;       ldi r24,32 ; 200 kHz
-        ldi r24,72 ; 100 kHz
+;        ldi r24,72 ; 100 kHz
         sts TWBR,r24 ; factor
+
+        ldi r24,100
+        rcall util_msleep
         ret
 
 ; ============
@@ -229,11 +232,14 @@ framebuffer_scroll_up:
           ldi r30, LOW(framebuffer+7*8*BYTES_PER_ROW) ; Z
 	ldi r27 , HIGH(BYTES_PER_ROW*8) ; X
 	ldi r26 , LOW(BYTES_PER_ROW*8)	
-	ldi r18,0x00
+	ldi r18,0xff
 .clrloop
 	st Z+,r18
 	sbiw r27:r26,1
 	brne clrloop
+
+           ldi r18,0xff ; vertical scrolling dirties all regions of the display
+           sts dirtyregions,r18 ;
 
            pop r29
            pop r28
@@ -246,8 +252,10 @@ framebuffer_scroll_up:
 ; RESULT: r24 != 0 => no errors , r24 == 0 => tx error
 ; ===============
 framebuffer_update_display:
-	lds r20,previousdirtyregions 
 	lds r21,dirtyregions
+          tst r21
+          breq nothingtodo
+	lds r20,previousdirtyregions 
 	sts previousdirtyregions,r21 ; previousdirtyregions = dirtyregions
 	or r20,r21
 	sts dirtyregions,r20 ; transmit union of this and the previous frame
@@ -255,14 +263,18 @@ framebuffer_update_display:
 	rcall send_framebuffer
 	brcs error
 
-	lds r21,previousdirtyregions
-	rcall clear_pages
+          clr r21
+          sts dirtyregions,r21
+;	lds r21,previousdirtyregions
+;	rcall clear_pages
+
           ldi r24,1 ; success
 	rjmp return
 .error        
 	clr r24 ; error
 .return
           clr r1 ; C code needs this
+.nothingtodo
           ret
 
 ; ============================
@@ -306,7 +318,7 @@ clear_page:
 	add r30,r0
 	adc r31,r1
 	ldi r20,16 ; 16 * 8 bytes to clear = 128 bytes = 1 page
-          ldi r18,0xff
+          ldi r18,0x00
 .clr_loop  
           st Z+, r18
           st Z+, r18
@@ -439,12 +451,13 @@ send_byte_fast:
 ; INPUT: r24 - char to write
 ; INPUT: r22 - column (X)
 ; INPUT: r20 - column (Y)
-; INPUT: (old) r18 - row (Y)
-; SCRATCHED: r0,r1,r2,r3,r16,r17 r18,r29,r28,r30 ,r31
+; SCRATCHED: r0,r1,r18,r19,r24,r28,r29,r30,r31
 ; =======
 framebuffer_write_char:
 ; map ASCII code to glyph  
 ; look-up glyph index
+           push r28
+           push r29
 	ldi r31,HIGH(charset_mapping)
 	ldi r30,LOW(charset_mapping)
 	add r30,r24 ; add character
@@ -484,6 +497,8 @@ framebuffer_write_char:
 	dec r24
 	brne row_loop
           clr r1 ; C code needs this
+          pop r29
+          pop r28
 	ret
 
 ; ===========================
@@ -508,7 +523,7 @@ mark_page_dirty:
 
 ; ==================
 ; Switch LCD displays on
-; SCRATCHED: r22,r23,r24,r26,r27,r30,r31
+; SCRATCHED: r18,r22,r23,r24,r26,r27,r30,r31
 ; RESULT: r24 != 0 => no errors, r24 = 0 => tx errors
 ; ==================
 lcd_display_on:
@@ -518,7 +533,7 @@ lcd_display_on:
 
 ; ======
 ; Reset display
-; SCRATCHED: r22,r23,r24,r26,r27,r30,r31
+; SCRATCHED: r18,r22,r23,r24,r26,r27,r30,r31
 ; RESULT: r24 = 0 => TX error, r24 != 0 => no errors
 ; ======
 lcd_reset_display:
@@ -527,28 +542,27 @@ lcd_reset_display:
 ;          sbi PORTD,DISPLAY_RESET_PIN ; Enable pull-up resisstor
 ;        cbi DDRB,TRIGGER_PIN ; set to input
 	sbi DDRD,DISPLAY_RESET_PIN ; set to output
-	cbi PORTD, DISPLAY_RESET_PIN
 
-	ldi r24,200
-	rcall util_msleep
+        cbi PORTD, DISPLAY_RESET_PIN
+        ldi r24,20
+        rcall util_msleep
 
-	sbi PORTD, DISPLAY_RESET_PIN
+        sbi PORTD, DISPLAY_RESET_PIN
 
-	ldi r24,200
-	rcall util_msleep
-
-	cbi PORTD, DISPLAY_RESET_PIN
-
-	ldi r24,100
-	rcall util_msleep
+        ldi r24,200
+        rcall util_msleep
 
 ; mark all regions dirty so display RAM gets written completely
 	ldi r24,0xff
 	sts dirtyregions,r24
 
+          clr r24
+          sts previousdirtyregions,r24
+
 ; switch to page addressing mode
 	ldi r24,CMD_PAGE_ADDRESSING_MODE
 	rcall send_command
+
 	ret
 
 ; ======
@@ -621,8 +635,8 @@ send_command:
           lsl r24 ; * 4 bytes per table entry ( 16-bit address + 16 bit byte count)
           lsl r24
           add r30,r24
-	clr r2
-          adc r31,r2 ; +carry
+	clr r18
+          adc r31,r18 ; +carry
 ; Z now contains ptr to start of cmd entry in table
           lpm r22,Z+ ; cmd address low
           lpm r23,Z+ ; cmd address hi

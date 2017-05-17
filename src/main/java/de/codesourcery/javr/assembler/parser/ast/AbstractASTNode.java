@@ -25,6 +25,7 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.CompilationUnit;
+import de.codesourcery.javr.assembler.parser.OperatorType;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 
 /**
@@ -162,7 +163,7 @@ public abstract class AbstractASTNode implements ASTNode
         final IASTVisitor visitor = new IASTVisitor() 
         {
             @Override
-            public void visit(ASTNode node, IIterationContext ctx) 
+            public void visit(ASTNode node, IIterationContext<?> ctx) 
             {
                 if ( pred.test( node ) ) 
                 {
@@ -264,14 +265,23 @@ public abstract class AbstractASTNode implements ASTNode
         return children.size();
     }    
     
-    protected static class IterationContext implements IIterationContext {
+    protected static class IterationContext<T> implements IIterationContext<T> {
 
+        public T result;
         public boolean stop;
         public boolean dontGoDeeper;
+        
+        public IterationContext() {
+        }
+        
+        public IterationContext(T value) {
+            this.result = value;
+        }
         
         public void reset() {
             dontGoDeeper = false;
         }
+        
         @Override
         public void stop() {
             stop = true;
@@ -281,17 +291,28 @@ public abstract class AbstractASTNode implements ASTNode
         public void dontGoDeeper() {
             dontGoDeeper = true;
         }
+        @Override
+        public void stop(T value) {
+            this.result = value;
+            this.stop = true;
+        }
+        
+        @Override
+        public T getResult() {
+            return result;
+        }
     }
     
     @Override
-    public final void visitBreadthFirst(IASTVisitor n) 
+    public final <T> T visitBreadthFirstWithResult(T initialValue,IASTVisitor2<T> n) 
     {
-        visitBreadthFirst( n , new IterationContext() );
+        final IterationContext<T> ctx = new IterationContext<T>(initialValue);
+        visitBreadthFirstWithResult( n , ctx );
+        return ctx.getResult();
     }
     
     @SuppressWarnings("deprecation")
-    @Override
-    public final void visitBreadthFirst(IASTVisitor n,IterationContext ctx)  
+    public final <T> void visitBreadthFirstWithResult(IASTVisitor2<T> n,IterationContext<T> ctx)  
     {
         n.visit( this , ctx );
         if ( ctx.stop ) {
@@ -302,8 +323,38 @@ public abstract class AbstractASTNode implements ASTNode
             return;
         }
         
-        for ( ASTNode child : children ) 
+        for (int i = 0 , l = children.size() ; i < l ; i++) {
+            final ASTNode child = children.get(i);
+            child.visitBreadthFirstWithResult( n , ctx );
+            if ( ctx.stop ) 
+            {
+                return;
+            }
+        }
+    }     
+    
+    @Override
+    public final void visitBreadthFirst(IASTVisitor n) 
+    {
+        visitBreadthFirst( n , new IterationContext<Object>() );
+    }
+    
+    @SuppressWarnings("deprecation")
+    @Override
+    public final void visitBreadthFirst(IASTVisitor n,IterationContext<?> ctx)  
+    {
+        n.visit( this , ctx );
+        if ( ctx.stop ) {
+            return;
+        }
+        if ( ctx.dontGoDeeper ) {
+            ctx.reset();
+            return;
+        }
+        
+        for (int i = 0 , len = children.size() ; i < len ; i++) 
         {
+            final ASTNode child = children.get(i);
             child.visitBreadthFirst( n , ctx );
             if ( ctx.stop ) 
             {
@@ -313,9 +364,40 @@ public abstract class AbstractASTNode implements ASTNode
     }    
     
     @Override
+    public final <T> T visitDepthFirstWithResult(T initialValue,IASTVisitor2<T> n) 
+    {
+        final IterationContext<T> ctx = new IterationContext<T>(initialValue) 
+        {
+            public void dontGoDeeper() {
+                throw new UnsupportedOperationException("dontGoDeeper() doesn't make sense with depth-first traversal");
+            }
+        };
+        visitDepthFirstWithResult( n , ctx );
+        return ctx.getResult();
+    }
+    
+    @Override
+    public final <T> void visitDepthFirstWithResult(IASTVisitor2<T> n, IterationContext<T> ctx) 
+    {
+        for (int i = 0 , l = children.size() ; i < l ; i++) 
+        {
+            final ASTNode child = children.get(i);
+            child.visitDepthFirstWithResult( n , ctx );
+            if ( ctx.stop ) 
+            {
+                return;
+            }
+        }
+        n.visit( this , ctx );
+        if ( ctx.stop ) {
+            return;
+        }
+    }
+    
+    @Override
     public final void visitDepthFirst(IASTVisitor n) 
     {
-        visitDepthFirst( n , new IterationContext() 
+        visitDepthFirst( n , new IterationContext<Object>() 
         {
             public void dontGoDeeper() {
                 throw new UnsupportedOperationException("dontGoDeeper() doesn't make sense with depth-first traversal");
@@ -325,10 +407,10 @@ public abstract class AbstractASTNode implements ASTNode
     
     @SuppressWarnings("deprecation")
     @Override
-    public final void visitDepthFirst(IASTVisitor n,IterationContext ctx)  
+    public final void visitDepthFirst(IASTVisitor n,IterationContext<?> ctx)  
     {
-        for ( ASTNode child : children ) 
-        {
+        for (int i = 0 , l = children.size() ; i < l ; i++) {
+            final ASTNode child = children.get(i);
             child.visitDepthFirst( n , ctx );
             if ( ctx.stop ) 
             {
@@ -456,5 +538,21 @@ public abstract class AbstractASTNode implements ASTNode
     @Override
     public int getSizeInBytes() throws IllegalStateException {
         throw new IllegalStateException( getClass().getName()+" can never be be associated with a memory location");
+    }
+    
+    @Override
+    public final OperatorNode asOperator() {
+        return (OperatorNode) this;
+    }
+    
+    @Override
+    public boolean isOperatorNode() {
+        return false;
+    }
+    
+    @Override
+    public boolean isOperator(OperatorType type) 
+    {
+        return false;
     }
 }

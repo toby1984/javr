@@ -759,6 +759,7 @@ public abstract class AbstractAchitecture implements IArchitecture
                 break;
                 // call / jmp
             case TWENTYTWO_BIT_FLASH_MEM_ADDRESS:
+                // FIXME: Double-check that the locationOffset doesn't need to be adjusted like in the SIXTEEN_BIT_SRAM_MEM_ADDRESS case....
                 kind = Relocation.Kind.R_AVR_CALL;
                 break;
             default:

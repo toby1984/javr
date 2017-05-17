@@ -54,13 +54,22 @@ public class PrepareGenerateCodePhase extends GenerateCodePhase
     {
         final AST ast = context.currentCompilationUnit().getAST();
         
-        final IIterationContext fakeCtx = new IIterationContext() 
+        final IIterationContext<Object> fakeCtx = new IIterationContext<Object>() 
         {
             @Override
             public void stop() { };
             
             @Override
-            public void dontGoDeeper() {};
+            public void dontGoDeeper() {}
+
+            @Override
+            public void stop(Object value) {
+            }
+
+            @Override
+            public Object getResult() {
+                return null;
+            };
         };
         
         for ( ASTNode child : ast.children() ) 
