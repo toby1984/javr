@@ -76,4 +76,15 @@ public class OperatorNode extends AbstractASTNode implements IValueNode , Resolv
     {
         return "Operator: "+this.type.getSymbol()+"( "+children()+")";
     }
+    
+    @Override
+    public boolean isOperatorNode() {
+        return true;
+    }
+    
+    @Override
+    public boolean isOperator(OperatorType type) 
+    {
+        return type.equals( this.type );
+    }    
 }

@@ -15,6 +15,8 @@
  */
 package de.codesourcery.javr.assembler;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -44,6 +46,7 @@ import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 import de.codesourcery.javr.assembler.parser.ast.StatementNode;
 import de.codesourcery.javr.assembler.parser.ast.StringLiteral;
+import de.codesourcery.javr.assembler.symbols.Symbol;
 
 public class PrettyPrinter extends AbstractASTVisitor {
 
@@ -53,6 +56,8 @@ public class PrettyPrinter extends AbstractASTVisitor {
     private String stringDelimiter = "\"";
     private String newLineCharacter = "\n";
     private boolean printCompoundRegistersAsRange = true;
+    private boolean forceCompoundRegisterNames= false;
+    
     private String binaryPrefix = "%";
     private String hexadecimalPrefix = "0x";
     private String indentString = "    ";
@@ -62,9 +67,83 @@ public class PrettyPrinter extends AbstractASTVisitor {
 
     private String globalLabelPrefix = "";
     private String globalLabelSuffix = ":";
-
+    
+    private String initByteLiteral = ".db";
+    private String initWordLiteral = ".dw";
+    
+    private String equDelimiter = " = ";
+    
+    private String reserveBytesLiteral = ".byte";
+    
+    private String dataSegmentLiteral = ".dseg";
+    
+    private boolean gnuGlobals = false;
+    
+    private boolean gnuSyntax;
+    
+    private Map<String,String> localSymbolMapping = new HashMap<>(); 
+    
+    public void setGNUSyntax(boolean gnuSyntax) 
+    {
+        this.gnuSyntax = gnuSyntax;
+        if ( gnuSyntax ) 
+        {
+            localLabelPrefix = "";
+            localLabelSuffix = ":";
+            binaryPrefix = "0b";
+            printCompoundRegistersAsRange = false;
+            initByteLiteral = ".byte";
+            initWordLiteral = ".word";
+            equDelimiter = ",";
+            forceCompoundRegisterNames = true;
+            reserveBytesLiteral = ".space";
+            dataSegmentLiteral = ".data";
+            gnuGlobals = true;
+        } else {
+            localLabelPrefix = ".";
+            localLabelSuffix = "";
+            binaryPrefix = "%";
+            printCompoundRegistersAsRange = true;
+            initByteLiteral = ".db";
+            initWordLiteral = ".dw";       
+            equDelimiter = " = ";
+            forceCompoundRegisterNames = false;
+            reserveBytesLiteral = ".byte";
+            dataSegmentLiteral = ".dseg";
+            gnuGlobals = false;
+        }
+    }
+    
+    private String getMappedSymbolName(Symbol s) 
+    {
+        if ( s.isLocalLabel() ) 
+        {
+            if ( gnuSyntax ) 
+            {
+                return getMappedSymbolName( s.getSegment() , s.getGlobalNamePart().value , s.getLocalNamePart().value );
+            }
+            return s.getLocalNamePart().value;
+        } 
+        return s.getGlobalNamePart().value;
+    }
+    
+    private String getMappedSymbolName(Segment segment,String globalPart,String localPart) 
+    {
+        final String key = segment.name()+"."+globalPart+"."+localPart;
+        final String mapped = localSymbolMapping.get( key );
+        if ( mapped == null ) 
+        {
+            final String mappedName = "local"+localSymbolMapping.size();
+            localSymbolMapping.put( key , mappedName );
+            return mappedName;
+        }
+        return mapped;
+    }
+    
     public String prettyPrint(ASTNode ast) 
     {
+        localSymbolMapping.clear();
+        
         buffer.setLength( 0 );
         visit( ast );
         return buffer.toString();
@@ -96,12 +175,29 @@ public class PrettyPrinter extends AbstractASTVisitor {
         if ( node.register.isPreDecrement() ) {
             append("-");
         }
-        if ( printCompoundRegistersAsRange && node.register.isCompoundRegister() ) 
+        
+        if ( node.register.isCompoundRegister() ) 
         {
-            append( "r" ).append( regNum+1 ).append(":r").append( regNum );
+            String regName=null;
+            switch ( node.register.getRegisterNumber() ) {
+                case Register.REG_X: regName = "X"; break;
+                case Register.REG_Y: regName = "Y"; break;
+                case Register.REG_Z: regName = "Z"; break;
+                default:
+            }
+            if ( forceCompoundRegisterNames && regName != null ) {
+                append( regName );
+            } 
+            else if ( printCompoundRegistersAsRange ) 
+            {
+                append( "r" ).append( regNum+1 ).append(":r").append( regNum );
+            } else {
+                append( "r" ).append( regNum );
+            }            
         } else {
-            append( "r" ).append( regNum );
+            append( "r" ).append( regNum );            
         }
+
         if ( node.register.isPostIncrement() ) {
             append("+");
         }
@@ -213,11 +309,15 @@ public class PrettyPrinter extends AbstractASTVisitor {
     }
 
     @Override
-    protected void visitNode(LabelNode node) {
+    protected void visitNode(LabelNode node) 
+    {
         if ( node.isLocal() ) {
-            append( localLabelPrefix ).append( node.getSymbol().getLocalNamePart().value ).append( localLabelSuffix );
+            append( localLabelPrefix ).append( getMappedSymbolName( node.getSymbol() ) ).append( localLabelSuffix );
         } else {
-            append( globalLabelPrefix ).append( node.getSymbol().getGlobalNamePart().value ).append( globalLabelSuffix );
+            if ( gnuGlobals ) {
+                append(".global").append( " " ).append( getMappedSymbolName( node.getSymbol() ) ).append( newLineCharacter );
+            }
+            append( globalLabelPrefix ).append( getMappedSymbolName( node.getSymbol() ) ).append( globalLabelSuffix );
         }
         if ( ! node.getStatement().isLabelLineOnly() ) {
             append(" ");
@@ -239,7 +339,16 @@ public class PrettyPrinter extends AbstractASTVisitor {
     @Override
     protected void visitNode(FunctionCallNode node) 
     {
-        append( node.functionName.value );
+        String funcName = node.functionName.value;
+        if ( gnuSyntax ) 
+        {
+            if ( FunctionCallNode.BUILDIN_FUNCTION_HIGH.equals( node.functionName ) ) {
+                funcName = "hi8";
+            } else if ( FunctionCallNode.BUILDIN_FUNCTION_LOW.equals( node.functionName ) ) {
+                funcName = "lo8";
+            }
+        } 
+        append( funcName );
         append("(");
         visitChildren( node );
         append(")");
@@ -261,9 +370,30 @@ public class PrettyPrinter extends AbstractASTVisitor {
     @Override
     protected void visitNode(DirectiveNode node) 
     {
-        if ( node.directive == Directive.INIT_BYTES || node.directive == Directive.INIT_WORDS ) 
+        if ( node.directive == Directive.DSEG ) {
+            append( dataSegmentLiteral );
+        } 
+        else if ( node.directive == Directive.RESERVE ) {
+            append( reserveBytesLiteral );
+            if ( node.hasChildren() ) {
+                append( " " );
+            }
+            visitChildren(node);
+        } 
+        else if ( node.directive == Directive.INIT_BYTES || node.directive == Directive.INIT_WORDS ) 
         {
-            append( "." ).append( node.directive.literal );
+            final String literal;
+            switch( node.directive ) {
+                case INIT_BYTES:
+                    literal = initByteLiteral;
+                    break;
+                case INIT_WORDS:
+                    literal = initWordLiteral;
+                    break;                    
+                default:
+                    throw new RuntimeException("Internal error,unreachable code reached");
+            }
+            append( literal );
             if ( node.hasChildren() ) {
                 append(" ");
                 for ( int i = 0 , len = node.childCount() ; i < len ; i++ ) {
@@ -278,7 +408,7 @@ public class PrettyPrinter extends AbstractASTVisitor {
         {
             append( ".equ ");
             visit( node.child(0) );
-            append(" = ");
+            append( equDelimiter );
             visitAnyRemainingChildren( node , 1 );
         } else {
             append( ".").append( node.directive.literal );
@@ -329,7 +459,14 @@ public class PrettyPrinter extends AbstractASTVisitor {
     }
 
     @Override
-    protected void visitNode(IdentifierNode node) {
+    protected void visitNode(IdentifierNode node) 
+    {
+        if ( gnuSyntax && Identifier.isLocalGlobalIdentifier( node.name ) ) 
+        {
+            final String name = getMappedSymbolName( node.getSymbol().getSegment() , Identifier.getGlobalIdentifierPart( node.name ).value , Identifier.getLocalIdentifierPart( node.name ).value );
+             append( name  );
+             return;
+        }
         if ( Identifier.isLocalGlobalIdentifier( node.name ) ) {
             append( Identifier.getLocalIdentifierPart( node.name ).value );
         } else {

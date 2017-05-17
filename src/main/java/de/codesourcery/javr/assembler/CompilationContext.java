@@ -164,7 +164,13 @@ public final class CompilationContext implements ICompilationContext
         currentCompilationUnit = null;
         pushCompilationUnit( rootCompilationUnit );
         objectCodeWriter.reset();
-        objectCodeWriter.setStartAddress( Address.byteAddress( Segment.SRAM , config.getArchitecture().getSRAMStartAddress() ) );        
+        if ( ! isGenerateRelocations() ) 
+        {
+            // we're directly generating an executable binary here. 
+            // As AVR maps registers at the start of RAM we'll need to add the architecture's 
+            // register offset so we don't access registers instead of memory.
+            objectCodeWriter.setStartAddress( Address.byteAddress( Segment.SRAM , config.getArchitecture().getSRAMStartAddress() ) );
+        }
         objectCodeWriter.setCurrentSegment( Segment.FLASH );
     }
 

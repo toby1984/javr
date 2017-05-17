@@ -43,23 +43,23 @@ import de.codesourcery.javr.assembler.symbols.Symbol.Type;
  */
 public enum OperatorType
 {
-    UNARY_MINUS("-",1,11),
+    UNARY_MINUS("-",1,11,true),
     LOGICAL_NOT("!",1,10),
-    BITWISE_NEGATION("~",1,10),
-    DIVIDE("/",2,9),
-    TIMES("*",2,9),
-    BINARY_MINUS("-",2,8),
-    PLUS("+",2,7),
-    SHIFT_LEFT("<<",2,6),
-    SHIFT_RIGHT(">>",2,6),
+    BITWISE_NEGATION("~",1,10,true),
+    DIVIDE("/",2,9,true),
+    TIMES("*",2,9,true),
+    BINARY_MINUS("-",2,8,true),
+    PLUS("+",2,7,true),
+    SHIFT_LEFT("<<",2,6,true),
+    SHIFT_RIGHT(">>",2,6,true),
     GT(">",2,5),
     LT("<",2,5),
     GTE(">=",2,5),
     LTE("<=",2,5),    
     REF_EQ("==",2,4),
     REF_NEQ("!=",2,4),    
-    BITWISE_AND("&",2,3),
-    BITWISE_OR("|",2,2),
+    BITWISE_AND("&",2,3,true),
+    BITWISE_OR("|",2,2,true),
     LOGICAL_AND("&&",2,1),
     LOGICAL_OR("||",2,0);
     
@@ -80,11 +80,17 @@ public enum OperatorType
     private final String symbol;
     private final int argumentCount;
     private final int precedence;
+    private final boolean arithmeticOperator;
 
     private OperatorType(String op,int argumentCount,int precedence) {
+        this(op,argumentCount,precedence,false);
+    }
+    
+    private OperatorType(String op,int argumentCount,int precedence,boolean arithmeticOperator) {
         this.symbol=op;
         this.precedence = precedence;
         this.argumentCount = argumentCount;
+        this.arithmeticOperator = arithmeticOperator;
     }
 
     public boolean isLeftAssociative() {
@@ -99,8 +105,12 @@ public enum OperatorType
         return this.precedence;
     }
 
+    public boolean hasSamePrecedenceAs(OperatorType other) {
+        return this.precedence == other.precedence;
+    }
+    
     public boolean isArithmeticOperator() {
-        return false;
+        return this.arithmeticOperator;
     }
 
     public String toPrettyString() {
@@ -355,5 +365,18 @@ public enum OperatorType
         }
         context.error("Not a built-in function: "+fn.functionName,fn);
         return null;
+    }
+    
+    public boolean isPlusMinusTimesDivide() 
+    {
+        switch( this ) {
+            case BINARY_MINUS:
+            case DIVIDE:
+            case PLUS:
+            case TIMES:
+                return true;
+            default:
+                return false;
+        }
     }
 }

@@ -21,6 +21,7 @@ import java.util.function.Predicate;
 
 import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.CompilationUnit;
+import de.codesourcery.javr.assembler.parser.OperatorType;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.parser.ast.AbstractASTNode.IterationContext;
 
@@ -34,19 +35,29 @@ public interface ASTNode
     @FunctionalInterface
     public interface IASTVisitor {
         
-        public void visit(ASTNode node,IIterationContext ctx);
+        public void visit(ASTNode node,IIterationContext<?> ctx);
     }
+    
+    @FunctionalInterface
+    public interface IASTVisitor2<T> {
+        
+        public void visit(ASTNode node,IIterationContext<T> ctx);
+    }    
     
     /**
      * Iteration context used to control depth-first/breadth-first traversal.
      *
      * @author tobias.gierke@code-sourcery.de
      */
-    public interface IIterationContext 
+    public interface IIterationContext<T> 
     {
         public void stop();
         
+        public void stop(T value);
+        
         public void dontGoDeeper();
+        
+        public T getResult();
     }    
     
     /**
@@ -172,13 +183,6 @@ public interface ASTNode
     public int childCount();
 
     /**
-     * Performs a breadth-first traversal of the AST starting with this node.
-     * 
-     * @param n
-     */
-    public void visitBreadthFirst(IASTVisitor n);
-    
-    /**
      * Returns the statement this node belongs to.
      * 
      * @return
@@ -186,13 +190,37 @@ public interface ASTNode
     public StatementNode getStatement();
 
     /**
+     * Performs a breadth-first traversal of the AST starting with this node.
+     * 
+     * @param n
+     */
+    public void visitBreadthFirst(IASTVisitor n);
+    
+    /**
      * DO NOT USE - PART OF INTERNAL API.     
      * @param n
      * @param ctx
      * @Deprecated
      */
     @Deprecated
-    public void visitBreadthFirst(IASTVisitor n,IterationContext ctx);      
+    public void visitBreadthFirst(IASTVisitor n,IterationContext<?> ctx);      
+    
+    /**
+     * Performs a breadth-first traversal of the AST starting with this node.
+     * 
+     * @param initialValue value to return by default     
+     * @param n
+     */
+    public <T> T visitBreadthFirstWithResult(T initialValue , IASTVisitor2<T> n);
+    
+    /**
+     * DO NOT USE - PART OF INTERNAL API.     
+     * @param n
+     * @param ctx
+     * @Deprecated
+     */
+    @Deprecated
+    public <T> void visitBreadthFirstWithResult(IASTVisitor2<T> n,IterationContext<T> ctx);      
 
     /**
      * Performs a depth-first traversal of the subtree starting at this node.
@@ -202,13 +230,28 @@ public interface ASTNode
     void visitDepthFirst(IASTVisitor n);
     
     /**
+     * Performs a depth-first traversal of the subtree starting at this node, returning a result.
+     * 
+     * @param initialValue value to return by default
+     * @param n
+     */
+    <T> T visitDepthFirstWithResult(T initialValue, IASTVisitor2<T> n);    
+    
+    /**
+     * Performs a depth-first traversal of the subtree starting at this node, returning a result.
+     * 
+     * @param n
+     */
+    <T> void visitDepthFirstWithResult(IASTVisitor2<T> n,IterationContext<T> ctx);      
+    
+    /**
      * DO NOT USE - PART OF INTERNAL API.
      * @param n
      * @param ctx
      * @Deprecated
      */
     @Deprecated
-    public void visitDepthFirst(IASTVisitor n,IterationContext ctx);    
+    public void visitDepthFirst(IASTVisitor n,IterationContext<?> ctx);    
 
     /**
      * Returns the region of the source code covered by this node (disregarding
@@ -344,5 +387,27 @@ public interface ASTNode
      * @param pred
      * @return
      */
-    public ASTNode searchBackwards(Predicate<ASTNode> pred);    
+    public ASTNode searchBackwards(Predicate<ASTNode> pred);
+    
+    /**
+     * Returns whether this is an {@link OperatorNode}.
+     * 
+     * @return
+     */
+    public boolean isOperatorNode();
+    
+    /**
+     * Returns whether this is an operator node with a specific type.
+     * 
+     * @param type
+     * @return
+     */
+    public boolean isOperator(OperatorType type);
+    
+    /**
+     * Tries to cast this instance into an {@link OperatorNode}.
+     * @return
+     * @throws ClassCastException 
+     */
+    public OperatorNode asOperator();
 }

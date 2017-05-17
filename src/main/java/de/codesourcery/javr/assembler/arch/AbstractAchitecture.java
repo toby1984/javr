@@ -720,19 +720,13 @@ public abstract class AbstractAchitecture implements IArchitecture
         final Relocation result = new Relocation( symbolNeedingRelocation );
         result.locationOffset = node.getMemoryLocation().getByteAddress();
 
-        final int addend;
-        if ( symbolNeedingRelocation.isLocalLabel() ) 
+        final long localAdr = toIntValue( symbolNeedingRelocation.getValue() );
+        if ( localAdr == VALUE_UNAVAILABLE ) 
         {
-            // avr-gcc performs relocation of local symbols against the start of the current segment
-            final long localAdr = toIntValue( symbolNeedingRelocation.getValue() );
-            if ( localAdr == VALUE_UNAVAILABLE ) 
-            {
-                throw new RuntimeException("Internal error, don't know how to turn symbol value "+symbolNeedingRelocation.getValue()+" into an int ?");
-            }            
-            addend = (int) localAdr;
-        } else {
-            addend = 0;
-        }
+            throw new RuntimeException("Internal error, don't know how to turn symbol value "+symbolNeedingRelocation.getValue()+" into an int ?");
+        }  
+        
+        final int addend = (int) localAdr;
 
         final Relocation.Kind kind;
         switch( argType ) 
@@ -752,20 +746,20 @@ public abstract class AbstractAchitecture implements IArchitecture
                 break;      
                 // conditional branches
             case SEVEN_BIT_SIGNED_COND_BRANCH_OFFSET:
-                // addend = node.getMemoryLocation().getByteAddress();                
                 kind = Relocation.Kind.R_AVR_7_PCREL;
                 break;
                 // lds,sts
             case SIXTEEN_BIT_SRAM_MEM_ADDRESS:
                 kind = Relocation.Kind.R_AVR_16;
+                result.locationOffset += 2; // 2 bytes opcode + 2 bytes address , we obviously want to relocate the data part and not overwrite the opcode...
                 break;
                 // rcall / rjmp
             case TWELVE_BIT_SIGNED_JUMP_OFFSET:
-                // addend = node.getMemoryLocation().getByteAddress();
                 kind = Relocation.Kind.R_AVR_13_PCREL;
                 break;
                 // call / jmp
             case TWENTYTWO_BIT_FLASH_MEM_ADDRESS:
+                // FIXME: Double-check that the locationOffset doesn't need to be adjusted like in the SIXTEEN_BIT_SRAM_MEM_ADDRESS case....
                 kind = Relocation.Kind.R_AVR_CALL;
                 break;
             default:

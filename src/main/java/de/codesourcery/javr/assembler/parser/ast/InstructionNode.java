@@ -15,15 +15,20 @@
  */
 package de.codesourcery.javr.assembler.parser.ast;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Instruction;
+import de.codesourcery.javr.assembler.arch.AbstractAchitecture;
 import de.codesourcery.javr.assembler.parser.OperatorType;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 public class InstructionNode extends NodeWithMemoryLocation implements Resolvable
@@ -37,12 +42,12 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
         Validate.notNull(insn, "insn must not be NULL");
         this.instruction = insn;
     }
-    
+
     @Override
     protected InstructionNode createCopy() {
         return new InstructionNode( this.instruction.createCopy() , getTextRegion().createCopy() );
     }
-    
+
     private static ASTNode unwrapExpression(ASTNode node) 
     {
         ASTNode result = node;
@@ -52,7 +57,7 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
         }
         return result;
     }
-    
+
     private static boolean isAddressIdentifierNode(ASTNode node,SymbolTable symbolTable) 
     {
         if ( node instanceof IdentifierNode) 
@@ -62,15 +67,23 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
         return false;
     }
 
+    public static boolean isSameSymbol(Symbol a,Symbol b) 
+    {
+        return a.name().equals( b.name() ) &&
+                a.hasType( b.getType() ) &&
+                Objects.equals( a.getSegment() , b.getSegment() ) &&
+                a.getCompilationUnit().hasSameResourceAs( b.getCompilationUnit() );             
+    }    
+
     public static Symbol getSymbolNeedingRelocation(ASTNode node, ICompilationContext context) 
     {
         final SymbolTable symbolTable = context.currentSymbolTable();
         final Symbol[] result = { null };
-        
+
         final IASTVisitor visitor = new IASTVisitor() 
         {
             @Override
-            public void visit(ASTNode node, IIterationContext ctx) 
+            public void visit(ASTNode node, IIterationContext<?> ctx) 
             {
                 // deal with special cases 
                 if ( node instanceof OperatorNode) 
@@ -93,6 +106,7 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
                         if ( isAddressIdentifierNode( child0 , symbolTable ) ) 
                         {
                             final IdentifierNode id = (IdentifierNode) child0;
+                            // FIXME: Why this restriction ?
                             if ( ! id.safeGetSymbol().getSegment().equals( context.currentSegment() ) ) {
                                 throw new RuntimeException("Not relocatable, symbol needs to be in same section as instruction");
                             }
@@ -106,14 +120,10 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
                     if ( result[0] == null ) 
                     {
                         result[0] = symbol;
-                    } else {
-                        if ( ! result[0].name().equals( symbol.name() ) ||
-                             ! result[0].hasType( symbol.getType() ) ||
-                             ! Objects.equals( result[0].getSegment() , symbol.getSegment() ) ||
-                             ! result[0].getCompilationUnit().hasSameResourceAs( symbol.getCompilationUnit() ) ) 
-                        {
-                            throw new RuntimeException("Expression is not relocatable as it refers to more than one symbol: First: "+result[0]+", offender: "+symbol);
-                        }
+                    } 
+                    else if ( ! isSameSymbol( result[0] , symbol ) ) 
+                    {
+                        throw new RuntimeException("Expression is not relocatable as it refers to more than one symbol: First: "+result[0]+", offender: "+symbol);
                     }
                 }
             }
@@ -121,25 +131,25 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
         node.visitBreadthFirst( visitor );
         return result[0];
     }
-     
+    
     public ASTNode src() {
         return child(1);
     }
-    
+
     public ASTNode dst() {
         return child(0);
     }    
-    
+
     @Override
     public String getAsString() {
         return instruction.getMnemonic().toUpperCase();
     }
-    
+
     @Override
     public boolean hasMemoryLocation() {
         return true;
     }
-    
+
     @Override
     public int getSizeInBytes() throws IllegalStateException 
     {
@@ -148,7 +158,7 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
         }
         return sizeInBytes;
     }    
-    
+
     @Override
     public boolean resolve(ICompilationContext context) 
     {
