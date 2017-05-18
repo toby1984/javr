@@ -40,7 +40,8 @@ java -jar target/javr.jar
 Note that for reasons unknown to me the AVR assembler duplicates a lot of preprocessor instructions as assembler directives ... I'm currently only implementing the preprocessor instructions
 
 - full ATmega88 instruction set
-- output to RAW / Intel HEX / ELF (executable/relocatable) files (ELF output is still very much a work-in-progress)
+- able to convert the AVR assembly syntax to avr-as
+- output to RAW / Intel HEX / ELF (executable/relocatable) files
 - local labels ( watch out, currently not working properly when used in macros) 
   - Just write '.myLabel' instead of 'myLabel:' when declaring them ; referencing local labels works just like with global labels so no 'b' or 'f' suffixes are needed. Note that its illegal to declare a local label that has the same identifier as a global label ; otherwise I would've needed to use the ugly 'b'/'f' suffix solution to resolve the ambiguity)  
 - Expression correctly handles nested expressions and operator precedence for the following operators: 
@@ -76,7 +77,7 @@ Note that for reasons unknown to me the AVR assembler duplicates a lot of prepro
 
 ## Differences to 'official' AVR assembler syntax
 
-- the LPM instruction treats the Z register as holding a _byte_ address while SPM treams it as holding a WORD address.
+- the LPM instruction treats the Z register as holding a _byte_ address while SPM treats it as holding a WORD address.
  
 This assembler internally treats all addresses as byte addresses (even in .cseg) so when using LPM you have to write
   
@@ -110,15 +111,16 @@ but with SPM you need to write
 
 ## Known issues
 
+-Calculation of relocations is glitchy (rewrite is underway though...)
 - Syntax coloring is off when using MSDOS-style line endings (won't fix this since it is related to the fact that Swing text components internally convert all EOL sequences to '\n' but my parser uses the 'true' text offsets)
 - parsing #define is currently broken when trying to #define stuff like (a+b)/c (gets irritated by the leading parens)
 - parsing string literals currently swallows whitespace (0x20) chars in the strings
 - parsing of .def is quite picky when it comes to whitespace ( '.def x = r16' works but '.def x=r16' doesnt ...)
-- Parser throws NPE because of NULL ICompilationContext when certain tokens are present at the end of the top-level file. This is because the PreprocessingLexer prematurely pops the last context while the parser is not yet done parsing. Work-around is to just add some more code to the very end of the top-level file.
+- Parser throws NPE because of NULL ICompilationContext when certain tokens are present at the end of the top-level file. This is because the PreprocessingLexer prematurely pops the last context while the parser is not yet done parsing. Work-around is to just add a newline to the very end of the top-level file.
 
 ## To do
 
-- Improve ELF support (symbols are currently all tagged as functions) to be able to link against C programs written using avr-gcc) 
+- Support emitting ELF relocations for targets other than atmega328p
 - Compile source files individually (output ELF relocatable) and add linking step to reduce compilation times and allow C programs to be linked against the output
 - Add support for .org directive
 - Better parse error recovery
