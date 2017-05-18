@@ -604,7 +604,7 @@ public abstract class AbstractAchitecture implements IArchitecture
 
         final EncodingEntry variants;
         
-        if (  mnemonic.equalsIgnoreCase("clr" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for LSL ... 
+        if (  mnemonic.equalsIgnoreCase("clr" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for clr ... 
         {
             variants = lookupInstruction( "eor" );
             // turn "CLR rX" into "EOR rX,rX"
@@ -671,9 +671,8 @@ public abstract class AbstractAchitecture implements IArchitecture
         final int srcValue;
         if ( encoding.mayNeedRelocation && context.isGenerateRelocations() ) 
         {
-            // 8-bit AVRs will only require relocation of either the src or destination but not both arguments
+            // code is simple her as 8-bit AVRs will only require relocation of either the src or destination but not both arguments
             Symbol symbolNeedingRelocation = null;
-
             if ( srcArgument != null && ( symbolNeedingRelocation = InstructionNode.getSymbolNeedingRelocation( srcArgument , context ) ) != null ) 
             {
                 dstValue = (int) getDstValue( dstArgument , encoding.dstType , context , false );                
@@ -762,6 +761,9 @@ public abstract class AbstractAchitecture implements IArchitecture
                 // FIXME: Double-check that the locationOffset doesn't need to be adjusted like in the SIXTEEN_BIT_SRAM_MEM_ADDRESS case....
                 kind = Relocation.Kind.R_AVR_CALL;
                 break;
+            case SIX_BIT_CONSTANT:
+                kind = Relocation.Kind.R_AVR_6_ADIW;
+                break;
             default:
                 throw new RuntimeException("Internal error,unhandled instruction argument type: "+argType);
         }
@@ -809,7 +811,7 @@ public abstract class AbstractAchitecture implements IArchitecture
             } 
             else if ( op.type == OperatorType.SHIFT_RIGHT ) 
             {
-                final ASTNode rhs = maybeUnwrapExpression( op.child(1) );
+                final ASTNode rhs = maybeUnwrapExpression( op.rhs() );
                 // check RHS of >> 
                 if ( rhs instanceof IValueNode ) 
                 {
@@ -819,14 +821,14 @@ public abstract class AbstractAchitecture implements IArchitecture
                         throw new RuntimeException("Internal error - expression has value '"+value+"' which is not a constant ?");                        
                     }
                     if ( ((Number) value).intValue() != 1 ) {
-                        throw new RuntimeException("Non-relocatable right-shift operator ; only shift by 1 is supported");
+                        throw new RuntimeException("Non-relocatable right-shift operator ; only right-shifts by 1 can be relocated");
                     }
                     result |= Relocation.EXPR_FLAG_PM; // division by 2
                 } else {
                     throw new RuntimeException("Non-relocatable right-shift operator,argument does not resolve to a IValueNode");
                 }
                 // check LHS of expression , only <address> or -<address> are supported
-                final ASTNode lhs = maybeUnwrapExpression( op.child(0) );
+                final ASTNode lhs = maybeUnwrapExpression( op.lhs() );
                 if ( lhs instanceof IdentifierNode && ((IdentifierNode) lhs).refersToAddressSymbol( symbolTable ) ) 
                 {
                     // <adr>

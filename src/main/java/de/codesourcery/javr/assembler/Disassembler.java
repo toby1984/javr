@@ -184,7 +184,7 @@ public class Disassembler {
         return settings;
     }
 
-    private void disassemble(InputStream in,OutputStream out) throws IOException 
+    public void disassemble(InputStream in,OutputStream out) throws IOException 
     {
         final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         final byte[] tmpBuffer = new byte[1024];

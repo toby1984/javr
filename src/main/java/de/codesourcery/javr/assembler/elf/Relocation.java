@@ -27,15 +27,18 @@ public class Relocation
      * Kind of relocation to perform.
      */
     public Kind kind;
+    
     /**
      * The value to be used in the calculation when
      * calculating the final value.
      */
     public int addend;
+    
     /**
      * Offset within the section where to apply this relocation
      */
     public int locationOffset;
+    
     /**
      * The symbol this relocation refers to
      */
@@ -73,33 +76,33 @@ public class Relocation
     {
         R_AVR_NONE(0),
         // relocation of absolute address values (for example a ".dw" directive referencing a label)
-        R_AVR_16(4),
-        R_AVR_16_PM(5),
+        R_AVR_16(4), // UNIT-TESTED
+        R_AVR_16_PM(5), // UNIT-TESTED
         R_AVR_8(26),
-        R_AVR_8_LO8(27),
-        R_AVR_8_HI8(28),
+        R_AVR_8_LO8(27), // UNIT-TESTED
+        R_AVR_8_HI8(28), // UNIT-TESTED
         // conditional branches
-        R_AVR_7_PCREL(2),
-        R_AVR_13_PCREL(3),
+        R_AVR_7_PCREL(2), // UNIT-TESTED
+        R_AVR_13_PCREL(3), // UNIT-TESTED
         // unconditional branches
-        R_AVR_CALL(18),        
+        R_AVR_CALL(18), // UNIT-TEST    
         // LDI
-        R_AVR_LDI(19),
-        R_AVR_LO8_LDI(6,EXPR_FLAG_LO),
-        R_AVR_LO8_LDI_PM(12,EXPR_FLAG_LO|EXPR_FLAG_PM),
-        R_AVR_HI8_LDI(7, EXPR_FLAG_HI),
-        R_AVR_HI8_LDI_PM(13,EXPR_FLAG_HI|EXPR_FLAG_PM),
+        R_AVR_LDI(19), // UNIT-TESTED
+        R_AVR_LO8_LDI(6,EXPR_FLAG_LO), // UNIT-TESTED
+        R_AVR_LO8_LDI_PM(12,EXPR_FLAG_LO|EXPR_FLAG_PM), // UNIT-TESTED
+        R_AVR_HI8_LDI(7, EXPR_FLAG_HI), // UNIT-TESTED
+        R_AVR_HI8_LDI_PM(13,EXPR_FLAG_HI|EXPR_FLAG_PM), // UNIT-TESTED
         // negative addresses
-        R_AVR_LO8_LDI_PM_NEG(15 , EXPR_FLAG_LO | EXPR_FLAG_PM  | EXPR_FLAG_NEG ),
-        R_AVR_LO8_LDI_NEG(9,EXPR_FLAG_LO | EXPR_FLAG_NEG ), // ldi r16,lo8(-(label))
-        R_AVR_HI8_LDI_NEG(10 , EXPR_FLAG_HI | EXPR_FLAG_NEG ),
-        R_AVR_HI8_LDI_PM_NEG(16 , EXPR_FLAG_HI | EXPR_FLAG_PM | EXPR_FLAG_NEG ),
+        R_AVR_LO8_LDI_PM_NEG(15 , EXPR_FLAG_LO | EXPR_FLAG_PM  | EXPR_FLAG_NEG ), // UNIT-TESTED
+        R_AVR_LO8_LDI_NEG(9,EXPR_FLAG_LO | EXPR_FLAG_NEG ), // ldi r16,lo8(-(label)) UNIT-TESTED
+        R_AVR_HI8_LDI_NEG(10 , EXPR_FLAG_HI | EXPR_FLAG_NEG ), // UNIT-TESTED
+        R_AVR_HI8_LDI_PM_NEG(16 , EXPR_FLAG_HI | EXPR_FLAG_PM | EXPR_FLAG_NEG ), // UNIT-TESTED
         // LDS / STS
-        R_AVR_LDS_STS_16(33),        
+        R_AVR_LDS_STS_16(33),       
         // ldd/sdd command 
         R_AVR_6(20),
         // For sbiw/adiw command
-        R_AVR_6_ADIW(21), // ok
+        R_AVR_6_ADIW(21), // ok // UNIT-TESTED
         // in,out
         R_AVR_PORT6(34),
         // sbi, sbic , etc.

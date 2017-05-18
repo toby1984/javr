@@ -83,6 +83,11 @@ public class ObjectCodeWriter implements IObjectCodeWriter
             data[dataPtr++] = (byte) byteToWrite;
         }
         
+        @Override
+        public int size() {
+            return dataPtr;
+        }
+        
         private void growDataArray() 
         {
             byte[] tmp = new byte[ data.length*2 ];

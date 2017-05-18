@@ -1339,14 +1339,17 @@ public abstract class EditorPanel extends JPanel
 		result.add( button("Symbols" , ev -> this.toggleSymbolTableWindow() ) );
 		result.add( button("Upload to uC" , ev -> this.uploadToController() ) );
 		
-		result.add( button("PrettyPrint" , ev -> 
+		result.add( button("Show as avr-as" , ev -> 
 		{
-		    if ( ! isPrettyPrintShown() ) {
-		        showPrettyPrint();
-		    } else {
 		        hidePrettyPrint();
-		    }
+		        showPrettyPrint(true);
         } ) );
+		
+        result.add( button("Pretty print" , ev -> 
+        {
+            hidePrettyPrint();
+            showPrettyPrint(false);
+        } ) );		
 		
 		result.add( new JLabel("Cursor pos:" ) );
 		result.add( cursorPositionLabel );
@@ -1363,11 +1366,13 @@ public abstract class EditorPanel extends JPanel
 	    
 	    private JTextArea textArea = new JTextArea();
 	    
+	    public boolean gnuSyntax = true;
+	    
 	    public void astChanged() 
 	    {
 	        final PrettyPrinter printer = new PrettyPrinter();
 	        try {
-	            printer.setGNUSyntax( true );
+	            printer.setGNUSyntax( gnuSyntax );
 	            final String source = printer.prettyPrint( getCompilationUnit().getAST() );
 	            textArea.setText( source );
 	        } 
@@ -1430,12 +1435,13 @@ public abstract class EditorPanel extends JPanel
 	    }
 	}
 	
-	private void showPrettyPrint() 
+	private void showPrettyPrint(boolean gnuSyntax) 
 	{
 	    if ( ! isPrettyPrintShown() ) 
 	    {
 	        prettyPrintWindow = new PrettyPrintWindow();
 	    }
+	    prettyPrintWindow.gnuSyntax = gnuSyntax;
 	    prettyPrintWindow.astChanged();
 	    prettyPrintWindow.toFront();
 	}
@@ -1574,7 +1580,7 @@ public abstract class EditorPanel extends JPanel
 		currentUnit.addMessage( CompilationMessage.info(currentUnit,"Compilation "+success+" ("+assembleTime+") on "+df.format( ZonedDateTime.now() ) ) );
 
 		if ( isPrettyPrintShown() ) {
-		    showPrettyPrint();
+		    showPrettyPrint( prettyPrintWindow.gnuSyntax );
 		}
 		
         final List<CompilationMessage> allMessages = root.getMessages(true);

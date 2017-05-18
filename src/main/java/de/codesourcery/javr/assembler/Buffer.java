@@ -28,6 +28,8 @@ import de.codesourcery.javr.assembler.elf.Relocation;
  */
 public interface Buffer 
 {
+    public int size();
+    
     public boolean isEmpty();
     
     public boolean isNotEmpty();

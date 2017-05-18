@@ -105,11 +105,6 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
                         final ASTNode child0 = unwrapExpression( op.child(0) );
                         if ( isAddressIdentifierNode( child0 , symbolTable ) ) 
                         {
-                            final IdentifierNode id = (IdentifierNode) child0;
-                            // FIXME: Why this restriction ?
-                            if ( ! id.safeGetSymbol().getSegment().equals( context.currentSegment() ) ) {
-                                throw new RuntimeException("Not relocatable, symbol needs to be in same section as instruction");
-                            }
                             ctx.dontGoDeeper();
                         }
                     }

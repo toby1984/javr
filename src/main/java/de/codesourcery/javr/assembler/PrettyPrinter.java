@@ -370,7 +370,14 @@ public class PrettyPrinter extends AbstractASTVisitor {
     @Override
     protected void visitNode(DirectiveNode node) 
     {
-        if ( node.directive == Directive.DSEG ) {
+        if ( node.directive == Directive.DEF && gnuSyntax ) {
+            append("#define ");
+            IdentifierDefNode child = (IdentifierDefNode) node.child(0);
+            append( child.name.value );
+            append(" ");
+            visit( node.child(1) );
+        } 
+        else if ( node.directive == Directive.DSEG ) {
             append( dataSegmentLiteral );
         } 
         else if ( node.directive == Directive.RESERVE ) {
@@ -393,13 +400,31 @@ public class PrettyPrinter extends AbstractASTVisitor {
                 default:
                     throw new RuntimeException("Internal error,unreachable code reached");
             }
-            append( literal );
-            if ( node.hasChildren() ) {
-                append(" ");
-                for ( int i = 0 , len = node.childCount() ; i < len ; i++ ) {
-                    visit( node.child(i) );
-                    if ((i+1) < len ) {
-                        append(",");
+
+            if ( node.hasChildren() ) 
+            {
+                if ( ! (gnuSyntax && node.directive == Directive.INIT_BYTES && needsConversion( node.child(0) ) ) ) {
+                    append( literal ).append(" ");
+                }
+                for ( int i = 0 , len = node.childCount() ; i < len ; i++ ) 
+                {
+                    final boolean hasMore = (i+1) < len;
+                    final ASTNode child = node.child(i);
+                    if ( gnuSyntax && node.directive == Directive.INIT_BYTES && needsConversion( child ) ) {
+                        append( newLineCharacter ).append( ".asciz ");
+                        visit( child );
+                        if ( hasMore ) 
+                        {
+                            if ( !( gnuSyntax && node.directive == Directive.INIT_BYTES && needsConversion( node.child(i+1) ) ) ) {
+                                append( newLineCharacter );
+                                append( initByteLiteral ).append(" ");
+                            }
+                        }
+                    } else {
+                        visit( child );
+                        if ( hasMore && ! ( gnuSyntax && needsConversion( node.child(i+1) ) ) ) {
+                            append(",");
+                        }                        
                     }
                 }
             } 
@@ -417,6 +442,10 @@ public class PrettyPrinter extends AbstractASTVisitor {
             }
             visitChildren(node);
         }
+    }
+    
+    private boolean needsConversion(ASTNode node) {
+        return node instanceof StringLiteral; 
     }
 
     @Override
