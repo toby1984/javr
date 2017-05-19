@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 import org.apache.commons.beanutils.converters.AbstractArrayConverter;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.arch.AbstractArchitecture;
@@ -61,10 +62,35 @@ public class RelocationHelper
             this.astNode = astNode;
         }        
 
+        public String printTree() 
+        {
+            StringBuilder buffer = new StringBuilder();
+            printTree(0,buffer);
+            return buffer.toString();
+        }
+        
+        private void printTree(int depth,StringBuilder buffer) 
+        {
+            buffer.append( StringUtils.repeat(' ' , depth*2 ) );
+            if ( astNode.hasNoChildren() ) {
+                buffer.append( "value=").append( value ).append(", node=").append( astNode ).append("\n");
+            } else {
+                if ( astNode instanceof OperatorNode) {
+                    buffer.append( "value=").append( value ).append(", OPERATOR ").append( ((OperatorNode) astNode).getOperatorType().getSymbol() ).append("\n");
+                } else {
+                    buffer.append( "value=").append( value ).append(", node=").append( astNode.getClass().getSimpleName() ).append("\n");
+                }
+            }
+            for ( Evaluated child : children ) 
+            {
+                child.printTree( depth+1 , buffer);
+            }
+        }
+        
         @Override
         public String toString() 
         {
-            return "Evaluated[ value="+value+",node: "+astNode+"]";
+            return printTree();
         }
         
         public boolean isOperator() {
@@ -435,7 +461,7 @@ public class RelocationHelper
 
                     if ( childOp.type.isPlusMinusTimesDivide() && parentOp.type.isPlusMinusTimesDivide() ) 
                     {
-                        if ( childOp.type.hasSamePrecedenceAs( parentOp.type ) )
+                        if ( childOp.type.hasSamePrecedenceAs( parentOp.type ) && childOp.type.isCommutative() && parentOp.type.isCommutative() )
                         {
                             final Evaluated otherChild = parent.otherChild( child );
                             if ( otherChild.isNumber() ) 
@@ -453,6 +479,8 @@ public class RelocationHelper
                                     nodesReordered[0] = true;
                                 }
                             }
+                        } else if ( child.isNumber() ) {
+                            System.out.println("other");
                         }
                     }
                 }
@@ -476,7 +504,22 @@ public class RelocationHelper
         return result;
     }
 
-    static Evaluated reduce(Evaluated n,SymbolTable symbolTable)
+    static void reduceFully(Evaluated tree,SymbolTable symbolTable) 
+    {
+        while( true ) 
+        {
+            reduce( tree , symbolTable );
+            if ( tree.isNumber() ) // trivial case: expression reduced to a single number 
+            {
+                return;
+            }
+            if ( ! pushDownConstants( tree ) ) { // try to push down constants that are below binary +,-,*,/ operators with the same precedence 
+                return;
+            }
+        }        
+    }
+    
+    private static Evaluated reduce(Evaluated n,SymbolTable symbolTable)
     {
         if ( n.isNumber() ) {
             return n;

@@ -47,21 +47,35 @@ public enum OperatorType
     LOGICAL_NOT("!",1,10),
     BITWISE_NEGATION("~",1,10,true),
     DIVIDE("/",2,9,true),
-    TIMES("*",2,9,true),
-    BINARY_MINUS("-",2,8,true),
-    PLUS("+",2,7,true),
+    TIMES("*",2,9,true) {
+        @Override public boolean isCommutative() { return true; }
+    },
+    BINARY_MINUS("-",2,7,true),
+    PLUS("+",2,7,true) {
+        @Override public boolean isCommutative() { return true; }
+    },
     SHIFT_LEFT("<<",2,6,true),
     SHIFT_RIGHT(">>",2,6,true),
     GT(">",2,5),
     LT("<",2,5),
     GTE(">=",2,5),
     LTE("<=",2,5),    
-    REF_EQ("==",2,4),
-    REF_NEQ("!=",2,4),    
+    REF_EQ("==",2,4) {
+        @Override public boolean isCommutative() { return true; }
+    },
+    REF_NEQ("!=",2,4) {
+        @Override public boolean isCommutative() { return true; }
+    },    
     BITWISE_AND("&",2,3,true),
-    BITWISE_OR("|",2,2,true),
-    LOGICAL_AND("&&",2,1),
-    LOGICAL_OR("||",2,0);
+    BITWISE_OR("|",2,2,true) {
+        @Override public boolean isCommutative() { return true; }
+    },
+    LOGICAL_AND("&&",2,1) {
+        @Override public boolean isCommutative() { return true; }
+    },
+    LOGICAL_OR("||",2,0) {
+        @Override public boolean isCommutative() { return true; }
+    };
     
     /*
      *  1. ||
@@ -100,6 +114,10 @@ public enum OperatorType
     public final boolean isRightAssociative() {
         return ! isLeftAssociative();
     }
+    
+    public boolean isCommutative() {
+        return false;
+    }
 
     public int getPrecedence() {
         return this.precedence;
@@ -108,6 +126,8 @@ public enum OperatorType
     public boolean hasSamePrecedenceAs(OperatorType other) {
         return this.precedence == other.precedence;
     }
+    
+    
     
     public boolean isArithmeticOperator() {
         return this.arithmeticOperator;

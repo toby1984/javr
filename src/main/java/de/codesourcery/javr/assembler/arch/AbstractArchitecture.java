@@ -29,6 +29,8 @@ import org.apache.log4j.Logger;
 import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Register;
+import de.codesourcery.javr.assembler.RelocationHelper;
+import de.codesourcery.javr.assembler.RelocationHelper.RelocationInfo;
 import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.InstructionEncoder.Transform;
 import de.codesourcery.javr.assembler.elf.Relocation;
@@ -672,18 +674,18 @@ public abstract class AbstractArchitecture implements IArchitecture
         if ( encoding.mayNeedRelocation && context.isGenerateRelocations() ) 
         {
             // code is simple her as 8-bit AVRs will only require relocation of either the src or destination but not both arguments
-            Symbol symbolNeedingRelocation = null;
-            if ( srcArgument != null && ( symbolNeedingRelocation = InstructionNode.getSymbolNeedingRelocation( srcArgument , context ) ) != null ) 
+            RelocationInfo relocationInfo = null;
+            if ( srcArgument != null && ( relocationInfo = RelocationHelper.getRelocationInfo( srcArgument , context.currentSymbolTable() ) ) != null ) 
             {
+                final Relocation reloc = getRelocation(encoding,insn,srcArgument,encoding.srcType,relocationInfo,context);
                 dstValue = (int) getDstValue( dstArgument , encoding.dstType , context , false );                
-                srcValue = 0; // output zero address as linker calculates final address by adding the relocation addent to this value
-                final Relocation reloc = getRelocation(encoding,insn,srcArgument,encoding.srcType,symbolNeedingRelocation,context);
+                srcValue = reloc.s; // output zero address as linker calculates final address by adding the relocation addent to this value
                 context.addRelocation( reloc );
             } 
-            else if (dstArgument != null && ( symbolNeedingRelocation = InstructionNode.getSymbolNeedingRelocation( dstArgument , context ) ) != null  ) {
-                dstValue = 0;  // output zero address as linker calculates final address by adding the relocation addent to this value
+            else if (dstArgument != null && ( relocationInfo = RelocationHelper.getRelocationInfo( dstArgument , context.currentSymbolTable() ) ) != null  ) {
+                final Relocation reloc = getRelocation(encoding,insn,dstArgument,encoding.dstType,relocationInfo,context );
+                dstValue = reloc.s;  // output zero address as linker calculates final address by adding the relocation addent to this value
                 srcValue = (int) getSrcValue( srcArgument , encoding.srcType , context , false );  
-                final Relocation reloc = getRelocation(encoding,insn,dstArgument,encoding.dstType,symbolNeedingRelocation,context );
                 context.addRelocation( reloc );
             } else {
                 dstValue = (int) getDstValue( dstArgument , encoding.dstType , context , false );                     
@@ -714,8 +716,9 @@ public abstract class AbstractArchitecture implements IArchitecture
         }
     }
 
-    private Relocation getRelocation(InstructionEncoding encoding, InstructionNode node, ASTNode argument,ArgumentType argType,Symbol symbolNeedingRelocation,ICompilationContext context) 
+    private Relocation getRelocation(InstructionEncoding encoding, InstructionNode node, ASTNode argument,ArgumentType argType,RelocationInfo relocationInfo,ICompilationContext context) 
     {
+        final Symbol symbolNeedingRelocation = relocationInfo.symbol;
         final Relocation result = new Relocation( symbolNeedingRelocation );
         result.locationOffset = node.getMemoryLocation().getByteAddress();
 
@@ -768,6 +771,7 @@ public abstract class AbstractArchitecture implements IArchitecture
                 throw new RuntimeException("Internal error,unhandled instruction argument type: "+argType);
         }
         result.addend = addend;
+        result.s = relocationInfo.s;
         result.kind = kind;
         return result;
     }

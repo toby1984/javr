@@ -34,6 +34,8 @@ public class Relocation
      */
     public int addend;
     
+    public int s;
+    
     /**
      * Offset within the section where to apply this relocation
      */

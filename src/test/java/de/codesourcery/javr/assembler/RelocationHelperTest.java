@@ -17,14 +17,13 @@ public class RelocationHelperTest extends AbstractCompilerTest
            
            final AST ast = compilationUnit.getAST();
            final InstructionNode insn = (InstructionNode) ast.child(0).child(0);
-           final Evaluated converted = RelocationHelper.convert( insn.src() );
-           final Evaluated reduced = RelocationHelper.reduce( converted , compilationUnit.getSymbolTable() );
+           final Evaluated reduced = RelocationHelper.convert( insn.src() );
+           RelocationHelper.reduceFully( reduced , compilationUnit.getSymbolTable() );
            
            assertNull( RelocationHelper.getRelocationInfo( insn.src() , compilationUnit.getSymbolTable() ) );
            
            assertEquals( 0 , reduced.childCount() );
            assertEquals( 10 , reduced.value );
-           assertEquals( 10 , converted.value );
     }
     
     public void testReduce2() throws IOException 
@@ -33,8 +32,8 @@ public class RelocationHelperTest extends AbstractCompilerTest
            
            final AST ast = compilationUnit.getAST();
            final InstructionNode insn = (InstructionNode) ast.child(0).child(0);
-           final Evaluated converted = RelocationHelper.convert( insn.src() );
-           final Evaluated reduced = RelocationHelper.reduce( converted , compilationUnit.getSymbolTable() );
+           final Evaluated reduced = RelocationHelper.convert( insn.src() );
+           RelocationHelper.reduceFully( reduced , compilationUnit.getSymbolTable() );
            
            assertNull( RelocationHelper.getRelocationInfo( insn.src() , compilationUnit.getSymbolTable() ) );
            
@@ -48,8 +47,8 @@ public class RelocationHelperTest extends AbstractCompilerTest
            
            final AST ast = compilationUnit.getAST();
            final InstructionNode insn = (InstructionNode) ast.child(0).child(0);
-           final Evaluated converted = RelocationHelper.convert( insn.src() );
-           final Evaluated reduced = RelocationHelper.reduce( converted , compilationUnit.getSymbolTable() );
+           final Evaluated reduced = RelocationHelper.convert( insn.src() );
+           RelocationHelper.reduceFully( reduced , compilationUnit.getSymbolTable() );
            
            final List<Pair> list = RelocationHelper.toPairs( reduced );
            assertEquals( 1 , list.size() );
@@ -67,8 +66,8 @@ public class RelocationHelperTest extends AbstractCompilerTest
            
            final AST ast = compilationUnit.getAST();
            final InstructionNode insn = (InstructionNode) ast.child(0).child(0);
-           final Evaluated converted = RelocationHelper.convert( insn.src() );
-           final Evaluated reduced = RelocationHelper.reduce( converted , compilationUnit.getSymbolTable() );
+           final Evaluated reduced = RelocationHelper.convert( insn.src() );
+           RelocationHelper.reduceFully( reduced , compilationUnit.getSymbolTable() );
            
            assertNull( RelocationHelper.getRelocationInfo( insn.src() , compilationUnit.getSymbolTable() ) );
            
@@ -82,8 +81,8 @@ public class RelocationHelperTest extends AbstractCompilerTest
            
            final AST ast = compilationUnit.getAST();
            final InstructionNode insn = (InstructionNode) ast.child(0).child(0);
-           final Evaluated converted = RelocationHelper.convert( insn.src() );
-           final Evaluated reduced = RelocationHelper.reduce( converted , compilationUnit.getSymbolTable() );
+           final Evaluated reduced = RelocationHelper.convert( insn.src() );
+           RelocationHelper.reduceFully( reduced , compilationUnit.getSymbolTable() );
            
            assertNull( RelocationHelper.getRelocationInfo( insn.src() , compilationUnit.getSymbolTable() ) );
            
@@ -98,8 +97,8 @@ public class RelocationHelperTest extends AbstractCompilerTest
            
            final AST ast = compilationUnit.getAST();
            final InstructionNode insn = (InstructionNode) ast.child(0).child(0);
-           final Evaluated converted = RelocationHelper.convert( insn.src() );
-           final Evaluated reduced = RelocationHelper.reduce( converted , compilationUnit.getSymbolTable() );
+           final Evaluated reduced = RelocationHelper.convert( insn.src() );
+           RelocationHelper.reduceFully( reduced , compilationUnit.getSymbolTable() );
            
            assertFalse( reduced.isNumber() );
            
@@ -116,8 +115,8 @@ public class RelocationHelperTest extends AbstractCompilerTest
            
            final AST ast = compilationUnit.getAST();
            final InstructionNode insn = (InstructionNode) ast.child(0).child(0);
-           final Evaluated converted = RelocationHelper.convert( insn.src() );
-           final Evaluated reduced = RelocationHelper.reduce( converted , compilationUnit.getSymbolTable() );
+           final Evaluated reduced = RelocationHelper.convert( insn.src() );
+           RelocationHelper.reduceFully( reduced , compilationUnit.getSymbolTable() );
            
            assertFalse( reduced.isNumber() );
            
@@ -135,8 +134,8 @@ public class RelocationHelperTest extends AbstractCompilerTest
            
            final AST ast = compilationUnit.getAST();
            final InstructionNode insn = (InstructionNode) ast.child(0).child(0);
-           final Evaluated converted = RelocationHelper.convert( insn.src() );
-           final Evaluated reduced = RelocationHelper.reduce( converted , compilationUnit.getSymbolTable() );
+           final Evaluated reduced = RelocationHelper.convert( insn.src() );
+           RelocationHelper.reduceFully( reduced , compilationUnit.getSymbolTable() );
            
            assertTrue( reduced.isNumber() );
            assertEquals( 2 , reduced.value );
@@ -153,8 +152,8 @@ public class RelocationHelperTest extends AbstractCompilerTest
            
            final AST ast = compilationUnit.getAST();
            final InstructionNode insn = (InstructionNode) ast.child(0).child(0);
-           final Evaluated converted = RelocationHelper.convert( insn.src() );
-           final Evaluated reduced = RelocationHelper.reduce( converted , compilationUnit.getSymbolTable() );
+           final Evaluated reduced = RelocationHelper.convert( insn.src() );
+           RelocationHelper.reduceFully( reduced , compilationUnit.getSymbolTable() );
            
            assertTrue( reduced.isNumber() );
            assertEquals( 5 , reduced.value );
@@ -171,8 +170,8 @@ public class RelocationHelperTest extends AbstractCompilerTest
            
            final AST ast = compilationUnit.getAST();
            final InstructionNode insn = (InstructionNode) ast.child(0).child(0);
-           final Evaluated converted = RelocationHelper.convert( insn.src() );
-           final Evaluated reduced = RelocationHelper.reduce( converted , compilationUnit.getSymbolTable() );
+           final Evaluated reduced = RelocationHelper.convert( insn.src() );
+           RelocationHelper.reduceFully( reduced , compilationUnit.getSymbolTable() );
            
            assertTrue( reduced.isNumber() );
            assertEquals( 5 , reduced.value );
@@ -189,8 +188,8 @@ public class RelocationHelperTest extends AbstractCompilerTest
            
            final AST ast = compilationUnit.getAST();
            final InstructionNode insn = (InstructionNode) ast.child(0).child(0);
-           final Evaluated converted = RelocationHelper.convert( insn.src() );
-           final Evaluated reduced = RelocationHelper.reduce( converted , compilationUnit.getSymbolTable() );
+           final Evaluated reduced = RelocationHelper.convert( insn.src() );
+           RelocationHelper.reduceFully( reduced , compilationUnit.getSymbolTable() );
            
            assertTrue( reduced.isNumber() );
            assertEquals( 6 , reduced.value );
