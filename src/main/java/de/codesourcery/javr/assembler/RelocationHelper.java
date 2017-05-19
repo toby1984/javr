@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 
+import org.apache.commons.beanutils.converters.AbstractArrayConverter;
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.arch.AbstractAchitecture;
@@ -13,21 +14,25 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.ExpressionNode;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
+import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
 import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.symbols.Symbol.Type;
+import jdk.internal.org.objectweb.asm.commons.GeneratorAdapter;
 
 public class RelocationHelper 
 {
     public static final class RelocationInfo 
     {
         public final Symbol symbol;
+        public final int s;
         public final int addent;
 
-        public RelocationInfo(Symbol symbol, int addent) {
+        public RelocationInfo(Symbol symbol, int addent,int s) {
             this.symbol = symbol;
             this.addent = addent;
+            this.s = s;
         }
 
         public boolean isSameSymbol(Symbol other) 
@@ -56,8 +61,26 @@ public class RelocationHelper
             this.astNode = astNode;
         }        
 
+        @Override
+        public String toString() 
+        {
+            return "Evaluated[ value="+value+",node: "+astNode+"]";
+        }
+        
         public boolean isOperator() {
             return astNode.isOperatorNode();
+        }
+        
+        public OperatorType getOperatorType() {
+            return ((OperatorNode) astNode).type;
+        }
+        
+        public boolean hasChildren() {
+            return childCount() != 0 ;
+        }
+        
+        public boolean hasNoChildren() {
+            return childCount() == 0 ;
         }
         
         public void replaceChild(Evaluated oldChild,Evaluated newChild) 
@@ -149,16 +172,34 @@ public class RelocationHelper
             children.add( child );
             child.parent = this;
         }
+
+        public void removeChildren() {
+            this.children.clear();
+        }
+
+        public boolean hasParent() {
+            return parent != null;
+        }
+
+        public boolean hasReloctableIdentifier(SymbolTable table) 
+        {
+            return isIdentifierInNeedOfRelocation( astNode , table );
+        }
+
+        public Symbol getSymbol() 
+        {
+            return ((IdentifierNode) astNode).getSymbol();
+        }
     }
     
-    public static RelocationInfo getRelocatableInfo(ASTNode node,SymbolTable symbolTable) 
+    public static RelocationInfo getRelocationInfo(ASTNode node,SymbolTable symbolTable) 
     {
-        if ( mightNeedRelocation(node,symbolTable ) ) 
+        if ( mayNeedRelocation(node,symbolTable ) ) 
         {
             final Evaluated tree = convert( node );
             while( true ) 
             {
-                reduce( tree );
+                reduce( tree , symbolTable );
                 if ( tree.isNumber() ) // trivial case: expression reduced to a single number 
                 {
                     return null;
@@ -195,21 +236,179 @@ public class RelocationHelper
              * 
              * Relocatability: If two terms are defined in the same control section, they are characterized as having the same relocatability attribute.
              */
-        }
+            final List<Pair> pairs = toPairs( tree );
+            if ( pairs.size() == 1) 
+            {
+                final Pair pair = pairs.get(0);
+                final boolean hasConstantValue = pair.hasConstantValue();
+                final boolean hasRelocatableSymbol = pair.hasRelocatableIdentifiers( symbolTable );
+                if ( hasConstantValue && ! hasRelocatableSymbol )
+                {
+                    return null;
+                }
+                if ( hasConstantValue && hasRelocatableSymbol ) 
+                {
+                    final Number value = pair.getConstantValue();
+                    final Symbol symbol = pair.getRelocatableSymbol( symbolTable );
+                    final int address = getAddress( symbol );
+                    return new RelocationInfo(symbol,address , value.intValue() );
+                }
+                if ( ! hasConstantValue && hasRelocatableSymbol ) {
+                    final Symbol symbol = pair.getRelocatableSymbol( symbolTable );
+                    final int address = getAddress( symbol );
+                    return new RelocationInfo(symbol,address , 0 );
+                }
+                // no constant and no symbol ??
+                throw new RuntimeException("Internal error,unreachable code reached");
+            } 
+            else {
+                throw new RuntimeException("Internal error,unexpected pair count "+pairs.size());
+            }
+        } 
         return null;
     }
+    
+    static List<Pair> toPairs(Evaluated tree) 
+    {
+        final List<Pair> result = new ArrayList<>();
+        toPairs(tree,result);
+        return result;
+    }
+    
+    private static void toPairs(Evaluated tree,List<Pair> result) 
+    {
+        if ( tree.hasNoChildren() ) 
+        {
+            result.add( new Pair(tree) );
+            return;
+        }
+        tree.visitDepthFirst( node -> 
+        {
+            if ( node.isOperator() ) 
+            {
+                if ( node.childCount() == 0 ) {
+                    result.add( new Pair( node ) );
+                    return;
+                }
+                
+                for ( int i = 0 , len = node.childCount() ; i < len ; i++ ) {
+                    if ( node.child(i).hasChildren() ) {
+                        return;
+                    }
+                }
+                if ( node.childCount() == 1 ) {
+                    result.add( new Pair( node ) );
+                } else if ( node.childCount() == 2 ) {
+                    result.add( new Pair( node.child(0) , node.child(1) ) );
+                } else {
+                    throw new RuntimeException("Internal error, unhandled Evaluated with "+node.childCount()+" children ?");
+                }
+            }
+        });
+    }
+    
+    static final class Pair 
+    {
+        public final Evaluated p1;
+        public final Evaluated p2;
+        
+        public Pair(Evaluated p1) 
+        {
+            this(p1,null);
+        }
+        
+        public boolean hasConstantValue() 
+        {
+            return p1IsNumber() || p2IsNumber();
+        }
+        
+        public Symbol getRelocatableSymbol(SymbolTable table) 
+        {
+            Symbol s1 = null;
+            Symbol s2 = null;
+            if ( p1IsSymbol( table ) ) {
+                s1 = p1.getSymbol();
+            }
+            if ( p2IsSymbol( table ) ) {
+                s2 = p2.getSymbol();
+            }
+            if ( s1 != null && s2 != null ) 
+            {
+                throw new UnsupportedOperationException("Invoked on pair "+this+" that has two relocatable symbols");
+            }
+            return s1 != null ? s1 : s2;
+        }
+        
+        public boolean p1IsNumber() {
+            return p1.isNumber();
+        }
+        
+        public boolean p2IsNumber() {
+            return p2 != null && p2.isNumber();
+        }
+        
+        public boolean p1IsSymbol(SymbolTable table) {
+            return p1.hasReloctableIdentifier( table );
+        }
+        
+        public boolean p2IsSymbol(SymbolTable table) {
+            return p2 != null && p2.hasReloctableIdentifier( table );
+        }        
+        
+        public Number getConstantValue() 
+        {
+            Number n1 = p1IsNumber()  ? (Number) p1.value : null;
+            Number n2 = p2IsNumber()  ? (Number) p2.value : null;
+            if ( n1 != null && n2 != null ) 
+            {
+                // hm, we failed to reduce this term...
+                throw new IllegalStateException("Each pair is expected to contain at most one number after reduce(), something went wrong");
+            }
+            final Number result = n1 != null ? n1 : n2;
+            if ( result == null ) {
+                throw new UnsupportedOperationException("getConstantValue() called on instance that has no constant value?");
+            }
+            return result;
+        }
+        
+        public boolean hasRelocatableIdentifiers(SymbolTable table) {
+            return p1.hasReloctableIdentifier(table) || ( p2 != null && p2.hasReloctableIdentifier(table) );
+        }
+        
+        public Pair(Evaluated p1,Evaluated p2) 
+        {
+            if ( p1 == null ) {
+                throw new IllegalArgumentException("p1 cannot be NULL");
+            }
+            this.p1 = p1;
+            this.p2 = p2;
+        }
+        
+        public boolean isComplete() 
+        {
+            return p1 != null && p2 != null;
+        }
+        
+        @Override
+        public String toString() {
+            if ( p1 != null && p2 != null ) {
+                return "Pair[ p1="+p1+" , p2="+p2+"]";
+            }
+            return "Pair[ "+p1+" ]";
+        }
+    }
 
-    private static boolean mightNeedRelocation(ASTNode node,SymbolTable symbolTable) 
+    static boolean mayNeedRelocation(ASTNode node,SymbolTable symbolTable) 
     {
         return node.visitDepthFirstWithResult( false , (n,ctx) -> 
         {
-            if ( isAddressIdentifierNode( n , symbolTable ) ) {
+            if ( isIdentifierInNeedOfRelocation( n , symbolTable ) ) {
                 ctx.stop( true );
             }
         });
     }     
     
-    private static boolean isAddressIdentifierNode(ASTNode node,SymbolTable symbolTable) 
+    static boolean isIdentifierInNeedOfRelocation(ASTNode node,SymbolTable symbolTable) 
     {
         if ( node instanceof IdentifierNode) 
         {
@@ -218,7 +417,7 @@ public class RelocationHelper
         return false;
     }    
 
-    private static boolean pushDownConstants(Evaluated input) 
+    static boolean pushDownConstants(Evaluated input) 
     {
         final boolean[] nodesReordered = {false};
         final Consumer<Evaluated> visitor = new Consumer<Evaluated>() 
@@ -263,7 +462,7 @@ public class RelocationHelper
         return nodesReordered[0];
     }
     
-    private static Evaluated convert(ASTNode subtree) 
+    static Evaluated convert(ASTNode subtree) 
     {
         if ( subtree instanceof ExpressionNode ) 
         {
@@ -277,16 +476,18 @@ public class RelocationHelper
         return result;
     }
 
-    private static Evaluated reduce(Evaluated n)
+    static Evaluated reduce(Evaluated n,SymbolTable symbolTable)
     {
-        if ( n.isNumber() || n.children.isEmpty() ) {
+        if ( n.isNumber() ) {
             return n;
         }
         final ASTNode subtree = n.astNode;
         if ( subtree.hasNoChildren() )
         {
             final Object value;
-            if ( subtree instanceof IdentifierNode) {
+            if ( subtree instanceof NumberLiteralNode ) {
+                value = ((NumberLiteralNode) subtree).getValue();
+            } else if ( subtree instanceof IdentifierNode) {
                 final Symbol symbol = ((IdentifierNode) subtree).getSymbol();
                 if ( symbol == null ) {
                     throw new RuntimeException("AST node "+subtree+" has NULL symbol ?");
@@ -318,10 +519,30 @@ public class RelocationHelper
             final OperatorNode op= subtree.asOperator();
             if ( op.type.getArgumentCount() == 2 ) 
             {
-                Evaluated v1 = reduce( n.child(0) );
-                Evaluated v2 = reduce( n.child(1) );
+                Evaluated v1 = reduce( n.child(0) , symbolTable );
+                Evaluated v2 = reduce( n.child(1) , symbolTable );
                 if ( !(v1.isNumber() && v2.isNumber() ) ) 
                 {
+                    // special case where we do symA - symB / symA + symB
+                    if ( isIdentifierInNeedOfRelocation( v1.astNode , symbolTable ) && isIdentifierInNeedOfRelocation( v2.astNode , symbolTable ) ) 
+                    {
+                        if ( op.type == OperatorType.BINARY_MINUS || op.type == OperatorType.PLUS ) 
+                        {
+                            Symbol sym1 = getSymbol( v1.astNode );
+                            Symbol sym2 = getSymbol( v2.astNode );
+                            
+                            if ( sym1.getSegment() != sym2.getSegment() ) {
+                                throw new RuntimeException("Expression must not refer to symbols in different segments");
+                            }
+                            if ( op.type == OperatorType.BINARY_MINUS ) {
+                                n.value = getAddress( sym1 ) - getAddress( sym2 );
+                            } else {
+                                n.value = getAddress( sym1 ) + getAddress( sym2 );
+                            }
+                            n.removeChildren();
+                            return n;
+                        }
+                    }
                     return n;
                 } 
                 int value1 = ((Number) v1.value).intValue();
@@ -342,6 +563,7 @@ public class RelocationHelper
                         throw new RuntimeException("Operator not allowed in relocatable expression: "+op.type);
                 }
                 n.value = result;
+                n.removeChildren();
                 return n;
             }
             if ( op.type.getArgumentCount() == 1 ) 
@@ -350,7 +572,7 @@ public class RelocationHelper
                 {
                     case BITWISE_NEGATION:
                     case UNARY_MINUS:
-                        Evaluated v1 = reduce( n.child(0) );
+                        Evaluated v1 = reduce( n.child(0) , symbolTable  );
                         if ( v1.isNumber() ) 
                         {
                             final int num = ((Number) v1.value).intValue();
@@ -370,5 +592,18 @@ public class RelocationHelper
             throw new RuntimeException("Internal error,unhandled operator node in expression: "+subtree);
         }
         throw new IllegalArgumentException("Called with AST node that is not a valid part of a relocatable expression");
+    }
+ 
+    static int getAddress(Symbol s) 
+    {
+        long result = AbstractAchitecture.toIntValue( s.getValue() );
+        if ( result == AbstractAchitecture.VALUE_UNAVAILABLE) {
+            throw new RuntimeException("Internal error,failed to determine address of symbol "+s);
+        }
+        return (int) result;
+    }
+    
+    static Symbol getSymbol(ASTNode node) {
+        return ((IdentifierNode) node).getSymbol();
     }
 }
