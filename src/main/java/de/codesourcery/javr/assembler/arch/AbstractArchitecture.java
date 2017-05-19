@@ -45,9 +45,9 @@ import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
 import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
-public abstract class AbstractAchitecture implements IArchitecture 
+public abstract class AbstractArchitecture implements IArchitecture 
 {
-    private static final Logger LOG = Logger.getLogger(AbstractAchitecture.class);
+    private static final Logger LOG = Logger.getLogger(AbstractArchitecture.class);
 
     public static final long VALUE_UNAVAILABLE= 0xdeadabcdbeefdeadL;
 
@@ -412,7 +412,7 @@ public abstract class AbstractAchitecture implements IArchitecture
     // TODO: Currently not used as I had trouble decoding the instructions reliably...might improve disassembler performance though
     protected final PrefixTree prefixTree = new PrefixTree();
 
-    public AbstractAchitecture() 
+    public AbstractArchitecture() 
     {
         initInstructions();
 

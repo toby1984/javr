@@ -19,7 +19,7 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Segment;
-import de.codesourcery.javr.assembler.arch.AbstractAchitecture;
+import de.codesourcery.javr.assembler.arch.AbstractArchitecture;
 import de.codesourcery.javr.assembler.elf.Relocation;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.TextRegion;
@@ -225,8 +225,8 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
                 if ( symbol != null && symbol.hasType( Type.ADDRESS_LABEL ) ) 
                 {
                     final Relocation reloc = new Relocation( symbol );
-                    final long tmp = AbstractAchitecture.toIntValue( symbol.getValue() );
-                    if ( tmp == AbstractAchitecture.VALUE_UNAVAILABLE ) {
+                    final long tmp = AbstractArchitecture.toIntValue( symbol.getValue() );
+                    if ( tmp == AbstractArchitecture.VALUE_UNAVAILABLE ) {
                         throw new RuntimeException("Internal error, failed to get value for "+symbol);
                     }
                     // avr-as seems to always generate this relocations relative to the start of the .text segment

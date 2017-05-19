@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 
-import de.codesourcery.javr.assembler.arch.AbstractAchitecture.InstructionEncoding;
+import de.codesourcery.javr.assembler.arch.AbstractArchitecture.InstructionEncoding;
 
 /**
  * A binary prefix tree used to look up instructions my bit patterns.

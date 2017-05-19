@@ -24,7 +24,7 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Instruction;
-import de.codesourcery.javr.assembler.arch.AbstractAchitecture;
+import de.codesourcery.javr.assembler.arch.AbstractArchitecture;
 import de.codesourcery.javr.assembler.parser.OperatorType;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.symbols.Symbol;

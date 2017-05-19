@@ -8,7 +8,7 @@ import java.util.function.Consumer;
 import org.apache.commons.beanutils.converters.AbstractArrayConverter;
 import org.apache.commons.lang3.Validate;
 
-import de.codesourcery.javr.assembler.arch.AbstractAchitecture;
+import de.codesourcery.javr.assembler.arch.AbstractArchitecture;
 import de.codesourcery.javr.assembler.parser.OperatorType;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.ExpressionNode;
@@ -505,8 +505,8 @@ public class RelocationHelper
             } 
             else 
             {
-                final long tmp = AbstractAchitecture.toIntValue( ((IValueNode) subtree).getValue() );
-                if ( tmp == AbstractAchitecture.VALUE_UNAVAILABLE ) {
+                final long tmp = AbstractArchitecture.toIntValue( ((IValueNode) subtree).getValue() );
+                if ( tmp == AbstractArchitecture.VALUE_UNAVAILABLE ) {
                     throw new RuntimeException("Failed to evaluate "+subtree);
                 }
                 value = (int) tmp;
@@ -596,8 +596,8 @@ public class RelocationHelper
  
     static int getAddress(Symbol s) 
     {
-        long result = AbstractAchitecture.toIntValue( s.getValue() );
-        if ( result == AbstractAchitecture.VALUE_UNAVAILABLE) {
+        long result = AbstractArchitecture.toIntValue( s.getValue() );
+        if ( result == AbstractArchitecture.VALUE_UNAVAILABLE) {
             throw new RuntimeException("Internal error,failed to determine address of symbol "+s);
         }
         return (int) result;

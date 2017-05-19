@@ -21,7 +21,7 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.Register;
 import de.codesourcery.javr.assembler.Segment;
-import de.codesourcery.javr.assembler.arch.AbstractAchitecture;
+import de.codesourcery.javr.assembler.arch.AbstractArchitecture;
 import de.codesourcery.javr.assembler.arch.Architecture;
 import de.codesourcery.javr.assembler.arch.InstructionEncoder;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
@@ -32,7 +32,7 @@ import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
  *
  * @author tobias.gierke@code-sourcery.de
  */
-public class ATMega88 extends AbstractAchitecture 
+public class ATMega88 extends AbstractArchitecture 
 {
     protected void initInstructions()
     {
