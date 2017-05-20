@@ -75,58 +75,6 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
                 a.getCompilationUnit().hasSameResourceAs( b.getCompilationUnit() );             
     }    
 
-    public static Symbol getSymbolNeedingRelocation(ASTNode node, ICompilationContext context) 
-    {
-        final SymbolTable symbolTable = context.currentSymbolTable();
-        final Symbol[] result = { null };
-
-        final IASTVisitor visitor = new IASTVisitor() 
-        {
-            @Override
-            public void visit(ASTNode node, IIterationContext<?> ctx) 
-            {
-                // deal with special cases 
-                if ( node instanceof OperatorNode) 
-                {
-                    final OperatorNode op = (OperatorNode) node;
-                    // subtraction between addresses in same segment doesn't need relocation
-                    if ( op.getOperatorType() == OperatorType.BINARY_MINUS ) 
-                    {
-                        final ASTNode child0 = unwrapExpression( op.child(0) );
-                        final ASTNode child1 = unwrapExpression( op.child(1) );
-                        if ( isAddressIdentifierNode(child0 , symbolTable) && isAddressIdentifierNode( child1 , symbolTable) ) 
-                        {
-                            // (label1-label2) expressions don't need relocation
-                            ctx.dontGoDeeper();
-                        }
-                    } 
-                    else if ( op.getOperatorType() == OperatorType.UNARY_MINUS ) // 0 - address doesn't need special case 
-                    {
-                        final ASTNode child0 = unwrapExpression( op.child(0) );
-                        if ( isAddressIdentifierNode( child0 , symbolTable ) ) 
-                        {
-                            ctx.dontGoDeeper();
-                        }
-                    }
-                } 
-                else if ( isAddressIdentifierNode( node , symbolTable ) )
-                {
-                    final Symbol symbol = ((IdentifierNode) node).safeGetSymbol();
-                    if ( result[0] == null ) 
-                    {
-                        result[0] = symbol;
-                    } 
-                    else if ( ! isSameSymbol( result[0] , symbol ) ) 
-                    {
-                        throw new RuntimeException("Expression is not relocatable as it refers to more than one symbol: First: "+result[0]+", offender: "+symbol);
-                    }
-                }
-            }
-        };
-        node.visitBreadthFirst( visitor );
-        return result[0];
-    }
-    
     public ASTNode src() {
         return child(1);
     }

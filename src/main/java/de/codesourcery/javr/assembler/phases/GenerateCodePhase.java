@@ -22,6 +22,7 @@ import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.ICompilationContext;
+import de.codesourcery.javr.assembler.RelocationHelper;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
@@ -158,7 +159,7 @@ public class GenerateCodePhase extends AbstractPhase
                     final boolean checkForRelocation =  directive == Directive.INIT_WORDS && ! isInResolvePhase && context.isGenerateRelocations();
                     for ( ASTNode child : node.children() ) 
                     {
-                        final boolean relocated = checkForRelocation && InstructionNode.getSymbolNeedingRelocation( child , context ) != null;
+                        final boolean relocated = checkForRelocation && RelocationHelper.getRelocationInfo( child ) != null;
                         Object value = ((IValueNode) child).getValue();
                         final int[] data;
                         if ( isInResolvePhase ) 

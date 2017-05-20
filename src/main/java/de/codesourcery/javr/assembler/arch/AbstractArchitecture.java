@@ -675,16 +675,16 @@ public abstract class AbstractArchitecture implements IArchitecture
         {
             // code is simple her as 8-bit AVRs will only require relocation of either the src or destination but not both arguments
             RelocationInfo relocationInfo = null;
-            if ( srcArgument != null && ( relocationInfo = RelocationHelper.getRelocationInfo( srcArgument , context.currentSymbolTable() ) ) != null ) 
+            if ( srcArgument != null && ( relocationInfo = RelocationHelper.getRelocationInfo( srcArgument ) ) != null ) 
             {
                 final Relocation reloc = getRelocation(encoding,insn,srcArgument,encoding.srcType,relocationInfo,context);
                 dstValue = (int) getDstValue( dstArgument , encoding.dstType , context , false );                
-                srcValue = reloc.s; // output zero address as linker calculates final address by adding the relocation addent to this value
+                srcValue = 0; // output zero address as linker calculates final address by adding the relocation addent to this value
                 context.addRelocation( reloc );
             } 
-            else if (dstArgument != null && ( relocationInfo = RelocationHelper.getRelocationInfo( dstArgument , context.currentSymbolTable() ) ) != null  ) {
+            else if (dstArgument != null && ( relocationInfo = RelocationHelper.getRelocationInfo( dstArgument ) ) != null  ) {
                 final Relocation reloc = getRelocation(encoding,insn,dstArgument,encoding.dstType,relocationInfo,context );
-                dstValue = reloc.s;  // output zero address as linker calculates final address by adding the relocation addent to this value
+                dstValue = 0;  // output zero address as linker calculates final address by adding the relocation addent to this value
                 srcValue = (int) getSrcValue( srcArgument , encoding.srcType , context , false );  
                 context.addRelocation( reloc );
             } else {
@@ -718,25 +718,16 @@ public abstract class AbstractArchitecture implements IArchitecture
 
     private Relocation getRelocation(InstructionEncoding encoding, InstructionNode node, ASTNode argument,ArgumentType argType,RelocationInfo relocationInfo,ICompilationContext context) 
     {
-        final Symbol symbolNeedingRelocation = relocationInfo.symbol;
-        final Relocation result = new Relocation( symbolNeedingRelocation );
+        final Relocation result = new Relocation( relocationInfo.symbol );
         result.locationOffset = node.getMemoryLocation().getByteAddress();
-
-        final long localAdr = toIntValue( symbolNeedingRelocation.getValue() );
-        if ( localAdr == VALUE_UNAVAILABLE ) 
-        {
-            throw new RuntimeException("Internal error, don't know how to turn symbol value "+symbolNeedingRelocation.getValue()+" into an int ?");
-        }  
-        
-        final int addend = (int) localAdr;
+        result.addend = relocationInfo.addent + relocationInfo.s;
 
         final Relocation.Kind kind;
         switch( argType ) 
         {
             // // andi // cbr // cpi // ldi // sbci // ori,sbr // subi
             case EIGHT_BIT_CONSTANT:
-                final int expressionTypeBitMask = classifyExpression( argument , context.currentSymbolTable() );                
-                kind = Relocation.Kind.get8BitLDIRelocation( expressionTypeBitMask );
+                kind = Relocation.Kind.get8BitLDIRelocation( relocationInfo.expressionFlags );
                 break;
                 // I/O registers: // cbi,sbi,sbic,sbis
             case FIVE_BIT_IO_REGISTER_CONSTANT:
@@ -770,8 +761,6 @@ public abstract class AbstractArchitecture implements IArchitecture
             default:
                 throw new RuntimeException("Internal error,unhandled instruction argument type: "+argType);
         }
-        result.addend = addend;
-        result.s = relocationInfo.s;
         result.kind = kind;
         return result;
     }
@@ -789,90 +778,6 @@ public abstract class AbstractArchitecture implements IArchitecture
             return VALUE_UNAVAILABLE;
         }
         return result;
-    }
-
-    private int classifyExpression(ASTNode argument,SymbolTable symbolTable) 
-    {
-        int result = 0;
-        ASTNode toInspect = maybeUnwrapExpression(argument);
-        if ( argument instanceof FunctionCallNode) {
-            final FunctionCallNode fn = (FunctionCallNode) argument;
-            if ( fn.functionName.equals( FunctionCallNode.BUILDIN_FUNCTION_HIGH ) ) {
-                result |= Relocation.EXPR_FLAG_HI;
-                toInspect = maybeUnwrapExpression( fn.child(0) );                
-            } else if ( fn.functionName.equals( FunctionCallNode.BUILDIN_FUNCTION_LOW ) ) {
-                result |= Relocation.EXPR_FLAG_LO;
-                toInspect = maybeUnwrapExpression( fn.child(0) );
-            } else {
-                throw new RuntimeException("Internal error,unknown function: "+fn);
-            }
-        }
-        if ( toInspect instanceof OperatorNode) 
-        {
-            final OperatorNode op = (OperatorNode) toInspect;
-            if ( op.type == OperatorType.PLUS || op.type == OperatorType.BINARY_MINUS) {
-                // ok, plus and minus are operations we know how to relocate
-            } 
-            else if ( op.type == OperatorType.SHIFT_RIGHT ) 
-            {
-                final ASTNode rhs = maybeUnwrapExpression( op.rhs() );
-                // check RHS of >> 
-                if ( rhs instanceof IValueNode ) 
-                {
-                    // TODO: we should actually make sure that the RHS does not refer to any address symbols...
-                    Object value = ((IValueNode) rhs).getValue();
-                    if ( value instanceof Number == false ) {
-                        throw new RuntimeException("Internal error - expression has value '"+value+"' which is not a constant ?");                        
-                    }
-                    if ( ((Number) value).intValue() != 1 ) {
-                        throw new RuntimeException("Non-relocatable right-shift operator ; only right-shifts by 1 can be relocated");
-                    }
-                    result |= Relocation.EXPR_FLAG_PM; // division by 2
-                } else {
-                    throw new RuntimeException("Non-relocatable right-shift operator,argument does not resolve to a IValueNode");
-                }
-                // check LHS of expression , only <address> or -<address> are supported
-                final ASTNode lhs = maybeUnwrapExpression( op.lhs() );
-                if ( lhs instanceof IdentifierNode && ((IdentifierNode) lhs).refersToAddressSymbol( symbolTable ) ) 
-                {
-                    // <adr>
-                } 
-                else if ( isNegatedAddress( lhs , symbolTable ) ) // -<adr> 
-                {
-                    result |= Relocation.EXPR_FLAG_NEG; 
-                } else {
-                    throw new RuntimeException("Internal error, LHS of right-shift operator does not refer to an address symbol ?"); 
-                }
-            } 
-            else if ( isNegatedAddress( op , symbolTable ) )
-            {
-                result |= Relocation.EXPR_FLAG_NEG;
-            } 
-            else {
-                throw new RuntimeException("Internal error, not a recognized relocatable expression");
-            }
-        }
-        return result;
-    }
-
-    private boolean isNegatedAddress(ASTNode node, SymbolTable symbolTable) 
-    {
-        ASTNode op = maybeUnwrapExpression( node );
-        if ( op instanceof OperatorNode && ((OperatorNode) op).type == OperatorType.UNARY_MINUS ) 
-        {
-            final ASTNode child = maybeUnwrapExpression( op.child(0) );
-            return child instanceof IdentifierNode && ((IdentifierNode) child).refersToAddressSymbol( symbolTable );
-        }
-        return false;
-    }
-
-    private ASTNode maybeUnwrapExpression(ASTNode node) 
-    {
-        ASTNode toInspect = node;
-        while ( toInspect instanceof ExpressionNode ) {
-            toInspect = toInspect.child(0);
-        }
-        return toInspect;
     }
 
     private void debugAssembly(InstructionNode node,final InstructionEncoding encoding, final int dstValue,final int srcValue, final int instruction) 

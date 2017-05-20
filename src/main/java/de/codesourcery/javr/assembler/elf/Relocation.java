@@ -34,8 +34,6 @@ public class Relocation
      */
     public int addend;
     
-    public int s;
-    
     /**
      * Offset within the section where to apply this relocation
      */
@@ -52,7 +50,7 @@ public class Relocation
      * If set to NULL , relocation will be based on
      * the symbol's address instead (addent = symbol address).
      */
-    public Segment relocateRelativeToSegment=null;
+    public Segment relocateRelativeToStartOf=null;
 
     /**
      * LDI relocation type (bitmask value): HIGH(x)

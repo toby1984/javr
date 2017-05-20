@@ -18,6 +18,8 @@ package de.codesourcery.javr.assembler.parser.ast;
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
+import de.codesourcery.javr.assembler.RelocationHelper;
+import de.codesourcery.javr.assembler.RelocationHelper.RelocationInfo;
 import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.AbstractArchitecture;
 import de.codesourcery.javr.assembler.elf.Relocation;
@@ -221,18 +223,14 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
             int offset = context.currentOffset();
             for ( ASTNode child : children() ) 
             {
-                final Symbol symbol = InstructionNode.getSymbolNeedingRelocation( child , context );
-                if ( symbol != null && symbol.hasType( Type.ADDRESS_LABEL ) ) 
+                final RelocationInfo info = RelocationHelper.getRelocationInfo( child );
+                if ( info != null )
                 {
-                    final Relocation reloc = new Relocation( symbol );
-                    final long tmp = AbstractArchitecture.toIntValue( symbol.getValue() );
-                    if ( tmp == AbstractArchitecture.VALUE_UNAVAILABLE ) {
-                        throw new RuntimeException("Internal error, failed to get value for "+symbol);
-                    }
+                    final Relocation reloc = new Relocation( info.symbol );
                     // avr-as seems to always generate this relocations relative to the start of the .text segment
                     // instead of using addent=0 and relative to the symbol itself ...
-                    reloc.relocateRelativeToSegment = Segment.FLASH;
-                    reloc.addend = (int) (tmp);
+                    reloc.relocateRelativeToStartOf = info.symbol.getSegment();
+                    reloc.addend = info.addent + info.s;
                     reloc.locationOffset = offset;
                     reloc.kind = Relocation.Kind.R_AVR_16;
                     context.addRelocation( reloc );
