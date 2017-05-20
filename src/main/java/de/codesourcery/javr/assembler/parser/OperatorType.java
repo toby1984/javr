@@ -387,11 +387,10 @@ public enum OperatorType
         return null;
     }
     
-    public boolean isPlusMinusTimesDivide() 
+    public boolean isPlusTimes() 
     {
-        switch( this ) {
-            case BINARY_MINUS:
-            case DIVIDE:
+        switch( this ) 
+        {
             case PLUS:
             case TIMES:
                 return true;

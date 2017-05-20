@@ -172,8 +172,9 @@ public class RelocationHelperTest extends AbstractCompilerTest
            final InstructionNode insn = (InstructionNode) ast.child(0).child(0);
            final Evaluated reduced = RelocationHelper.convert( insn.src() );
            RelocationHelper.reduceFully( reduced , compilationUnit.getSymbolTable() );
+           System.out.println( reduced.printTree() );
            
-           assertTrue( reduced.isNumber() );
+           assertTrue( "Expression should've been reduced to a number" , reduced.isNumber() );
            assertEquals( 5 , reduced.value );
            
            final RelocationInfo info = RelocationHelper.getRelocationInfo( insn.src() , compilationUnit.getSymbolTable() );
@@ -181,6 +182,49 @@ public class RelocationHelperTest extends AbstractCompilerTest
     }
     
     public void testReduce11() throws IOException 
+    {
+           compile( "ldi r16, 3+label2 - label1\n"
+                   + "label1: .word 1\n"
+                   + "label2:\n");
+           
+           final AST ast = compilationUnit.getAST();
+           final InstructionNode insn = (InstructionNode) ast.child(0).child(0);
+           final Evaluated reduced = RelocationHelper.convert( insn.src() );
+           System.out.println( "Converted: \n"+reduced.printTree() );
+           
+           RelocationHelper.reduceFully( reduced , compilationUnit.getSymbolTable() );
+           System.out.println( reduced.printTree() );
+           
+           assertTrue( "Expression should've been reduced to a number" , reduced.isNumber() );
+           assertEquals( 5 , reduced.value );
+           
+           final RelocationInfo info = RelocationHelper.getRelocationInfo( insn.src() , compilationUnit.getSymbolTable() );
+           assertNull(info);
+    }    
+    
+    public void testReduce12() throws IOException 
+    {
+           compile( "ldi r16, 6+label2 - 4 + label1+7-1+3\n" // 6 - 4 + 7 - 1 + 3 = 11 
+                   + "label1: .word 1\n"
+                   + "label2:\n");
+           
+           final AST ast = compilationUnit.getAST();
+           final InstructionNode insn = (InstructionNode) ast.child(0).child(0);
+           final Evaluated reduced = RelocationHelper.convert( insn.src() );
+           System.out.println( "Converted: \n"+reduced.printExpression() );
+           
+           RelocationHelper.reduceFully( reduced , compilationUnit.getSymbolTable() );
+           System.out.println( reduced.printExpression() );
+           
+           RelocationHelper.reduceFully( reduced , compilationUnit.getSymbolTable() );
+           assertTrue( "Expression should've been reduced to a number" , reduced.isNumber() );
+           assertEquals( 5 , reduced.value );
+           
+           final RelocationInfo info = RelocationHelper.getRelocationInfo( insn.src() , compilationUnit.getSymbolTable() );
+           assertNull(info);
+    }     
+    
+    public void testReduce13() throws IOException
     {
            compile( "ldi r16, label2+label1\n"
                    + "label1: .word 1\n"
