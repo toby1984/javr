@@ -14,13 +14,17 @@
 void framebuffer_write_string(char *string,int x,int y);
 void print_hex(char value);
 void print(char* s);
-
+void print_dec(char value);
+    
 static char hexChars[] = {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'};
 static char cursorx=0;
 static char cursory=0;
+static char keyboard_buffer[128];
 
 int main() 
 {
+        char bytes_read;
+        
         i2c_setup( LCD_ADR );
         
         if ( ! lcd_reset_display() ) {
@@ -33,19 +37,63 @@ int main()
             goto error;
         }
         
-        framebuffer_clear();              
+        framebuffer_clear();           
+        framebuffer_update_display();    
 
-        for ( int i = 255 ; i >= 0 ; i--) {
-          print_hex( i );       
-          framebuffer_update_display();    
-          util_msleep(64);
-        }         
-
-//         framebuffer_scroll_up();
-//         framebuffer_update_display();   
+        ps2_reset();
+        framebuffer_clear();  
+        framebuffer_write_string("waiting",0,0);        
+        framebuffer_update_display();          
+        while ( 1 ) 
+        {
+            bytes_read = ps2_read_byte( &keyboard_buffer[0] , sizeof(keyboard_buffer) );
+            // 0xff on timeout error, 0xfe on parity error, 0xfd on start-bit error , 0xfc on stop-bit error
+            if ( bytes_read == 0xff ) {
+                    print("timeout error");                       
+                    framebuffer_update_display();                  
+            } else if ( bytes_read == 0xfe ) {
+                    print("parity error");                       
+                    framebuffer_update_display();                  
+            } else if ( bytes_read == 0xfd ) {
+                    print("start bit error");                           
+                    framebuffer_update_display();                  
+            } else if ( bytes_read == 0xfc ) {
+                    print("stop bit error");                           
+                    framebuffer_update_display();        
+            } else if ( bytes_read == 0xfb ) {
+                    print("buffer full");                           
+                    framebuffer_update_display();                      
+            } else if ( bytes_read > 0 && bytes_read < 127 ) {
+                    print("received ");     
+//                     print_dec( bytes_read );
+                     for ( char ptr = 0 ; ptr < bytes_read ; ptr++) {
+                       print_hex( keyboard_buffer[ptr] );
+                     }
+                    framebuffer_update_display();                    
+            }                
+        }        
 error:
         while (1 ) {
         }
+}
+
+void print_dec(char value) {
+          
+    char buffer[4];
+    int ptr = 0;
+    
+    if ( value >= 100 ) {
+        buffer[ptr++] = '0' + (value/100);
+        value -= (value/100)*100;
+    }
+    if ( value >= 10 ) {
+        buffer[ptr++] = '0' + (value/10);
+        value -= (value/10)*10;
+    }    
+    buffer[ptr++] = '0' + value;
+    buffer[ptr++] = 0;
+    
+    print( &buffer[0] );    
 }
 
 void print_hex(char value) 
@@ -69,14 +117,14 @@ void framebuffer_write_string(char *string,int x,int y) {
    
       while ( *string ) 
       {
-         framebuffer_write_char( *string++, currentX, currentY);
-         if ( ++currentX >= COLUMNS ) {
+         if ( currentX >= COLUMNS ) {
             currentX=0;
             if ( ++currentY >= ROWS ) {
               framebuffer_scroll_up();
               currentY = ROWS-1;
             }
-         }  
+         }            
+         framebuffer_write_char( *string++, currentX++, currentY);
       }
       cursorx = currentX;
       cursory = currentY;

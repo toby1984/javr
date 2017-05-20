@@ -599,7 +599,17 @@ public abstract class AbstractArchitecture implements IArchitecture
 
         final EncodingEntry variants;
         
-        if (  mnemonic.equalsIgnoreCase("clr" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for clr ... 
+        if (  mnemonic.equalsIgnoreCase("rol" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for rol ... 
+        {
+            variants = lookupInstruction( "adc" );
+            // turn "rol rX" into "ADC rX,rX"
+            insn = (InstructionNode) insn.createCopy( true );
+            if ( insn.childCount() == 1 ) 
+            {
+                insn.addChild( insn.child(0).createCopy( true ) );
+            }
+        }  
+        else if (  mnemonic.equalsIgnoreCase("clr" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for clr ... 
         {
             variants = lookupInstruction( "eor" );
             // turn "CLR rX" into "EOR rX,rX"

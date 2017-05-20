@@ -50,6 +50,9 @@ Return values:
 .equ loop_count = (CPU_FREQUENCY/1000)/3-3 ; - 3 loop iterations (=9 cycles) for instructions before/after loop
 
 ; PINs
+.equ PS2_CLK_PIN = 2
+.equ PS2_DATA_PIN = 3
+
 .equ DISPLAY_RESET_PIN = 4
 .equ GREEN_LED_PIN = 6
 .equ RED_LED_PIN = 7
@@ -232,7 +235,7 @@ framebuffer_scroll_up:
           ldi r30, LOW(framebuffer+7*8*BYTES_PER_ROW) ; Z
 	ldi r27 , HIGH(BYTES_PER_ROW*8) ; X
 	ldi r26 , LOW(BYTES_PER_ROW*8)	
-	ldi r18,0xff
+	ldi r18,0x00
 .clrloop
 	st Z+,r18
 	sbiw r27:r26,1
@@ -565,35 +568,64 @@ lcd_reset_display:
 
 	ret
 
+; ==== debugging helper
+
+debug_toggle_green_led:
+         sbic PIND,GREEN_LED_PIN ; skip if LED is off
+         rjmp debug_green_led_off
+         rjmp debug_green_led_on
+
+debug_toggle_red_led:
+         sbic PIND,RED_LED_PIN ; skip if LED is off
+         rjmp debug_red_led_off
+         rjmp debug_red_led_on
+
 ; ======
 ; Switch green LED.
 ; INPUT: r24 - either 0 to disable or anything else to enable
 ; ======
 debug_green_led:
-	sbi DDRD,GREEN_LED_PIN ; set to output
           tst r24
-          brne enable
-          cbi PORTD, GREEN_LED_PIN
-          ret
-.enable
+          breq debug_green_led_off
+debug_green_led_on:
+	sbi DDRD,GREEN_LED_PIN ; set to output
 	sbi PORTD,GREEN_LED_PIN
+          ret
+
+debug_green_led_off:
+	sbi DDRD,GREEN_LED_PIN ; set to output
+	cbi PORTD,GREEN_LED_PIN
+          ret
+                
+; ======
+; Switch red LED.
+; INPUT: r24 - either 0 to disable or anything else to enable
+; ======
+debug_red_led:
+          tst r24
+          breq debug_red_led_off
+debug_red_led_on:
+	sbi DDRD,RED_LED_PIN ; set to output
+	sbi PORTD,RED_LED_PIN
+          ret
+
+debug_red_led_off:
+	sbi DDRD,RED_LED_PIN ; set to output
+	cbi PORTD,RED_LED_PIN
           ret
 
 ; ======
 ; Blink red LED.
 ; INPUT: r24 - number of times to blink
 ; ======
-debug_blink_red:
-          mov r26,r24          
+debug_blink_red:   
 .loop    
-          cbi PORTD, RED_LED_PIN
-          rcall sleep_500_ms
-          cbi PORTD, RED_LED_PIN
-          tst r26
+          rcall debug_red_led_off
+          tst r24
           breq back
-          sbi  PORTD, RED_LED_PIN
+          rcall debug_red_led_on
           rcall sleep_500_ms
-          dec r26
+          dec r24
           rjmp loop
 .back
           ret
@@ -603,26 +635,14 @@ debug_blink_red:
 ; SCRATCHED: r24
 ; ======
 sleep_500_ms:
+          push r24
           ldi r24, 250
           rcall util_msleep
           ldi r24, 250
           rcall util_msleep
+          pop r24
           ret
-                
-; ======
-; Switch red LED.
-; INPUT: r24 - either 0 to disable or anything else to enable
-; ======
-debug_red_led:
-	sbi DDRD,RED_LED_PIN ; set to output
-          tst r24
-          brne enable
-          cbi PORTD, RED_LED_PIN
-          ret
-.enable
-	sbi PORTD,RED_LED_PIN
-          ret
-     
+
 ; ====
 ; send command.
 ; INPUT: r24 - command table entry index 
@@ -703,7 +723,185 @@ sleep_one_ms:
 .loop1
 	sbiw r27:r26,1 ; 2 cycles
 	brne loop1 ; 1 if condition is false, otherwise 2 
-	ret ; 4 cles
+	ret ; 4 cycles
+
+; =====
+; Resets the PS/2 configuration
+; SCRATCHED: nothing
+; =====
+ps2_reset:
+; .equ PS2_CLK_PIN = 2
+; .equ PS2_DATA_PIN = 3
+;	cbi DDRD,^ ; set to input
+;          sbi PORTD,DISPLAY_RESET_PIN ; Enable pull-up resisstor
+;        cbi DDRB,TRIGGER_PIN ; set to input
+	cbi DDRD,PS2_CLK_PIN ; set to input
+	cbi DDRD,PS2_DATA_PIN ; set to input
+
+          ; cbi PORTD, CLK_PIN
+          ; cbi PORTD, PS2_DATA_PIN
+          ret
+
+; ======
+; Read bytes from the PS/2 keyboard
+; INPUT: r24 - low byte of destination in SRAM
+; INPUT: r25 - hi byte of destination in SRAM
+; INPUT: r22 - size of destination in SRAM
+; RESULT: r24 - Number of bytes read,0xff on timeout error, 0xfe on parity error, 0xfd on start-bit error , 0xfc on stop-bit error, 0xfb = buffer overflow
+; ======
+ps2_read_byte:
+         movw r31:r30,r25:r24
+         ldi r24,0 ; set number of bytes received to zero
+; wait for device to start sending
+         rcall ps2_wait_data_low
+         brcs back ; timeout
+.read_byte
+; read start bit (this one is always zero)
+         rcall ps2_read_bit ; scratches r20,r26,r27
+         tst r20
+         breq timeout_error ; timeout
+         brcs start_bit_error ; error, start bit should be a zero bit
+
+; read 8 data bits
+         ldi r18,8 ; bit count
+         ldi r23,0x00 ; received byte
+.data_loop
+          rcall ps2_read_bit ; scratches r20,r26,r27
+          tst r20
+          breq timeout_error
+          ror r23 ; shift-in carry bit
+          dec r18
+          brne data_loop
+; read parity bit
+          ldi r21,0 ;=> temp parity bit storage
+          rcall ps2_read_bit
+          tst r20
+          breq timeout_error
+          brcc parity_not_set
+          ldi r21,1 ; parity bit set ; The parity bit is set if there is an even number of 1's in the data bits and reset (0) if there is an odd number of 1's in the data bits
+.parity_not_set
+; check parity
+;          rcall ps2_calc_parity ; scratches r18,r19,r20
+;          cp r21,r18
+;          brne parity_error
+;          rcall debug_toggle_red_led
+; read stop bit (always 1)
+          rcall ps2_read_bit ; scratches r20,r26,r27
+          tst r20
+          breq timeout_error
+          brcc stop_bit_error
+; store byte
+          cp r24,r22 ; check bytes written against buffer size
+          breq buffer_overflow_error ; => target buffer is full
+          st Z+,r23 ; write byte to buffer
+          inc r24 ; inc bytes written counter
+          rjmp read_byte
+          
+.back
+          ret
+.timeout_error
+          tst r24
+          brne already_bytes_received ; we received at least one byte, sender probably stopped
+          ldi r24,3
+          debug_blink_red
+          ldi r24,0xff
+.already_bytes_received
+          ret
+.parity_error
+          ldi r24,0xfe
+          ret
+.start_bit_error
+          ldi r24,0xfd
+          ret
+.stop_bit_error
+          ldi r24,0xfc
+          ret
+.buffer_overflow_error
+          ldi r24,0xfb
+          ret
+; ==== Calculate odd parity
+; INPUT: r23 - byte to calculate parity for
+; RESULT: r18 - parity
+; SCRATCHED: r18,r19,r20
+; =====
+; The parity bit is set if there is an even number of 1's in the data bits and reset (0) if there is an odd number of 1's in the data bits
+ps2_calc_parity:
+           mov r19,r23
+           ldi r18,0
+           ldi r20,8
+.calc_loop
+           rol r19
+           brcc zero_bit
+           inc r18
+.zero_bit
+           dec r20
+           brne calc_loop
+           com r18
+           andi r18,1
+           ret       
+; =====
+; Read one bit from PS/2.
+; RESULT: Carry set = 1-bit , Carry clear = 0-bit
+; RESULT: r20 - not zero => ok , zero => timeout         
+; SCRATCHED: r20,r26,r27
+; =====
+ps2_read_bit:
+          ldi r26,0xff
+          ldi r27,0xff
+.wait_clk_low
+          sbis PIND,PS2_CLK_PIN ; skip if bit set
+          rjmp clk_low ; => bit clear
+          sbiw r27:r26,1
+          brne wait_clk_low
+          rjmp timeout       
+.clk_low
+; now read data line (abuse r20 for storage)        
+          sbic PIND,PS2_DATA_PIN
+          rjmp one_bit
+.zero_bit ldi r20,0  
+          rjmp cont
+.one_bit  ldi r20,1
+.cont
+          ldi r26,0xff
+          ldi r27,0xff
+.wait_clk_hi
+          sbic PIND,PS2_CLK_PIN ; skip if bit clear
+          rjmp return
+          sbiw r27:r26,1
+          brne wait_clk_hi
+          rjmp timeout  
+.return          
+          clc ; carry indicates received bit
+          tst r20
+          breq received_zero_bit
+          sec ; received one bit
+.received_zero_bit
+          ldi r20,1 ; => success
+          ret
+.timeout
+	clr r20 ; => failure
+          ret
+
+; ====================
+; wait for data line to go low
+; SCRATCHED: r26,r27
+; RESULT: Carry clear => success , Carry set => timeout
+; ===================
+ps2_wait_data_low:
+          ldi r26,0xff
+          ldi r27,0xff
+.loop
+          sbis PIND,PS2_DATA_PIN ; skip if bit set
+          rjmp data_low ; => bit clear
+          sbiw r27:r26,1
+          brne loop
+          sec
+	ret
+.data_low
+          clc
+          ret
+
+; ======================== DATA ======================
 
 commands: .dw cmd1,2
           .dw cmd2,3

@@ -283,24 +283,17 @@ public class ElfFile
                          */
                         writer.writeWord( r.locationOffset , Endianess.LITTLE );
                         final int symbolTableIdx;
-                        if ( r.relocateRelativeToStartOf != null ) 
-                        {
-                            if ( r.relocateRelativeToStartOf == Segment.FLASH ) {
+                        switch( r.symbol.getSegment() ) {
+                            case FLASH:
                                 symbolTableIdx = symbolTable.indexOf( symbolTable.textSectionSymbol );
-                            } else if ( r.relocateRelativeToStartOf == Segment.SRAM ) {
+                                break;
+                            case SRAM:
                                 symbolTableIdx = symbolTable.indexOf( symbolTable.dataSectionSymbol );
-                            } else {
-                                throw new RuntimeException("Not implemented - relocation relative to start of segment "+r.relocateRelativeToStartOf);
-                            }
-                        } 
-                        else if ( r.symbol.isLocalLabel() ) { // avr-gcc does relocations of local labels always relative to their segment 
-                            if ( r.symbol.getSegment() != Segment.FLASH ) { // we currently only support local labels within the text segment
-                                throw new RuntimeException("Internal error, relocation of symbol "+r.symbol+" that is not in .text segment ?");
-                            }
-                            symbolTableIdx = symbolTable.indexOf( symbolTable.textSectionSymbol );
-                        } else {
-                            symbolTableIdx = symbolTable.indexOf( symbolTable.textSectionSymbol );
+                                break;
+                            default:
+                                throw new RuntimeException("Not implemented - relocation relative to "+r.symbol.getSegment());
                         }
+
                         final int typeAndSymbolIdx = symbolTableIdx<<8 | r.kind.elfId;
                         writer.writeWord( typeAndSymbolIdx , Endianess.LITTLE );
                         writer.writeWord( r.addend , Endianess.LITTLE );

@@ -45,14 +45,6 @@ public class Relocation
     public final Symbol symbol;
     
     /**
-     * Segment used to determine starting address
-     * when writing ELF relocation info.
-     * If set to NULL , relocation will be based on
-     * the symbol's address instead (addent = symbol address).
-     */
-    public Segment relocateRelativeToStartOf=null;
-
-    /**
      * LDI relocation type (bitmask value): HIGH(x)
      */
     public static final int EXPR_FLAG_HI = 1;

@@ -27,3 +27,16 @@ extern void util_msleep(char millis);
 extern void debug_green_led(char enable);
 extern void debug_red_led(char enable);
 extern void debug_blink_red(char count);
+extern void debug_green_led_on(void);
+extern void debug_green_led_off(void);
+extern void debug_red_led_on(void);
+extern void debug_red_led_off(void);
+
+extern void debug_toggle_green_led(void);
+extern void debug_toggle_red_led(void);
+
+/*
+ * PS/2 methods
+ */
+extern void ps2_reset();
+extern char ps2_read_byte(char *buffer,char bufsize);
