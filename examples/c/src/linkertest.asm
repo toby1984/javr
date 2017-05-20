@@ -730,16 +730,8 @@ sleep_one_ms:
 ; SCRATCHED: nothing
 ; =====
 ps2_reset:
-; .equ PS2_CLK_PIN = 2
-; .equ PS2_DATA_PIN = 3
-;	cbi DDRD,^ ; set to input
-;          sbi PORTD,DISPLAY_RESET_PIN ; Enable pull-up resisstor
-;        cbi DDRB,TRIGGER_PIN ; set to input
 	cbi DDRD,PS2_CLK_PIN ; set to input
 	cbi DDRD,PS2_DATA_PIN ; set to input
-
-          ; cbi PORTD, CLK_PIN
-          ; cbi PORTD, PS2_DATA_PIN
           ret
 
 ; ======
@@ -781,10 +773,9 @@ ps2_read_byte:
           ldi r21,1 ; parity bit set ; The parity bit is set if there is an even number of 1's in the data bits and reset (0) if there is an odd number of 1's in the data bits
 .parity_not_set
 ; check parity
-;          rcall ps2_calc_parity ; scratches r18,r19,r20
-;          cp r21,r18
-;          brne parity_error
-;          rcall debug_toggle_red_led
+          rcall ps2_calc_parity ; scratches r18,r19,r20
+          cp r21,r18
+          brne parity_error
 ; read stop bit (always 1)
           rcall ps2_read_bit ; scratches r20,r26,r27
           tst r20
@@ -802,8 +793,6 @@ ps2_read_byte:
 .timeout_error
           tst r24
           brne already_bytes_received ; we received at least one byte, sender probably stopped
-          ldi r24,3
-          debug_blink_red
           ldi r24,0xff
 .already_bytes_received
           ret
