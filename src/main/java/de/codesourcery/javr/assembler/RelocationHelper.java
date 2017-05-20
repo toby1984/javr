@@ -37,13 +37,11 @@ public class RelocationHelper
        // bitmask that may contain hint bits Relocation.EXPR_FLAG_HI | Relocation.EXPR_FLAG_LO | Relocation.EXPR_FLAG_PM | Relocation.EXPR_FLAG_NEG 
         public int expressionFlags; 
         public final Symbol symbol;
-        public final int s;
         public final int addent;
 
-        public RelocationInfo(Symbol symbol, int addent,int s) {
+        public RelocationInfo(Symbol symbol, int addent) {
             this.symbol = symbol;
             this.addent = addent;
-            this.s = s;
         }
 
         public RelocationInfo withFlags(int expressionFlags ) {
@@ -363,7 +361,7 @@ public class RelocationHelper
             if ( ! root.hasChildren() ) 
             {
                 // not a number and no children => must be a symbol that needs resolving
-                return new RelocationInfo( root.getSymbol() , getAddress( root.getSymbol() ) , 0 );
+                return new RelocationInfo( root.getSymbol() , getAddress( root.getSymbol() ) );
             }
             // not a number and has children
             if ( root.astNode instanceof FunctionCallNode ) 
@@ -384,7 +382,7 @@ public class RelocationHelper
                     {
                         // at this point can only be func( label ) or func( -label )
                         if ( toInspect.child(0).isRelocatableSymbol() ) {
-                            return new RelocationInfo( toInspect.child(0).getSymbol() , toInspect.child(0).getAddress() , 0 ).withFlags( expressionFlags );
+                            return new RelocationInfo( toInspect.child(0).getSymbol() , toInspect.child(0).getAddress() ).withFlags( expressionFlags );
                         }
                         toInspect = toInspect.child(0);
                         if ( toInspect.isOperator( OperatorType.UNARY_MINUS ) ) {
@@ -409,14 +407,14 @@ public class RelocationHelper
                             throw new RuntimeException("Expected a relocatable symbol as LHS of right-shift operator");
                         }
                         expressionFlags |= Relocation.EXPR_FLAG_PM;
-                        return new RelocationInfo(  n1.getSymbol() , getAddress( n1.getSymbol() ) , 0 ).withFlags( expressionFlags );
+                        return new RelocationInfo(  n1.getSymbol() , getAddress( n1.getSymbol() ) ).withFlags( expressionFlags );
                     }
 
                     if ( n1.isRelocatableSymbol() && n2.isConstantValue() ) {
-                        return new RelocationInfo(  n1.getSymbol() , getAddress( n1.getSymbol() ) , ((Number) n2.value).intValue() ).withFlags( expressionFlags );
+                        return new RelocationInfo(  n1.getSymbol() , getAddress( n1.getSymbol() ) + ((Number) n2.value).intValue() ).withFlags( expressionFlags );
                     } 
                     if ( n1.isConstantValue() && n2.isRelocatableSymbol() ) {
-                        return new RelocationInfo(  n2.getSymbol() , getAddress( n2.getSymbol() ) , ((Number) n1.value).intValue() ).withFlags( expressionFlags );
+                        return new RelocationInfo(  n2.getSymbol() , getAddress( n2.getSymbol() ) + ((Number) n1.value).intValue() ).withFlags( expressionFlags );
                     }                    
                 }
             } 
@@ -434,10 +432,10 @@ public class RelocationHelper
                     Evaluated n2 = root.rightChild();
 
                     if ( n1.isRelocatableSymbol() && n2.isConstantValue() ) {
-                        return new RelocationInfo(  n1.getSymbol() , getAddress( n1.getSymbol() ) , ((Number) n2.value).intValue() );
+                        return new RelocationInfo(  n1.getSymbol() , getAddress( n1.getSymbol() ) + ((Number) n2.value).intValue() );
                     } 
                     if ( n1.isConstantValue() && n2.isRelocatableSymbol() ) {
-                        return new RelocationInfo(  n2.getSymbol() , getAddress( n2.getSymbol() ) , ((Number) n1.value).intValue() );
+                        return new RelocationInfo(  n2.getSymbol() , getAddress( n2.getSymbol() ) + ((Number) n1.value).intValue() );
                     }
                 }
             }

@@ -299,7 +299,7 @@ public class ElfFile
                             }
                             symbolTableIdx = symbolTable.indexOf( symbolTable.textSectionSymbol );
                         } else {
-                            symbolTableIdx = symbolTable.indexOf( r.symbol );
+                            symbolTableIdx = symbolTable.indexOf( symbolTable.textSectionSymbol );
                         }
                         final int typeAndSymbolIdx = symbolTableIdx<<8 | r.kind.elfId;
                         writer.writeWord( typeAndSymbolIdx , Endianess.LITTLE );

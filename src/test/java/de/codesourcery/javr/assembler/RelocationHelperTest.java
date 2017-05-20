@@ -105,7 +105,6 @@ public class RelocationHelperTest extends AbstractCompilerTest
         assertEquals( 0 , reloc.expressionFlags );
         assertTrue( reloc.symbol instanceof Symbol);
         assertEquals( 2 , reloc.addent );
-        assertEquals( 0 , reloc.s );              
     }    
 
     public void testReduce7() throws IOException 
@@ -124,8 +123,7 @@ public class RelocationHelperTest extends AbstractCompilerTest
         assertNotNull(reloc);
         assertEquals( 0 , reloc.expressionFlags );
         assertTrue( reloc.symbol instanceof Symbol);
-        assertEquals( 2 , reloc.addent );
-        assertEquals( 10 , reloc.s );           
+        assertEquals( 2+10 , reloc.addent );
     }
 
     public void testReduce8() throws IOException 
@@ -261,8 +259,7 @@ public class RelocationHelperTest extends AbstractCompilerTest
         assertNotNull(info);
         assertEquals( info.expressionFlags , Relocation.EXPR_FLAG_HI );
         assertEquals( "framebuffer" , info.symbol.name().value ); 
-        assertEquals( 2 , info.addent ); 
-        assertEquals( 448 , info.s ); 
+        assertEquals( 2 + 448, info.addent ); 
     }
 
     public void testReduce15() throws IOException 
@@ -315,8 +312,7 @@ public class RelocationHelperTest extends AbstractCompilerTest
         assertNotNull( reloc );
         assertEquals( reloc.expressionFlags , Relocation.EXPR_FLAG_HI );
         assertEquals( "label" , reloc.symbol.name().value ); 
-        assertEquals( 2 , reloc.addent );
-        assertEquals( 10 , reloc.s );
+        assertEquals( 2 + 10 , reloc.addent );
     }
 
     public void testReduce18() throws IOException 
@@ -338,7 +334,6 @@ public class RelocationHelperTest extends AbstractCompilerTest
         assertEquals( Relocation.EXPR_FLAG_HI | Relocation.EXPR_FLAG_PM  , reloc.expressionFlags );
         assertEquals( "label1" , reloc.symbol.name().value );            
         assertEquals( 2 , reloc.addent );
-        assertEquals( 0 , reloc.s );           
     }
 
     public void testReduce19() throws IOException 
@@ -360,7 +355,6 @@ public class RelocationHelperTest extends AbstractCompilerTest
         assertEquals( Relocation.EXPR_FLAG_LO | Relocation.EXPR_FLAG_PM  , reloc.expressionFlags );
         assertEquals( "label1" , reloc.symbol.name().value );            
         assertEquals( 2 , reloc.addent );
-        assertEquals( 0 , reloc.s );           
     } 
 
     public void testReduce20() throws IOException 
@@ -382,7 +376,6 @@ public class RelocationHelperTest extends AbstractCompilerTest
         assertEquals( Relocation.EXPR_FLAG_LO | Relocation.EXPR_FLAG_PM | Relocation.EXPR_FLAG_NEG , reloc.expressionFlags );
         assertEquals( "label1" , reloc.symbol.name().value );            
         assertEquals( 2 , reloc.addent );
-        assertEquals( 0 , reloc.s );           
     }     
 
     public void testReduce21() throws IOException 
@@ -404,7 +397,6 @@ public class RelocationHelperTest extends AbstractCompilerTest
         assertEquals( Relocation.EXPR_FLAG_LO | Relocation.EXPR_FLAG_NEG , reloc.expressionFlags );
         assertEquals( "label1" , reloc.symbol.name().value );            
         assertEquals( 2 , reloc.addent );
-        assertEquals( 0 , reloc.s );           
     }   
 
     public void testReduce22() throws IOException 
@@ -426,7 +418,6 @@ public class RelocationHelperTest extends AbstractCompilerTest
         assertEquals( Relocation.EXPR_FLAG_HI | Relocation.EXPR_FLAG_NEG , reloc.expressionFlags );
         assertEquals( "label1" , reloc.symbol.name().value );            
         assertEquals( 2 , reloc.addent );
-        assertEquals( 0 , reloc.s );           
     }   
     
     public void testReduce23() throws IOException 
@@ -449,7 +440,6 @@ public class RelocationHelperTest extends AbstractCompilerTest
         assertEquals( 0 , reloc.expressionFlags );
         assertEquals( "cmd1" , reloc.symbol.name().value );
         assertEquals( 2 , reloc.addent );
-        assertEquals( 0 , reloc.s );           
     }      
 
 }

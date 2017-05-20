@@ -34,18 +34,11 @@ import de.codesourcery.javr.assembler.RelocationHelper.RelocationInfo;
 import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.InstructionEncoder.Transform;
 import de.codesourcery.javr.assembler.elf.Relocation;
-import de.codesourcery.javr.assembler.parser.OperatorType;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
-import de.codesourcery.javr.assembler.parser.ast.ExpressionNode;
-import de.codesourcery.javr.assembler.parser.ast.FunctionCallNode;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
-import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
-import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
-import de.codesourcery.javr.assembler.symbols.Symbol;
-import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 public abstract class AbstractArchitecture implements IArchitecture 
 {
@@ -720,8 +713,7 @@ public abstract class AbstractArchitecture implements IArchitecture
     {
         final Relocation result = new Relocation( relocationInfo.symbol );
         result.locationOffset = node.getMemoryLocation().getByteAddress();
-        result.addend = relocationInfo.addent + relocationInfo.s;
-
+        result.addend = relocationInfo.addent;
         final Relocation.Kind kind;
         switch( argType ) 
         {

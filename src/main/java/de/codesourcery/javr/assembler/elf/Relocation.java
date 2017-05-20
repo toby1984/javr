@@ -42,7 +42,7 @@ public class Relocation
     /**
      * The symbol this relocation refers to
      */
-    public Symbol symbol;
+    public final Symbol symbol;
     
     /**
      * Segment used to determine starting address

@@ -230,7 +230,7 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
                     // avr-as seems to always generate this relocations relative to the start of the .text segment
                     // instead of using addent=0 and relative to the symbol itself ...
                     reloc.relocateRelativeToStartOf = info.symbol.getSegment();
-                    reloc.addend = info.addent + info.s;
+                    reloc.addend = info.addent;
                     reloc.locationOffset = offset;
                     reloc.kind = Relocation.Kind.R_AVR_16;
                     context.addRelocation( reloc );
