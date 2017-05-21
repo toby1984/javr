@@ -769,17 +769,14 @@ public abstract class AbstractArchitecture implements IArchitecture
 
     public static long toIntValue(Object value) 
     {
-        int result;
         if ( value instanceof Number) {
-            result = ((Number) value).intValue();
+            return ((Number) value).intValue();
         } 
         else if ( value instanceof Address) 
         {
-            result = ((Address) value).getByteAddress();
-        } else {
-            return VALUE_UNAVAILABLE;
-        }
-        return result;
+            return ((Address) value).getByteAddress();
+        } 
+        return VALUE_UNAVAILABLE;
     }
 
     private void debugAssembly(InstructionNode node,final InstructionEncoding encoding, final int dstValue,final int srcValue, final int instruction) 

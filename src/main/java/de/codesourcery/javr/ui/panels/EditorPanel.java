@@ -107,6 +107,7 @@ import de.codesourcery.javr.assembler.IObjectCodeWriter;
 import de.codesourcery.javr.assembler.ObjectCodeWriter;
 import de.codesourcery.javr.assembler.PrettyPrinter;
 import de.codesourcery.javr.assembler.Segment;
+import de.codesourcery.javr.assembler.arch.AbstractArchitecture;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
@@ -215,7 +216,7 @@ public abstract class EditorPanel extends JPanel
 	    {
 	        if ( e.getClickCount() == 1 && e.getButton() == MouseEvent.BUTTON1 ) 
 	        {
-	            final IdentifierNode node = getNode( e );
+	            final IdentifierNode node = getNodeOnlyIfCtrl( e );
 	            if ( node != null ) 
 	            {
 	                final Symbol symbol = getSymbol( node );
@@ -285,20 +286,41 @@ public abstract class EditorPanel extends JPanel
 	    @Override
 	    public void mouseMoved(MouseEvent e) 
 	    {
-            setHighlight( getNode( e ) );
+	        final IdentifierNode node = getNode( e );
+            String toolTipText = null;
+            if ( node != null ) 
+            {
+                final Symbol symbol = getSymbol( node );
+                if ( symbol != null ) {
+                    final long value = AbstractArchitecture.toIntValue( symbol.getValue() );
+                    if ( value != AbstractArchitecture.VALUE_UNAVAILABLE ) {
+                        toolTipText = symbol.name()+" = "+value+" (0x"+Integer.toHexString( (int) value )+")";
+                        System.out.println("TOOLTIP: "+toolTipText);
+                    } 
+                }
+            }
+            editor.setToolTipText( toolTipText );
+            if ( controlKeyPressed ) {
+                setHighlight( node );
+            }
 	    }
 	    
-	    private IdentifierNode getNode(MouseEvent e) 
-	    {
+        private IdentifierNode getNode(MouseEvent e) 
+        {
             point.x = e.getX();
             point.y = e.getY();
             final int pos = editor.viewToModel( point );
             ASTNode node = null;
-            if ( pos >= 0 &&  controlKeyPressed ) 
+            if ( pos >= 0 ) 
             {
                 node = astTreeModel.getAST().getNodeAtOffset( pos );
             }
             return node == null || node.getTextRegion() == null || !(node instanceof IdentifierNode)? null : (IdentifierNode) node;
+        }
+        
+	    private IdentifierNode getNodeOnlyIfCtrl(MouseEvent e) 
+	    {
+            return controlKeyPressed ? getNode( e ) : null; 
 	    }
 	}
 
@@ -1786,7 +1808,7 @@ public abstract class EditorPanel extends JPanel
 
 		final JTree tree = new JTree( astTreeModel );
 		
-		tree.addMouseListener( new MouseAdapter() 
+		final MouseAdapter mouseListener = new MouseAdapter() 
 		{
 		    public void mouseClicked(MouseEvent e) 
 		    {
@@ -1802,7 +1824,8 @@ public abstract class EditorPanel extends JPanel
 		            }
 		        }
 		    }
-		});
+		};
+        tree.addMouseListener( mouseListener);
 
 		tree.setCellRenderer( new DefaultTreeCellRenderer() 
 		{
