@@ -24,17 +24,19 @@ import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.AbstractArchitecture;
 import de.codesourcery.javr.assembler.elf.Relocation;
 import de.codesourcery.javr.assembler.parser.Identifier;
+import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.Symbol.ObjectType;
 import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 
 public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
 {
     private static final int SIZE_NOT_RESOLVED = -1;
-    
+
     public final Directive directive;
     private int sizeInBytes = SIZE_NOT_RESOLVED;
-    
+
     public static enum Directive 
     {
         ORG("org",1,1),
@@ -46,25 +48,38 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
         DEVICE("device",1,1),
         RESERVE("byte",1,1),
         INIT_BYTES("db",1,Integer.MAX_VALUE),
-        INIT_WORDS("dw",1,Integer.MAX_VALUE),
+        INIT_WORDS("dw",1,Integer.MAX_VALUE,true),
+        // generates an entry in the IRQ vector table that points the given IRQ vector entry to this method
+        // (currently relies on linker to generate the actual IRQ vector data so only works with ELF relocatable output format)
+        IRQ_ROUTINE("irq",1,1,true),
         EQU("equ" , 1 , 1 );
-        
+
         public final String literal;
         public final int minOperandCount;
         public final int maxOperandCount;
+        public final boolean mayNeedRelocation;
+
+        private Directive(String literal,int minOperandCount,int maxOperandCount) {
+            this(literal,minOperandCount,maxOperandCount,false);
+        }
         
-        private Directive(String literal,int minOperandCount,int maxOperandCount) 
+        private Directive(String literal,int minOperandCount,int maxOperandCount,boolean mayNeedRelocation) 
         {
             this.literal = literal.toLowerCase();
             this.minOperandCount = minOperandCount;
             this.maxOperandCount = maxOperandCount;
+            this.mayNeedRelocation = mayNeedRelocation;
         }
         
+        public boolean mayRequireRelocation() {
+            return false;
+        }
+
         public boolean isValidOperandCount(int actual) 
         {
             return minOperandCount <= actual && actual <= maxOperandCount;
         }
-        
+
         public static boolean isValidDirective(String s) 
         {
             if ( s != null ) {
@@ -78,7 +93,7 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
             }
             return false;
         }
-        
+
         public static Directive parse(String s) 
         {
             Directive[] v = values();
@@ -90,24 +105,24 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
             return null;
         }
     }
-    
+
     public boolean is(Directive d) {
         return d.equals( this.directive );
     }
-    
+
     private DirectiveNode(Directive directive) 
     {
         Validate.notNull(directive, "directive must not be NULL");
         this.directive = directive;
     }    
-    
+
     public DirectiveNode(Directive directive,TextRegion region) 
     {
         super(region);
         Validate.notNull(directive, "directive must not be NULL");
         this.directive = directive;
     }
-    
+
     @Override
     protected DirectiveNode createCopy() {
         if ( getTextRegion() != null ) {
@@ -115,7 +130,7 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
         }
         return new DirectiveNode(this.directive );
     }
-    
+
     /**
      * Check whether this node has a given {@link Directive type}.
      * @param type
@@ -125,7 +140,7 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
     {
         return this.directive == type;
     }
-    
+
     @Override
     public boolean hasMemoryLocation() 
     {
@@ -139,7 +154,7 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
                 return false;
         }
     }
-    
+
     private boolean resolveSize(ICompilationContext context)
     {
         switch( this.directive ) 
@@ -174,7 +189,7 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
         }  
         return sizeInBytes != SIZE_NOT_RESOLVED;
     }
-    
+
     @Override
     public int getSizeInBytes() throws IllegalStateException 
     {
@@ -215,25 +230,76 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
         }
         return false;
     }    
-    
+
     public void addRelocations(ICompilationContext context) 
     {
-        if ( context.isGenerateRelocations() && is( Directive.INIT_WORDS ) ) 
+        if ( is ( Directive.IRQ_ROUTINE ) ) 
         {
-            int offset = context.currentOffset();
-            for ( ASTNode child : children() ) 
+            LabelNode label = null;
+            StatementNode stmt = statement();
+            final ASTNode ast = stmt.getParent();
+            final int nextChild = ast.indexOf( stmt )+1;
+            final int lastChild = ast.childCount();
+            for ( int i = nextChild ; label == null && i < lastChild ; i++ ) 
             {
-                final RelocationInfo info = RelocationHelper.getRelocationInfo( child );
-                if ( info != null )
+                label = ast.child(i).visitBreadthFirstWithResult( (LabelNode) null, (node,ctx) -> 
                 {
-                    final Relocation reloc = new Relocation( info.symbol );
-                    reloc.addend = info.addent;
-                    reloc.locationOffset = offset;
-                    reloc.kind = Relocation.Kind.R_AVR_16;
-                    context.addRelocation( reloc );
-                }
-                offset += 2;
+                    if ( node instanceof LabelNode && ((LabelNode) node).isGlobal() ) {
+                        ctx.stop( (LabelNode) node);
+                    }
+                });
             }
+            if ( label == null ) {
+                context.error(".irq directive needs to be followed by a global label",this);
+                return;
+            }
+            final Symbol symbol = label.getSymbol();
+            if ( symbol.getSegment() != Segment.FLASH ) {
+                context.error(".irq directive requires a global function label within FLASH but "+symbol.name()+" isn't",this);
+                return;
+            }
+            if ( symbol.getObjectType() != ObjectType.FUNCTION ) {
+                context.error(".irq directive needs to be followed by a global FUNCTION label",this);
+                return;
+            }
+            symbol.markAsReferenced();
+            
+            final int vectorIdx = ((NumberLiteralNode) child(0)).getValue();
+            if ( vectorIdx < 0 || vectorIdx >= context.getArchitecture().getIRQVectorCount() ) 
+            {
+                context.error("IRQ vector out of range, "+context.getArchitecture().getType()+" architecture only supports IRQ vectors 0-"+(context.getArchitecture().getIRQVectorCount()-1), child(0));
+                return;
+            }
+            // 0c 94 34 00     jmp     0x68    ; 0x68 <__ctors_end>
+            final Relocation reloc = new Relocation( symbol );
+            final long addr = AbstractArchitecture.toIntValue( symbol.getValue() );
+            if ( addr == AbstractArchitecture.VALUE_UNAVAILABLE ) {
+                throw new RuntimeException("Internal error, symbol "+symbol+" has no address assigned ?");
+            }
+            reloc.addend = (int) addr;
+            reloc.locationOffset = vectorIdx*4; // each jmp instruction takes 4 bytes 
+            reloc.kind = Relocation.Kind.R_AVR_CALL;
+            context.addRelocation( reloc );            
+        }
+        else if ( context.isGenerateRelocations() )
+        { 
+            if ( is( Directive.INIT_WORDS ) ) 
+            {
+                int offset = context.currentOffset();
+                for ( ASTNode child : children() ) 
+                {
+                    final RelocationInfo info = RelocationHelper.getRelocationInfo( child );
+                    if ( info != null )
+                    {
+                        final Relocation reloc = new Relocation( info.symbol );
+                        reloc.addend = info.addent;
+                        reloc.locationOffset = offset;
+                        reloc.kind = Relocation.Kind.R_AVR_16;
+                        context.addRelocation( reloc );
+                    }
+                    offset += 2;
+                }
+            } 
         }
     }
 }

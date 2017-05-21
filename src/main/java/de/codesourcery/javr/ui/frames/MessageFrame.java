@@ -226,9 +226,12 @@ public class MessageFrame extends JInternalFrame implements IWindow
                         case ERROR:
                             result.setBackground( Color.RED );
                             break;
+                        case ATTENTION:
+                            result.setBackground( Color.ORANGE );
+                            break;
                         case WARNING:
                             result.setBackground( Color.YELLOW );
-                            break;
+                            break;                            
                         default:
                             result.setBackground( Color.WHITE );
                     }

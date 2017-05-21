@@ -68,7 +68,10 @@ Note that for reasons unknown to me the AVR assembler duplicates a lot of prepro
   - .dseg
   - .eseg
   - .equ
-  
+  - .irq <irq vector idx>
+  	- This directive currently only works when selecting ELF relocatable as output format. It generates a relocation that tell the linker to put a JMP instruction 
+          into the given IRQ vector that jumps to the next global function label following the .irq directive. The maximum IRQ vector index (zero-based) depends on the
+          project's target architecture.
 
 ## What's not implemented
 

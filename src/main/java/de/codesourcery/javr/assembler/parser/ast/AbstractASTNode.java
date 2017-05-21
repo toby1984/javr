@@ -555,4 +555,13 @@ public abstract class AbstractASTNode implements ASTNode
     {
         return false;
     }
+    
+    protected StatementNode statement() 
+    {
+        ASTNode current = this;
+        while ( current != null && !(current instanceof StatementNode) ) {
+            current = current.getParent();
+        }
+        return (StatementNode) current;
+    }
 }

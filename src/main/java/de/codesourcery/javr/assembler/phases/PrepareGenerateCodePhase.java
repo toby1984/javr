@@ -95,7 +95,7 @@ public class PrepareGenerateCodePhase extends GenerateCodePhase
         {
             private LabelNode previousGlobalLabel;
             
-            public void visit(ASTNode node,IIterationContext ctx) 
+            public void visit(ASTNode node,IIterationContext<?> ctx) 
             {
                 if ( node instanceof DirectiveNode )
                 {

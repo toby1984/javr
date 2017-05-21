@@ -129,6 +129,13 @@ public interface IArchitecture
     public int getSRAMStartAddress();
     
     /**
+     * Returns the number of IRQ vectors this architecture has.
+     * 
+     * @return
+     */
+    public int getIRQVectorCount();
+    
+    /**
      * Checks that code generation is possible for a given {@link ASTNode}.
      * 
      * @param node

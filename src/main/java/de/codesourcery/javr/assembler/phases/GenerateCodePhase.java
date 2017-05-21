@@ -140,6 +140,14 @@ public class GenerateCodePhase extends AbstractPhase
             final Directive directive = ((DirectiveNode) node).directive;
             switch( directive ) 
             {
+                case IRQ_ROUTINE:
+                    if ( ! isInResolvePhase ) 
+                    {
+                        if ( context.isGenerateRelocations() ) {
+                            ((DirectiveNode) node).addRelocations( context );
+                        }
+                    }
+                    break;
                 case INIT_BYTES:
                 case INIT_WORDS:
                     if ( ! isInResolvePhase ) 
@@ -151,7 +159,7 @@ public class GenerateCodePhase extends AbstractPhase
                             previousDataSymbols.forEach( s -> s.incObjectSize( size ) );
                         }
                         
-                        if ( directive == Directive.INIT_WORDS && context.isGenerateRelocations() ) {
+                        if ( directive.mayNeedRelocation && context.isGenerateRelocations() ) {
                             ((DirectiveNode) node).addRelocations( context );
                         }
                     }

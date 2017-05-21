@@ -79,7 +79,7 @@ public class Parser
 
     public static enum Severity 
     {
-        INFO(0),WARNING(1),ERROR(2);
+        INFO(0),WARNING(1),ATTENTION(3),ERROR(2);
         public final int level;
         
         private Severity(int level) {
@@ -149,6 +149,7 @@ public class Parser
             this( unit,severity , message , (TextRegion) null );
         }        
 
+        // error
         public static CompilationMessage error(CompilationUnit unit,String msg) {
             return new CompilationMessage(unit,Severity.ERROR , msg , (TextRegion) null ); 
         }        
@@ -160,7 +161,34 @@ public class Parser
         public static CompilationMessage error(CompilationUnit unit,String msg,TextRegion region) {
             return new CompilationMessage(unit,Severity.ERROR , msg , region ); 
         }        
-
+        
+        // attention
+        public static CompilationMessage attention(CompilationUnit unit,String msg,ASTNode node) {
+            return new CompilationMessage(unit,Severity.ATTENTION , msg , node ); 
+        }        
+        
+        public static CompilationMessage attention(CompilationUnit unit,String msg,TextRegion region) {
+            return new CompilationMessage(unit,Severity.ATTENTION, msg , region ); 
+        }
+        
+        public static CompilationMessage attention(CompilationUnit unit,String msg) {
+            return new CompilationMessage(unit,Severity.ATTENTION, msg , (ASTNode) null ); 
+        }          
+        
+        // warning
+        public static CompilationMessage warning(CompilationUnit unit,String msg,ASTNode node) {
+            return new CompilationMessage(unit,Severity.WARNING , msg , node ); 
+        }        
+        
+        public static CompilationMessage warning(CompilationUnit unit,String msg,TextRegion region) {
+            return new CompilationMessage(unit,Severity.WARNING, msg , region ); 
+        }
+        
+        public static CompilationMessage warning(CompilationUnit unit,String msg) {
+            return new CompilationMessage(unit,Severity.WARNING, msg , (ASTNode) null ); 
+        }   
+        
+        // info 
         public static CompilationMessage info(CompilationUnit unit,String msg) {
             return new CompilationMessage(unit,Severity.INFO , msg , (ASTNode) null ); 
         }
@@ -172,18 +200,6 @@ public class Parser
         public static CompilationMessage info(CompilationUnit unit,String msg,TextRegion region) {
             return new CompilationMessage(unit,Severity.INFO, msg , region ); 
         }    
-        
-        public static CompilationMessage warning(CompilationUnit unit,String msg,ASTNode node) {
-            return new CompilationMessage(unit,Severity.WARNING , msg , node ); 
-        }        
-
-        public static CompilationMessage warning(CompilationUnit unit,String msg,TextRegion region) {
-            return new CompilationMessage(unit,Severity.WARNING, msg , region ); 
-        }
-        
-        public static CompilationMessage warning(CompilationUnit unit,String msg) {
-            return new CompilationMessage(unit,Severity.WARNING, msg , (ASTNode) null ); 
-        }         
     }
 
     public Parser(IArchitecture arch) 
@@ -540,6 +556,17 @@ public class Parser
         final String value = tok2.value;
         switch( value.toLowerCase() ) // AVR documentation states that directives are matched ignoring case
         {
+            case "irq":
+            {
+                final ASTNode expr = parseExpression(lexer);
+                if ( expr != null ) 
+                {
+                    final DirectiveNode result = new DirectiveNode( Directive.IRQ_ROUTINE , tok2.region() );
+                    result.addChild( expr );
+                    return result;
+                }                
+                throw new ParseException(".irq requires an IRQ vector index",tok2);   
+            }
             case "org":
                 {
                     final ASTNode expr = parseExpression(lexer);

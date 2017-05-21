@@ -468,4 +468,9 @@ public class ATMega88 extends AbstractArchitecture
     protected int getGeneralPurposeRegisterCount() {
         return 32;
     }
+    
+    @Override
+    public int getIRQVectorCount() {
+        return 26;
+    }
 }

@@ -20,6 +20,7 @@ import java.util.List;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Segment;
+import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode.IASTVisitor;
@@ -60,7 +61,7 @@ public class SyntaxCheckPhase implements Phase
                 }
             }
             @Override
-            public void visit(ASTNode node, IIterationContext ctx) 
+            public void visit(ASTNode node, IIterationContext<?> ctx) 
             {
                 if ( node instanceof LabelNode ) 
                 {
@@ -129,8 +130,16 @@ public class SyntaxCheckPhase implements Phase
                            }
                            markPreviousSymbols( ObjectType.DATA );
                            break;
-                       case EQU: // currently ignored
+                       case EQU: // not checkedf here
+                           break;
                        case DEVICE: // currently ignored
+                           break;
+                       case IRQ_ROUTINE: // checked during code generation
+                           if ( ! context.isGenerateRelocations() ) 
+                           {
+                               context.message( CompilationMessage.attention( context.currentCompilationUnit() , ".irq has no effect as the current output format does not support relocation" , node  ) );
+                               return;
+                           }                           
                            break;
                        default:
                            throw new RuntimeException("Internal error, unhandled directive "+directive);

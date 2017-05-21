@@ -1741,7 +1741,6 @@ public abstract class AbstractArchitecture implements IArchitecture
     protected abstract boolean isValidRegisterNumber(int number);
     protected abstract boolean isValidIOSpaceAdress(int byteAddress);
     protected abstract boolean isValidEEPROMAdress(int byteAddress);
-    
     protected abstract int getGeneralPurposeRegisterCount();
     protected abstract void initInstructions();
 

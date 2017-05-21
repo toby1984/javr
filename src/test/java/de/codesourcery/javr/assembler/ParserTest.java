@@ -974,6 +974,27 @@ public class ParserTest extends ParseTestHelper
     }     
     
     @Test
+    public void testParseIRQ() 
+    {
+        AST ast = parse(".irq 12");
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() ); 
+        
+        final StatementNode stmt = (StatementNode) ast.child(0);
+        assertNotNull(stmt);
+        assertEquals( 1 , stmt.childCount() );
+        
+        final DirectiveNode node = (DirectiveNode) stmt.child(0);
+        assertEquals(Directive.IRQ_ROUTINE, node.directive );
+        assertNotNull(node);
+        assertEquals( 1 , node.childCount() );
+
+        final NumberLiteralNode num2 = (NumberLiteralNode) node.child(0);
+        assertEquals( 12 , num2.getValue().intValue() );
+    }     
+    
+    @Test
     public void testParseExpression() {
         
         AST ast = parse(".equ a = ((16000000 * 500)/1000)-3");
