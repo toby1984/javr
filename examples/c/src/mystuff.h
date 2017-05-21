@@ -39,4 +39,6 @@ extern void debug_toggle_red_led(void);
  * PS/2 methods
  */
 extern void ps2_reset();
-extern char ps2_read_byte(char *buffer,char bufsize);
+extern char ps2_keybuffer_read(char *buffer,char bufsize);
+extern char ps2_get_overflow_counter(void);
+extern char ps2_get_last_error(void);

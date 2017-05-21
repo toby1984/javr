@@ -12,8 +12,15 @@
 #define ROWS (DISPLAY_HEIGHT_IN_PIXEL/GLYPH_HEIGHT_IN_BITS) 
 
 void framebuffer_write_string(char *string,int x,int y);
+
+void linefeed(void);
+
 void print_hex(char value);
+void println_hex(char value);
+
 void print(char* s);
+void println(char* s);
+
 void print_dec(char value);
     
 static char hexChars[] = {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'};
@@ -23,6 +30,7 @@ static char keyboard_buffer[128];
 
 int main() 
 {
+        char last_error;
         char bytes_read;
         
         i2c_setup( LCD_ADR );
@@ -42,32 +50,23 @@ int main()
 
         ps2_reset();
         framebuffer_clear();  
-        framebuffer_write_string("waiting",0,0);        
+        println("waiting...");        
         framebuffer_update_display();          
         while ( 1 ) 
         {
-            bytes_read = ps2_read_byte( &keyboard_buffer[0] , sizeof(keyboard_buffer) );
-            // 0xff on timeout error, 0xfe on parity error, 0xfd on start-bit error , 0xfc on stop-bit error
-            if ( bytes_read == 0xff ) {
-                    print("timeout error");                       
+            last_error = ps2_get_last_error();
+            if ( last_error !=  0 ) {
+                    print("error: ");                       
+                    println_hex( last_error );
                     framebuffer_update_display();                  
-            } else if ( bytes_read == 0xfe ) {
-                    print("parity error");                       
-                    framebuffer_update_display();                  
-            } else if ( bytes_read == 0xfd ) {
-                    print("start bit error");                           
-                    framebuffer_update_display();                  
-            } else if ( bytes_read == 0xfc ) {
-                    print("stop bit error");                           
-                    framebuffer_update_display();        
-            } else if ( bytes_read == 0xfb ) {
-                    print("buffer full");                           
-                    framebuffer_update_display();                      
-            } else if ( bytes_read > 0 && bytes_read < 127 ) {
+            }
+            
+            bytes_read = ps2_keybuffer_read( &keyboard_buffer[0] , sizeof(keyboard_buffer) );
+                     
+            if ( bytes_read > 0 ) {
                     print("received ");     
-//                     print_dec( bytes_read );
                      for ( char ptr = 0 ; ptr < bytes_read ; ptr++) {
-                       print_hex( keyboard_buffer[ptr] );
+                       println_hex( keyboard_buffer[ptr] );
                      }
                     framebuffer_update_display();                    
             }                
@@ -96,6 +95,9 @@ void print_dec(char value) {
     print( &buffer[0] );    
 }
 
+/*
+ * Writes a byte value as hexadecimal string to the display.
+ */
 void print_hex(char value) 
 {
     char buffer[3];
@@ -106,8 +108,31 @@ void print_hex(char value)
     print( &buffer[0] );
 }
 
+/*
+ * Writes a byte value as hexadecimal string to the display.
+ */
+void println_hex(char value)  {
+    print_hex(value);
+    linefeed();
+}
+
+void linefeed() 
+{    
+    cursorx=0;
+    if ( ++cursory >= ROWS ) {
+        framebuffer_scroll_up();
+        cursory = ROWS-1;
+    }    
+}
+
+
 void print(char* s) {
     framebuffer_write_string(s,cursorx,cursory);
+}
+
+void println(char* s) {
+    framebuffer_write_string(s,cursorx,cursory);
+    linefeed();
 }
 
 void framebuffer_write_string(char *string,int x,int y) {

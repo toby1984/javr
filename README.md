@@ -114,7 +114,6 @@ but with SPM you need to write
 
 ## Known issues
 
--Calculation of relocations is glitchy (rewrite is underway though...)
 - Syntax coloring is off when using MSDOS-style line endings (won't fix this since it is related to the fact that Swing text components internally convert all EOL sequences to '\n' but my parser uses the 'true' text offsets)
 - parsing #define is currently broken when trying to #define stuff like (a+b)/c (gets irritated by the leading parens)
 - parsing string literals currently swallows whitespace (0x20) chars in the strings
@@ -123,6 +122,7 @@ but with SPM you need to write
 
 ## To do
 
+- Implement object size calculation for ObjectType.FUNCTION symbols (though I didn't notice any avr-ld glitches caused by the missing size info yet)
 - Support having '_' characters as separators in binary literals to improve readability
 - Make .irq work when generating RAW output, not just ELF relocatables
 - Support emitting ELF relocations for targets other than atmega328p

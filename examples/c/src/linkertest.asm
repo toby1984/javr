@@ -40,6 +40,8 @@ Return values:
 
 .equ CPU_FREQUENCY = 16000000 ; 16 Mhz
 
+.equ KEYBOARD_BUFFER_SIZE = 16
+
 .equ DISPLAY_WIDTH_IN_PIXEL = 128
 .equ DISPLAY_HEIGHT_IN_PIXEL = 64
 
@@ -730,45 +732,70 @@ sleep_one_ms:
 ; SCRATCHED: nothing
 ; =====
 ps2_reset:
+          cli ; disable interrupts
 	cbi DDRD,PS2_CLK_PIN ; set to input
 	cbi DDRD,PS2_DATA_PIN ; set to input
+  	ldi r24,0
+	sts keybuffer_ptr,r24
+	sts keybuffer_lost,r24
+	sts keybuffer_error,r24	         
+; trigger interrupt when PS2_DATA_PIN goes low
+          rcall ps2_enable_irq
+          ret
+
+; =====
+; Enable PS/2 interrupt
+; SCRATCHED: r24
+; =====
+ps2_enable_irq:
+	cli
+; setup INT1 external interrupt
+          lds r24,EICRA
+          andi r24,%11110011
+	ori r24,%1000 ; falling edge on INT1 triggers interrupt
+	sts EICRA,r24
+; clear pending interrupts
+	sbi EIFR,INTF1
+; enable IRQ         
+	sbi EIMSK,INT1
+	sei
+          ret
+
+; =====
+; Disable PS/2 interrupt
+; SCRATCHED: r24
+; =====
+ps2_disable_irq:
+	cli
+	cbi EIMSK,INT1
+	sbi EIFR,INTF1 ; clear pending interrupts that will have accumulated in the meantime
           ret
 
 ; ======
-; Read bytes from the PS/2 keyboard
-; INPUT: r24 - low byte of destination in SRAM
-; INPUT: r25 - hi byte of destination in SRAM
-; INPUT: r22 - size of destination in SRAM
-; RESULT: r24 - Number of bytes read,0xff on timeout error, 0xfe on parity error, 0xfd on start-bit error , 0xfc on stop-bit error, 0xfb = buffer overflow
+; Called by IRQ routine after PS/2 DATA line went low
+; RESULT: r24 - Byte read , carry set => RX error, carry clear => success
 ; ======
-ps2_read_byte:
-         movw r31:r30,r25:r24
-         ldi r24,0 ; set number of bytes received to zero
-; wait for device to start sending
-         rcall ps2_wait_data_low
-         brcs back ; timeout
-.read_byte
+ps2_irq_read_byte:
 ; read start bit (this one is always zero)
          rcall ps2_read_bit ; scratches r20,r26,r27
          tst r20
-         breq timeout_error ; timeout
+         breq timeout_error_start ; timeout
          brcs start_bit_error ; error, start bit should be a zero bit
-
 ; read 8 data bits
          ldi r18,8 ; bit count
-         ldi r23,0x00 ; received byte
+         ldi r24,0x00 ; received byte
 .data_loop
           rcall ps2_read_bit ; scratches r20,r26,r27
           tst r20
-          breq timeout_error
-          ror r23 ; shift-in carry bit
+          breq timeout_error_data
+          ror r24 ; shift-in carry bit
           dec r18
           brne data_loop
 ; read parity bit
           ldi r21,0 ;=> temp parity bit storage
           rcall ps2_read_bit
           tst r20
-          breq timeout_error
+          breq timeout_error_parity
           brcc parity_not_set
           ldi r21,1 ; parity bit set ; The parity bit is set if there is an even number of 1's in the data bits and reset (0) if there is an odd number of 1's in the data bits
 .parity_not_set
@@ -779,43 +806,54 @@ ps2_read_byte:
 ; read stop bit (always 1)
           rcall ps2_read_bit ; scratches r20,r26,r27
           tst r20
-          breq timeout_error
-          brcc stop_bit_error
-; store byte
-          cp r24,r22 ; check bytes written against buffer size
-          breq buffer_overflow_error ; => target buffer is full
-          st Z+,r23 ; write byte to buffer
-          inc r24 ; inc bytes written counter
-          rjmp read_byte
-          
-.back
+          breq timeout_error_stop
+          brcc stop_bit_error    
+	clc
           ret
-.timeout_error
-          tst r24
-          brne already_bytes_received ; we received at least one byte, sender probably stopped
+
+.timeout_error_start
           ldi r24,0xff
-.already_bytes_received
-          ret
+	rjmp error_return
+
 .parity_error
           ldi r24,0xfe
-          ret
+          rjmp error_return
+
 .start_bit_error
           ldi r24,0xfd
-          ret
+          rjmp error_return
+
 .stop_bit_error
           ldi r24,0xfc
-          ret
+          rjmp error_return
+
+.timeout_error_stop
+          ldi r24,0xfa
+	rjmp error_return
+
+.timeout_error_data
+          ldi r24,0xf9
+	rjmp error_return
+
+.timeout_error_parity
+          ldi r24,0xf8
+	rjmp error_return
+
 .buffer_overflow_error
           ldi r24,0xfb
+.error_return
+	sts keybuffer_error,r24
+	sec
           ret
+
 ; ==== Calculate odd parity
-; INPUT: r23 - byte to calculate parity for
+; INPUT: r24 - byte to calculate parity for
 ; RESULT: r18 - parity
 ; SCRATCHED: r18,r19,r20
 ; =====
 ; The parity bit is set if there is an even number of 1's in the data bits and reset (0) if there is an odd number of 1's in the data bits
 ps2_calc_parity:
-           mov r19,r23
+           mov r19,r24
            ldi r18,0
            ldi r20,8
 .calc_loop
@@ -890,7 +928,144 @@ ps2_wait_data_low:
           clc
           ret
 
+; ==== EXTINT1 IRQ routine
+.irq 2
+extint1_irq:
+          push r0
+	in r0, SREG
+	push r0 ; push flags
+        	push r1
+	push r18
+	push r19
+	push r20
+	push r21
+	push r22
+	push r23
+	push r24
+	push r25
+	push r26
+	push r27
+	push r30
+	push r31
+	
+; --- START: actual IRQ routine
+
+          rcall ps2_irq_read_byte
+; byte is in r24 
+; carry set = RX error, carry clear = success
+	brcs error
+	rcall ps2_keybuffer_write
+.error
+; --- END: actual IRQ routine
+
+	sbi EIFR,INTF1 ; clear pending interrupts that will have accumulated in the meantime
+
+	pop r31
+	pop r30
+	pop r27
+	pop r26
+	pop r25
+	pop r24
+	pop r23
+	pop r22
+	pop r21
+	pop r20
+	pop r19
+	pop r18
+	pop r1
+;pop flags
+          pop r0
+          out SREG,r0 ; 
+          pop r0 ; restore r0
+          reti
+
+; ===== 
+; write a byte to the keybuffer
+; INPUT: r24 - byte to write
+; SCRATCHED: r0,r1,r18,r30,r31
+; =====
+ps2_keybuffer_write:
+	ldi r31,HIGH(keybuffer)
+	ldi r30,LOW(keybuffer)
+	lds r18,keybuffer_ptr
+	cpi r18,KEYBOARD_BUFFER_SIZE-1
+	breq buffer_full
+	mov r0,r18
+	clr r1
+	add r30,r0
+	adc r31,r1
+	st Z,r24
+	inc r18
+	sts keybuffer_ptr,r18
+	ret
+
+; buffer already at capacity
+.buffer_full
+	lds r18,keybuffer_lost
+	cpi r18,0xff
+	breq cnt_overflow ; do not overflow to zero, otherwise caller would not realize the loss
+	inc r18
+	sts keybuffer_lost,r18
+.cnt_overflow
+	ret
+
+; ===== 
+; Read keyboard buffer.
+;
+; Side effects:
+;
+; - resets last error flags
+; - resets buffer overflow counter
+;
+; INPUT: r25:r24 - ptr to SRAM where to store keyboard buffer contents
+; INPUT: r22 - size of destination area
+; RESULT: r24 - number of bytes READ
+; SCRATCHED: r18,r19,r26,r27,r30,r31
 ; ======================== DATA ======================
+ps2_keybuffer_read:
+	cli ; disable IRQs while we're reading from the buffer
+	ldi r31,HIGH(keybuffer)
+	ldi r30,LOW(keybuffer)
+	movw r27:r26,r25:r24
+	lds r18,keybuffer_ptr
+	mov r24,r18 ; copy buffer size to result register
+	tst r18
+	breq buffer_empty
+.copy_loop
+	ld r19,Z+		
+	st r27:r26+,r19
+	dec r18
+	brne copy_loop
+	sts keybuffer_ptr,r18
+	sts keybuffer_lost,r18
+	sts keybuffer_error,r18
+.buffer_empty
+	sei ; re-enable IRQs
+	ret
+
+; ====
+; Returns the last PS/2 error and resets all error flags.
+; RESULT: r24 - last error code
+; ====
+ps2_get_last_error:
+	cli
+	lds r24,keybuffer_error
+	clr r1
+	sts keybuffer_error,r1
+	sei
+	ret
+; ====
+; Returns the number of bytes lost due to
+; keyboard buffer overflows and resets this counter.
+; RESULT: r24 - number of bytes lost due to buffer overflow
+; ====
+ps2_get_overflow_counter:
+	cli
+	lds r24,keybuffer_lost
+	clr r1
+	sts keybuffer_lost,r1
+	sei
+	ret
 
 commands: .dw cmd1,2
           .dw cmd2,3
@@ -999,6 +1174,21 @@ charset_mapping:
 .dseg
 
 framebuffer: .byte FRAMEBUFFER_SIZE
+
+; stores bytes received from the PS/2 keyboard
+keybuffer: .byte KEYBOARD_BUFFER_SIZE
+
+; offset relative to start of key buffer 
+; where the next received byte will be stored
+keybuffer_ptr: .byte 1
+
+; number of bytes that were lost
+; because the key buffer ran out of space
+keybuffer_lost: .byte 1
+
+; most recent error since the last time
+; the buffer was read using ps2_keybuffer_read()
+keybuffer_error: .byte 1
 
 ; dirty-page tracking (0 bit per display page, bit 0 = page0 , bit set = page dirty)
 ; only dirty pages are transmitted to display controller
