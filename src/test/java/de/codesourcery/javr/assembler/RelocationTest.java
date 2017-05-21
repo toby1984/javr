@@ -1,21 +1,8 @@
 package de.codesourcery.javr.assembler;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.util.List;
-import java.util.stream.Collectors;
 
-import de.codesourcery.javr.assembler.arch.Architecture;
 import de.codesourcery.javr.assembler.elf.Relocation;
-import de.codesourcery.javr.assembler.util.HexDump;
-import de.codesourcery.javr.assembler.util.Resource;
-import de.codesourcery.javr.assembler.util.StringResource;
-import de.codesourcery.javr.ui.Project;
-import de.codesourcery.javr.ui.config.ProjectConfiguration;
-import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputFormat;
-import junit.framework.TestCase;
 
 public class RelocationTest extends AbstractCompilerTest
 {

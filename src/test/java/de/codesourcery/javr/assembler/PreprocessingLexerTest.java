@@ -39,7 +39,6 @@ import de.codesourcery.javr.assembler.parser.PreprocessingLexer;
 import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.parser.Token;
 import de.codesourcery.javr.assembler.parser.TokenType;
-import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.FileResourceFactory;

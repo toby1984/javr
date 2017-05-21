@@ -24,6 +24,7 @@ import org.apache.log4j.Logger;
 
 public class EditorSettings 
 {
+    @SuppressWarnings("unused")
     private static final Logger LOG = Logger.getLogger(EditorSettings.class);
     
     private String indentString;

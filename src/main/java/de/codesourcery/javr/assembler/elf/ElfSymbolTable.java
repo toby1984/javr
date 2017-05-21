@@ -25,12 +25,10 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.Segment;
-import de.codesourcery.javr.assembler.elf.ElfSymbolTable.ElfSymbol;
 import de.codesourcery.javr.assembler.elf.ElfWriter.Endianess;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.symbols.Symbol;
-import de.codesourcery.javr.assembler.symbols.Symbol.ObjectType;
 import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 

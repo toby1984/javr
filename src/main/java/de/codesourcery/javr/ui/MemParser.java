@@ -50,7 +50,8 @@ public class MemParser
 		public final Map<String,Integer> mem1 = new HashMap<>();
 		public final Map<String,Integer> mem2 = new HashMap<>();
 		
-		public Entry(Date timestamp) 
+		@SuppressWarnings("deprecation")
+        public Entry(Date timestamp) 
 		{
 			this.timestamp = new Date(timestamp.getYear(),timestamp.getMonth(),timestamp.getDate());
 		}

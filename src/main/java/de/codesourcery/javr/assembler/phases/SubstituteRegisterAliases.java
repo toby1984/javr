@@ -69,7 +69,7 @@ public class SubstituteRegisterAliases implements Phase
         final IASTVisitor visitor = new IASTVisitor() 
         {
             @Override
-            public void visit(ASTNode node, IIterationContext ctx) 
+            public void visit(ASTNode node, IIterationContext<?> ctx) 
             {
                 if ( node instanceof DirectiveNode) 
                 {

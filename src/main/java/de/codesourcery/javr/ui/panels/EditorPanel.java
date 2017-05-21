@@ -1639,7 +1639,7 @@ public abstract class EditorPanel extends JPanel
             final IASTVisitor visitor = new IASTVisitor() 
             {
                 @Override
-                public void visit(ASTNode node, IIterationContext ctx) 
+                public void visit(ASTNode node, IIterationContext<?> ctx) 
                 {
                     setNodeStyle( node , doc );
                 }

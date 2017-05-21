@@ -15,21 +15,14 @@
  */
 package de.codesourcery.javr.assembler.parser.ast;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
-import java.util.function.Consumer;
 
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Instruction;
-import de.codesourcery.javr.assembler.arch.AbstractArchitecture;
-import de.codesourcery.javr.assembler.parser.OperatorType;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.symbols.Symbol;
-import de.codesourcery.javr.assembler.symbols.Symbol.Type;
-import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 public class InstructionNode extends NodeWithMemoryLocation implements Resolvable
 {
@@ -46,25 +39,6 @@ public class InstructionNode extends NodeWithMemoryLocation implements Resolvabl
     @Override
     protected InstructionNode createCopy() {
         return new InstructionNode( this.instruction.createCopy() , getTextRegion().createCopy() );
-    }
-
-    private static ASTNode unwrapExpression(ASTNode node) 
-    {
-        ASTNode result = node;
-        while( result instanceof ExpressionNode) 
-        {
-            result = result.child(0);
-        }
-        return result;
-    }
-
-    private static boolean isAddressIdentifierNode(ASTNode node,SymbolTable symbolTable) 
-    {
-        if ( node instanceof IdentifierNode) 
-        {
-            return ((IdentifierNode) node).refersToAddressSymbol( symbolTable );
-        }
-        return false;
     }
 
     public static boolean isSameSymbol(Symbol a,Symbol b) 

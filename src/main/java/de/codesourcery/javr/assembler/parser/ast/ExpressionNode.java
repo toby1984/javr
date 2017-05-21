@@ -16,7 +16,6 @@
 package de.codesourcery.javr.assembler.parser.ast;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
-import de.codesourcery.javr.assembler.parser.TextRegion;
 
 public class ExpressionNode extends AbstractASTNode implements IValueNode , Resolvable {
 

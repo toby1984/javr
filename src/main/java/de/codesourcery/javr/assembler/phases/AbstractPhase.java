@@ -51,7 +51,7 @@ public abstract class AbstractPhase implements Phase
         previousGlobalLabel = null;
     }
     
-    protected void visitNode(ICompilationContext context, ASTNode node,IIterationContext ctx) 
+    protected void visitNode(ICompilationContext context, ASTNode node,IIterationContext<?> ctx) 
     {
         if ( node instanceof LabelNode) 
         {

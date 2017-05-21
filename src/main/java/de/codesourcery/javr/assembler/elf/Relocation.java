@@ -17,7 +17,6 @@ package de.codesourcery.javr.assembler.elf;
 
 import org.apache.commons.lang3.Validate;
 
-import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 

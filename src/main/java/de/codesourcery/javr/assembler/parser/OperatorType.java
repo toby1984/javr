@@ -294,6 +294,7 @@ public enum OperatorType
                             return b1 == b2;
                         case REF_NEQ:
                             return b1 != b2;
+                        default:
                     }
                     throw new RuntimeException("Internal error - unreachable code reached");
                 default:

@@ -24,11 +24,9 @@ import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.AbstractArchitecture;
 import de.codesourcery.javr.assembler.elf.Relocation;
 import de.codesourcery.javr.assembler.parser.Identifier;
-import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.symbols.Symbol.ObjectType;
-import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 
 public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
 {

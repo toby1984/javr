@@ -67,7 +67,7 @@ public class GenerateCodePhase extends AbstractPhase
         final IASTVisitor visitor = new IASTVisitor() 
         {
             @Override
-            public void visit(ASTNode node, IIterationContext ctx) 
+            public void visit(ASTNode node, IIterationContext<?> ctx) 
             {
                 generateCode(context, node, ctx); 
             }
@@ -75,7 +75,7 @@ public class GenerateCodePhase extends AbstractPhase
         ast.visitBreadthFirst( visitor );        
     }
     
-    protected boolean generateCode(ICompilationContext context, ASTNode node,IIterationContext ctx) 
+    protected boolean generateCode(ICompilationContext context, ASTNode node,IIterationContext<?> ctx) 
     {
         visitNode( context , node , ctx );
 

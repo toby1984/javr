@@ -48,9 +48,6 @@ import javax.swing.tree.TreePath;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
-import de.codesourcery.javr.ui.IProject;
-import de.codesourcery.javr.ui.IProjectProvider.IProjectListener;
-
 public class FileSystemBrowser extends JPanel
 {
 	private static final Logger LOG = Logger.getLogger(FileSystemBrowser.class);
