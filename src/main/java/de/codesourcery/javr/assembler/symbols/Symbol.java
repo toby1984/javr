@@ -59,7 +59,12 @@ public final class Symbol
      * @param other
      */
     public Symbol(Symbol other) {
-        this.name = other.name;
+        this( other , other.name );
+    }
+    
+    private Symbol(Symbol other,Identifier name) 
+    {
+        this.name = name;
         this.node = other.node;
         this.compilationUnit = other.compilationUnit;
         this.type = other.type;
@@ -69,6 +74,17 @@ public final class Symbol
         this.segment = other.segment;
         this.objectType = other.objectType;
         this.objectSize = other.objectSize;
+    }    
+    
+    /**
+     * Creates a copy of this symbol with a different name.
+     * 
+     * @param name
+     * @return
+     */
+    public Symbol withName(Identifier name) 
+    {
+        return new Symbol(this,name);
     }
     
     public static enum ObjectType 

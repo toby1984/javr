@@ -166,6 +166,7 @@ public class SymbolTable
     
     private Symbol internalGet(Identifier name) 
     {
+        Validate.notNull(name, "name must not be NULL");        
         final Symbol result = symbols.get( name );
         if ( result == null && parent != null ) {
             return parent.internalGet( name );

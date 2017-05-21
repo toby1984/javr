@@ -21,7 +21,6 @@ import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.RelocationHelper;
 import de.codesourcery.javr.assembler.RelocationHelper.RelocationInfo;
 import de.codesourcery.javr.assembler.Segment;
-import de.codesourcery.javr.assembler.arch.AbstractArchitecture;
 import de.codesourcery.javr.assembler.elf.Relocation;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.TextRegion;
@@ -34,7 +33,7 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
 
     public final Directive directive;
     private int sizeInBytes = SIZE_NOT_RESOLVED;
-
+    
     public static enum Directive 
     {
         ORG("org",1,1),
@@ -46,29 +45,22 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
         DEVICE("device",1,1),
         RESERVE("byte",1,1),
         INIT_BYTES("db",1,Integer.MAX_VALUE),
-        INIT_WORDS("dw",1,Integer.MAX_VALUE,true),
+        INIT_WORDS("dw",1,Integer.MAX_VALUE),
         // generates an entry in the IRQ vector table that points the given IRQ vector entry to this method
         // (currently relies on linker to generate the actual IRQ vector data so only works with ELF relocatable output format)
-        IRQ_ROUTINE("irq",1,1,true),
+        IRQ_ROUTINE("irq",1,1),
         EQU("equ" , 1 , 1 );
 
         public final String literal;
         public final int minOperandCount;
         public final int maxOperandCount;
-        public final boolean mayNeedRelocation;
 
         private Directive(String literal,int minOperandCount,int maxOperandCount) {
-            this(literal,minOperandCount,maxOperandCount,false);
-        }
-        
-        private Directive(String literal,int minOperandCount,int maxOperandCount,boolean mayNeedRelocation) 
-        {
             this.literal = literal.toLowerCase();
             this.minOperandCount = minOperandCount;
             this.maxOperandCount = maxOperandCount;
-            this.mayNeedRelocation = mayNeedRelocation;
         }
-        
+
         public boolean mayRequireRelocation() {
             return false;
         }
@@ -202,6 +194,9 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
     {
         switch( directive ) 
         {
+            case IRQ_ROUTINE:
+                handleIRQ( context );
+                return true;
             case EQU:
                 // child 0 is EquLabelNode
                 final Identifier identifier = ((EquLabelNode) child(0)).name;
@@ -227,76 +222,93 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
             default:
         }
         return false;
-    }    
+    }   
+
+    private void handleIRQ(ICompilationContext context) {
+
+        if ( context.currentSegment() != Segment.FLASH ) {
+            context.error(".irq can only be used within the .text segment",this);
+            return;
+        }
+
+        final Symbol symbol = findNextGlobalFunctionSymbol( context );
+        if ( symbol == null ) {
+            return;
+        }
+        if ( symbol.getSegment() != Segment.FLASH ) {
+            context.error(".irq directive requires a global function label within FLASH but "+symbol.name()+" isn't",this);
+            return;
+        }
+        if ( symbol.getObjectType() != ObjectType.FUNCTION ) {
+            context.error(".irq directive needs to be followed by a global FUNCTION label",this);
+            return;
+        }
+
+        final int vectorIdx = ((NumberLiteralNode) child(0)).getValue();
+        if ( vectorIdx < 0 || vectorIdx >= context.getArchitecture().getIRQVectorCount() ) 
+        {
+            context.error("IRQ vector out of range, "+context.getArchitecture().getType()+" architecture only supports IRQ vectors 0-"+(context.getArchitecture().getIRQVectorCount()-1), child(0));
+            return;
+        }
+        
+        symbol.markAsReferenced(); // ...so that the check for unreferenced symbols doesn't complain about this function
+    }
+    
+    /**
+     * Returns the next global function symbol following this node.
+     * 
+     * @param context
+     * @return
+     */
+    public Symbol findNextGlobalFunctionSymbol(ICompilationContext context) 
+    {
+        LabelNode label = null;
+        StatementNode stmt = statement();
+        final ASTNode ast = stmt.getParent();
+        final int nextChild = ast.indexOf( stmt )+1;
+        final int lastChild = ast.childCount();
+        for ( int i = nextChild ; label == null && i < lastChild ; i++ ) 
+        {
+            label = ast.child(i).visitBreadthFirstWithResult( (LabelNode) null, (node,ctx) -> 
+            {
+                if ( node instanceof LabelNode && ((LabelNode) node).isGlobal() ) {
+                    ctx.stop( (LabelNode) node);
+                }
+            });
+        }
+        if ( label == null ) {
+            context.error(".irq directive needs to be followed by a global label",this);
+            return null;
+        }
+        final Symbol symbol = label.getSymbol();
+        if ( symbol.getSegment() != Segment.FLASH ) {
+            context.error(".irq directive requires a global function label within FLASH but "+symbol.name()+" isn't",this);
+            return null;
+        }
+        if ( symbol.getObjectType() != ObjectType.FUNCTION ) {
+            context.error(".irq directive needs to be followed by a global FUNCTION label",this);
+            return null;
+        }        
+        return symbol;
+    }
 
     public void addRelocations(ICompilationContext context) 
     {
-        if ( is ( Directive.IRQ_ROUTINE ) ) 
-        {
-            LabelNode label = null;
-            StatementNode stmt = statement();
-            final ASTNode ast = stmt.getParent();
-            final int nextChild = ast.indexOf( stmt )+1;
-            final int lastChild = ast.childCount();
-            for ( int i = nextChild ; label == null && i < lastChild ; i++ ) 
-            {
-                label = ast.child(i).visitBreadthFirstWithResult( (LabelNode) null, (node,ctx) -> 
-                {
-                    if ( node instanceof LabelNode && ((LabelNode) node).isGlobal() ) {
-                        ctx.stop( (LabelNode) node);
-                    }
-                });
-            }
-            if ( label == null ) {
-                context.error(".irq directive needs to be followed by a global label",this);
-                return;
-            }
-            final Symbol symbol = label.getSymbol();
-            if ( symbol.getSegment() != Segment.FLASH ) {
-                context.error(".irq directive requires a global function label within FLASH but "+symbol.name()+" isn't",this);
-                return;
-            }
-            if ( symbol.getObjectType() != ObjectType.FUNCTION ) {
-                context.error(".irq directive needs to be followed by a global FUNCTION label",this);
-                return;
-            }
-            symbol.markAsReferenced();
-            
-            final int vectorIdx = ((NumberLiteralNode) child(0)).getValue();
-            if ( vectorIdx < 0 || vectorIdx >= context.getArchitecture().getIRQVectorCount() ) 
-            {
-                context.error("IRQ vector out of range, "+context.getArchitecture().getType()+" architecture only supports IRQ vectors 0-"+(context.getArchitecture().getIRQVectorCount()-1), child(0));
-                return;
-            }
-            // 0c 94 34 00     jmp     0x68    ; 0x68 <__ctors_end>
-            final Relocation reloc = new Relocation( symbol );
-            final long addr = AbstractArchitecture.toIntValue( symbol.getValue() );
-            if ( addr == AbstractArchitecture.VALUE_UNAVAILABLE ) {
-                throw new RuntimeException("Internal error, symbol "+symbol+" has no address assigned ?");
-            }
-            reloc.addend = (int) addr;
-            reloc.locationOffset = vectorIdx*4; // each jmp instruction takes 4 bytes 
-            reloc.kind = Relocation.Kind.R_AVR_CALL;
-            context.addRelocation( reloc );            
-        }
-        else if ( context.isGenerateRelocations() )
+        if ( is( Directive.INIT_WORDS )  && context.isGenerateRelocations() )
         { 
-            if ( is( Directive.INIT_WORDS ) ) 
+            int offset = context.currentOffset();
+            for ( ASTNode child : children() ) 
             {
-                int offset = context.currentOffset();
-                for ( ASTNode child : children() ) 
+                final RelocationInfo info = RelocationHelper.getRelocationInfo( child );
+                if ( info != null )
                 {
-                    final RelocationInfo info = RelocationHelper.getRelocationInfo( child );
-                    if ( info != null )
-                    {
-                        final Relocation reloc = new Relocation( info.symbol );
-                        reloc.addend = info.addent;
-                        reloc.locationOffset = offset;
-                        reloc.kind = Relocation.Kind.R_AVR_16;
-                        context.addRelocation( reloc );
-                    }
-                    offset += 2;
+                    final Relocation reloc = new Relocation( info.symbol );
+                    reloc.addend = info.addent;
+                    reloc.locationOffset = offset;
+                    reloc.kind = Relocation.Kind.R_AVR_16;
+                    context.addRelocation( reloc );
                 }
+                offset += 2;
             } 
         }
     }

@@ -26,7 +26,7 @@ public interface Resolvable extends ASTNode
      * so there's no need to do this again.
      *  
      * @param context
-     * @return
+     * @return <code>true</code> if resolving this node was successful (or this node has already been resolved in a previous pass) or <code>false</code> if resolving this node failed
      */
     public boolean resolve(ICompilationContext context);
 }

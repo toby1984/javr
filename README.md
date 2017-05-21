@@ -123,6 +123,8 @@ but with SPM you need to write
 
 ## To do
 
+- Support having '_' characters as separators in binary literals to improve readability
+- Make .irq work when generating RAW output, not just ELF relocatables
 - Support emitting ELF relocations for targets other than atmega328p
 - Compile source files individually (output ELF relocatable) and add linking step to reduce compilation times and allow C programs to be linked against the output
 - Add support for .org directive

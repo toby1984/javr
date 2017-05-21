@@ -17,12 +17,14 @@ package de.codesourcery.javr.assembler.phases;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.RelocationHelper;
+import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
@@ -33,8 +35,11 @@ import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
+import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
 import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.symbols.Symbol.ObjectType;
+import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 
 /**
  * Performs the actual code generation.
@@ -143,9 +148,16 @@ public class GenerateCodePhase extends AbstractPhase
                 case IRQ_ROUTINE:
                     if ( ! isInResolvePhase ) 
                     {
-                        if ( context.isGenerateRelocations() ) {
-                            ((DirectiveNode) node).addRelocations( context );
-                        }
+                        /* The AVR GNU linker checks for special function symbols named
+                         * __vector_X
+                         * and if present, will generate an IRQ vector entry for vector X that jumps to this function.
+                         */
+                        final int vectorIdx = ((NumberLiteralNode) node.child(0)).getValue();
+                        final Identifier symName = new Identifier("__vector_"+vectorIdx);
+                        final Symbol nextGlobalFunc = ((DirectiveNode) node).findNextGlobalFunctionSymbol( context );
+                        final SymbolTable symTable = context.currentSymbolTable().getTopLevelTable();
+                        final Symbol copy = nextGlobalFunc.withName( symName );
+                        symTable.defineSymbol( copy , nextGlobalFunc.getSegment() );
                     }
                     break;
                 case INIT_BYTES:
@@ -159,7 +171,7 @@ public class GenerateCodePhase extends AbstractPhase
                             previousDataSymbols.forEach( s -> s.incObjectSize( size ) );
                         }
                         
-                        if ( directive.mayNeedRelocation && context.isGenerateRelocations() ) {
+                        if ( context.isGenerateRelocations() ) {
                             ((DirectiveNode) node).addRelocations( context );
                         }
                     }
