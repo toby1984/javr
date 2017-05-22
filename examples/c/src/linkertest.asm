@@ -740,6 +740,7 @@ ps2_reset:
           cli ; disable interrupts
 	cbi DDRD,PS2_CLK_PIN ; set to input
 	cbi DDRD,PS2_DATA_PIN ; set to input
+
   	ldi r24,0
 	sts keybuffer_ptr,r24
 	sts keybuffer_lost,r24
@@ -1082,8 +1083,13 @@ ps2_write_byte:
 	sbiw r31:r30,1
 	brne delay1
 
-	sbi DDRD,PS2_CLK_PIN ; set clk to output
-	cbi PORTD,PS2_CLK_PIN ; => clock low
+; LOW: To sink current, set the data direction pin DDxn to 1 (output). Then set the bit in the output PORTxn register to 0.
+; HIGH: To change this to a high-impedance open-drain, set the data direction pin DDxn to 0 (input), while leaving the PORTxn bit 0.
+; So instead of toggling the PORT pin, you are toggling the data directionpin.
+	
+; set clock low
+	sbi DDRD,PS2_CLK_PIN 
+	cbi PORTD,PS2_CLK_PIN
 
           ldi r31,HIGH(16*1600/4)
 	ldi r30,LOW(16*1600/4)
@@ -1091,13 +1097,14 @@ ps2_write_byte:
 	sbiw r31:r30,1
 	brne delay2
 
-;	sbi PORTD,PS2_CLK_PIN ; => clock hi
-	cbi DDRD,PS2_CLK_PIN ; set clk to input
+; set clock high
+	cbi DDRD,PS2_CLK_PIN
 
 ; *** transmission starts here ***
 
-	sbi DDRD,PS2_DATA_PIN ; set data to output
-          cbi PORTD,PS2_DATA_PIN ; pull data low => this is the start bit
+; set data low
+	sbi DDRD,PS2_DATA_PIN
+          cbi PORTD,PS2_DATA_PIN
 
 ; send 8 bits (MSB first)
 	ldi r19,8
@@ -1126,6 +1133,7 @@ ps2_write_byte:
 	sbis PIND,PS2_CLK_PIN
 	rjmp wait_clk_hi
 ; now read the response
+	cbi DDRD,PS2_DATA_PIN ; set data to input
 	rcall ps2_read_byte ; SCRATCHED: r18,r20,r21,r24,r26,r27
 	brcs error
 	cpi r24,0xfa ; PS/2 SUCCESS
@@ -1138,18 +1146,23 @@ ps2_write_byte:
 	rcall ps2_enable_irq
 	ret
 ; ======
+; Write bit in carry.
 ; INPUT: carry bit
 ; ======
+; LOW: To sink current, set the data direction pin DDxn to 1 (output). Then set the bit in the output PORTxn register to 0.
+; HIGH: To change this to a high-impedance open-drain, set the data direction pin DDxn to 0 (input), while leaving the PORTxn bit 0.
+; So instead of toggling the PORT pin, you are toggling the data directionpin.
 ps2_write_bit:
 ; wait for clock to be low
 .wait_low sbic PIND,PS2_CLK_PIN
           rjmp wait_low
 ; clock is now low, load bit
 	brcc send_0_bit
-	sbi PORTD,PS2_DATA_PIN
+; send 1 bit
+	cbi DDRD,PS2_DATA_PIN
 	rjmp wait_high
 .send_0_bit
-	cbi PORTD,PS2_DATA_PIN	
+	sbi DDRD,PS2_DATA_PIN
 .wait_high sbis PIND,PS2_CLK_PIN
           rjmp wait_high
 	ret

@@ -86,6 +86,8 @@ static char pressed_keys_count=0;
 
 static char modifiers=0;
 
+void sleep_one_sec(void);
+
 int main() 
 {  
   char buffer[2];
@@ -108,28 +110,32 @@ int main()
   
   ps2_reset();
   
-  util_msleep(200);
-  util_msleep(200);  
-  util_msleep(200);    
-  util_msleep(200);    
-  util_msleep(200);      
+   sleep_one_sec();    
 
-  debug_green_led_on();
-  
-  ps2_write_byte( 0xee );
-  
-  char success1=0,success2=0;
-  success1 = ps2_write_byte( 0xed );
-  
-  if ( success1 ) {
-    debug_red_led_on();    
-    success2 = ps2_write_byte( 0x01 );      
-  }
-  
-   print("success 1: ");
-   println_hex( success1 );
-   print("success 2: ");
-   println_hex( success2 );   
+   println("start"); 
+   framebuffer_update_display();   
+   
+   
+   while ( true ) {
+   
+     for ( int i = 0 ; i < 8 ; i++ ) 
+     {
+          sleep_one_sec();
+          ps2_write_byte( 0xed );
+          ps2_write_byte( (char) i );          
+     }
+   }
+   
+//   for ( int i = 0 ; i <= 255 ; i++ ) 
+//   {
+//       ps2_write_byte( 0xed );
+//       if ( ps2_write_byte( (char) i ) ) {
+//          print_hex( (char) i );
+//          print(",");         
+//       }
+//   }
+    
+   println("done"); 
    framebuffer_update_display();   
   
   while ( 1 ) 
@@ -515,4 +521,9 @@ void framebuffer_write_string(char *string,int x,int y) {
   }
   cursorx = currentX;
   cursory = currentY;
+}
+
+void sleep_one_sec(void) {
+  util_msleep(200);    
+  util_msleep(200);   
 }
