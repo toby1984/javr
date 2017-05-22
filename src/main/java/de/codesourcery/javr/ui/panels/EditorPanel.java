@@ -54,6 +54,7 @@ import java.util.function.Function;
 
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -81,6 +82,7 @@ import javax.swing.event.UndoableEditListener;
 import javax.swing.table.TableModel;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultStyledDocument.AttributeUndoableEdit;
 import javax.swing.text.Document;
 import javax.swing.text.DocumentFilter;
 import javax.swing.text.Element;
@@ -92,7 +94,7 @@ import javax.swing.text.StyledDocument;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreePath;
-import javax.swing.undo.UndoableEdit;
+import javax.swing.undo.UndoManager;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -149,144 +151,142 @@ import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour.InitialUserInput
 
 public abstract class EditorPanel extends JPanel
 {
-	private static final Logger LOG = Logger.getLogger(EditorFrame.class);
+    private static final Logger LOG = Logger.getLogger(EditorFrame.class);
 
-	public static final Duration RECOMPILATION_DELAY = Duration.ofMillis( 500 );
+    public static final Duration RECOMPILATION_DELAY = Duration.ofMillis( 500 );
 
-	private final JTextPane editor = new JTextPane();
+    private final JTextPane editor = new JTextPane();
 
-	private final EditorFrame topLevelWindow;
-	
+    private final EditorFrame topLevelWindow;
+
     private final AutoCompleteBehaviour<Symbol> autoComplete = new AutoCompleteBehaviour<>();
-	   
-	private final IApplicationConfigProvider appConfigProvider;
-	
-	private final Consumer<IApplicationConfig> configListener = config -> 
-	{
-	    setupStyles();
-	};
-	
-	private boolean ignoreEditEvents;
-	
-	private final List<UndoableEdit> undoStack = new ArrayList<>();
-	private int undoStackPtr=0;
 
-	private IProject project;
+    private final IApplicationConfigProvider appConfigProvider;
 
-	private final JLabel cursorPositionLabel = new JLabel("0");
-	
-	private final ASTTreeModel astTreeModel = new ASTTreeModel();
-	private JFrame astWindow = null;
-	private JFrame searchWindow = null;
+    private final Consumer<IApplicationConfig> configListener = config -> 
+    {
+        setupStyles();
+    };
 
-	private JFrame symbolWindow = null;
-	
-	private final SymbolTableModel symbolModel = new SymbolTableModel();
+    private boolean ignoreEditEvents;
+    private final UndoManager undoManager = new UndoManager();
 
-	private final RecompilationThread recompilationThread = new RecompilationThread();
+    private IProject project;
 
-	protected Style STYLE_TOPLEVEL;
-	protected Style STYLE_LABEL;
-	protected Style STYLE_NUMBER;
-	protected Style STYLE_REGISTER;
-	protected Style STYLE_PREPROCESSOR;
-	protected Style STYLE_MNEMONIC;
-	protected Style STYLE_COMMENT;
-	protected Style STYLE_HIGHLIGHTED;
-	protected Style STYLE_TODO;
+    private final JLabel cursorPositionLabel = new JLabel("0");
 
-	private CompilationUnit currentUnit = new CompilationUnit( new StringResource("dummy",  "" ) );
+    private final ASTTreeModel astTreeModel = new ASTTreeModel();
+    private JFrame astWindow = null;
+    private JFrame searchWindow = null;
 
-	private final MessageFrame messageFrame;
-	
-	private final SearchHelper searchHelper=new SearchHelper();
-	
-	private ASTNode highlight;
-	private boolean controlKeyPressed;
-	
-	private boolean wasCompiledAtLeastOnce = false; 
-	private final List<Runnable> afterCompilation = new ArrayList<>();
-	
-	protected class MyMouseListener extends MouseAdapter 
-	{
-	    private final Point point = new Point();
-	    
-	    @Override
-	    public void mouseClicked(MouseEvent e) 
-	    {
-	        if ( e.getClickCount() == 1 && e.getButton() == MouseEvent.BUTTON1 ) 
-	        {
-	            final IdentifierNode node = getNodeOnlyIfCtrl( e );
-	            if ( node != null ) 
-	            {
-	                final Symbol symbol = getSymbol( node );
-	                if ( symbol != null && symbol.getTextRegion() != null ) 
-	                {
-	                    final TextRegion region = symbol.getTextRegion();
-	                    if ( symbol.getCompilationUnit().hasSameResourceAs( currentUnit ) ) {
-	                        setSelection( region );
-	                    } 
-	                    else 
-	                    {
-	                        try 
-	                        {
+    private JFrame symbolWindow = null;
+
+    private final SymbolTableModel symbolModel = new SymbolTableModel();
+
+    private final RecompilationThread recompilationThread = new RecompilationThread();
+
+    protected Style STYLE_TOPLEVEL;
+    protected Style STYLE_LABEL;
+    protected Style STYLE_NUMBER;
+    protected Style STYLE_REGISTER;
+    protected Style STYLE_PREPROCESSOR;
+    protected Style STYLE_MNEMONIC;
+    protected Style STYLE_COMMENT;
+    protected Style STYLE_HIGHLIGHTED;
+    protected Style STYLE_TODO;
+
+    private CompilationUnit currentUnit = new CompilationUnit( new StringResource("dummy",  "" ) );
+
+    private final MessageFrame messageFrame;
+
+    private final SearchHelper searchHelper=new SearchHelper();
+
+    private ASTNode highlight;
+    private boolean controlKeyPressed;
+
+    private boolean wasCompiledAtLeastOnce = false; 
+    private final List<Runnable> afterCompilation = new ArrayList<>();
+
+    protected class MyMouseListener extends MouseAdapter 
+    {
+        private final Point point = new Point();
+
+        @Override
+        public void mouseClicked(MouseEvent e) 
+        {
+            if ( e.getClickCount() == 1 && e.getButton() == MouseEvent.BUTTON1 ) 
+            {
+                final IdentifierNode node = getNodeOnlyIfCtrl( e );
+                if ( node != null ) 
+                {
+                    final Symbol symbol = getSymbol( node );
+                    if ( symbol != null && symbol.getTextRegion() != null ) 
+                    {
+                        final TextRegion region = symbol.getTextRegion();
+                        if ( symbol.getCompilationUnit().hasSameResourceAs( currentUnit ) ) {
+                            setSelection( region );
+                        } 
+                        else 
+                        {
+                            try 
+                            {
                                 final EditorPanel editor = topLevelWindow.openEditor( project , symbol.getCompilationUnit() );
                                 SwingUtilities.invokeLater( () -> editor.setSelection( region ) );
                             } 
-	                        catch (IOException e1) 
-	                        {
+                            catch (IOException e1) 
+                            {
                                 e1.printStackTrace();
                             }
-	                    }
-	                }
-	            }
-	        }
-	    }
-	    
-	    private Symbol getSymbol(IdentifierNode node) 
-	    {
-	        Symbol result = node.getSymbol();
-	        if ( result == null ) 
-	        {
-	            final SymbolTable table = currentUnit.getSymbolTable().getTopLevelTable();
-	            result = table.maybeGet( node.name ).orElse( null );
-	            if ( result == null ) 
-	            { 
-	                // maybe this is the name of a local variable.
-	                //
-	                // Traverse the AST backwards until we find the next global label while looking for a match,
-	                // if this fails try traversing the AST forwards until we reach the next global label
-	                StatementNode statement = node.getStatement();
-	                while ( true ) 
-	                {
-	                    final List<LabelNode> labels = statement.findLabels();
-	                    boolean foundGlobalLabel = false;
-	                    for ( LabelNode ln : labels ) 
-	                    {
-	                        if ( ln.isGlobal() ) 
-	                        {
-	                            foundGlobalLabel = true;
-	                            result = table.maybeGet( Identifier.newLocalGlobalIdentifier( ln.identifier , node.name ) ).orElse( null );
-	                            if ( result != null ) {
-	                                return result;
-	                            }
-	                        } 
-	                    }
-	                    final int previousIdx = statement.getParent().indexOf( statement )-1;
-	                    if ( foundGlobalLabel || previousIdx < 0 ) {
-	                        break;
-	                    }
-	                    statement = (StatementNode) statement.getParent().child( previousIdx );
-	                }
-	            }
-	        }
-	        return result;
-	    }
-	    
-	    @Override
-	    public void mouseMoved(MouseEvent e) 
-	    {
-	        final IdentifierNode node = getNode( e );
+                        }
+                    }
+                }
+            }
+        }
+
+        private Symbol getSymbol(IdentifierNode node) 
+        {
+            Symbol result = node.getSymbol();
+            if ( result == null ) 
+            {
+                final SymbolTable table = currentUnit.getSymbolTable().getTopLevelTable();
+                result = table.maybeGet( node.name ).orElse( null );
+                if ( result == null ) 
+                { 
+                    // maybe this is the name of a local variable.
+                    //
+                    // Traverse the AST backwards until we find the next global label while looking for a match,
+                    // if this fails try traversing the AST forwards until we reach the next global label
+                    StatementNode statement = node.getStatement();
+                    while ( true ) 
+                    {
+                        final List<LabelNode> labels = statement.findLabels();
+                        boolean foundGlobalLabel = false;
+                        for ( LabelNode ln : labels ) 
+                        {
+                            if ( ln.isGlobal() ) 
+                            {
+                                foundGlobalLabel = true;
+                                result = table.maybeGet( Identifier.newLocalGlobalIdentifier( ln.identifier , node.name ) ).orElse( null );
+                                if ( result != null ) {
+                                    return result;
+                                }
+                            } 
+                        }
+                        final int previousIdx = statement.getParent().indexOf( statement )-1;
+                        if ( foundGlobalLabel || previousIdx < 0 ) {
+                            break;
+                        }
+                        statement = (StatementNode) statement.getParent().child( previousIdx );
+                    }
+                }
+            }
+            return result;
+        }
+
+        @Override
+        public void mouseMoved(MouseEvent e) 
+        {
+            final IdentifierNode node = getNode( e );
             String toolTipText = null;
             if ( node != null ) 
             {
@@ -303,8 +303,8 @@ public abstract class EditorPanel extends JPanel
             if ( controlKeyPressed ) {
                 setHighlight( node );
             }
-	    }
-	    
+        }
+
         private IdentifierNode getNode(MouseEvent e) 
         {
             point.x = e.getX();
@@ -317,407 +317,407 @@ public abstract class EditorPanel extends JPanel
             }
             return node == null || node.getTextRegion() == null || !(node instanceof IdentifierNode)? null : (IdentifierNode) node;
         }
-        
-	    private IdentifierNode getNodeOnlyIfCtrl(MouseEvent e) 
-	    {
+
+        private IdentifierNode getNodeOnlyIfCtrl(MouseEvent e) 
+        {
             return controlKeyPressed ? getNode( e ) : null; 
-	    }
-	}
+        }
+    }
 
-	protected class SearchHelper 
-	{
-		private int currentPosition;
-		private String term;
+    protected class SearchHelper 
+    {
+        private int currentPosition;
+        private String term;
 
-		public boolean searchBackward() 
-		{
-			if ( ! canSearch() ) 
-			{
-				return false;
-			} 
-			String text = editor.getText().toLowerCase();
-			if ( currentPosition ==0 ) {
-				System.out.println("At start of text, starting from end");
-				currentPosition = text.length()-1;
-			}            
-			System.out.println("Starting to search  backwards @ "+currentPosition);
+        public boolean searchBackward() 
+        {
+            if ( ! canSearch() ) 
+            {
+                return false;
+            } 
+            String text = editor.getText().toLowerCase();
+            if ( currentPosition ==0 ) {
+                System.out.println("At start of text, starting from end");
+                currentPosition = text.length()-1;
+            }            
+            System.out.println("Starting to search  backwards @ "+currentPosition);
 
-			int startIndex = 0;
-			final String searchTerm = term.toLowerCase();
-			int previousMatch = text.indexOf( searchTerm, 0 );
-			boolean searchWrapped = false;
-			while ( previousMatch != -1 && startIndex < ( text.length()-1 ) ) {
-				final int match = text.indexOf( searchTerm , startIndex );
-				if ( match == -1 || match >= (currentPosition-1) ) 
-				{
-					if ( searchWrapped || previousMatch < (currentPosition-1 ) ) {
-						break;
-					}
-					startIndex = 0;
-					currentPosition = text.length();
-					searchWrapped = true;
-					continue;                    
-				} 
-				previousMatch = match;
-				startIndex = previousMatch+1;
-			}
-			if ( previousMatch != -1 ) {
-				currentPosition = previousMatch;
-				gotoMatch( currentPosition );
-				return true;
-			}
-			return false;
-		}
+            int startIndex = 0;
+            final String searchTerm = term.toLowerCase();
+            int previousMatch = text.indexOf( searchTerm, 0 );
+            boolean searchWrapped = false;
+            while ( previousMatch != -1 && startIndex < ( text.length()-1 ) ) {
+                final int match = text.indexOf( searchTerm , startIndex );
+                if ( match == -1 || match >= (currentPosition-1) ) 
+                {
+                    if ( searchWrapped || previousMatch < (currentPosition-1 ) ) {
+                        break;
+                    }
+                    startIndex = 0;
+                    currentPosition = text.length();
+                    searchWrapped = true;
+                    continue;                    
+                } 
+                previousMatch = match;
+                startIndex = previousMatch+1;
+            }
+            if ( previousMatch != -1 ) {
+                currentPosition = previousMatch;
+                gotoMatch( currentPosition );
+                return true;
+            }
+            return false;
+        }
 
-		private void gotoMatch(int cursorPos) 
-		{
-			editor.setCaretPosition( cursorPos );
-			editor.select( cursorPos , cursorPos+term.length() );
-			editor.requestFocus();
-			currentPosition = cursorPos+1;
-			System.out.println("Found match at "+cursorPos);            
-		}
+        private void gotoMatch(int cursorPos) 
+        {
+            editor.setCaretPosition( cursorPos );
+            editor.select( cursorPos , cursorPos+term.length() );
+            editor.requestFocus();
+            currentPosition = cursorPos+1;
+            System.out.println("Found match at "+cursorPos);            
+        }
 
-		public boolean searchForward() 
-		{
-			if ( ! canSearch() ) 
-			{
-				return false;
-			}            
-			final String text = editor.getText();
-			if ( currentPosition >= text.length()) {
-				System.out.println("At end of text, starting from 0");
-				currentPosition = 0;
-			}
-			System.out.println("Starting to search @ "+currentPosition);
-			final int nextMatch = text.substring( currentPosition , text.length() ).toLowerCase().indexOf( term.toLowerCase() );
-			if ( nextMatch != -1 ) 
-			{
-				gotoMatch( currentPosition + nextMatch );
-				return true;
-			}
-			System.out.println("No more matches");
-			return false;
-		}
+        public boolean searchForward() 
+        {
+            if ( ! canSearch() ) 
+            {
+                return false;
+            }            
+            final String text = editor.getText();
+            if ( currentPosition >= text.length()) {
+                System.out.println("At end of text, starting from 0");
+                currentPosition = 0;
+            }
+            System.out.println("Starting to search @ "+currentPosition);
+            final int nextMatch = text.substring( currentPosition , text.length() ).toLowerCase().indexOf( term.toLowerCase() );
+            if ( nextMatch != -1 ) 
+            {
+                gotoMatch( currentPosition + nextMatch );
+                return true;
+            }
+            System.out.println("No more matches");
+            return false;
+        }
 
-		public void startFromBeginning() {
-			System.out.println("Start from beginning");
-			currentPosition = 0;
-		}
+        public void startFromBeginning() {
+            System.out.println("Start from beginning");
+            currentPosition = 0;
+        }
 
-		public boolean canSearch() 
-		{
-			final String text = editor.getText();
-			return term != null && term.length() > 0 && text != null && text.length() != 0;
-		}
+        public boolean canSearch() 
+        {
+            final String text = editor.getText();
+            return term != null && term.length() > 0 && text != null && text.length() != 0;
+        }
 
-		public void setTerm(String term) {
-			this.term = term;
-		}
+        public void setTerm(String term) {
+            this.term = term;
+        }
 
-		public String getTerm() {
-			return term;
-		}
-	}
+        public String getTerm() {
+            return term;
+        }
+    }
 
-	protected static final class FilteredList<T> extends AbstractList<T> {
+    protected static final class FilteredList<T> extends AbstractList<T> {
 
-		private final List<T> unfiltered = new ArrayList<T>();
-		private final List<T> filtered = new ArrayList<T>();
+        private final List<T> unfiltered = new ArrayList<T>();
+        private final List<T> filtered = new ArrayList<T>();
 
-		private Function<T,Boolean> filterFunc = x -> true;
+        private Function<T,Boolean> filterFunc = x -> true;
 
-		public void setFilterFunc(Function<T,Boolean> filterFunc ) 
-		{
-			Validate.notNull(filterFunc, "filterFunc must not be NULL");
-			this.filterFunc = filterFunc;
-			doFilter();
-		}
+        public void setFilterFunc(Function<T,Boolean> filterFunc ) 
+        {
+            Validate.notNull(filterFunc, "filterFunc must not be NULL");
+            this.filterFunc = filterFunc;
+            doFilter();
+        }
 
-		private void doFilter() 
-		{
-			filtered.clear();
-			for ( T elem : unfiltered ) 
-			{
-				if ( filterFunc.apply( elem ) == Boolean.TRUE ) {
-					filtered.add( elem );
-				}
-			}
-		}
+        private void doFilter() 
+        {
+            filtered.clear();
+            for ( T elem : unfiltered ) 
+            {
+                if ( filterFunc.apply( elem ) == Boolean.TRUE ) {
+                    filtered.add( elem );
+                }
+            }
+        }
 
-		@Override
-		public boolean addAll(Collection<? extends T> c) 
-		{
-			boolean result = false;
-			for ( T elem : c ) {
-				result |= add(elem);
-			}
-			return result;
-		}
+        @Override
+        public boolean addAll(Collection<? extends T> c) 
+        {
+            boolean result = false;
+            for ( T elem : c ) {
+                result |= add(elem);
+            }
+            return result;
+        }
 
-		@Override
-		public boolean add(T e) 
-		{
-			Validate.notNull(e, "e must not be NULL");
-			unfiltered.add( e );
-			if ( filterFunc.apply( e ) == Boolean.TRUE ) {
-				filtered.add(e);
-				return true;
-			}
-			return false;
-		}
+        @Override
+        public boolean add(T e) 
+        {
+            Validate.notNull(e, "e must not be NULL");
+            unfiltered.add( e );
+            if ( filterFunc.apply( e ) == Boolean.TRUE ) {
+                filtered.add(e);
+                return true;
+            }
+            return false;
+        }
 
-		@Override
-		public void clear() {
-			filtered.clear();
-			unfiltered.clear();
-		}
+        @Override
+        public void clear() {
+            filtered.clear();
+            unfiltered.clear();
+        }
 
-		@Override
-		public Iterator<T> iterator() {
-			return filtered.iterator();
-		}
+        @Override
+        public Iterator<T> iterator() {
+            return filtered.iterator();
+        }
 
-		@Override
-		public T get(int index) 
-		{
-			return filtered.get(index);
-		}
+        @Override
+        public T get(int index) 
+        {
+            return filtered.get(index);
+        }
 
-		@Override
-		public int size() {
-			return filtered.size();
-		}
-	}
+        @Override
+        public int size() {
+            return filtered.size();
+        }
+    }
 
-	protected class IndentFilter extends DocumentFilter 
-	{
-		private static final String NEWLINE = "\n";
+    protected class IndentFilter extends DocumentFilter 
+    {
+        private static final String NEWLINE = "\n";
 
-		public void insertString(FilterBypass fb, int offs, String str, AttributeSet a) throws BadLocationException
-		{
-			if ( isNewline( str ) ) 
-			{
-				str = addWhiteSpace(fb.getDocument(), offs);
-			}
-			super.insertString(fb, offs, replaceTabs(str) , a);
-		}
+        public void insertString(FilterBypass fb, int offs, String str, AttributeSet a) throws BadLocationException
+        {
+            if ( isNewline( str ) ) 
+            {
+                str = addWhiteSpace(fb.getDocument(), offs);
+            }
+            super.insertString(fb, offs, replaceTabs(str) , a);
+        }
 
-		private boolean isNewline(String s) {
-			return NEWLINE.equals( s );
-		}
+        private boolean isNewline(String s) {
+            return NEWLINE.equals( s );
+        }
 
-		private String replaceTabs(String in) {
-			return in.replace("\t" ,  project.getConfig().getEditorIndentString() );
-		}
+        private String replaceTabs(String in) {
+            return in.replace("\t" ,  project.getConfig().getEditorIndentString() );
+        }
 
-		public void replace(FilterBypass fb, int offs, int length, String str, AttributeSet a) throws BadLocationException
-		{
-			if ( isNewline( str ) ) {
-				str = addWhiteSpace(fb.getDocument(), offs);
-			}
-			super.replace(fb, offs, length, replaceTabs(str) , a);
-		}
+        public void replace(FilterBypass fb, int offs, int length, String str, AttributeSet a) throws BadLocationException
+        {
+            if ( isNewline( str ) ) {
+                str = addWhiteSpace(fb.getDocument(), offs);
+            }
+            super.replace(fb, offs, length, replaceTabs(str) , a);
+        }
 
-		private String addWhiteSpace(Document doc, int offset) throws BadLocationException
-		{
-			final StringBuilder whiteSpace = new StringBuilder("\n");
-			final Element rootElement = doc.getDefaultRootElement();
-			final int line = rootElement.getElementIndex( offset );
+        private String addWhiteSpace(Document doc, int offset) throws BadLocationException
+        {
+            final StringBuilder whiteSpace = new StringBuilder("\n");
+            final Element rootElement = doc.getDefaultRootElement();
+            final int line = rootElement.getElementIndex( offset );
 
-			int i = rootElement.getElement(line).getStartOffset();
-			while (true)
-			{
-				final String temp = doc.getText(i, 1);
+            int i = rootElement.getElement(line).getStartOffset();
+            while (true)
+            {
+                final String temp = doc.getText(i, 1);
 
-				if (temp.equals(" ") || temp.equals("\t"))
-				{
-					whiteSpace.append(temp);
-					i++;
-				}
-				else {
-					break;
-				}
-			}
-			return whiteSpace.toString();
-		}        
-	}
+                if (temp.equals(" ") || temp.equals("\t"))
+                {
+                    whiteSpace.append(temp);
+                    i++;
+                }
+                else {
+                    break;
+                }
+            }
+            return whiteSpace.toString();
+        }        
+    }
 
-	protected final class RecompilationThread extends Thread {
+    protected final class RecompilationThread extends Thread {
 
-		private long lastChange = -1;
+        private long lastChange = -1;
 
-		private final AtomicBoolean terminate = new AtomicBoolean(false);
+        private final AtomicBoolean terminate = new AtomicBoolean(false);
 
-		private final Object SLEEP_LOCK = new Object();
+        private final Object SLEEP_LOCK = new Object();
 
-		{
-			setDaemon(true);
-			setName("recompilation");
-		}
+        {
+            setDaemon(true);
+            setName("recompilation");
+        }
 
-		public void run() 
-		{
-			while ( ! terminate.get() ) 
-			{
-				long ts = -1;                    
-				synchronized( SLEEP_LOCK ) 
-				{
-					try
-					{
-						SLEEP_LOCK.wait();
-						ts = lastChange;
-					}
-					catch (InterruptedException e) { /* */ } 
-				}
+        public void run() 
+        {
+            while ( ! terminate.get() ) 
+            {
+                long ts = -1;                    
+                synchronized( SLEEP_LOCK ) 
+                {
+                    try
+                    {
+                        SLEEP_LOCK.wait();
+                        ts = lastChange;
+                    }
+                    catch (InterruptedException e) { /* */ } 
+                }
 
-				if ( ts == -1 ) {
-					continue;
-				}
+                if ( ts == -1 ) {
+                    continue;
+                }
 
-				boolean doRecompile = false;
-				while( ! terminate.get() ) 
-				{
-					try { Thread.sleep( (int) RECOMPILATION_DELAY.toMillis() ); } catch(Exception e) { /* */ }
+                boolean doRecompile = false;
+                while( ! terminate.get() ) 
+                {
+                    try { Thread.sleep( (int) RECOMPILATION_DELAY.toMillis() ); } catch(Exception e) { /* */ }
 
-					synchronized( SLEEP_LOCK ) 
-					{
-						if( lastChange == ts ) 
-						{
-							lastChange = -1;
-							doRecompile = true;
-							break;
-						} 
-						ts = lastChange;
-					}
-				}
+                    synchronized( SLEEP_LOCK ) 
+                    {
+                        if( lastChange == ts ) 
+                        {
+                            lastChange = -1;
+                            doRecompile = true;
+                            break;
+                        } 
+                        ts = lastChange;
+                    }
+                }
 
-				if ( doRecompile ) 
-				{
-					try {
-						SwingUtilities.invokeAndWait( () -> compile() );
-					}
-					catch(Exception e) {
-						// ignore
-					}
-				}
-			}
-		}
+                if ( doRecompile ) 
+                {
+                    try {
+                        SwingUtilities.invokeAndWait( () -> compile() );
+                    }
+                    catch(Exception e) {
+                        // ignore
+                    }
+                }
+            }
+        }
 
-		public void documentChanged(DocumentEvent event) 
-		{
-		    new Exception("===============> Document changed").printStackTrace();
-			synchronized ( SLEEP_LOCK ) 
-			{
-				lastChange = System.currentTimeMillis();
-				SLEEP_LOCK.notifyAll();
-			}
-		}
-	}
+        public void documentChanged(DocumentEvent event) 
+        {
+            // new Exception("===============> Document changed").printStackTrace();
+            synchronized ( SLEEP_LOCK ) 
+            {
+                lastChange = System.currentTimeMillis();
+                SLEEP_LOCK.notifyAll();
+            }
+        }
+    }
 
-	private final class SymbolTableModel implements TableModel {
+    private final class SymbolTableModel implements TableModel {
 
-		private final FilteredList<Symbol> symbols = new FilteredList<>();
+        private final FilteredList<Symbol> symbols = new FilteredList<>();
 
-		private final List<TableModelListener> listeners = new ArrayList<>();
+        private final List<TableModelListener> listeners = new ArrayList<>();
 
-		private String filterString = null;
+        private String filterString = null;
 
-		public void setSymbolTable(SymbolTable table)
-		{
-			Validate.notNull(table,"table must not be NULL");
-			this.symbols.clear();
-			final List<Symbol> allSymbolsSorted = table.getAllSymbolsSorted();
-			this.symbols.addAll( allSymbolsSorted );
-			tableChanged();
-		}        
+        public void setSymbolTable(SymbolTable table)
+        {
+            Validate.notNull(table,"table must not be NULL");
+            this.symbols.clear();
+            final List<Symbol> allSymbolsSorted = table.getAllSymbolsSorted();
+            this.symbols.addAll( allSymbolsSorted );
+            tableChanged();
+        }        
 
-		public void clear() 
-		{
-			symbols.clear();
-			setFilterString( this.filterString );
-		}
+        public void clear() 
+        {
+            symbols.clear();
+            setFilterString( this.filterString );
+        }
 
-		private void tableChanged() {
-			final TableModelEvent ev = new TableModelEvent( this );
-			listeners.forEach( l -> l.tableChanged( ev ) );
-		}
+        private void tableChanged() {
+            final TableModelEvent ev = new TableModelEvent( this );
+            listeners.forEach( l -> l.tableChanged( ev ) );
+        }
 
-		public void setFilterString(String s) 
-		{
-			this.filterString = s == null ? null : s.toLowerCase();
-			final Function<Symbol,Boolean> func;
-			if ( filterString == null ) 
-			{
-				func = symbol -> true;
-			} else {
-				func = symbol -> filterString == null ? Boolean.TRUE : Boolean.valueOf( symbol.name().value.toLowerCase().contains( filterString ) );
-			}
-			symbols.setFilterFunc( func );        
-			tableChanged();
-		}
+        public void setFilterString(String s) 
+        {
+            this.filterString = s == null ? null : s.toLowerCase();
+            final Function<Symbol,Boolean> func;
+            if ( filterString == null ) 
+            {
+                func = symbol -> true;
+            } else {
+                func = symbol -> filterString == null ? Boolean.TRUE : Boolean.valueOf( symbol.name().value.toLowerCase().contains( filterString ) );
+            }
+            symbols.setFilterFunc( func );        
+            tableChanged();
+        }
 
-		@Override
-		public int getRowCount() {
-			return symbols.size();
-		}
+        @Override
+        public int getRowCount() {
+            return symbols.size();
+        }
 
-		@Override
-		public int getColumnCount() {
-			return 8;
-		}
+        @Override
+        public int getColumnCount() {
+            return 8;
+        }
 
-		private void assertValidColumn(int columnIndex) {
-			if ( columnIndex < 0 || columnIndex > 7 ) {
-				throw new RuntimeException("Invalid column: "+columnIndex);
-			}
-		}
-		@Override
-		public String getColumnName(int columnIndex) 
-		{
-			switch(columnIndex) {
-				case 0:
-					return "Name";
-				case 1:
-					return "Symbol Type";
+        private void assertValidColumn(int columnIndex) {
+            if ( columnIndex < 0 || columnIndex > 7 ) {
+                throw new RuntimeException("Invalid column: "+columnIndex);
+            }
+        }
+        @Override
+        public String getColumnName(int columnIndex) 
+        {
+            switch(columnIndex) {
+                case 0:
+                    return "Name";
+                case 1:
+                    return "Symbol Type";
                 case 2:
                     return "Object Type";		
                 case 3:
                     return "Object Size";                       
-				case 4:
-				    return "Segment";
-				case 5:
-					return "Value";
-				case 6:
-				    return "Node";
-				case 7:
-				    return "Compilation unit";
-				default:
-					throw new RuntimeException("Invalid column: "+columnIndex);
-			}
-		}
+                case 4:
+                    return "Segment";
+                case 5:
+                    return "Value";
+                case 6:
+                    return "Node";
+                case 7:
+                    return "Compilation unit";
+                default:
+                    throw new RuntimeException("Invalid column: "+columnIndex);
+            }
+        }
 
-		@Override
-		public Class<?> getColumnClass(int columnIndex) 
-		{
-			assertValidColumn(columnIndex);
-			return String.class;
-		}
+        @Override
+        public Class<?> getColumnClass(int columnIndex) 
+        {
+            assertValidColumn(columnIndex);
+            return String.class;
+        }
 
-		@Override
-		public boolean isCellEditable(int rowIndex, int columnIndex) {
-			return false;
-		}
+        @Override
+        public boolean isCellEditable(int rowIndex, int columnIndex) {
+            return false;
+        }
 
-		@Override
-		public Object getValueAt(int rowIndex, int columnIndex) 
-		{
-			final Symbol symbol = symbols.get(rowIndex);
-			switch( columnIndex ) {
-				case 0:
-					return symbol.name().value;
-				case 1:
-					return symbol.getType().toString();
+        @Override
+        public Object getValueAt(int rowIndex, int columnIndex) 
+        {
+            final Symbol symbol = symbols.get(rowIndex);
+            switch( columnIndex ) {
+                case 0:
+                    return symbol.name().value;
+                case 1:
+                    return symbol.getType().toString();
                 case 2:
                     return symbol.getObjectType().toString();
                 case 3:
@@ -725,121 +725,121 @@ public abstract class EditorPanel extends JPanel
                 case 4:
                     final Segment segment = symbol.getSegment();
                     return segment == null ? "--" : segment.toString();					
-				case 5:
-					final Object value = symbol.getValue(); 
-					return value == null ? "<no value>" : value.toString();
-				case 6:
-				    return symbol.getNode() == null ? null : symbol.getNode().toString();
-				case 7:
-				    return symbol.getCompilationUnit().getResource().toString();
-				default:
-					throw new RuntimeException("Invalid column: "+columnIndex);                 
-			}
-		}
+                case 5:
+                    final Object value = symbol.getValue(); 
+                    return value == null ? "<no value>" : value.toString();
+                case 6:
+                    return symbol.getNode() == null ? null : symbol.getNode().toString();
+                case 7:
+                    return symbol.getCompilationUnit().getResource().toString();
+                default:
+                    throw new RuntimeException("Invalid column: "+columnIndex);                 
+            }
+        }
 
-		@Override
-		public void setValueAt(Object aValue, int rowIndex, int columnIndex) {
-			throw new UnsupportedOperationException();
-		}
+        @Override
+        public void setValueAt(Object aValue, int rowIndex, int columnIndex) {
+            throw new UnsupportedOperationException();
+        }
 
-		@Override
-		public void addTableModelListener(TableModelListener l) {
-			listeners.add(l);
-		}
+        @Override
+        public void addTableModelListener(TableModelListener l) {
+            listeners.add(l);
+        }
 
-		@Override
-		public void removeTableModelListener(TableModelListener l) {
-			listeners.remove(l);
-		}
-	}
+        @Override
+        public void removeTableModelListener(TableModelListener l) {
+            listeners.remove(l);
+        }
+    }
 
-	private final class ASTTreeModel implements TreeModel 
-	{
-		private final List<TreeModelListener> listeners = new ArrayList<>();
+    private final class ASTTreeModel implements TreeModel 
+    {
+        private final List<TreeModelListener> listeners = new ArrayList<>();
 
-		private AST ast = new AST();
+        private AST ast = new AST();
 
-		public void setAST(AST ast) 
-		{
-			this.ast = ast;
+        public void setAST(AST ast) 
+        {
+            this.ast = ast;
 
-			final TreeModelEvent ev = new TreeModelEvent(this, new TreePath(this.ast) );
-			listeners.forEach( l -> l.treeStructureChanged( ev  ) );
-		}
+            final TreeModelEvent ev = new TreeModelEvent(this, new TreePath(this.ast) );
+            listeners.forEach( l -> l.treeStructureChanged( ev  ) );
+        }
 
-		public AST getAST() 
-		{
-			return ast;
-		}
+        public AST getAST() 
+        {
+            return ast;
+        }
 
-		@Override
-		public AST getRoot() {
-			return ast;
-		}
+        @Override
+        public AST getRoot() {
+            return ast;
+        }
 
-		@Override
-		public Object getChild(Object parent, int index) 
-		{
-			return ((ASTNode) parent).child(index);
-		}
+        @Override
+        public Object getChild(Object parent, int index) 
+        {
+            return ((ASTNode) parent).child(index);
+        }
 
-		@Override
-		public int getChildCount(Object parent) {
-			return ((ASTNode) parent).childCount();
-		}
+        @Override
+        public int getChildCount(Object parent) {
+            return ((ASTNode) parent).childCount();
+        }
 
-		@Override
-		public boolean isLeaf(Object node) {
-			return ((ASTNode) node).hasNoChildren();
-		}
+        @Override
+        public boolean isLeaf(Object node) {
+            return ((ASTNode) node).hasNoChildren();
+        }
 
-		@Override
-		public void valueForPathChanged(TreePath path, Object newValue) 
-		{
-			final TreeModelEvent ev = new TreeModelEvent(this , path );
-			listeners.forEach( l -> l.treeNodesChanged( ev  ) );
-		}
+        @Override
+        public void valueForPathChanged(TreePath path, Object newValue) 
+        {
+            final TreeModelEvent ev = new TreeModelEvent(this , path );
+            listeners.forEach( l -> l.treeNodesChanged( ev  ) );
+        }
 
-		@Override
-		public int getIndexOfChild(Object parent, Object child) {
-			return ((ASTNode) parent).indexOf( (ASTNode) child);
-		}
+        @Override
+        public int getIndexOfChild(Object parent, Object child) {
+            return ((ASTNode) parent).indexOf( (ASTNode) child);
+        }
 
-		@Override
-		public void addTreeModelListener(TreeModelListener l) {
-			listeners.add(l);
-		}
+        @Override
+        public void addTreeModelListener(TreeModelListener l) {
+            listeners.add(l);
+        }
 
-		@Override
-		public void removeTreeModelListener(TreeModelListener l) {
-			listeners.remove(l);
-		}
-	}
+        @Override
+        public void removeTreeModelListener(TreeModelListener l) {
+            listeners.remove(l);
+        }
+    }
 
-	public EditorPanel(IProject project, EditorFrame topLevelWindow , CompilationUnit unit,IApplicationConfigProvider appConfigProvider,MessageFrame messageFrame,
-	        CaretPositionTracker caretTracker) throws IOException 
-	{
-		Validate.notNull(project, "project must not be NULL");
-		Validate.notNull(unit, "unit must not be NULL");
+    public EditorPanel(IProject project, EditorFrame topLevelWindow , CompilationUnit unit,IApplicationConfigProvider appConfigProvider,MessageFrame messageFrame,
+            CaretPositionTracker caretTracker) throws IOException 
+    {
+        Validate.notNull(project, "project must not be NULL");
+        Validate.notNull(unit, "unit must not be NULL");
         Validate.notNull(appConfigProvider, "appConfigProvider must not be NULL");
         Validate.notNull(messageFrame, "messageFrame must not be NULL");
         Validate.notNull(caretTracker,"caretTracker must not be NULL");
         this.messageFrame = messageFrame;
         this.appConfigProvider = appConfigProvider;
-		this.project = project;
-		this.currentUnit = unit;
-		this.topLevelWindow = topLevelWindow;
-		this.caretTracker = caretTracker;
-		
-		// symbol auto completion callback
-		autoComplete.setCallback( new DefaultAutoCompleteCallback<Symbol>() 
-		{
-		    private Symbol previousGlobalSymbol;
-		    
-		    private final char[] separatorChars = new char[] {'(',')',','};
-		    
-		    private boolean matches(Identifier name,String userInput) 
-		    {
+        this.project = project;
+        this.currentUnit = unit;
+        this.topLevelWindow = topLevelWindow;
+        this.caretTracker = caretTracker;
+
+        // symbol auto completion callback
+        autoComplete.setCallback( new DefaultAutoCompleteCallback<Symbol>() 
+        {
+            private Symbol previousGlobalSymbol;
+
+            private final char[] separatorChars = new char[] {'(',')',','};
+
+            private boolean matches(Identifier name,String userInput) 
+            {
                 for ( int i = 0 , matchCount = 0 , len = name.value.length() < userInput.length() ? name.value.length() : userInput.length() ; i < len ; i++ ) 
                 {
                     final char c = Character.toLowerCase( name.value.charAt( i ) );
@@ -853,14 +853,14 @@ public abstract class EditorPanel extends JPanel
                         break;
                     }
                 }		        
-		        if ( name.value.toLowerCase().contains( userInput ) ) {
-		            return true;
-		        }
-		        return false;
-		    }
-		    
-		    private boolean matches(Symbol symbol,String userInput) 
-		    {
+                if ( name.value.toLowerCase().contains( userInput ) ) {
+                    return true;
+                }
+                return false;
+            }
+
+            private boolean matches(Symbol symbol,String userInput) 
+            {
                 if ( previousGlobalSymbol != null ) 
                 {
                     if ( symbol.isLocalLabel() ) 
@@ -886,32 +886,32 @@ public abstract class EditorPanel extends JPanel
                     }
                 }
                 return false;
-		    }
-		    
-		    @Override
-		    protected boolean isSeparatorChar(char c) 
-		    {
-		        if ( Character.isWhitespace( c ) ) {
-		            return true;
-		        }
-		        for ( int i = 0, len = separatorChars.length ; i < len ; i++ ) 
-		        {
-		            if ( c == separatorChars[i] ) {
-		                return true;
-		            }
-		        }
-		        return false;
-		    }
-		    
+            }
+
+            @Override
+            protected boolean isSeparatorChar(char c) 
+            {
+                if ( Character.isWhitespace( c ) ) {
+                    return true;
+                }
+                for ( int i = 0, len = separatorChars.length ; i < len ; i++ ) 
+                {
+                    if ( c == separatorChars[i] ) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
             @Override
             public List<Symbol> getProposals(String input) 
             {
                 System.out.println("*** Looking for >"+input+"<");
                 final String lower = input.toLowerCase();
-                
+
                 final List<Symbol> globalMatches = new ArrayList<>();
                 final List<Symbol> localMatches = new ArrayList<>();
-                
+
                 final SymbolTable globalTable = currentUnit.getSymbolTable().getTopLevelTable();
                 globalTable.visitSymbols( (symbol) -> 
                 {
@@ -940,10 +940,10 @@ public abstract class EditorPanel extends JPanel
 
                     return Boolean.TRUE;
                 });
-                
+
                 globalMatches.sort( (a,b) -> a.name().value.compareTo( b.name().value ) );
                 localMatches.sort( (a,b) -> a.getLocalNamePart().value.compareTo( b.getLocalNamePart().value ) );
-                
+
                 final List<Symbol> result = new ArrayList<>( globalMatches.size() + localMatches.size() );
                 result.addAll( localMatches );
                 result.addAll( globalMatches );
@@ -958,7 +958,7 @@ public abstract class EditorPanel extends JPanel
                 }
                 return value.name().value;
             }
-		 
+
             @Override
             public InitialUserInput getInitialUserInput(JTextComponent editor, int caretPosition) 
             {
@@ -988,68 +988,68 @@ public abstract class EditorPanel extends JPanel
                 }
                 return super.getInitialUserInput(editor, caretPosition);
             }
-		});
+        });
 
-		autoComplete.setListCellRenderer( new DefaultListCellRenderer() {
-		
-		    public Component getListCellRendererComponent(javax.swing.JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) 
-		    {
-		        final Component result = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-		        final Symbol symbol = (Symbol) value;
-		        setText( symbol.isLocalLabel() ? symbol.getLocalNamePart().value : symbol.name().value );
-		        return result;
-		    };
-		});
-		
-		autoComplete.setInitialPopupSize( new Dimension(250,200 ) );
-		autoComplete.setVisibleRowCount( 10 );
-		
-		editor.setFont( new Font(Font.MONOSPACED, Font.PLAIN, 12) );
-		editor.addCaretListener( new CaretListener() 
-		{
+        autoComplete.setListCellRenderer( new DefaultListCellRenderer() {
+
+            public Component getListCellRendererComponent(javax.swing.JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) 
+            {
+                final Component result = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+                final Symbol symbol = (Symbol) value;
+                setText( symbol.isLocalLabel() ? symbol.getLocalNamePart().value : symbol.name().value );
+                return result;
+            };
+        });
+
+        autoComplete.setInitialPopupSize( new Dimension(250,200 ) );
+        autoComplete.setVisibleRowCount( 10 );
+
+        editor.setFont( new Font(Font.MONOSPACED, Font.PLAIN, 12) );
+        editor.addCaretListener( new CaretListener() 
+        {
             @Override
             public void caretUpdate(CaretEvent e) 
             {
                 cursorPositionLabel.setText( Integer.toString( e.getDot()  ) );
             }
-		});
-		final MyMouseListener mouseListener = new MyMouseListener(); 
-		
-		editor.addMouseMotionListener( mouseListener);
-		editor.addMouseListener( mouseListener );
-		editor.addKeyListener( new KeyAdapter() 
-		{
-		    
-		    @Override
-		    public void keyPressed(KeyEvent e) 
-		    {
-		        if ( isCtrlDown( e ) && e.getKeyCode() == KeyEvent.VK_W ) {
-		            EditorPanel.this.close( true );
-		        } 
-		        else if ( e.getKeyCode() == KeyEvent.VK_CONTROL ) {
-		            controlKeyPressed = true;
-		        }
-		    }
-		    
-		    @Override
-		    public void keyReleased(KeyEvent e) 
-		    {
+        });
+        final MyMouseListener mouseListener = new MyMouseListener(); 
+
+        editor.addMouseMotionListener( mouseListener);
+        editor.addMouseListener( mouseListener );
+        editor.addKeyListener( new KeyAdapter() 
+        {
+
+            @Override
+            public void keyPressed(KeyEvent e) 
+            {
+                if ( isCtrlDown( e ) && e.getKeyCode() == KeyEvent.VK_W ) {
+                    EditorPanel.this.close( true );
+                } 
+                else if ( e.getKeyCode() == KeyEvent.VK_CONTROL ) {
+                    controlKeyPressed = true;
+                }
+            }
+
+            @Override
+            public void keyReleased(KeyEvent e) 
+            {
                 if ( e.getKeyCode() == KeyEvent.VK_CONTROL ) {
                     setHighlight( null );
                     controlKeyPressed = false;
                 }
-		    }
-		    
-		    private boolean isCtrlDown(KeyEvent e) 
-		    {
-		        return ( e.getModifiersEx() & KeyEvent.CTRL_DOWN_MASK ) != 0; 
-		    }
-		    
+            }
+
+            private boolean isCtrlDown(KeyEvent e) 
+            {
+                return ( e.getModifiersEx() & KeyEvent.CTRL_DOWN_MASK ) != 0; 
+            }
+
             private boolean isAltDown(KeyEvent e) 
             {
                 return ( e.getModifiersEx() & KeyEvent.ALT_DOWN_MASK ) != 0; 
             }		    
-		    
+
             /**
              * Returns a {@link TextRegion} for the line that holds a given
              * caret position.
@@ -1067,14 +1067,14 @@ public abstract class EditorPanel extends JPanel
                 if ( len == 0 || caretPosition > len ) {
                     return null;
                 }
-                
+
                 final boolean atStartOfLine;
                 if ( caretPosition == 0 ) {
                     atStartOfLine = true;
                 } else {
                     atStartOfLine = text.charAt( caretPosition-1 ) == 'n';
                 }
-                
+
                 if ( atStartOfLine ) 
                 {
                     // search ahead
@@ -1088,7 +1088,7 @@ public abstract class EditorPanel extends JPanel
                     }                    
                     return new TextRegion(caretPosition , (end-caretPosition)+1 , 1 , 1);
                 }
-                
+
                 final boolean atEndOfLine;
                 if ( caretPosition < len ) {
                     atEndOfLine = text.charAt( caretPosition ) == '\n';
@@ -1096,7 +1096,7 @@ public abstract class EditorPanel extends JPanel
                     atEndOfLine = true;
                     caretPosition--;
                 }
-                
+
                 if ( atEndOfLine ) 
                 { 
                     // search backwards
@@ -1106,7 +1106,7 @@ public abstract class EditorPanel extends JPanel
                     }
                     return new TextRegion(start,(caretPosition-start)+1,1,1);
                 }
-                
+
                 // somewhere in-between, search forwards and backwards
                 int end = caretPosition;
                 while ( (end+1) < len ) 
@@ -1122,22 +1122,22 @@ public abstract class EditorPanel extends JPanel
                 }
                 return new TextRegion(start,(end-start)+1,1,1);
             }
-            
-			@Override
-			public void keyTyped(KeyEvent e) 
-			{
-			    if ( isAltDown(e) ) {
-	                 final byte[] bytes = Character.toString( e.getKeyChar() ).getBytes();
-	                 System.out.println("Bytes: "+bytes.length+" , "+Integer.toHexString( bytes[0] ) );
-			    } 
-			    else if ( isCtrlDown(e) ) 
-				{
-					final byte[] bytes = Character.toString( e.getKeyChar() ).getBytes();
-					System.out.println("Bytes: "+bytes.length+" , "+Integer.toHexString( bytes[0] ) );
-					if ( e.getKeyChar() == 6 ) // CTRL-F ... search
-					{
-						toggleSearchWindow();
-					} 
+
+            @Override
+            public void keyTyped(KeyEvent e) 
+            {
+                if ( isAltDown(e) ) {
+                    final byte[] bytes = Character.toString( e.getKeyChar() ).getBytes();
+                    System.out.println("Bytes: "+bytes.length+" , "+Integer.toHexString( bytes[0] ) );
+                } 
+                else if ( isCtrlDown(e) ) 
+                {
+                    final byte[] bytes = Character.toString( e.getKeyChar() ).getBytes();
+                    System.out.println("Bytes: "+bytes.length+" , "+Integer.toHexString( bytes[0] ) );
+                    if ( e.getKeyChar() == 6 ) // CTRL-F ... search
+                    {
+                        toggleSearchWindow();
+                    } 
                     else if ( e.getKeyChar() == 0x12 ) // CTRL-R   ... delete to end of line
                     {
                         final TextRegion line = getLineAt( editor.getCaretPosition() );
@@ -1166,100 +1166,100 @@ public abstract class EditorPanel extends JPanel
                             }
                         }
                     }					
-					else if ( e.getKeyChar() == 0x0b && searchHelper.canSearch() ) // CTRL-K ... search forward
-					{
-						searchHelper.searchForward();
-					} 
-					else if ( e.getKeyChar() == 0x02 && searchHelper.canSearch() ) // CTRL-B ... search backwards
-					{
-						searchHelper.searchBackward();
-					}                     
-					else if ( e.getKeyChar() == 0x07 ) // CTRL-G ... goto line
-					{
-						gotoLine();
-					}                    
-					else if ( e.getKeyChar() == 0x0d ) // CTRL+S ... save 
-					{ 
-						try {
-							saveSource();
-						} 
-						catch (IOException e1) 
-						{
-							IDEMain.fail(e1);
-						}
-					} else if ( e.getKeyChar() == 0x1a && undoStackPtr > 0 ) { // CTRL-Z
-						final UndoableEdit edit = undoStack.get( --undoStackPtr );
-						edit.undo();
-					}  else if ( e.getKeyChar() == 0x19 && undoStackPtr < undoStack.size() ) { // CTRL-Y
-						final UndoableEdit edit = undoStack.get(undoStackPtr++);
-						edit.redo();
-					}
-				}
-			}
-		});
+                    else if ( e.getKeyChar() == 0x0b && searchHelper.canSearch() ) // CTRL-K ... search forward
+                    {
+                        searchHelper.searchForward();
+                    } 
+                    else if ( e.getKeyChar() == 0x02 && searchHelper.canSearch() ) // CTRL-B ... search backwards
+                    {
+                        searchHelper.searchBackward();
+                    }                     
+                    else if ( e.getKeyChar() == 0x07 ) // CTRL-G ... goto line
+                    {
+                        gotoLine();
+                    }                    
+                    else if ( e.getKeyChar() == 0x0d ) // CTRL+S ... save 
+                    { 
+                        try {
+                            saveSource();
+                        } 
+                        catch (IOException e1) 
+                        {
+                            IDEMain.fail(e1);
+                        }
+                    } else if ( e.getKeyChar() == 0x1a && undoManager.canUndo() ) { // CTRL-Z
+                        undoManager.undo();
+                        e.consume();
+                    }  else if ( e.getKeyChar() == 0x19 && undoManager.canRedo() ) { // CTRL-Y
+                        undoManager.redo();
+                        e.consume();
+                    }
+                }
+            }
+        });
 
-		editor.setFont(new Font("monospaced", Font.PLAIN, 12));
-		final JPanel panel = new JPanel();
-		panel.setLayout( new GridBagLayout() );
+        editor.setFont(new Font("monospaced", Font.PLAIN, 12));
+        final JPanel panel = new JPanel();
+        panel.setLayout( new GridBagLayout() );
 
-		// add toolbar
-		GridBagConstraints cnstrs = new GridBagConstraints();
-		cnstrs.fill = GridBagConstraints.HORIZONTAL;
-		cnstrs.weightx = 1.0; cnstrs.weighty=0;
-		cnstrs.gridwidth=1; cnstrs.gridheight = 1 ;
-		cnstrs.gridx = 0; cnstrs.gridy = 0;
+        // add toolbar
+        GridBagConstraints cnstrs = new GridBagConstraints();
+        cnstrs.fill = GridBagConstraints.HORIZONTAL;
+        cnstrs.weightx = 1.0; cnstrs.weighty=0;
+        cnstrs.gridwidth=1; cnstrs.gridheight = 1 ;
+        cnstrs.gridx = 0; cnstrs.gridy = 0;
 
-		panel.add( createToolbar() , cnstrs );
+        panel.add( createToolbar() , cnstrs );
 
-		// editor        
+        // editor        
 
-		// ugly hack to adjust splitpane size after it has become visible
-		addAncestorListener( new AncestorListener() {
-            
+        // ugly hack to adjust splitpane size after it has become visible
+        addAncestorListener( new AncestorListener() {
+
             @Override
             public void ancestorRemoved(AncestorEvent event) { 
                 appConfigProvider.removeChangeListener( configListener );
             }
-            
+
             @Override
             public void ancestorMoved(AncestorEvent event) { }
-            
+
             @Override
             public void ancestorAdded(AncestorEvent event) 
             {
                 appConfigProvider.addChangeListener( configListener );
             }
         });
-		
-		cnstrs = new GridBagConstraints();
-		cnstrs.fill = GridBagConstraints.BOTH;
-		cnstrs.weightx = 1.0; cnstrs.weighty=1;
-		cnstrs.gridwidth=1; cnstrs.gridheight = 1 ;
-		cnstrs.gridx = 0; cnstrs.gridy = 1;
 
-		final JScrollPane editorPane = new JScrollPane( editor );
-		panel.add( editorPane , cnstrs );
+        cnstrs = new GridBagConstraints();
+        cnstrs.fill = GridBagConstraints.BOTH;
+        cnstrs.weightx = 1.0; cnstrs.weighty=1;
+        cnstrs.gridwidth=1; cnstrs.gridheight = 1 ;
+        cnstrs.gridx = 0; cnstrs.gridy = 1;
 
-	    setLayout( new GridBagLayout() );
+        final JScrollPane editorPane = new JScrollPane( editor );
+        panel.add( editorPane , cnstrs );
+
+        setLayout( new GridBagLayout() );
         cnstrs = new GridBagConstraints();
         cnstrs.fill = GridBagConstraints.BOTH;
         cnstrs.weightx = 1.0; cnstrs.weighty=1;
         cnstrs.gridwidth=1; cnstrs.gridheight = 1 ;
         cnstrs.gridx = 0; cnstrs.gridy = 0;
-        
-		add( panel , cnstrs );
 
-		// setup styles
-		setupStyles();
+        add( panel , cnstrs );
 
-		// setup recompilation
-		recompilationThread.start();
+        // setup styles
+        setupStyles();
 
-		setProject( project , currentUnit );
-	}
-	
-	private void setupStyles() 
-	{
+        // setup recompilation
+        recompilationThread.start();
+
+        setProject( project , currentUnit );
+    }
+
+    private void setupStyles() 
+    {
         final StyleContext ctx = new StyleContext();
 
         final Style topLevelStyle = ctx.addStyle( "topLevelStyle" , null);
@@ -1272,202 +1272,203 @@ public abstract class EditorPanel extends JPanel
         STYLE_COMMENT  = createStyle( "commentStyle" , SourceElement.COMMENT , ctx );     
         STYLE_TODO = createStyle( "todoStyle" , SourceElement.TODO , ctx );     
         STYLE_PREPROCESSOR = createStyle( "preprocStyle" , SourceElement.PREPROCESSOR , ctx );   
-        
+
         // highlight
         STYLE_HIGHLIGHTED = ctx.addStyle( "highlight", topLevelStyle );
         STYLE_HIGHLIGHTED.addAttribute(StyleConstants.Foreground, Color.BLUE);
         STYLE_HIGHLIGHTED.addAttribute(StyleConstants.Underline, Boolean.TRUE );
-	}
-	
-	private Style createStyle(String name,SourceElement sourceElement,StyleContext ctx) 
-	{
-	    final Color col = appConfigProvider.getApplicationConfig().getEditorSettings().getColor( sourceElement );
-	    System.out.println("Element "+sourceElement+" has color "+col);
-	    final Style style = ctx.addStyle( name , STYLE_TOPLEVEL );
-	    style.addAttribute(StyleConstants.Foreground, col );
-	    return style;
-	}
+    }
 
-	private Document createDocument() 
-	{
-		final Document doc = editor.getEditorKit().createDefaultDocument();
+    private Style createStyle(String name,SourceElement sourceElement,StyleContext ctx) 
+    {
+        final Color col = appConfigProvider.getApplicationConfig().getEditorSettings().getColor( sourceElement );
+        System.out.println("Element "+sourceElement+" has color "+col);
+        final Style style = ctx.addStyle( name , STYLE_TOPLEVEL );
+        style.addAttribute(StyleConstants.Foreground, col );
+        return style;
+    }
 
-		// setup styles
+    private Document createDocument() 
+    {
+        final Document doc = editor.getEditorKit().createDefaultDocument();
 
-		ignoreEditEvents = false;
+        // setup styles
 
-		doc.addDocumentListener( new DocumentListener() 
-		{
-			@Override public void insertUpdate(DocumentEvent e) 
-			{
-				if ( ! ignoreEditEvents ) {
-					lastEditLocation = e.getOffset();
-					caretTracker.rememberCaretPosition(e.getOffset(),currentUnit);
-					recompilationThread.documentChanged(e);
-				}
-			}
-			@Override public void removeUpdate(DocumentEvent e) 
-			{ 
-				if ( ! ignoreEditEvents ) 
-				{
-					lastEditLocation = e.getOffset();
-                    caretTracker.rememberCaretPosition(e.getOffset(),currentUnit);
-					recompilationThread.documentChanged(e); 
-				}
-			}
-			@Override public void changedUpdate(DocumentEvent e) 
-			{ 
-				if ( ! ignoreEditEvents ) {
+        ignoreEditEvents = false;
+
+        doc.addDocumentListener( new DocumentListener() 
+        {
+            @Override public void insertUpdate(DocumentEvent e) 
+            {
+                if ( ! ignoreEditEvents ) {
                     lastEditLocation = e.getOffset();
                     caretTracker.rememberCaretPosition(e.getOffset(),currentUnit);
-					recompilationThread.documentChanged(e);
-				}
-			}
-		});
+                    recompilationThread.documentChanged(e);
+                }
+            }
+            @Override public void removeUpdate(DocumentEvent e) 
+            { 
+                if ( ! ignoreEditEvents ) 
+                {
+                    lastEditLocation = e.getOffset();
+                    caretTracker.rememberCaretPosition(e.getOffset(),currentUnit);
+                    recompilationThread.documentChanged(e); 
+                }
+            }
+            @Override public void changedUpdate(DocumentEvent e) 
+            { 
+                if ( ! ignoreEditEvents ) {
+                    lastEditLocation = e.getOffset();
+                    caretTracker.rememberCaretPosition(e.getOffset(),currentUnit);
+                    recompilationThread.documentChanged(e);
+                }
+            }
+        });
 
-		// setup auto-indent
-		//        ((AbstractDocument) doc).setDocumentFilter( new IndentFilter() );
+        // setup auto-indent
+        //        ((AbstractDocument) doc).setDocumentFilter( new IndentFilter() );
 
-		undoStack.clear();
-		undoStackPtr = 0;
-		
-		doc.addUndoableEditListener( new UndoableEditListener() 
-		{
-			@Override
-			public void undoableEditHappened(UndoableEditEvent e) 
-			{
-				if ( ! ignoreEditEvents ) 
-				{
-					if ( undoStackPtr == undoStack.size() ) {
-						undoStackPtr++;
-					}
-					undoStack.add( e.getEdit() );
-				}
-			}
-		});
-		return doc;
-	}
+        undoManager.discardAllEdits();
 
-	private JToolBar createToolbar() 
-	{
-		final JToolBar result = new JToolBar(JToolBar.HORIZONTAL);
+        doc.addUndoableEditListener( new UndoableEditListener()
+        {
 
-		result.add( button("Compile" , ev -> this.compile() ) );
-		result.add( button("AST" , ev -> this.toggleASTWindow() ) );
-		result.add( button("Goto last edit" , ev -> this.gotoLastEditLocation() ) );
-		result.add( button("Goto previous" , ev -> setCaretPosition( caretTracker.getPreviousCaretPosition() ) ) );
-		result.add( button("Goto next" , ev -> setCaretPosition( caretTracker.getNextCaretPosition() ) ) );
-		
-		result.add( button("Symbols" , ev -> this.toggleSymbolTableWindow() ) );
-		result.add( button("Upload to uC" , ev -> this.uploadToController() ) );
-		
-		result.add( button("Show as avr-as" , ev -> 
-		{
-		        hidePrettyPrint();
-		        showPrettyPrint(true);
+            @Override
+            public void undoableEditHappened(UndoableEditEvent e)
+            {
+                if ( ! ignoreEditEvents ) 
+                {
+                    if ( e.getEdit() instanceof AttributeUndoableEdit || e.getEdit().getClass().getName().contains("StyleChangeUndoableEdit") ) {
+                        System.out.println("EDIT: "+e.getEdit());
+                        return;
+                    }
+                    undoManager.undoableEditHappened( e );
+                }
+            }
+        });
+        return doc;
+    }
+
+    private JToolBar createToolbar() 
+    {
+        final JToolBar result = new JToolBar(JToolBar.HORIZONTAL);
+
+        result.add( button("Compile" , ev -> this.compile() ) );
+        result.add( button("AST" , ev -> this.toggleASTWindow() ) );
+        result.add( button("Goto last edit" , ev -> this.gotoLastEditLocation() ) );
+        result.add( button("Goto previous" , ev -> setCaretPosition( caretTracker.getPreviousCaretPosition() ) ) );
+        result.add( button("Goto next" , ev -> setCaretPosition( caretTracker.getNextCaretPosition() ) ) );
+
+        result.add( button("Symbols" , ev -> this.toggleSymbolTableWindow() ) );
+        result.add( button("Upload to uC" , ev -> this.uploadToController() ) );
+
+        result.add( button("Show as avr-as" , ev -> 
+        {
+            hidePrettyPrint();
+            showPrettyPrint(true);
         } ) );
-		
+
         result.add( button("Pretty print" , ev -> 
         {
             hidePrettyPrint();
             showPrettyPrint(false);
         } ) );		
-		
-		result.add( new JLabel("Cursor pos:" ) );
-		result.add( cursorPositionLabel );
-		return result;
-	}
 
-	private final CaretPositionTracker caretTracker;
-	
-	private int lastEditLocation = -1;
-	
-	private PrettyPrintWindow prettyPrintWindow;
-	
-	private final class PrettyPrintWindow extends JFrame {
-	    
-	    private JTextArea textArea = new JTextArea();
-	    
-	    public boolean gnuSyntax = true;
-	    
-	    public void astChanged() 
-	    {
-	        final PrettyPrinter printer = new PrettyPrinter();
-	        try {
-	            printer.setGNUSyntax( gnuSyntax );
-	            final String source = printer.prettyPrint( getCompilationUnit().getAST() );
-	            textArea.setText( source );
-	        } 
-	        catch(Exception e) 
-	        {
-	            final ByteArrayOutputStream out = new ByteArrayOutputStream();
-	            try ( PrintWriter pw = new PrintWriter( out ) ) {
-	                e.printStackTrace( pw );
-	            }
-	            final String stacktrace = new String( out.toByteArray() );
+        result.add( new JLabel("Cursor pos:" ) );
+        result.add( cursorPositionLabel );
+        return result;
+    }
+
+    private final CaretPositionTracker caretTracker;
+
+    private int lastEditLocation = -1;
+
+    private PrettyPrintWindow prettyPrintWindow;
+
+    private final class PrettyPrintWindow extends JFrame {
+
+        private JTextArea textArea = new JTextArea();
+
+        public boolean gnuSyntax = true;
+
+        public void astChanged() 
+        {
+            final PrettyPrinter printer = new PrettyPrinter();
+            try {
+                printer.setGNUSyntax( gnuSyntax );
+                final String source = printer.prettyPrint( getCompilationUnit().getAST() );
+                textArea.setText( source );
+            } 
+            catch(Exception e) 
+            {
+                final ByteArrayOutputStream out = new ByteArrayOutputStream();
+                try ( PrintWriter pw = new PrintWriter( out ) ) {
+                    e.printStackTrace( pw );
+                }
+                final String stacktrace = new String( out.toByteArray() );
                 textArea.setText( stacktrace );
-	        }
-	        textArea.setCaretPosition( 0 );
-	    }
-	    
-	    public PrettyPrintWindow() 
-	    {
-	        super("Pretty print");
-	        setMinimumSize( new Dimension(400,200 ) );
-	        
-	        getContentPane().setLayout( new GridBagLayout() );
-	        
-	        textArea.setEditable( false );
-	        
-	        GridBagConstraints cnstrs = new GridBagConstraints();
-	        cnstrs.fill = GridBagConstraints.BOTH;
-	        cnstrs.gridx = 0;
-	        cnstrs.gridy = 0;
-	        cnstrs.gridheight = 1;
-	        cnstrs.gridwidth = 1;
-	        cnstrs.weightx = 1;
-	        cnstrs.weighty = 1;
-	        cnstrs.insets = new Insets(0,0,0,0);
-	        getContentPane().add( new JScrollPane( textArea ) , cnstrs );
-	        pack();
-	        setVisible( true );
+            }
+            textArea.setCaretPosition( 0 );
+        }
+
+        public PrettyPrintWindow() 
+        {
+            super("Pretty print");
+            setMinimumSize( new Dimension(400,200 ) );
+
+            getContentPane().setLayout( new GridBagLayout() );
+
+            textArea.setEditable( false );
+
+            GridBagConstraints cnstrs = new GridBagConstraints();
+            cnstrs.fill = GridBagConstraints.BOTH;
+            cnstrs.gridx = 0;
+            cnstrs.gridy = 0;
+            cnstrs.gridheight = 1;
+            cnstrs.gridwidth = 1;
+            cnstrs.weightx = 1;
+            cnstrs.weighty = 1;
+            cnstrs.insets = new Insets(0,0,0,0);
+            getContentPane().add( new JScrollPane( textArea ) , cnstrs );
+            pack();
+            setVisible( true );
             textArea.setFont( new Font( Font.MONOSPACED , getFont().getStyle() , getFont().getSize() ) );	        
-	        setDefaultCloseOperation( JFrame.DO_NOTHING_ON_CLOSE );
-	        addWindowListener( new WindowAdapter() 
-	        {
-	            @Override
-	            public void windowClosing(WindowEvent e) 
-	            {
-	                prettyPrintWindow = null;
-	                dispose();
-	            }
+            setDefaultCloseOperation( JFrame.DO_NOTHING_ON_CLOSE );
+            addWindowListener( new WindowAdapter() 
+            {
+                @Override
+                public void windowClosing(WindowEvent e) 
+                {
+                    prettyPrintWindow = null;
+                    dispose();
+                }
             });
-	    }
-	}
-	
-	private boolean isPrettyPrintShown() {
-	    return prettyPrintWindow != null;
-	}
-	
-	private void hidePrettyPrint() 
-	{
-	    if ( isPrettyPrintShown() ) 
-	    {
-	        prettyPrintWindow.dispose();
-	    }
-	}
-	
-	private void showPrettyPrint(boolean gnuSyntax) 
-	{
-	    if ( ! isPrettyPrintShown() ) 
-	    {
-	        prettyPrintWindow = new PrettyPrintWindow();
-	    }
-	    prettyPrintWindow.gnuSyntax = gnuSyntax;
-	    prettyPrintWindow.astChanged();
-	    prettyPrintWindow.toFront();
-	}
-    
+        }
+    }
+
+    private boolean isPrettyPrintShown() {
+        return prettyPrintWindow != null;
+    }
+
+    private void hidePrettyPrint() 
+    {
+        if ( isPrettyPrintShown() ) 
+        {
+            prettyPrintWindow.dispose();
+        }
+    }
+
+    private void showPrettyPrint(boolean gnuSyntax) 
+    {
+        if ( ! isPrettyPrintShown() ) 
+        {
+            prettyPrintWindow = new PrettyPrintWindow();
+        }
+        prettyPrintWindow.gnuSyntax = gnuSyntax;
+        prettyPrintWindow.astChanged();
+        prettyPrintWindow.toFront();
+    }
+
     private void gotoLastEditLocation() 
     {
         if ( lastEditLocation != -1 ) 
@@ -1482,131 +1483,133 @@ public abstract class EditorPanel extends JPanel
             });
         }
     }
-    
+
     private void setCaretPosition(CaretPosition position) 
     {
         if ( position != null ) {
             setCaretPosition( position.offset );
         }
     }
-	
-	private void uploadToController() 
-	{
-		if ( project.canUploadToController() ) 
-		{
-			try 
-			{
-				project.uploadToController();
-			} 
-			catch(Exception e) 
-			{
-				LOG.error("UPLOAD failed",e);
-				IDEMain.fail("Upload failed",e);
-			} 
-		}
-		else 
-		{
-			JOptionPane.showMessageDialog(null, "Upload not possible", "Program upload", JOptionPane.INFORMATION_MESSAGE );
-		}
-	}
-	
-	private void saveSource() throws IOException 
-	{
-		String text = editor.getText();
-		text = text == null ? "" : text;
 
-		final Resource resource = currentUnit.getResource();
-		LOG.info("saveSource(): Saving source to "+currentUnit.getResource());
-		try ( OutputStream out = currentUnit.getResource().createOutputStream() ) 
-		{
-			final byte[] bytes = text.getBytes( resource.getEncoding() );
+    private void uploadToController() 
+    {
+        if ( project.canUploadToController() ) 
+        {
+            try 
+            {
+                project.uploadToController();
+            } 
+            catch(Exception e) 
+            {
+                LOG.error("UPLOAD failed",e);
+                IDEMain.fail("Upload failed",e);
+            } 
+        }
+        else 
+        {
+            JOptionPane.showMessageDialog(null, "Upload not possible", "Program upload", JOptionPane.INFORMATION_MESSAGE );
+        }
+    }
+
+    private void saveSource() throws IOException 
+    {
+        String text = editor.getText();
+        text = text == null ? "" : text;
+
+        final Resource resource = currentUnit.getResource();
+        LOG.info("saveSource(): Saving source to "+currentUnit.getResource());
+        try ( OutputStream out = currentUnit.getResource().createOutputStream() ) 
+        {
+            final byte[] bytes = text.getBytes( resource.getEncoding() );
             out.write( bytes );
-		}
-	}
+        }
+    }
 
-	public void compile() 
-	{
-	    new Exception("##################################### COMPILE TRIGGERED ##################").printStackTrace();
-	    highlight = null;
-	    
-	    messageFrame.clearMessages();
-	    currentUnit.clearMessages();
-		symbolModel.clear();
-
-		String text = editor.getText();
-		text = text == null ? "" : text;
-
-		// save source to file
-		try {
-			saveSource();
-		} 
-		catch(IOException e) 
-		{
-			LOG.error("compile(): Failed to save changes",e);
-			currentUnit.addMessage( CompilationMessage.error( currentUnit, "Failed to save changes: "+e.getMessage()) );
-			return;
-		}
-		
-		// try to parse only this compilation unit
-		// to get an AST suitable for syntax highlighting
-        astTreeModel.setAST( new AST() );
+    public void compile() 
+    {
+        // new Exception("##################################### COMPILE TRIGGERED ##################").printStackTrace();
         
+        highlight = null;
+
+        messageFrame.clearMessages();
+        currentUnit.clearMessages();
+        symbolModel.clear();
+
+        String text = editor.getText();
+        text = text == null ? "" : text;
+
+        // save source to file
+        try {
+            saveSource();
+        } 
+        catch(IOException e) 
+        {
+            LOG.error("compile(): Failed to save changes",e);
+            currentUnit.addMessage( CompilationMessage.error( currentUnit, "Failed to save changes: "+e.getMessage()) );
+            return;
+        }
+
+        // try to parse only this compilation unit
+        // to get an AST suitable for syntax highlighting
+        astTreeModel.setAST( new AST() );
+
         // do not use the current unit directly as this will break because
         // all the symbols are already defined
         final CompilationUnit tmpUnit = new CompilationUnit( currentUnit.getResource() );
-        
+
         final long parseStart =  System.currentTimeMillis();
-		try 
-		{
-		    final CompilerSettings compilerSettings = new CompilerSettings();
-		    final IObjectCodeWriter writer = new ObjectCodeWriter();
+        try 
+        {
+            final CompilerSettings compilerSettings = new CompilerSettings();
+            final IObjectCodeWriter writer = new ObjectCodeWriter();
             final SymbolTable globalSymbolTable = new SymbolTable( SymbolTable.GLOBAL ); // fake global symbol table so we don't fail parsing because of duplicate symbols already in the real one
-			final ICompilationContext context = new CompilationContext( tmpUnit , globalSymbolTable , writer , project , compilerSettings , project.getConfig() );
+            final ICompilationContext context = new CompilationContext( tmpUnit , globalSymbolTable , writer , project , compilerSettings , project.getConfig() );
             ParseSourcePhase.parseWithoutIncludes( context, tmpUnit , project );
-		} 
-		catch(Exception e) {
-		    LOG.error("Parsing source failed",e);
-		}
+        } 
+        catch(Exception e) {
+            LOG.error("Parsing source failed",e);
+        }
         astTreeModel.setAST( tmpUnit.getAST() );
 
         final long parseEnd =  System.currentTimeMillis();
+
         doSyntaxHighlighting();
-        
+
         final long highlightEnd =  System.currentTimeMillis();
-		// assemble
-		final CompilationUnit root = project.getCompileRoot();
+        // assemble
+        final CompilationUnit root = project.getCompileRoot();
 
-		boolean compilationSuccessful = false;
-		try 
-		{
-			compilationSuccessful = project.compile();
-		} 
-		catch(Exception e) 
-		{
-			e.printStackTrace();
-			root.addMessage( toCompilationMessage( currentUnit, e ) );
-		}
-		symbolModel.setSymbolTable( currentUnit.getSymbolTable() );    
-		
-		final long compileEnd =  System.currentTimeMillis();
-		
-		final String success = compilationSuccessful ? "successful" : "failed"; 
-		final DateTimeFormatter df = DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss");
-		
-		final long parseTime = parseEnd - parseStart;
-		final long highlightTime = highlightEnd - parseEnd;
-		final long compileTime = compileEnd - highlightEnd;
-		
-		final String assembleTime = "parsing: "+parseTime+" ms,highlighting: "+highlightTime+" ms,compile: "+compileTime+" ms";
-		
-		currentUnit.addMessage( CompilationMessage.info(currentUnit,"Compilation "+success+" ("+assembleTime+") on "+df.format( ZonedDateTime.now() ) ) );
+        boolean compilationSuccessful = false;
+        try 
+        {
+            compilationSuccessful = project.compile();
+        } 
+        catch(Exception e) 
+        {
+            e.printStackTrace();
+            root.addMessage( toCompilationMessage( currentUnit, e ) );
+        }
+        symbolModel.setSymbolTable( currentUnit.getSymbolTable() );    
 
-		if ( isPrettyPrintShown() ) {
-		    showPrettyPrint( prettyPrintWindow.gnuSyntax );
-		}
-		
+        final long compileEnd =  System.currentTimeMillis();
+
+        final String success = compilationSuccessful ? "successful" : "failed"; 
+        final DateTimeFormatter df = DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss");
+
+        final long parseTime = parseEnd - parseStart;
+        final long highlightTime = highlightEnd - parseEnd;
+        final long compileTime = compileEnd - highlightEnd;
+
+        final String assembleTime = "parsing: "+parseTime+" ms,highlighting: "+highlightTime+" ms,compile: "+compileTime+" ms";
+
+        currentUnit.addMessage( CompilationMessage.info(currentUnit,"Compilation "+success+" ("+assembleTime+") on "+df.format( ZonedDateTime.now() ) ) );
+
+        if ( isPrettyPrintShown() ) {
+            showPrettyPrint( prettyPrintWindow.gnuSyntax );
+        }
+
         final List<CompilationMessage> allMessages = root.getMessages(true);
-        
+
         // create warnings for symbols defined in this unit but not used anywhere
         if ( compilationSuccessful ) 
         {
@@ -1622,9 +1625,9 @@ public abstract class EditorPanel extends JPanel
                 return true;
             });
         }
-        
+
         messageFrame.addAll( allMessages );        
-        
+
         wasCompiledAtLeastOnce = true;
         if ( ! afterCompilation.isEmpty() ) 
         {
@@ -1637,21 +1640,21 @@ public abstract class EditorPanel extends JPanel
             }
             afterCompilation.clear();
         }
-	}
-	
-	private static CompilationMessage toCompilationMessage(CompilationUnit unit,Exception e)
-	{
-		if ( e instanceof ParseException ) {
-			return new CompilationMessage(unit,Severity.ERROR , e.getMessage() , new TextRegion( ((ParseException ) e).getOffset() , 0 ,-1 , -1 ) ); 
-		} 
-		return new CompilationMessage(unit,Severity.ERROR , e.getMessage() );
-	}
+    }
 
-	private void doSyntaxHighlighting() 
-	{
-	    doSyntaxHighlighting(astTreeModel.getAST());
-	}
-	
+    private static CompilationMessage toCompilationMessage(CompilationUnit unit,Exception e)
+    {
+        if ( e instanceof ParseException ) {
+            return new CompilationMessage(unit,Severity.ERROR , e.getMessage() , new TextRegion( ((ParseException ) e).getOffset() , 0 ,-1 , -1 ) ); 
+        } 
+        return new CompilationMessage(unit,Severity.ERROR , e.getMessage() );
+    }
+
+    private void doSyntaxHighlighting() 
+    {
+        doSyntaxHighlighting(astTreeModel.getAST());
+    }
+
     private void doSyntaxHighlighting(ASTNode subtree) 
     {
         ignoreEditEvents = true;
@@ -1671,8 +1674,9 @@ public abstract class EditorPanel extends JPanel
             ignoreEditEvents = false;
         }        
     }
-	private void setNodeStyle(ASTNode node,StyledDocument styledDoc) 
-	{
+
+    private void setNodeStyle(ASTNode node,StyledDocument styledDoc) 
+    {
         final TextRegion region = node.getTextRegion();
         if ( region != null ) 
         {
@@ -1711,21 +1715,21 @@ public abstract class EditorPanel extends JPanel
                 styledDoc.setCharacterAttributes( region.start(), region.length() , STYLE_TOPLEVEL , true );
             }
         }
-	}
-	
-	private void setHighlight(ASTNode newHighlight) 
-	{
-	    if ( this.highlight == newHighlight ) {
-	        return;
-	    }
-	    
-	    if ( newHighlight != null && newHighlight.getTextRegion() == null ) {
-	        throw new IllegalStateException("Cannot highlight a node that has no text region assigned");
-	    }
-	    
-	    if ( this.highlight != null && newHighlight != null && this.highlight.getTextRegion().equals( newHighlight.getTextRegion() ) ) {
-	        return;
-	    }
+    }
+
+    private void setHighlight(ASTNode newHighlight) 
+    {
+        if ( this.highlight == newHighlight ) {
+            return;
+        }
+
+        if ( newHighlight != null && newHighlight.getTextRegion() == null ) {
+            throw new IllegalStateException("Cannot highlight a node that has no text region assigned");
+        }
+
+        if ( this.highlight != null && newHighlight != null && this.highlight.getTextRegion().equals( newHighlight.getTextRegion() ) ) {
+            return;
+        }
 
         if ( this.highlight != null ) {
             System.out.println("Clearing highlight @ "+this.highlight.getTextRegion());
@@ -1743,408 +1747,452 @@ public abstract class EditorPanel extends JPanel
                 ignoreEditEvents = false;
             }
         }
-	}
+    }
 
-	private JButton button(String label,ActionListener l) {
-		final JButton astButton = new JButton( label );
-		astButton.addActionListener( l );
-		return astButton;
-	}
+    private JButton button(String label,ActionListener l) {
+        final JButton astButton = new JButton( label );
+        astButton.addActionListener( l );
+        return astButton;
+    }
 
-	private void toggleASTWindow() 
-	{
-		if ( astWindow != null ) {
-			astWindow.dispose();
-			astWindow=null;
-			return;
-		}
-		astWindow = createASTWindow();
+    private void toggleASTWindow() 
+    {
+        if ( astWindow != null ) {
+            astWindow.dispose();
+            astWindow=null;
+            return;
+        }
+        astWindow = createASTWindow();
 
-		astWindow.pack();
-		astWindow.setLocationRelativeTo( this );
-		astWindow.setVisible( true );
-	}
+        astWindow.pack();
+        astWindow.setLocationRelativeTo( this );
+        astWindow.setVisible( true );
+    }
 
-	private void toggleSearchWindow() 
-	{
-		if ( searchWindow != null ) {
-			searchWindow.dispose();
-			searchWindow=null;
-			return;
-		}
-		searchWindow = createSearchWindow();
+    private void toggleSearchWindow() 
+    {
+        if ( searchWindow != null ) {
+            searchWindow.dispose();
+            searchWindow=null;
+            return;
+        }
+        searchWindow = createSearchWindow();
 
-		searchWindow.pack();
-		searchWindow.setLocationRelativeTo( this );
-		searchWindow.setVisible( true );
-	}    
+        searchWindow.pack();
+        searchWindow.setLocationRelativeTo( this );
+        searchWindow.setVisible( true );
+    }    
 
-	private void toggleSymbolTableWindow() 
-	{
-		if ( symbolWindow != null ) {
-			symbolWindow.dispose();
-			symbolWindow=null;
-			return;
-		}
-		symbolWindow = createSymbolWindow();
+    private void toggleSymbolTableWindow() 
+    {
+        if ( symbolWindow != null ) {
+            symbolWindow.dispose();
+            symbolWindow=null;
+            return;
+        }
+        symbolWindow = createSymbolWindow();
 
-		symbolWindow.pack();
-		symbolWindow.setLocationRelativeTo( this );
-		symbolWindow.setVisible( true );
-	}
+        symbolWindow.pack();
+        symbolWindow.setLocationRelativeTo( this );
+        symbolWindow.setVisible( true );
+    }
 
-	private JFrame createASTWindow() 
-	{
-		final JFrame frame = new JFrame("AST");
+    private JFrame createASTWindow() 
+    {
+        final JFrame frame = new JFrame("AST");
 
-		frame.addWindowListener( new WindowAdapter() {
+        frame.addWindowListener( new WindowAdapter() {
 
-			@Override
-			public void windowClosing(WindowEvent e) {
-				frame.dispose();
-				astWindow = null;
-			}
-		});
+            @Override
+            public void windowClosing(WindowEvent e) {
+                frame.dispose();
+                astWindow = null;
+            }
+        });
 
-		final JTree tree = new JTree( astTreeModel );
-		
-		final MouseAdapter mouseListener = new MouseAdapter() 
-		{
-		    public void mouseClicked(MouseEvent e) 
-		    {
-		        if ( e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1 ) 
-		        {
-		            final TreePath path = tree.getClosestPathForLocation( e.getX() ,  e.getY() );
-		            if ( path != null && path.getPath() != null && path.getPath().length >= 1 ) 
-		            {
-		                final ASTNode node = (ASTNode) path.getLastPathComponent();
-		                if ( node.getTextRegion() != null ) {
-		                    setSelection( node.getTextRegion() );
-		                }
-		            }
-		        }
-		    }
-		};
+        final JTree tree = new JTree( astTreeModel );
+
+        final MouseAdapter mouseListener = new MouseAdapter() 
+        {
+            public void mouseClicked(MouseEvent e) 
+            {
+                if ( e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1 ) 
+                {
+                    final TreePath path = tree.getClosestPathForLocation( e.getX() ,  e.getY() );
+                    if ( path != null && path.getPath() != null && path.getPath().length >= 1 ) 
+                    {
+                        final ASTNode node = (ASTNode) path.getLastPathComponent();
+                        if ( node.getTextRegion() != null ) {
+                            setSelection( node.getTextRegion() );
+                        }
+                    }
+                }
+            }
+        };
         tree.addMouseListener( mouseListener);
 
-		tree.setCellRenderer( new DefaultTreeCellRenderer() 
-		{
-			@Override
-			public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, boolean expanded, boolean leaf, int row, boolean hasFocus)
-			{
-				final Component result = super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row,hasFocus);
-				if ( value instanceof ASTNode) 
-				{
-					final ASTNode node = (ASTNode) value;
-					String text=node.getClass().getSimpleName();
+        tree.setCellRenderer( new DefaultTreeCellRenderer() 
+        {
+            @Override
+            public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, boolean expanded, boolean leaf, int row, boolean hasFocus)
+            {
+                final Component result = super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row,hasFocus);
+                if ( value instanceof ASTNode) 
+                {
+                    final ASTNode node = (ASTNode) value;
+                    String text=node.getClass().getSimpleName();
 
-					if ( node instanceof FunctionCallNode ) {
-						text = ((FunctionCallNode) node).functionName.value+"(...)";
-					} 
-					else if ( node instanceof DirectiveNode) {
-						text = "."+((DirectiveNode) node).directive.literal;
-					} 
-					else  if ( node instanceof PreprocessorNode) {
-						text = "#"+((PreprocessorNode) node).type.literal;
-					} else if ( node instanceof OperatorNode) {
-						text = "OperatorNode: "+((OperatorNode) node).type.getSymbol();
-					} else  if ( node instanceof IdentifierNode) {
-						text = "IdentifierNode: "+((IdentifierNode) node).name.value;
-					}
-					else if ( node instanceof StatementNode) {
-						text = "StatementNode";
-					}                     
-					else if ( node instanceof LabelNode) {
-						text = "LabelNode:"+((LabelNode) node).identifier.value;
-					} 
-					else if ( node instanceof CommentNode) {
-						text = "CommentNode: "+((CommentNode) node).value;
-					}                     
-					else if ( node instanceof NumberLiteralNode ) 
-					{
-						final NumberLiteralNode node2 = (NumberLiteralNode) value;
-						switch( node2.getType() ) {
-							case BINARY:
-								text = "0b"+Integer.toBinaryString( node2.getValue() );
-								break;
-							case DECIMAL:
-								text = Integer.toString( node2.getValue() );
-								break;
-							case HEXADECIMAL:
-								text = "0x"+Integer.toHexString( node2.getValue() );
-								break;
-							default:
-								throw new RuntimeException("Unreachable code reached");
-						}
-					} 
-					else if ( node instanceof InstructionNode ) 
-					{
-						text = "insn: "+((InstructionNode) node).instruction.getMnemonic();
-					}
-					else if ( node instanceof RegisterNode) 
-					{
-						text = "reg: "+((RegisterNode) node).register.toString();
-					}
+                    if ( node instanceof FunctionCallNode ) {
+                        text = ((FunctionCallNode) node).functionName.value+"(...)";
+                    } 
+                    else if ( node instanceof DirectiveNode) {
+                        text = "."+((DirectiveNode) node).directive.literal;
+                    } 
+                    else  if ( node instanceof PreprocessorNode) {
+                        text = "#"+((PreprocessorNode) node).type.literal;
+                    } else if ( node instanceof OperatorNode) {
+                        text = "OperatorNode: "+((OperatorNode) node).type.getSymbol();
+                    } else  if ( node instanceof IdentifierNode) {
+                        text = "IdentifierNode: "+((IdentifierNode) node).name.value;
+                    }
+                    else if ( node instanceof StatementNode) {
+                        text = "StatementNode";
+                    }                     
+                    else if ( node instanceof LabelNode) {
+                        text = "LabelNode:"+((LabelNode) node).identifier.value;
+                    } 
+                    else if ( node instanceof CommentNode) {
+                        text = "CommentNode: "+((CommentNode) node).value;
+                    }                     
+                    else if ( node instanceof NumberLiteralNode ) 
+                    {
+                        final NumberLiteralNode node2 = (NumberLiteralNode) value;
+                        switch( node2.getType() ) {
+                            case BINARY:
+                                text = "0b"+Integer.toBinaryString( node2.getValue() );
+                                break;
+                            case DECIMAL:
+                                text = Integer.toString( node2.getValue() );
+                                break;
+                            case HEXADECIMAL:
+                                text = "0x"+Integer.toHexString( node2.getValue() );
+                                break;
+                            default:
+                                throw new RuntimeException("Unreachable code reached");
+                        }
+                    } 
+                    else if ( node instanceof InstructionNode ) 
+                    {
+                        text = "insn: "+((InstructionNode) node).instruction.getMnemonic();
+                    }
+                    else if ( node instanceof RegisterNode) 
+                    {
+                        text = "reg: "+((RegisterNode) node).register.toString();
+                    }
 
-					setText( text + " - " + ((ASTNode) node).getTextRegion() + " - merged: "+((ASTNode) node).getMergedTextRegion() );
-				}
-				return result;
-			}
-		});
-		tree.setRootVisible( true );
-		tree.setVisibleRowCount( 5 );
+                    setText( text + " - " + ((ASTNode) node).getTextRegion() + " - merged: "+((ASTNode) node).getMergedTextRegion() );
+                }
+                return result;
+            }
+        });
+        tree.setRootVisible( true );
+        tree.setVisibleRowCount( 5 );
 
-		final JPanel panel = new JPanel();
-		panel.setLayout( new BorderLayout() );
-		final JScrollPane pane = new JScrollPane();
-		pane.getViewport().add( tree );
-		panel.add( pane , BorderLayout.CENTER );
-		frame.getContentPane().add( panel );
+        final JPanel panel = new JPanel();
+        panel.setLayout( new BorderLayout() );
+        final JScrollPane pane = new JScrollPane();
+        pane.getViewport().add( tree );
+        panel.add( pane , BorderLayout.CENTER );
+        frame.getContentPane().add( panel );
 
-		return frame;
-	}
+        return frame;
+    }
 
-	private JFrame createSearchWindow() 
-	{
-		final JFrame frame = new JFrame("Search");
+    private JFrame createSearchWindow() 
+    {
+        final boolean[] wrap = { true };
+        
+        final JFrame frame = new JFrame("Search");
 
-		frame.addWindowListener( new WindowAdapter() {
+        frame.addWindowListener( new WindowAdapter() {
 
-			@Override
-			public void windowClosing(WindowEvent e) {
-				frame.dispose();
-				searchWindow = null;
-			}
-		});
+            @Override
+            public void windowClosing(WindowEvent e) {
+                frame.dispose();
+                searchWindow = null;
+            }
+        });
 
-		final JLabel label = new JLabel();
-		label.setText("Enter text to search.");
+        final JLabel label = new JLabel("Enter text to search.");
 
-		final JTextField filterField = new JTextField();
-		if ( searchHelper.getTerm() != null ) {
-			filterField.setText( searchHelper.getTerm() );
-		}
-		filterField.getDocument().addDocumentListener( new DocumentListener() {
+        final JTextField filterField = new JTextField();
+        if ( searchHelper.getTerm() != null ) {
+            filterField.setText( searchHelper.getTerm() );
+        }
+        filterField.getDocument().addDocumentListener( new DocumentListener() {
 
-			@Override
-			public void insertUpdate(DocumentEvent e) { resetLabel(); }
+            @Override
+            public void insertUpdate(DocumentEvent e) { resetLabel(); }
 
-			@Override
-			public void removeUpdate(DocumentEvent e) { resetLabel(); }
+            @Override
+            public void removeUpdate(DocumentEvent e) { resetLabel(); }
 
-			@Override
-			public void changedUpdate(DocumentEvent e) { resetLabel(); }
+            @Override
+            public void changedUpdate(DocumentEvent e) { resetLabel(); }
 
-			private void resetLabel() 
-			{
-				label.setText( "Hit enter to start searching");
-				searchHelper.startFromBeginning();
-			}
-		});
+            private void resetLabel() 
+            {
+                label.setText( "Hit enter to start searching");
+                searchHelper.startFromBeginning();
+            }
+        });
 
-		filterField.addActionListener( ev -> 
-		{
-			searchHelper.setTerm( filterField.getText() );
-			boolean foundMatch  = false;
-			if ( searchHelper.canSearch() ) 
-			{
-				foundMatch = searchHelper.searchForward(); 
-				if ( ! foundMatch )
-				{
-					searchHelper.startFromBeginning();
-					foundMatch = searchHelper.searchForward();
-				}
-			}
-			if ( foundMatch ) {
-				label.setText("Hit enter to continue searching");
-			} else {
-				label.setText("No (more) matches.");
-			}            
-		});
+        filterField.addKeyListener( new KeyAdapter() {
+            
+            @Override
+            public void keyReleased(KeyEvent e)
+            {
+                if ( e.getKeyCode() == KeyEvent.VK_ESCAPE ) 
+                {
+                    e.consume();
+                    toggleSearchWindow();
+                }
+            }
+        });
+        filterField.addActionListener( ev -> 
+        {
+            searchHelper.setTerm( filterField.getText() );
+            boolean foundMatch  = false;
+            if ( searchHelper.canSearch() ) 
+            {
+                foundMatch = searchHelper.searchForward(); 
+                if ( ! foundMatch && wrap[0] )
+                {
+                    searchHelper.startFromBeginning();
+                    foundMatch = searchHelper.searchForward();
+                }
+            }
+            frame.toFront();
+            filterField.requestFocus();
+            if ( foundMatch ) {
+                label.setText("Hit enter to continue searching");
+            } else {
+                label.setText("No (more) matches.");
+            }            
+        });
 
-		final JPanel panel = new JPanel();
-		panel.setLayout( new BorderLayout() );
-		panel.add( filterField , BorderLayout.NORTH );
-		panel.add( label , BorderLayout.CENTER );
-		frame.getContentPane().add( panel );
-		frame.setPreferredSize( new Dimension(200,50 ) );
-		return frame;
-	}      
+        final JPanel panel = new JPanel();
+        panel.setLayout( new GridBagLayout() );
 
-	private JFrame createSymbolWindow() 
-	{
-		final JFrame frame = new JFrame("Symbols");
+        // add search textfield
+        GridBagConstraints cnstrs = new GridBagConstraints();
+        cnstrs.weightx = 1.0; cnstrs.weightx = 0.33;
+        cnstrs.gridheight = 1 ; cnstrs.gridwidth = 1;
+        cnstrs.gridx = 0; cnstrs.gridy = 0;
+        cnstrs.fill = GridBagConstraints.HORIZONTAL;
+        
+        panel.add( filterField , cnstrs );
+        
+        // add 'wrap?' checkbox
+        final JCheckBox wrapCheckbox = new JCheckBox("Wrap?" , wrap[0] );
+        wrapCheckbox.addActionListener( ev -> 
+        {
+            wrap[0] = wrapCheckbox.isSelected(); 
+        });
+        cnstrs = new GridBagConstraints();
+        cnstrs.weightx = 1.0; cnstrs.weightx = 0.33;
+        cnstrs.gridheight = 1 ; cnstrs.gridwidth = 1;
+        cnstrs.gridx = 0; cnstrs.gridy = 1;
+        cnstrs.fill = GridBagConstraints.HORIZONTAL;        
+        panel.add( wrapCheckbox , cnstrs );        
+        
+        // add status line
+        cnstrs = new GridBagConstraints();
+        cnstrs.weightx = 1.0; cnstrs.weightx = 0.33;
+        cnstrs.gridheight = 1 ; cnstrs.gridwidth = 1;
+        cnstrs.gridx = 0; cnstrs.gridy = 2;
+        cnstrs.fill = GridBagConstraints.HORIZONTAL;        
+        panel.add( label , cnstrs );
+        
+        frame.getContentPane().add( panel );
+        frame.setPreferredSize( new Dimension(200,100 ) );
+        return frame;
+    }      
 
-		frame.addWindowListener( new WindowAdapter() {
+    private JFrame createSymbolWindow() 
+    {
+        final JFrame frame = new JFrame("Symbols");
 
-			@Override
-			public void windowClosing(WindowEvent e) {
-				frame.dispose();
-				symbolWindow = null;
-			}
-		});
+        frame.addWindowListener( new WindowAdapter() {
 
-		final JTextField filterField = new JTextField();
+            @Override
+            public void windowClosing(WindowEvent e) {
+                frame.dispose();
+                symbolWindow = null;
+            }
+        });
 
-		filterField.addActionListener( ev -> 
-		{
-			symbolModel.setFilterString( filterField.getText() );
-		});
-		filterField.getDocument().addDocumentListener( new DocumentListener() {
+        final JTextField filterField = new JTextField();
 
-			@Override
-			public void insertUpdate(DocumentEvent e) { symbolModel.setFilterString( filterField.getText() ); }
+        filterField.addActionListener( ev -> 
+        {
+            symbolModel.setFilterString( filterField.getText() );
+        });
+        filterField.getDocument().addDocumentListener( new DocumentListener() {
 
-			@Override
-			public void removeUpdate(DocumentEvent e) { symbolModel.setFilterString( filterField.getText() ); }
+            @Override
+            public void insertUpdate(DocumentEvent e) { symbolModel.setFilterString( filterField.getText() ); }
 
-			@Override
-			public void changedUpdate(DocumentEvent e) { symbolModel.setFilterString( filterField.getText() ); }
-		});
+            @Override
+            public void removeUpdate(DocumentEvent e) { symbolModel.setFilterString( filterField.getText() ); }
 
-		final JTable table= new JTable( symbolModel );
+            @Override
+            public void changedUpdate(DocumentEvent e) { symbolModel.setFilterString( filterField.getText() ); }
+        });
 
-		final JPanel panel = new JPanel();
-		panel.setLayout( new BorderLayout() );
-		final JScrollPane pane = new JScrollPane();
-		pane.getViewport().add( table );
-		panel.add( filterField , BorderLayout.NORTH );
-		panel.add( pane , BorderLayout.CENTER );
+        final JTable table= new JTable( symbolModel );
 
-		frame.getContentPane().add( panel );
-		return frame;
-	}    
+        final JPanel panel = new JPanel();
+        panel.setLayout( new BorderLayout() );
+        final JScrollPane pane = new JScrollPane();
+        pane.getViewport().add( table );
+        panel.add( filterField , BorderLayout.NORTH );
+        panel.add( pane , BorderLayout.CENTER );
 
-	private void gotoLine() {
+        frame.getContentPane().add( panel );
+        return frame;
+    }    
 
-		final String lineNo = JOptionPane.showInputDialog(null, "Enter line number", "Go to line", JOptionPane.QUESTION_MESSAGE );
-		if ( StringUtils.isNotBlank( lineNo ) ) 
-		{
-			int no = -1;
-			try {
-				no = Integer.parseInt( lineNo );                    
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-			if ( no > 0 ) 
-			{
-			    String text = editor.getText();
-			    if ( text == null ) {
-			        text = "";
-			    }
-			    int offset = 0;
-			    for ( final int len=text.length() ; no > 1 && offset < len ; offset++ ) {
-			        final char c = text.charAt( offset );
-			        if ( c == '\r' && (offset+1) < len && text.charAt(offset+1) == '\n' ) {
-			            no--;
-			            offset++;
-			        } 
-			        else if ( c == '\n' ) 
-			        {
-			            no--;
-			        }
-			    }
-			    editor.setCaretPosition( offset );
-				editor.requestFocus();
-			}
-		}
-	}
+    private void gotoLine() {
 
-	public void setProject(IProject project,CompilationUnit unit) throws IOException 
-	{
-		Validate.notNull(project, "project must not be NULL");
-		Validate.notNull(unit, "unit must not be NULL");
-		
-		LOG.info("addWindows(): Now editing  "+unit.getResource());
-		this.project = project;
-		this.currentUnit = unit;
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		try ( InputStream in = unit.getResource().createInputStream() ) 
-		{
-			IOUtils.copy( in , out );
-		}
-		final byte[] data = out.toByteArray();
-		final String source = new String(data, unit.getResource().getEncoding() );
+        final String lineNo = JOptionPane.showInputDialog(null, "Enter line number", "Go to line", JOptionPane.QUESTION_MESSAGE );
+        if ( StringUtils.isNotBlank( lineNo ) ) 
+        {
+            int no = -1;
+            try {
+                no = Integer.parseInt( lineNo );                    
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            if ( no > 0 ) 
+            {
+                String text = editor.getText();
+                if ( text == null ) {
+                    text = "";
+                }
+                int offset = 0;
+                for ( final int len=text.length() ; no > 1 && offset < len ; offset++ ) {
+                    final char c = text.charAt( offset );
+                    if ( c == '\r' && (offset+1) < len && text.charAt(offset+1) == '\n' ) {
+                        no--;
+                        offset++;
+                    } 
+                    else if ( c == '\n' ) 
+                    {
+                        no--;
+                    }
+                }
+                editor.setCaretPosition( offset );
+                editor.requestFocus();
+            }
+        }
+    }
 
-		lastEditLocation = -1;
-		
-		autoComplete.detach();
-		editor.setDocument( createDocument() );
-		autoComplete.attachTo( editor );
-		editor.setText( source );
-		editor.setCaretPosition( 0 );
-	}
+    public void setProject(IProject project,CompilationUnit unit) throws IOException 
+    {
+        Validate.notNull(project, "project must not be NULL");
+        Validate.notNull(unit, "unit must not be NULL");
 
-	public void save(File file) throws FileNotFoundException 
-	{
-		try ( PrintWriter w = new PrintWriter(file ) ) 
-		{
-			if ( editor.getText() != null )  {
-				w.write( editor.getText() );
-			}
-			currentUnit.addMessage( CompilationMessage.info( currentUnit , "Source saved to "+file.getAbsolutePath() ) );
-		}
-	}
-	
-	public boolean close(boolean askIfDirty) 
-	{
-		lastEditLocation = -1;
-		setVisible( false );
-		final Container parent = getParent();
-		parent.remove( this );
-		parent.revalidate();
-		try {
-		    return true;
-		} finally {
-		    afterRemove();
-		}
-	}
-	
-	protected abstract void afterRemove();
-	
-	public IProject getProject() {
+        LOG.info("addWindows(): Now editing  "+unit.getResource());
+        this.project = project;
+        this.currentUnit = unit;
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try ( InputStream in = unit.getResource().createInputStream() ) 
+        {
+            IOUtils.copy( in , out );
+        }
+        final byte[] data = out.toByteArray();
+        final String source = new String(data, unit.getResource().getEncoding() );
+
+        lastEditLocation = -1;
+
+        autoComplete.detach();
+        editor.setDocument( createDocument() );
+        autoComplete.attachTo( editor );
+        editor.setText( source );
+        editor.setCaretPosition( 0 );
+    }
+
+    public void save(File file) throws FileNotFoundException 
+    {
+        try ( PrintWriter w = new PrintWriter(file ) ) 
+        {
+            if ( editor.getText() != null )  {
+                w.write( editor.getText() );
+            }
+            currentUnit.addMessage( CompilationMessage.info( currentUnit , "Source saved to "+file.getAbsolutePath() ) );
+        }
+    }
+
+    public boolean close(boolean askIfDirty) 
+    {
+        lastEditLocation = -1;
+        setVisible( false );
+        final Container parent = getParent();
+        parent.remove( this );
+        parent.revalidate();
+        try {
+            return true;
+        } finally {
+            afterRemove();
+        }
+    }
+
+    protected abstract void afterRemove();
+
+    public IProject getProject() {
         return project;
     }
-	
-	public CompilationUnit getCompilationUnit() {
+
+    public CompilationUnit getCompilationUnit() {
         return currentUnit;
     }
-	
-	public void gotoMessage(CompilationMessage message) 
-	{
-		final int len = editor.getText().length();
-		if ( message.region != null && 0 <= message.region.start() && message.region.start() < len ) 
-		{
-		    setSelection( message.region );
-		} else {
-			System.err.println("Index "+message.region+" is out of range, cannot set caret");
-		}
-	}
-	
-	public void setSelection(TextRegion region) 
-	{
-	    final Runnable r = () -> {
-	        editor.setCaretPosition( region.start() );
-	        editor.setSelectionStart( region.start() );
-	        editor.setSelectionEnd( region.end() );
-	        editor.requestFocus();
-	    };
-	    runAfterCompilation(r);
-	}
-	
-	private void runAfterCompilation(Runnable r) 
-	{
-       if ( wasCompiledAtLeastOnce ) {
+
+    public void gotoMessage(CompilationMessage message) 
+    {
+        final int len = editor.getText().length();
+        if ( message.region != null && 0 <= message.region.start() && message.region.start() < len ) 
+        {
+            setSelection( message.region );
+        } else {
+            System.err.println("Index "+message.region+" is out of range, cannot set caret");
+        }
+    }
+
+    public void setSelection(TextRegion region) 
+    {
+        final Runnable r = () -> {
+            editor.setCaretPosition( region.start() );
+            editor.setSelectionStart( region.start() );
+            editor.setSelectionEnd( region.end() );
+            editor.requestFocus();
+        };
+        runAfterCompilation(r);
+    }
+
+    private void runAfterCompilation(Runnable r) 
+    {
+        if ( wasCompiledAtLeastOnce ) {
             r.run();
         } else {
             afterCompilation.add( r );
         }
-	}
-	
+    }
+
     public void setCaretPosition(TextRegion region) {
         setCaretPosition( region.start() );
     }
-	
+
     public void setCaretPosition(int position) 
     {
         runAfterCompilation( () -> editor.setCaretPosition( position ) );
