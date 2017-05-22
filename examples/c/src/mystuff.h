@@ -42,4 +42,4 @@ extern void ps2_reset();
 extern char ps2_keybuffer_read(char *buffer,char bufsize);
 extern char ps2_get_overflow_counter(void);
 extern char ps2_get_last_error(void);
-extern char ps2_write_byte(char cmd,char *responsebuffer,char bufsize);
+extern char ps2_write_byte(char cmd);

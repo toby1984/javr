@@ -40,6 +40,8 @@ Return values:
 
 .equ CPU_FREQUENCY = 16000000 ; 16 Mhz
 
+.equ CYCLES_PER_MS = CPU_FREQUENCY/1000
+
 .equ KEYBOARD_BUFFER_SIZE = 16
 
 .equ DISPLAY_WIDTH_IN_PIXEL = 128
@@ -58,7 +60,10 @@ Return values:
 .equ DISPLAY_RESET_PIN = 4
 .equ GREEN_LED_PIN = 6
 .equ RED_LED_PIN = 7
+
 #define LCD_ADR %01111000
+
+#define RX_TIMEOUT_STARTBIT 0xff
 
 .equ FRAMEBUFFER_SIZE = 1024
 .equ BYTES_PER_ROW = DISPLAY_WIDTH_IN_PIXEL/GLYPH_WIDTH_IN_BITS
@@ -745,10 +750,10 @@ ps2_reset:
 
 ; =====
 ; Enable PS/2 interrupt
-; SCRATCHED: r24
 ; =====
 ps2_enable_irq:
 	cli
+	push r24
 ; setup INT1 external interrupt
           lds r24,EICRA
           andi r24,%11110011
@@ -758,12 +763,12 @@ ps2_enable_irq:
 	sbi EIFR,INTF1
 ; enable IRQ         
 	sbi EIMSK,INT1
+	pop r24
 	sei
           ret
 
 ; =====
 ; Disable PS/2 interrupt
-; SCRATCHED: r24
 ; =====
 ps2_disable_irq:
 	cli
@@ -772,8 +777,26 @@ ps2_disable_irq:
           ret
 
 ; ======
-; Called by IRQ routine after PS/2 DATA line went low
+; Read one byte from the PS/2 interface.
+; RESULT: r24 - Byte read if carry clear (=success), error code if carry set (=rx error)
+; SCRATCHED: r18,r20,r21,r24,r26,r27
+; ======
+ps2_read_byte:
+; wait for data line to go low
+          ldi r26,0xff
+          ldi r27,0xff
+.wait_data_low
+          sbis PIND,PS2_DATA_PIN ; skip if bit set
+          rjmp ps2_irq_read_byte ; => bit clear
+          sbiw r27:r26,1
+          brne wait_data_low
+	ldi r24,RX_TIMEOUT_STARTBIT
+	sec
+          ret
+; ======
+; Called by IRQ routine after PS/2 DATA line went low.
 ; RESULT: r24 - Byte read , carry set => RX error, carry clear => success
+; SCRATCHED: r18,r20,r21,r24,r26,r27
 ; ======
 ps2_irq_read_byte:
 ; read start bit (this one is always zero)
@@ -812,7 +835,7 @@ ps2_irq_read_byte:
           ret
 
 .timeout_error_start
-          ldi r24,0xff
+          ldi r24,RX_TIMEOUT_STARTBIT
 	rjmp error_return
 
 .parity_error
@@ -854,18 +877,16 @@ ps2_irq_read_byte:
 ; The parity bit is set if there is an even number of 1's in the data bits and reset (0) if there is an odd number of 1's in the data bits
 ps2_calc_parity:
            mov r19,r24
-           ldi r18,0
+           clr r1
+           ldi r18,0xff
            ldi r20,8
 .calc_loop
            rol r19
-           brcc zero_bit
-           inc r18
-.zero_bit
+           sbc r18,r1
            dec r20
            brne calc_loop
-           com r18
            andi r18,1
-           ret       
+           ret
 ; =====
 ; Read one bit from PS/2.
 ; RESULT: Carry set = 1-bit , Carry clear = 0-bit
@@ -988,7 +1009,7 @@ ps2_keybuffer_write:
 	ldi r31,HIGH(keybuffer)
 	ldi r30,LOW(keybuffer)
 	lds r18,keybuffer_ptr
-	cpi r18,KEYBOARD_BUFFER_SIZE-1
+	cpi r18,KEYBOARD_BUFFER_SIZE
 	breq buffer_full
 	mov r0,r18
 	clr r1
@@ -1036,10 +1057,10 @@ ps2_keybuffer_read:
 	st r27:r26+,r19
 	dec r18
 	brne copy_loop
+.buffer_empty
 	sts keybuffer_ptr,r18
 	sts keybuffer_lost,r18
 	sts keybuffer_error,r18
-.buffer_empty
 	sei ; re-enable IRQs
 	ret
 
@@ -1047,28 +1068,37 @@ ps2_keybuffer_read:
 ; Send a single byte command and receives the response from the
 ; keyboard controller.
 ; INPUT: r24 - byte to send to keyboard controller
-; INPUT: r23:r22 - ptr to array where to save response
-; INPUT: r20 - size of a array
-; RESULT: r24 - number of received bytes or 0xff on error
+; RESULT: r24 - 0 on error, 1 on success
 ; ====
 ps2_write_byte:
-	movw r31:r30,r23:r22
-	mov r25,r20 ; backup receive buffer size (will be scratched)
 ; calculate parity to send later
 	rcall ps2_calc_parity ; SCRATCHED: r18,r19,r20
-; parity is now in r18
-	cli ; disable interrupts so we don't interfere with keyboard reads
+; parity bit was returned in r18
+	rcall ps2_disable_irq ; disable interrupts so we don't interfere with keyboard reads
+
+          ldi r31,HIGH(8*1600/4) ; looked good with 16*1600/4
+	ldi r30,LOW(8*1600/4)
+.delay1
+	sbiw r31:r30,1
+	brne delay1
 
 	sbi DDRD,PS2_CLK_PIN ; set clk to output
 	cbi PORTD,PS2_CLK_PIN ; => clock low
 
-          rcall sleep_one_ms
+          ldi r31,HIGH(16*1600/4)
+	ldi r30,LOW(16*1600/4)
+.delay2
+	sbiw r31:r30,1
+	brne delay2
 
+;	sbi PORTD,PS2_CLK_PIN ; => clock hi
 	cbi DDRD,PS2_CLK_PIN ; set clk to input
 
 ; *** transmission starts here ***
+
 	sbi DDRD,PS2_DATA_PIN ; set data to output
           cbi PORTD,PS2_DATA_PIN ; pull data low => this is the start bit
+
 ; send 8 bits (MSB first)
 	ldi r19,8
 .send_loop
@@ -1079,7 +1109,6 @@ ps2_write_byte:
 ; send parity bit
 	ror r18 ; shift parity bit into carry
 	rcall ps2_write_bit
-
 ; send stop bit (1)
 	cbi DDRD,PS2_DATA_PIN ; set data to input
 .wait_data_low
@@ -1091,20 +1120,23 @@ ps2_write_byte:
 ; wait for CLK and DATA to go high again
 .wait_data_high
 	sbic PIND,PS2_DATA_PIN
-	rjmp data_is_hi
+	rjmp wait_clk_hi
 	rjmp wait_data_high
-.data_is_hi
-	rcall debug_green_led_on
 .wait_clk_hi
 	sbis PIND,PS2_CLK_PIN
 	rjmp wait_clk_hi
-	rcall debug_red_led_on
-; TODO: receive response bytes from controller
+; now read the response
+	rcall ps2_read_byte ; SCRATCHED: r18,r20,r21,r24,r26,r27
+	brcs error
+	cpi r24,0xfa ; PS/2 SUCCESS
+	brne error
+	ldi r24,1
+	rjmp back 
+.error
+	clr r24
 .back
-	rcall debug_green_led_on
-	sei
+	rcall ps2_enable_irq
 	ret
-
 ; ======
 ; INPUT: carry bit
 ; ======

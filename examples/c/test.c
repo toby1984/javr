@@ -108,36 +108,46 @@ int main()
   
   ps2_reset();
   
-  framebuffer_clear();      
-  framebuffer_update_display();          
+  util_msleep(200);
+  util_msleep(200);  
+  util_msleep(200);    
+  util_msleep(200);    
+  util_msleep(200);      
+
+  debug_green_led_on();
+  
+  ps2_write_byte( 0xee );
+  
+  char success1=0,success2=0;
+  success1 = ps2_write_byte( 0xed );
+  
+  if ( success1 ) {
+    debug_red_led_on();    
+    success2 = ps2_write_byte( 0x01 );      
+  }
+  
+   print("success 1: ");
+   println_hex( success1 );
+   print("success 2: ");
+   println_hex( success2 );   
+   framebuffer_update_display();   
   
   while ( 1 ) 
   {
     handle_keybuffer();   
     
     if ( pressed_keys_count > 0 ) 
-    {
-      println("query id");
-      framebuffer_update_display();   
-            
-      // ps2_write_byte( 0xf2 , &keyboard_buffer[0] , sizeof( keyboard_buffer ) );      
-      ps2_write_byte( 0xff , &keyboard_buffer[0] , sizeof( keyboard_buffer ) );
-  
-      println("done");
-      framebuffer_update_display(); 
-      
-      util_msleep(200);
-  
-//       for ( char i = 0 ; i < pressed_keys_count ; i++ ) 
-//       {
-//         char c = mycode[ pressed_keys[i] ];
-//         if ( c != '\n' ) {
-//           buffer[0] = c;
-//           print( &buffer[0] );
-//         } else {
-//           linefeed();
-//         }
-//       }
+    {  
+      for ( char i = 0 ; i < pressed_keys_count ; i++ ) 
+      {
+        char c = mycode[ pressed_keys[i] ];
+        if ( c != '\n' ) {
+          buffer[0] = c;
+          print( &buffer[0] );
+        } else {
+          linefeed();
+        }
+      }
       pressed_keys_count = 0;
       framebuffer_update_display();        
     }    
