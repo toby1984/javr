@@ -1043,6 +1043,84 @@ ps2_keybuffer_read:
 	sei ; re-enable IRQs
 	ret
 
+; ==== 
+; Send a single byte command and receives the response from the
+; keyboard controller.
+; INPUT: r24 - byte to send to keyboard controller
+; INPUT: r23:r22 - ptr to array where to save response
+; INPUT: r20 - size of a array
+; RESULT: r24 - number of received bytes or 0xff on error
+; ====
+ps2_write_byte:
+	movw r31:r30,r23:r22
+	mov r25,r20 ; backup receive buffer size (will be scratched)
+; calculate parity to send later
+	rcall ps2_calc_parity ; SCRATCHED: r18,r19,r20
+; parity is now in r18
+	cli ; disable interrupts so we don't interfere with keyboard reads
+
+	sbi DDRD,PS2_CLK_PIN ; set clk to output
+	cbi PORTD,PS2_CLK_PIN ; => clock low
+
+          rcall sleep_one_ms
+
+	cbi DDRD,PS2_CLK_PIN ; set clk to input
+
+; *** transmission starts here ***
+	sbi DDRD,PS2_DATA_PIN ; set data to output
+          cbi PORTD,PS2_DATA_PIN ; pull data low => this is the start bit
+; send 8 bits (MSB first)
+	ldi r19,8
+.send_loop
+	ror r24
+          rcall ps2_write_bit
+	dec r19
+	brne send_loop
+; send parity bit
+	ror r18 ; shift parity bit into carry
+	rcall ps2_write_bit
+
+; send stop bit (1)
+	cbi DDRD,PS2_DATA_PIN ; set data to input
+.wait_data_low
+	sbic PIND,PS2_DATA_PIN
+	rjmp wait_data_low
+.wait_clk_low
+	sbic PIND,PS2_CLK_PIN
+	rjmp wait_clk_low	
+; wait for CLK and DATA to go high again
+.wait_data_high
+	sbic PIND,PS2_DATA_PIN
+	rjmp data_is_hi
+	rjmp wait_data_high
+.data_is_hi
+	rcall debug_green_led_on
+.wait_clk_hi
+	sbis PIND,PS2_CLK_PIN
+	rjmp wait_clk_hi
+	rcall debug_red_led_on
+; TODO: receive response bytes from controller
+.back
+	rcall debug_green_led_on
+	sei
+	ret
+
+; ======
+; INPUT: carry bit
+; ======
+ps2_write_bit:
+; wait for clock to be low
+.wait_low sbic PIND,PS2_CLK_PIN
+          rjmp wait_low
+; clock is now low, load bit
+	brcc send_0_bit
+	sbi PORTD,PS2_DATA_PIN
+	rjmp wait_high
+.send_0_bit
+	cbi PORTD,PS2_DATA_PIN	
+.wait_high sbis PIND,PS2_CLK_PIN
+          rjmp wait_high
+	ret
 ; ====
 ; Returns the last PS/2 error and resets all error flags.
 ; RESULT: r24 - last error code

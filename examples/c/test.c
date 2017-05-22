@@ -117,16 +117,27 @@ int main()
     
     if ( pressed_keys_count > 0 ) 
     {
-      for ( char i = 0 ; i < pressed_keys_count ; i++ ) 
-      {
-        char c = mycode[ pressed_keys[i] ];
-        if ( c != '\n' ) {
-          buffer[0] = c;
-          print( &buffer[0] );
-        } else {
-          linefeed();
-        }
-      }
+      println("query id");
+      framebuffer_update_display();   
+            
+      // ps2_write_byte( 0xf2 , &keyboard_buffer[0] , sizeof( keyboard_buffer ) );      
+      ps2_write_byte( 0xff , &keyboard_buffer[0] , sizeof( keyboard_buffer ) );
+  
+      println("done");
+      framebuffer_update_display(); 
+      
+      util_msleep(200);
+  
+//       for ( char i = 0 ; i < pressed_keys_count ; i++ ) 
+//       {
+//         char c = mycode[ pressed_keys[i] ];
+//         if ( c != '\n' ) {
+//           buffer[0] = c;
+//           print( &buffer[0] );
+//         } else {
+//           linefeed();
+//         }
+//       }
       pressed_keys_count = 0;
       framebuffer_update_display();        
     }    
