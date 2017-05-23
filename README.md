@@ -114,6 +114,7 @@ but with SPM you need to write
 
 ## Known issues
 
+- Auto-indention is implemented but broken and thus not available
 - Syntax coloring is off when using MSDOS-style line endings (won't fix this since it is related to the fact that Swing text components internally convert all EOL sequences to '\n' but my parser uses the 'true' text offsets)
 - parsing #define is currently broken when trying to #define stuff like (a+b)/c (gets irritated by the leading parens)
 - parsing of .def is quite picky when it comes to whitespace ( '.def x = r16' works but '.def x=r16' doesnt ...)

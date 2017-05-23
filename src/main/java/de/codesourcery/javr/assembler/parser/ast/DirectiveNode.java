@@ -294,7 +294,7 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
 
     public void addRelocations(ICompilationContext context) 
     {
-        if ( is( Directive.INIT_WORDS )  && context.isGenerateRelocations() )
+        if ( is( Directive.INIT_WORDS )  && context.getCompilationSettings().isGenerateRelocations() )
         { 
             int offset = context.currentOffset();
             for ( ASTNode child : children() ) 

@@ -31,14 +31,17 @@ import de.codesourcery.javr.assembler.elf.Relocation;
 public interface IObjectCodeWriter 
 {
     /**
-     * Resets this writer to it's initial state.
+     * Resets this writer's internal state.
      * 
-     * Any data written already through this writer is discarded.
+     * Any data written already through this writer is discarded and
+     * compilation is considered to not be successful.
      *  
+     * @param context
      * @throws IOException
      * @see #finish(boolean)
+     * @see #isCompilationSuccess()
      */
-    public void reset() throws IOException;
+    public void reset(ICompilationContext context) throws IOException;
     
     /**
      * Returns the currently active segment.
@@ -100,7 +103,7 @@ public interface IObjectCodeWriter
      * if code generation got aborted for some reason
      * @throws IOException
      */
-    public void finish(ICompilationContext context,boolean success) throws IOException;
+    public void finish(CompilationUnit unit,ICompilationContext context,boolean success) throws IOException;
     
     /**
      * Add relocation info to the current segment.
@@ -145,4 +148,13 @@ public interface IObjectCodeWriter
      * @return
      */
     public Buffer getBuffer(Segment segment);
+
+    /**
+     * Returns whether this object code writer was part of a successful compilation since
+     * the last call to {@link #reset()}.
+     * 
+     * @return
+     * @see #reset()
+     */
+    boolean isCompilationSuccess();
 }

@@ -27,34 +27,23 @@ import de.codesourcery.javr.assembler.arch.impl.ATXmega;
  */
 public enum Architecture 
 {
-    ATMEGA88("atmega88") {
-        @Override
-        public IArchitecture createImplementation() {
-            return new ATMega88();
-        }
-    },
-    ATMEGA328P("atmega328p") {
-        @Override
-        public IArchitecture createImplementation() {
-            return new ATMega328p();
-        }
-    },
-    XMEGA("xmega") {
-        @Override
-        public IArchitecture createImplementation() {
-            return new ATXmega();
-        }
-    };
+    ATMEGA88("atmega88", new ATMega88() ),
+    ATMEGA328P("atmega328p",new ATMega328p()), 
+    XMEGA("xmega" , new ATXmega() );
     
     private final String id;
+    private final IArchitecture implementation;
     
-    private Architecture(String id) {
+    private Architecture(String id,IArchitecture implementation) {
         this.id = id;
+        this.implementation = implementation;
     }
 
     public String getIdentifier() {
         return id;
     }
     
-    public abstract IArchitecture createImplementation();
+    public IArchitecture getImplementation() {
+        return implementation;
+    }
 }

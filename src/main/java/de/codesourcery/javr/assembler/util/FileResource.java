@@ -49,7 +49,7 @@ public class FileResource implements Resource
     }
     
     public static String nameFor(File file) {
-        return "file://"+file;
+        return "file://"+file.getAbsolutePath();
     }
     
     @Override

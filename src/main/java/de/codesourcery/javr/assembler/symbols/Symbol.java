@@ -232,10 +232,10 @@ public final class Symbol
      * {@link Identifier#isLocalGlobalIdentifier(Identifier)} syntax for its identifier.
      * 
      * @return
-     * @see #isLocalLabel()
-     * @see #isGlobalLabel()
+     * @see #isLocalSymbol()
+     * @see #isGlobalSymbol()
      */
-    public boolean isLocalLabel() {
+    public boolean isLocalSymbol() {
         return Identifier.isLocalGlobalIdentifier( name() );
     }
 
@@ -244,8 +244,8 @@ public final class Symbol
      * 
      * @return
      */
-    public boolean isGlobalLabel() {
-        return ! isLocalLabel();
+    public boolean isGlobalSymbol() {
+        return ! isLocalSymbol();
     }
     
     /**
@@ -268,7 +268,7 @@ public final class Symbol
      */
     public Identifier getGlobalNamePart() 
     {
-        if ( isLocalLabel() ) {
+        if ( isLocalSymbol() ) {
             return Identifier.getGlobalIdentifierPart( name() );
         }
         return name();

@@ -47,44 +47,44 @@ import de.codesourcery.javr.assembler.symbols.Symbol.Type;
 public class SymbolTable 
 {
     private static final Logger LOG = Logger.getLogger(SymbolTable.class);
-    
+
     public static final String GLOBAL = "<global>";
-    
+
     private final String name;
     private SymbolTable parent;
-    
+
     private final List<SymbolTable> children = new ArrayList<>();
-    
+
     private final Map<Identifier,Symbol> symbols = new HashMap<>();
-    
+
     public SymbolTable(String name) {
         Validate.notBlank(name, "name must not be NULL or blank");
         this.name = name;
     }
-    
+
     public SymbolTable(String name,SymbolTable parent) 
     {
         this(name);
         Validate.notNull(parent, "parent must not be NULL");
         setParent( parent );
     }
-    
+
     public SymbolTable getParent() {
-    	return parent;
+        return parent;
     }
-    
+
     public boolean hasParent() {
         return parent != null;
     }
-    
+
     public boolean isEmpty() {
-    	return symbols.isEmpty();
+        return symbols.isEmpty();
     }
-    
+
     public int size() {
-    	return symbols.size();
+        return symbols.size();
     }
-    
+
     /**
      * Walks the symbol table hierarchy upwards, returning the top-level symbol table.
      * 
@@ -92,17 +92,17 @@ public class SymbolTable
      */
     public SymbolTable getTopLevelTable() 
     {
-    	SymbolTable result = this;
-    	while ( result.hasParent() ) {
-    		result = result.getParent();
-    	}
-    	return result;
+        SymbolTable result = this;
+        while ( result.hasParent() ) {
+            result = result.getParent();
+        }
+        return result;
     }
-    
+
     public void clear() {
-    	this.symbols.clear();
+        this.symbols.clear();
     }
-    
+
     public Symbol get(Identifier name,Symbol.Type type) 
     {
         Validate.notNull(type, "type must not be NULL");
@@ -116,7 +116,7 @@ public class SymbolTable
         }
         throw new UnknownSymbolException( name );
     }    
-    
+
     public Symbol get(Identifier name) 
     {
         final Symbol result = internalGet(name);
@@ -135,26 +135,26 @@ public class SymbolTable
             final List<Symbol> parentSymbols = parent.getAllSymbolsUnsorted();
             for ( Symbol p : parentSymbols ) 
             {
-            	if ( ! symbols.keySet().contains( p.name() ) ) {
-            		result.add( p );
-            	}
+                if ( ! symbols.keySet().contains( p.name() ) ) {
+                    result.add( p );
+                }
             }
         }
         return result;
     }    
-    
+
     public List<Symbol> getAllSymbolsSorted() 
     {
         final List<Symbol> result = getAllSymbolsUnsorted();
         Collections.sort( result , (a,b) -> a.name().value.compareTo( b.name().value ) );
         return result;
     }
-    
+
     public Optional<Symbol> maybeGet(Identifier name) 
     {
         return Optional.ofNullable( internalGet( name ) );
     }   
-    
+
     public Optional<Symbol> maybeGet(Identifier name,Symbol.Type type) 
     {
         final Symbol result = internalGet( name );
@@ -163,7 +163,7 @@ public class SymbolTable
         }
         return Optional.ofNullable( result );
     }        
-    
+
     private Symbol internalGet(Identifier name) 
     {
         Validate.notNull(name, "name must not be NULL");        
@@ -173,20 +173,20 @@ public class SymbolTable
         }
         return result;
     }
-    
+
     private void internalDeclareSymbol(Symbol s) 
     {
         Validate.notNull(s, "symbol must not be NULL");
         Symbol existing = internalGet(s.name());
         if ( existing == null ) 
         {
-            if ( parent != null ) {
+            if ( parent != null && s.isGlobalSymbol() ) {
                 parent.internalDeclareSymbol( s );
             }
             putSymbol(s);
         }
     }
-    
+
     private void putSymbol(Symbol s) 
     {
         if ( LOG.isTraceEnabled() ) 
@@ -195,7 +195,7 @@ public class SymbolTable
         }        
         this.symbols.put( s.name() , s );
     }
-    
+
     public void declareSymbol(Identifier name,CompilationUnit unit) 
     {
         Validate.notNull(name, "name must not be NULL");
@@ -206,7 +206,7 @@ public class SymbolTable
             internalDeclareSymbol( new Symbol(name,Type.UNDEFINED,unit,null ) );
         }
     }
-    
+
     public boolean removeIf(Predicate<Symbol> predicate) 
     {
         boolean result = false;
@@ -223,20 +223,20 @@ public class SymbolTable
         }
         return result;
     }
-    
+
     public boolean isDefined(Identifier name) 
     {
         Validate.notNull(name, "name must not be NULL");
         final Symbol existing = internalGet( name );
         return existing != null && existing.isDefined();
     }
-    
+
     public boolean isDeclared(Identifier name) 
     {
         Validate.notNull(name, "name must not be NULL");
         return internalGet( name ) != null;
     }    
-    
+
     public void defineSymbol(Symbol symbol,Segment segment) throws DuplicateSymbolException
     {
         Validate.notNull(symbol, "symbol must not be NULL");
@@ -250,58 +250,58 @@ public class SymbolTable
         if ( symbol.hasType( Type.ADDRESS_LABEL ) ) {
             symbol.setSegment( segment );
         }
-        if ( parent != null ) {
+        if ( parent != null && symbol.isGlobalSymbol() ) {
             parent.defineSymbol( symbol , segment );
         }
         putSymbol(symbol);
     }
-    
+
     @Override
     public String toString() 
     {
         return name+" ["+super.toString()+","+this.symbols.size()+" symbols]";
     }
 
-	public void setParent(SymbolTable symbolTable) {
-		Validate.notNull(symbolTable, "symbolTable must not be NULL");
-		
-		this.parent = symbolTable;
-		this.parent.children.add( this );
-		
+    public void setParent(SymbolTable symbolTable) {
+        Validate.notNull(symbolTable, "symbolTable must not be NULL");
+
+        this.parent = symbolTable;
+        this.parent.children.add( this );
+
         IdentityHashMap<SymbolTable,Integer> chain = new IdentityHashMap<>();
         SymbolTable current = this;
         while ( current != null ) {
-        	if ( chain.containsKey( current ) ) {
-        		throw new IllegalArgumentException("Symbol table parents form a cycle");
-        	}
-        	chain.put( current , Integer.valueOf(0) );
-        	current = current.getParent();
+            if ( chain.containsKey( current ) ) {
+                throw new IllegalArgumentException("Symbol table parents form a cycle");
+            }
+            chain.put( current , Integer.valueOf(0) );
+            current = current.getParent();
         }
 
-	}
-	
-	/**
-	 * DEBUGGING ONLY.
-	 * @return
-	 * @deprecated DEBUGGING ONLY
-	 */
-	@Deprecated
+    }
+
+    /**
+     * DEBUGGING ONLY.
+     * @return
+     * @deprecated DEBUGGING ONLY
+     */
+    @Deprecated
     public Map<Identifier,Symbol> symbols() {
         return this.symbols;
     }
-	
-	/**
-	 * Removes a symbol from this table and 
-	 * all its children.
-	 * 
-	 * @param s
-	 */
-	public void removeSymbol(Symbol s) 
-	{
-	    this.symbols.remove( s.name() );
-	    children.forEach( child -> child.removeSymbol( s ) );
-	}
-	
+
+    /**
+     * Removes a symbol from this table and 
+     * all its children.
+     * 
+     * @param s
+     */
+    public void removeSymbol(Symbol s) 
+    {
+        this.symbols.remove( s.name() );
+        children.forEach( child -> child.removeSymbol( s ) );
+    }
+
     /**
      * Removes a symbol from this table and 
      * all its children.
@@ -320,21 +320,38 @@ public class SymbolTable
         }
         children.forEach( child -> child.removeDeclared( s ) );        
     }	
-	
-	/**
-	 * Visit all symbols in this table.
-	 * 
-	 * @param visitor visitor that accepts a symbol and returns either <code>true</code> to continue iteration or <code>false</code> to stop iteration and return
-	 */
-	public void visitSymbols(Function<Symbol,Boolean> visitor) 
-	{
-	    Collection<Symbol> values = this.symbols.values();
-	    for (Iterator<Symbol>  it = values.iterator(); it.hasNext();) 
-	    {
+
+    /**
+     * Visit all symbols in this table.
+     * 
+     * @param visitor visitor that accepts a symbol and returns either <code>true</code> to continue iteration or <code>false</code> to stop iteration and return
+     */
+    public void visitSymbols(Function<Symbol,Boolean> visitor) 
+    {
+        Collection<Symbol> values = this.symbols.values();
+        for (Iterator<Symbol>  it = values.iterator(); it.hasNext();) 
+        {
             final Symbol symbol = (Symbol) it.next();
             if ( ! Boolean.TRUE.equals( visitor.apply( symbol ) ) ) {
                 return;
             }
         }
-	}
+    }
+
+    /**
+     * Removes all symbols that belong to a given compilation unit from this symbol table 
+     * 
+     * @param unit
+     */
+    public void removeAllSymbols(CompilationUnit unit) {
+
+        final Collection<Symbol> values = this.symbols.values();
+        for (Iterator<Symbol>  it = values.iterator(); it.hasNext();) 
+        {
+            final Symbol symbol = (Symbol) it.next();
+            if ( symbol.getCompilationUnit().hasSameResourceAs( unit ) ) {
+                it.remove();
+            }
+        }
+    }
 }

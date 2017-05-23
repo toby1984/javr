@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
+import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.phases.ExpandMacrosPhase;
 import de.codesourcery.javr.assembler.phases.GatherSymbolsPhase;
 import de.codesourcery.javr.assembler.phases.GenerateCodePhase;
@@ -30,8 +31,6 @@ import de.codesourcery.javr.assembler.phases.Phase;
 import de.codesourcery.javr.assembler.phases.PrepareGenerateCodePhase;
 import de.codesourcery.javr.assembler.phases.SubstituteRegisterAliases;
 import de.codesourcery.javr.assembler.phases.SyntaxCheckPhase;
-import de.codesourcery.javr.ui.IProject;
-import de.codesourcery.javr.ui.config.IConfigProvider;
 
 public class Assembler 
 {
@@ -41,25 +40,25 @@ public class Assembler
 
     private CompilationContext compilationContext;
 
-    public boolean compile(IProject project,IObjectCodeWriter codeWriter,ResourceFactory rf, IConfigProvider config) throws IOException 
+    public boolean compile(CompilationUnit unit,
+            CompilerSettings compilerSettings,
+            IObjectCodeWriter codeWriter,
+            ResourceFactory rf) 
+                    throws IOException 
     {
-        Validate.notNull(project, "project must not be NULL");
+        Validate.notNull(compilerSettings, "compilerSettings must not be NULL");
         Validate.notNull(codeWriter, "codeWriter must not be NULL");
         Validate.notNull(rf, "resourceFactory must not be NULL");
-        Validate.notNull(config, "provider must not be NULL");
-
-        final CompilationUnit unit = project.getCompileRoot();
-        Validate.notNull(unit, "project's compile root must not be NULL");
+        Validate.notNull(unit,"unit must not be NULL");
         
-        project.getGlobalSymbolTable().clear();
-        unit.beforeCompilationStarts( project.getGlobalSymbolTable() );
+        this.compilerSettings.populateFrom( compilerSettings );
+        
+        unit.beforeCompilationStarts();
 
-        this.compilerSettings.populateFrom( project.getConfiguration().getCompilerSettings() );
-        this.compilationContext = new CompilationContext( unit , project.getGlobalSymbolTable() , codeWriter , rf , compilerSettings , config.getConfig() );
-        this.compilationContext.setGenerateRelocations( project.getConfiguration().getOutputFormat().supportsRelocation());
+        this.compilationContext = new CompilationContext( unit , codeWriter , rf , compilerSettings );
         
         final List<Phase> phases = new ArrayList<>();
-        phases.add( new ParseSourcePhase(config) );
+        phases.add( new ParseSourcePhase() );
         phases.add( new SyntaxCheckPhase() );
         phases.add( new GatherSymbolsPhase() );
         phases.add( new SubstituteRegisterAliases() );
@@ -73,6 +72,7 @@ public class Assembler
         boolean success = false;
         try 
         {
+            final long startAllPhases = System.currentTimeMillis();
             for ( Phase phase : phases )
             {
                 LOG.debug("Assembler phase: "+phase);
@@ -118,6 +118,9 @@ public class Assembler
                     return false;
                 }                
             }
+            
+            final long end = System.currentTimeMillis();
+            unit.addMessage( CompilationMessage.info( unit , "Finished compiling "+unit.getResource()+" after "+(end-startAllPhases)+" ms") );
 
             System.err.flush();
             System.out.flush();
@@ -129,12 +132,8 @@ public class Assembler
         } 
         finally 
         {
-            codeWriter.finish( compilationContext , success );
+            codeWriter.finish( unit , compilationContext , success );
         }
         return true;
-    }
-
-    public CompilerSettings getCompilerSettings() {
-        return compilerSettings;
     }
 }

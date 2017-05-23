@@ -17,44 +17,31 @@ package de.codesourcery.javr.assembler;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.ConsoleAppender;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PatternLayout;
 
-import de.codesourcery.hex2raw.IntelHex;
-import de.codesourcery.javr.assembler.arch.IArchitecture;
-import de.codesourcery.javr.assembler.arch.impl.ATMega88;
-import de.codesourcery.javr.assembler.parser.Lexer;
-import de.codesourcery.javr.assembler.parser.LexerImpl;
-import de.codesourcery.javr.assembler.parser.Parser;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.Parser.Severity;
-import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.util.FileResource;
 import de.codesourcery.javr.assembler.util.FileResourceFactory;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.ui.Project;
-import de.codesourcery.javr.ui.config.IConfig;
 import de.codesourcery.javr.ui.config.ProjectConfiguration;
 import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputFormat;
-import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputSpec;
 
 public class CmdLine 
 {
+    @SuppressWarnings("unused")
     private static final Logger LOG = Logger.getLogger(CmdLine.class);
     
     private boolean verbose = false;
@@ -197,52 +184,38 @@ public class CmdLine
         try {
             srcFile = new File(args.get(0) ).getCanonicalFile();
             unit = new CompilationUnit( new FileResource( srcFile , Resource.ENCODING_UTF ) );
-        } catch (IOException e) {
+        } 
+        catch (IOException e) 
+        {
             return error( "Failed to open file",e );
         }
 
-        final IArchitecture arch = new ATMega88();
-
+        final OutputFormat finalFormat = outputFormat;
         final ObjectCodeWriter writer;
-        try {
-            writer = createOutputWriter(srcFile, outputFormat, unit, arch);
-        } 
-        catch (IOException e1) 
-        {
-            return error("Failed to create output files",e1);
-        }
+        writer = new FileObjectCodeWriter() {
+            
+            @Override
+            protected Optional<Resource> getOutputFile(CompilationUnit unit, Segment s) throws IOException 
+            {
+                final Optional<File> file = Project.getOutputFileName( finalFormat ,s ,  srcFile );
+                if ( ! file.isPresent() ) {
+                    return Optional.empty();
+                }
+                return Optional.of( new FileResource( file.get()  , "UTF-8" ) );
+            }
+        };
 
         System.out.println("Compiling "+srcFile.getAbsolutePath() );
         final ResourceFactory rf = FileResourceFactory.createInstance( srcFile.getParentFile() );
-
-        final IConfig config  = new IConfig() 
-        {
-            @Override
-            public String getEditorIndentString() { return "  "; }
-
-            @Override
-            public IArchitecture getArchitecture() {
-                return arch;
-            }
-
-            @Override
-            public Parser createParser() {
-                return new Parser( arch );
-            }
-
-            @Override
-            public Lexer createLexer(Scanner s) {
-                return new LexerImpl( s );
-            }
-        };
 
         try 
         {
             final ProjectConfiguration projectConfiguration = new ProjectConfiguration();
             projectConfiguration.setCompilerSettings( compilerSettings );
 
-            final Project project = new Project( unit , projectConfiguration );
-            asm.compile( project , writer , rf , ()-> config );
+            final Project project = new Project( projectConfiguration );
+            
+            asm.compile( unit , project.getConfiguration().getCompilerSettings() , writer , rf );
             printMessages(unit);
         } 
         catch (IOException e) 
@@ -283,84 +256,6 @@ public class CmdLine
         }
     }
     
-    private static ObjectCodeWriter createOutputWriter(final File srcFile,OutputFormat format,final CompilationUnit unit, final IArchitecture arch)throws IOException 
-    {
-        final boolean[] compilationSuccess={false};
-
-        final String fileSuffix;
-        switch(format) 
-        {
-            case INTEL_HEX: fileSuffix = ".hex"; break;
-            case RAW: fileSuffix = ".raw"; break;
-            default: throw new RuntimeException("Internal error,unhandled output format "+format);
-        }
-
-        final Resource flashOut = new FileResource( new File( srcFile.getParentFile() , srcFile.getName()+".flash"+fileSuffix ) , Resource.ENCODING_UTF);
-        final Resource epromOut = new FileResource( new File( srcFile.getParentFile() , srcFile.getName()+".eeprom"+fileSuffix ) , Resource.ENCODING_UTF);
-        final Resource sramOut  = new FileResource( new File( srcFile.getParentFile() , srcFile.getName()+".sram"+fileSuffix ) , Resource.ENCODING_UTF);
-
-        final Map<Segment,OutputSpec> outputSpec = new HashMap<>();
-        outputSpec.put( Segment.FLASH , new OutputSpec(flashOut,Segment.FLASH, format ) ); 
-        outputSpec.put( Segment.EEPROM, new OutputSpec(epromOut,Segment.EEPROM, format ) );
-        outputSpec.put( Segment.SRAM , new OutputSpec(sramOut,Segment.SRAM,format ) );
-
-        return new ObjectCodeWriter() 
-        {
-            @Override
-            public void finish(ICompilationContext context,boolean success) throws IOException 
-            {
-                compilationSuccess[0] = success;
-                super.finish(context,success);
-
-                if ( ! success ) 
-                {
-                    return;
-                }
-
-                for ( Segment s : Segment.values() ) 
-                {
-                    final OutputSpec spec = outputSpec.get( s );
-                    if ( spec == null ) 
-                    {
-                        LOG.info("finish(): Not writing file, project configuration has no output spec for segment "+s);
-                        continue;
-                    }
-                    final Buffer buffer = super.getBuffer( s );
-                    if ( buffer.isEmpty() ) 
-                    {
-                        LOG.info("finish(): Not writing file, compilation produced no data for segment "+s);
-                        continue;
-                    }
-                    int bytesWritten;
-                    try ( InputStream in = buffer.createInputStream() ; OutputStream out = spec.resource.createOutputStream() ) 
-                    {
-                        if ( spec.format == OutputFormat.INTEL_HEX ) 
-                        {
-                            bytesWritten = new IntelHex().rawToHex( in , out , buffer.getStartAddress().getByteAddress() ); 
-                        } 
-                        else if ( spec.format == OutputFormat.RAW ) 
-                        {
-                            bytesWritten = IOUtils.copy( in , out );
-                        } else {
-                            throw new RuntimeException("Unhandled output format: "+spec.format);
-                        }
-                    }
-                    
-                    if ( bytesWritten > 0 )
-                    {
-                        final int segSize = arch.getSegmentSize( s );
-                        System.out.println("Architecture "+arch+" has "+segSize+" bytes of "+s);
-                        final float percentage = 100.0f*(bytesWritten/(float) segSize);
-                        final DecimalFormat DF = new DecimalFormat("#####0.00");
-                        final String msg = s+": Wrote "+bytesWritten+" bytes ("+DF.format(percentage)+" %) to "+spec.resource;
-                        context.message( CompilationMessage.info( context.currentCompilationUnit() , msg ) );                    
-                    }
-                    LOG.info("finish(): Wrote "+bytesWritten+" bytes to "+spec.resource+" in format "+spec.format);
-                }      
-            }
-        };
-    }
-
     private static int error(String msg) {
         return error(msg,null);
     }

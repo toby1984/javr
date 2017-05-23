@@ -15,190 +15,94 @@
  */
 package de.codesourcery.javr.ui;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Paths;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Stack;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
-import de.codesourcery.hex2raw.IntelHex;
 import de.codesourcery.javr.assembler.Assembler;
 import de.codesourcery.javr.assembler.Buffer;
+import de.codesourcery.javr.assembler.CompilationContext;
 import de.codesourcery.javr.assembler.CompilationUnit;
+import de.codesourcery.javr.assembler.FileObjectCodeWriter;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.IObjectCodeWriter;
 import de.codesourcery.javr.assembler.ObjectCodeWriter;
-import de.codesourcery.javr.assembler.ObjectCodeWriterWrapper;
+import de.codesourcery.javr.assembler.ResourceFactory;
 import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
-import de.codesourcery.javr.assembler.elf.ElfFile;
-import de.codesourcery.javr.assembler.parser.Lexer;
-import de.codesourcery.javr.assembler.parser.LexerImpl;
-import de.codesourcery.javr.assembler.parser.Parser;
-import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
-import de.codesourcery.javr.assembler.parser.Scanner;
+import de.codesourcery.javr.assembler.parser.Identifier;
+import de.codesourcery.javr.assembler.parser.ast.AST;
+import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
+import de.codesourcery.javr.assembler.phases.ParseSourcePhase;
+import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
+import de.codesourcery.javr.assembler.util.FileResource;
+import de.codesourcery.javr.assembler.util.FileResourceFactory;
 import de.codesourcery.javr.assembler.util.Misc;
 import de.codesourcery.javr.assembler.util.Resource;
-import de.codesourcery.javr.ui.config.IConfig;
 import de.codesourcery.javr.ui.config.ProjectConfiguration;
 import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputFormat;
-import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputSpec;
 
 public class Project implements IProject
 {
     private static final Logger LOG = Logger.getLogger(Project.class);
 
-    private IArchitecture architecture;
-
-    private final List<CompilationUnit> units = new ArrayList<>();
-    private CompilationUnit compileRoot;    
-    
-    private final SymbolTable globalSymbolTable = new SymbolTable( SymbolTable.GLOBAL );
-
-    private ProjectConfiguration projectConfig = new ProjectConfiguration();
-    
-    private final ObjectCodeWriter writerDelegate = new ObjectCodeWriter();
-    private final IObjectCodeWriter objWriter = new ObjectCodeWriterWrapper( writerDelegate ) 
+    private final class ResourceAndWriter 
     {
-        @Override
-        public void reset() throws IOException 
-        {
-            super.reset();
-            artifactsGenerated = false;
-            for ( OutputSpec spec : projectConfig.getOutputFormats().values() ) 
+        public final IObjectCodeWriter objWriter;
+        public final CompilationUnit unit;
+        
+        public ResourceAndWriter(CompilationUnit unit) {
+            Validate.notNull(unit,"unit must not be NULL");
+            this.unit = unit;
+            this.objWriter = new FileObjectCodeWriter() 
             {
-                spec.deleteFile();
-            }
+                @Override
+                protected Optional<Resource> getOutputFile(CompilationUnit unit, Segment s) throws IOException {
+                    return Project.this.getOutputResource( unit.getResource() , s );
+                }
+            };
         }
-
-        @Override
-        public void finish(ICompilationContext context,boolean success) throws IOException 
-        {
-            super.finish(context,success);
-            
-            if ( ! success ) 
-            {
-                compilationSuccess = false;
-                return;
-            }
-            
-            for ( Segment s : Segment.values() ) 
-            {
-                final OutputSpec spec = projectConfig.getOutputFormats().get( s );
-                if ( spec == null ) 
-                {
-                    LOG.info("finish(): Not writing file, project configuration has no output spec for segment "+s);
-                    continue;
-                }
-                final Buffer buffer = delegate.getBuffer( s );
-                if ( buffer.isEmpty() ) 
-                {
-                    LOG.info("finish(): Not writing file, compilation produced no data for segment "+s);
-                    continue;
-                }
-                int bytesWritten;
-                try ( InputStream in = buffer.createInputStream() ; OutputStream out = spec.resource.createOutputStream() ) 
-                {
-                    if ( spec.format == OutputFormat.INTEL_HEX ) 
-                    {
-                        bytesWritten = new IntelHex().rawToHex( in , out , buffer.getStartAddress().getByteAddress() ); 
-                    } 
-                    else if ( spec.format == OutputFormat.RAW ) 
-                    {
-                        bytesWritten = IOUtils.copy( in , out );
-                    } 
-                    else if ( spec.format == OutputFormat.ELF_EXECUTABLE || spec.format == OutputFormat.ELF_RELOCATABLE ) 
-                    {
-                        final ByteArrayOutputStream program = new ByteArrayOutputStream();
-                        bytesWritten = IOUtils.copy( in , program );
-                        if ( s == Segment.FLASH ) {
-                            new ElfFile( spec.format ).write( getArchitecture() , delegate , context.globalSymbolTable() , out );
-                        }
-                    } else {
-                        throw new RuntimeException("Unhandled output format: "+spec.format);
-                    }
-                }
-                if ( bytesWritten > 0 )
-                {
-                    artifactsGenerated = true;
-                    
-                    final int segSize = getArchitecture().getSegmentSize( s );
-                    final float percentage = 100.0f*(bytesWritten/(float) segSize);
-                    final DecimalFormat DF = new DecimalFormat("#####0.00");
-                    final String msg;
-                    if ( spec.format == OutputFormat.ELF_EXECUTABLE && s == Segment.SRAM ) {
-                        msg = s+": "+bytesWritten+" bytes used ("+DF.format(percentage)+" %)";
-                    } else {
-                        msg = s+": Wrote "+bytesWritten+" bytes ("+DF.format(percentage)+" %) to "+spec.resource;
-                    }
-                    context.message( CompilationMessage.info( context.currentCompilationUnit() , msg ) );                    
-                }
-                LOG.info("finish(): Wrote "+bytesWritten+" bytes to "+spec.resource+" in format "+spec.format);
-            } 
-        }
-    };
-
-    private boolean compilationSuccess = false;
-    private boolean artifactsGenerated = false;
-
-    public Project(CompilationUnit compilationRoot) 
-    {
-        this( compilationRoot , new ProjectConfiguration() ); 
     }
     
-    public Project( CompilationUnit compilationRoot, ProjectConfiguration config) 
+    private Long id;
+    private final ResourceFactory resourceFactory;
+    private final List<CompilationUnit> units = new ArrayList<>();
+    private final ProjectConfiguration projectConfig = new ProjectConfiguration();
+    private final List<ResourceAndWriter> writers = new ArrayList<>();
+    
+    public Project( ProjectConfiguration config) 
     {
-        Validate.notNull(compilationRoot, "compilationUnit must not be NULL");
         Validate.notNull(config, "config must not be NULL");
         
-        this.architecture = config.getArchitecture();
-        this.compileRoot = compilationRoot;
-        this.projectConfig = config;
-        units.add( compilationRoot );
+        this.resourceFactory = new FileResourceFactory() 
+        {
+            public File getBaseDir() 
+            {
+                return getConfiguration().getBaseDir();
+            }
+        };
+        this.projectConfig.populateFrom( config );
     }
     
-    @Override
-    public IObjectCodeWriter getObjectCodeWriter() {
-        return objWriter;
-    }
-
-    public void setArchitecture(IArchitecture architecture) {
-        Validate.notNull(architecture, "architecture must not be NULL");
-        this.architecture = architecture;
-    }
-
     @Override
     public IArchitecture getArchitecture() {
-        return architecture;
+        return getConfiguration().getCompilerSettings().getArchitecture();
     }
 
-    public void setCompileRoot(CompilationUnit compileRoot) 
-    {
-        Validate.notNull(compileRoot, "compileRoot must not be NULL");
-    	System.out.println("Setting compile root "+compileRoot);
-        this.compileRoot = compileRoot;
-        if ( ! this.units.stream().anyMatch( existing -> existing.getResource().pointsToSameData( compileRoot.getResource() ) ) ) 
-        {
-        	addCompilationUnit( compileRoot );
-        }
-    }
-    
     @Override
     public Optional<CompilationUnit> maybeGetCompilationUnit(Resource resource) 
     {
@@ -212,31 +116,31 @@ public class Project implements IProject
         if ( existing.isPresent() ) {
             return existing.get();
         }
-        return addCompilationUnit( new CompilationUnit( resource , new SymbolTable( resource.getName() , globalSymbolTable) ) );
+        return addCompilationUnit( new CompilationUnit( resource , new SymbolTable( resource.getName() ) ) );
     }
     
-    private CompilationUnit addCompilationUnit(CompilationUnit unit) 
+    private Optional<IObjectCodeWriter> getObjectCodeWriter(CompilationUnit unit) 
+    {
+        return getResourceAndWriter( unit ).map( r -> r.objWriter );
+    }
+    
+    private Optional<ResourceAndWriter> getResourceAndWriter(CompilationUnit unit) 
+    {
+        return writers.stream().filter( w -> w.unit.getResource().pointsToSameData( unit.getResource() ) ).findFirst();
+    }
+    
+    public CompilationUnit addCompilationUnit(CompilationUnit unit) 
     {
     	System.out.println("Adding new compilation unit: "+unit);
+    	final Optional<ResourceAndWriter> existing = getResourceAndWriter( unit );
+    	if ( existing.isPresent() ) 
+    	{
+    	    writers.remove( existing.get() );
+    	}
+    	writers.add( new ResourceAndWriter( unit ) );
         units.add( unit );
 		invokeProjectListeners( l -> l.unitAdded( this , unit ) ) ;   
 		return unit;
-    }
-
-    @Override
-    public CompilationUnit getCompileRoot() {
-        return compileRoot;
-    }
-
-    @Override
-    public boolean canUploadToController() 
-    {
-        final Collection<OutputSpec> values = projectConfig.getOutputFormats().values();
-        return compilationSuccess && 
-                artifactsGenerated && 
-                StringUtils.isNotBlank( projectConfig.getUploadCommand() ) &&
-               ! values.isEmpty() && 
-                values.stream().anyMatch( s -> s != null );
     }
     
     public final boolean equals(Object other) 
@@ -252,14 +156,50 @@ public class Project implements IProject
     {
         return getConfiguration().getBaseDir().hashCode();
     }
+    
+
+    @Override
+    public CheckResult checkCanUploadToController() 
+    {
+        if ( ! hasProjectType( ProjectType.EXECUTABLE ) ) {
+            return CheckResult.uploadNotPossible( "Wrong project type, does not generate an executable");
+        }
+        if ( StringUtils.isBlank( projectConfig.getUploadCommand() ) ) {
+            return CheckResult.uploadNotPossible( "Project configuration has no upload command configured");
+        }
+        
+        final List<CompilationUnit> roots;
+        try {
+            roots = getCompilationRoots();
+        } catch (IOException e) {
+            LOG.error("canUploadToController(): Caught ",e);
+            return CheckResult.uploadNotPossible( "Internal error: "+e.getMessage());
+        }
+        if ( roots.size() != 1 ) { // don't know which one to upload
+            return CheckResult.uploadNotPossible( "Project has multiple compilation roots, don't know which one to upload");
+        }
+        
+        final IObjectCodeWriter writer = getObjectCodeWriter( roots.get(0) ).orElseThrow( () -> new RuntimeException("Internal error, no object code writer for "+roots.get(0) ) );
+        if ( ! writer.isCompilationSuccess() ) {
+            return CheckResult.uploadNotPossible( "Project has not been successfully compiled (yet)");
+        }
+        if ( ! Arrays.asList( Segment.FLASH , Segment.EEPROM ).stream().anyMatch( segment -> writer.getBuffer( segment ).isNotEmpty() ) ) {
+            return CheckResult.uploadNotPossible( "Compilation didn't produce any output");
+        }
+        return CheckResult.uploadPossible("ok");
+    }    
 
     @Override
     public void uploadToController() throws IOException 
     {
-        if ( ! canUploadToController() ) {
+        if ( ! checkCanUploadToController().uploadPossible ) {
             throw new IllegalStateException("No upload command configured on this project");
         }
+        
+        final CompilationUnit root = getCompilationRoots().get(0);
+        final IObjectCodeWriter objWriter = getObjectCodeWriter( root ).get();
 
+        
         /*
          * Expand commandline arguments.
          * 
@@ -272,18 +212,18 @@ public class Project implements IProject
         final Map<String,String> params = new HashMap<>();
         for ( Segment s : new Segment[]{Segment.FLASH,Segment.EEPROM} ) 
         {
-            final Buffer buffer = writerDelegate.getBuffer( s );
-            final OutputSpec spec = projectConfig.getOutputFormats().get( s );
-            if ( spec != null ) 
+            final Buffer buffer = objWriter.getBuffer( s );
+            final Optional<Resource> resource = getOutputResource( root.getResource() , s );
+            if ( resource.isPresent() )
             {
                 switch( s ) 
                 {
                     case FLASH:
-                        params.put("f", spec.resource.toString() );
+                        params.put("f", resource.get().toString() );
                         params.put("fa", Integer.toString( buffer.getStartAddress().getByteAddress() ) );                        
                         break;
                     case EEPROM:
-                        params.put("e", spec.resource.toString() );
+                        params.put("e", resource.get().toString() );
                         params.put("ea", Integer.toString( buffer.getStartAddress().getByteAddress() ) );                       
                         break;
                     default:
@@ -309,46 +249,22 @@ public class Project implements IProject
     @Override
     public boolean compile() throws IOException 
     {
+        boolean compilationSuccess  = true ;
     	try 
     	{
-	        compilationSuccess  = false;
-	        artifactsGenerated = false;
-	        
-	        final Assembler asm = new Assembler();
-	        compilationSuccess = asm.compile(  this , getObjectCodeWriter() , projectConfig , this );
+            final Assembler asm = new Assembler();    	    
+	        for ( CompilationUnit unit : getCompilationRoots() ) 
+	        {
+	            final IObjectCodeWriter objWriter = getObjectCodeWriter( unit ).get();
+                compilationSuccess &= asm.compile(  unit , getConfiguration().getCompilerSettings() , objWriter , projectConfig );
+	        }
 	        return compilationSuccess;
     	} 
-    	finally {
-    		invokeProjectListeners( l -> l.compilationFinished( Project.this , compilationSuccess ) );
+    	finally 
+    	{
+    	    final boolean finalSuccess = compilationSuccess;
+    		invokeProjectListeners( l -> l.compilationFinished( Project.this , finalSuccess ) );
     	}
-    }
-    
-    @Override
-    public IConfig getConfig()
-    {
-        return new IConfig() {
-
-            @Override
-            public IArchitecture getArchitecture() {
-                return Project.this.getArchitecture();
-            }
-
-            @Override
-            public Lexer createLexer(Scanner s) {
-                return new LexerImpl(s);
-            }
-
-            @Override
-            public Parser createParser() 
-            {
-                return new Parser(Project.this.getArchitecture() );
-            }
-
-            @Override
-            public String getEditorIndentString() {
-                return "  ";
-            }
-        };
     }
 
     public static File getCurrentWorkingDirectory() {
@@ -357,39 +273,36 @@ public class Project implements IProject
 
     @Override
     public ProjectConfiguration getConfiguration() {
-        return this.projectConfig.createCopy();
-    }
-
-    @Override
-    public void setConfiguration(ProjectConfiguration newConfig) throws IOException 
-    {
-    	Resource resource = newConfig.getCompilationRootResource();
-    	if ( ! resource.exists() ) {
-    		throw new IllegalArgumentException("Failed to find compilation root file: "+resource);
-    	}
-    	setCompileRoot( getCompilationUnit( resource ) );
-        this.compilationSuccess = false;
-        this.artifactsGenerated = false;
-        this.architecture = newConfig.getArchitecture();
-        this.projectConfig = newConfig.createCopy();
+        return this.projectConfig;
     }
     
     @Override
+    public void setConfiguration(ProjectConfiguration config) 
+    {
+        Validate.notNull(config,"config must not be NULL");
+        this.projectConfig.populateFrom( config );
+    }
+
+    @Override
     public Resource resolveResource(String child) throws IOException 
     {
-        return projectConfig.resolveResource(child);
+        return resourceFactory.resolveResource(child);
     }
 
     @Override
     public Resource resolveResource(Resource parent, String child) throws IOException {
-        return projectConfig.resolveResource(parent,child);
+        return resourceFactory.resolveResource(parent,child);
     }
 
     @Override
-    public SymbolTable getGlobalSymbolTable() {
-        return globalSymbolTable;
+    public List<Resource> getAllAssemblerFiles(IProject project) throws IOException 
+    {
+        if ( project != this ) {
+            throw new IllegalArgumentException("Called for project that is not THIS project ?");
+        }
+        return resourceFactory.getAllAssemblerFiles(project);
     }
-
+    
 	@Override
 	public void removeCompilationUnit(CompilationUnit unit) 
 	{
@@ -425,5 +338,220 @@ public class Project implements IProject
 	public void removeProjectChangeListener(IProjectChangeListener listener) {
 		Validate.notNull(listener, "listener must not be NULL");
 		projectListeners.remove(listener);		
-	}	
+	}
+
+    @Override
+    public Long getID() {
+        return id;
+    }
+
+    @Override
+    public void setID(long projectId) {
+        this.id = projectId;
+    }
+    
+    private static final class Dependency 
+    {
+        public final CompilationUnit unit;
+        public final boolean hasMainFunction;
+        public final AST ast;
+        public final List<Dependency> dependencies = new ArrayList<>();
+        public boolean visited = false;
+        
+        public Dependency(CompilationUnit unit,AST ast,boolean hasMainFunction) 
+        {
+            Validate.notNull(unit,"unit must not be NULL");
+            Validate.notNull(ast,"AST must not be NULL");
+            this.unit = unit;
+            this.ast = ast;
+            this.hasMainFunction = hasMainFunction;
+        }
+    }
+    
+    private List<List<Dependency>> findCyclicDependencies(List<Dependency> deps) 
+    {
+        final List<List<Dependency>> result = new ArrayList<>();
+        final Stack<Dependency> stack = new Stack<>();
+        for ( Dependency d : deps ) 
+        {
+            deps.forEach( dep -> dep.visited=false );
+            stack.clear();
+            stack.push( d );
+            while ( ! stack.isEmpty() ) 
+            {
+                Dependency current = stack.pop();
+                if ( current.visited ) 
+                {
+                    result.add( new ArrayList<>( stack ) );
+                    break;
+                }
+                current.visited = true;
+                stack.addAll( current.dependencies );
+            }
+        }
+        return result;
+    }
+    
+    private List<Dependency> getDependencies() throws IOException 
+    {
+        final List<CompilationUnit> units = 
+                getAllAssemblerFiles( this ).stream().map( s -> getCompilationUnit( s ) ).collect( Collectors.toList() );
+        
+        final List<Dependency> result = new ArrayList<>();
+        for ( CompilationUnit unit : units ) 
+        {
+            final CompilationUnit dummy = new CompilationUnit( unit.getResource() );
+            
+            // FIXME: Performance - I'm currently always parsing the files again even when they've been already compiled before....this makes everything quite robust 
+            // FIXME: but obviously comes with a performance penalty...
+            // parse without processing any includes
+            final IObjectCodeWriter objectCodeWriter = new ObjectCodeWriter();
+            final ICompilationContext context = new CompilationContext(dummy,
+                    objectCodeWriter,
+                    resourceFactory, getConfiguration().getCompilerSettings() );
+            ParseSourcePhase.parseWithoutIncludes( context , unit );
+            
+            final AST ast = dummy.getAST();
+            if ( ast != null )
+            {
+                boolean hasMainFunction=false;
+                if ( getProjectType() == ProjectType.EXECUTABLE ) {
+                    // check for 'main' symbol
+                    hasMainFunction = dummy.getSymbolTable().maybeGet( new Identifier("main") , Symbol.Type.ADDRESS_LABEL ).isPresent();
+                }
+                result.add( new Dependency( unit , ast , hasMainFunction ) );
+            } else {
+                LOG.error("getDependencies(): Warning, failed to parse "+unit+" ... ignored as a potential compilation root");
+            }
+        }
+        
+        // now analyze dependencies between units by looking for #include commands
+        for ( Dependency dep : result ) 
+        {
+            // collect #include nodes 
+            final List<PreprocessorNode> includes = new ArrayList<>();
+            dep.ast.visitDepthFirstWithResult( includes , (node,ctx) -> 
+            {
+                if ( node instanceof PreprocessorNode ) 
+                {
+                    final PreprocessorNode p = (PreprocessorNode) node;
+                    if ( p.type == PreprocessorNode.Preprocessor.INCLUDE ) {
+                        includes.add( p );
+                    }
+                }
+            });
+            for (int i = 0; i < includes.size(); i++) 
+            {
+                final PreprocessorNode include = includes.get(i);
+                final String path = include.getArguments().get(0);
+                final Resource resource = resourceFactory.resolveResource( dep.unit.getResource() , path );
+                Dependency match = null;
+                for (int j = 0; j < result.size(); j++) 
+                {
+                    final Dependency dd = result.get(j);
+                    if ( dd.unit.getResource().pointsToSameData( resource ) ) {
+                        match = dd;
+                        break;
+                    }
+                }
+                if ( match != null ) 
+                {
+                    dep.dependencies.add( match );
+                } else {
+                    LOG.error("getDependencies(): Ignoring #include \""+path+"\" as it's not in our set of candidate compilation units (maybe parsing failed for the dependency?)");
+                }
+            }
+        }
+        
+        // make sure there are no cyclic dependencies so we don't get stuck in an infinite loop
+        List<List<Dependency>> cycles = findCyclicDependencies( result );
+        for ( List<Dependency> cycle : cycles ) 
+        {
+            final String msg = "Found cyclic dependency between compilation units: "+StringUtils.join( cycle , " <-> " );
+            System.err.println( "ERROR: "+msg );
+            LOG.error("getDependencies(): "+msg);
+        }
+        if ( ! cycles.isEmpty() ) {
+            throw new RuntimeException("Found cyclic dependency between compilation units, cannot continue");
+        }
+        return result;
+    }
+    
+    /**
+     * Returns the root {@link CompilationUnit}s that will each be passed to the compiler.
+     * 
+     * @return
+     * @throws IOException 
+     */
+    public List<CompilationUnit> getCompilationRoots() throws IOException 
+    {
+        long time = System.currentTimeMillis();
+        final List<Dependency> dependencies = getDependencies();
+        long time2 = System.currentTimeMillis();
+        LOG.info("getCompilationRoots(): Gathering compilation roots took "+(time2-time)+" ms");
+        switch( getProjectType() ) 
+        {
+            case EXECUTABLE:
+                // return only the units that have a 'main' symbol in their symbol table
+                return dependencies.stream().filter( d -> d.hasMainFunction ).map( d -> d.unit ).collect( Collectors.toCollection( ArrayList::new ) );                
+            case LIBRARY:
+                // just return all the units
+                return dependencies.stream().map( d -> d.unit ).collect( Collectors.toCollection( ArrayList::new ) );
+            default:
+                throw new RuntimeException("Unhandled switch/case: "+getProjectType());
+        }
+    }
+
+    @Override
+    public ProjectType getProjectType() {
+        return getConfiguration().getProjectType();
+    }
+    
+    private Optional<Resource> getOutputResource(Resource sourceFile,Segment segment) throws IOException 
+    {
+        if ( segment == Segment.SRAM ) {
+            return Optional.empty();
+        }
+        
+        if ( !( sourceFile instanceof FileResource ) ) {
+            return Optional.empty();
+        } 
+        final String name = ((FileResource) sourceFile).getFile().getName();
+        final File baseName = new File( getConfiguration().getBaseDir() , name );
+        final Optional<File> outputFile = getOutputFileName( getConfiguration().getOutputFormat(),segment, baseName);
+        if ( ! outputFile.isPresent() ) {
+            return Optional.empty();
+        }
+        return Optional.of( new FileResource(outputFile.get(),getConfiguration().getSourceFileEncoding() ) );
+    }
+
+    public static Optional<File> getOutputFileName( OutputFormat outputFormat, Segment segment, final File baseName) 
+    {
+        String basePath = baseName.getAbsolutePath();
+        if ( basePath.contains("." ) ) { // strip suffix
+            final String[] parts = basePath.split("\\.");
+            basePath = StringUtils.join( parts , "" , 0 , parts.length -1 );
+        }
+        
+        final String fileEnding;
+        switch( outputFormat )
+        {
+            case INTEL_HEX: fileEnding = ".hex"; break;
+            case RAW: fileEnding = ".raw"; break;
+            case ELF_EXECUTABLE: fileEnding = ".out" ; break;
+            case ELF_RELOCATABLE: fileEnding = ".o" ; break;                
+            default:
+                throw new RuntimeException("Unhandled file format: "+outputFormat);
+        }
+        final String suffix;
+        switch( segment ) 
+        {
+            case EEPROM: suffix = ".eeprom"; break;
+            case FLASH: suffix = ""; break;
+            case SRAM: return Optional.empty();
+            default:
+                throw new RuntimeException("Unhandled segment: "+segment);
+        }
+        return Optional.of( new File( basePath + suffix + fileEnding ) );
+    }        
 }

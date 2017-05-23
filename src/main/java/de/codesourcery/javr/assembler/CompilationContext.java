@@ -29,13 +29,10 @@ import de.codesourcery.javr.assembler.parser.Parser.Severity;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Resource;
-import de.codesourcery.javr.ui.config.IConfig;
 
 public final class CompilationContext implements ICompilationContext 
 {
     private static final Logger LOG = Logger.getLogger(CompilationContext.class);
-    
-    private final SymbolTable globalSymbolTable;
     
     private final CompilerSettings compilerSettings;
     
@@ -43,9 +40,7 @@ public final class CompilationContext implements ICompilationContext
     
     private final ResourceFactory resourceFactory;
     
-    private boolean generateLocations;
-    
-    private final IConfig config;        
+    private final IArchitecture architecture;
     
     // stack to keep track of the current compilation unit while processing #include directives
     private final Stack<CompilationUnit> compilationUnits = new Stack<CompilationUnit>();
@@ -64,22 +59,18 @@ public final class CompilationContext implements ICompilationContext
     
     public CompilationContext(
     		CompilationUnit rootCompilationUnit,
-    		SymbolTable globalSymbolTable,
             IObjectCodeWriter objectCodeWriter, 
             ResourceFactory resourceFactory,
-            CompilerSettings compilerSettings,
-            IConfig config) 
+            CompilerSettings compilerSettings) 
     {
         Validate.notNull(objectCodeWriter, "objectCodeWriter must not be NULL");
         Validate.notNull(resourceFactory, "resourceFactory must not be NULL");
         Validate.notNull(compilerSettings,"compilerSettings must not be NULL");
-        Validate.notNull(config,"config must not be NULL");
         this.resourceFactory = resourceFactory;
         this.rootCompilationUnit = rootCompilationUnit;
         this.objectCodeWriter = objectCodeWriter;
-        this.globalSymbolTable = globalSymbolTable;
         this.compilerSettings = compilerSettings;
-        this.config = config;
+        this.architecture = compilerSettings.getArchitecture();
         this.maxErrorsLimit = compilerSettings.getMaxErrors();
         
         pushCompilationUnit( rootCompilationUnit );
@@ -88,7 +79,9 @@ public final class CompilationContext implements ICompilationContext
     @Override
     public CompilationUnit newCompilationUnit(Resource res) 
     {
-    	return new CompilationUnit( res , globalSymbolTable );
+        final CompilationUnit newUnit = new CompilationUnit( res , rootCompilationUnit.getSymbolTable() );
+        rootCompilationUnit.getSymbolTable().removeAllSymbols(newUnit);
+    	return newUnit;
     }
     
     @Override
@@ -105,9 +98,7 @@ public final class CompilationContext implements ICompilationContext
             throw new IllegalArgumentException("Cannot push current compilation unit");
         }
         
-        /*
-         * Check for circular dependencies BEFORE pushing the new unit to the stack
-         */
+         // Check for circular dependencies BEFORE pushing the new unit to the stack
         final Stack<CompilationUnit> stack = new Stack<>();
         if ( currentCompilationUnit != null ) { // NULL when this method is called by the constructor
             stack.push( currentCompilationUnit() );
@@ -163,13 +154,16 @@ public final class CompilationContext implements ICompilationContext
         compilationUnits.clear();
         currentCompilationUnit = null;
         pushCompilationUnit( rootCompilationUnit );
-        objectCodeWriter.reset();
-        if ( ! isGenerateRelocations() ) 
+        
+        // invoke reset(ICompilationContext) AFTER current compilation unit is set
+        objectCodeWriter.reset(this);
+        
+        if ( ! compilerSettings.isGenerateRelocations() ) 
         {
             // we're directly generating an executable binary here. 
             // As AVR maps registers at the start of RAM we'll need to add the architecture's 
             // register offset so we don't access registers instead of memory.
-            objectCodeWriter.setStartAddress( Address.byteAddress( Segment.SRAM , config.getArchitecture().getSRAMStartAddress() ) );
+            objectCodeWriter.setStartAddress( Address.byteAddress( Segment.SRAM , architecture.getSRAMStartAddress() ) );
         }
         objectCodeWriter.setCurrentSegment( Segment.FLASH );
     }
@@ -186,7 +180,7 @@ public final class CompilationContext implements ICompilationContext
 
     @Override
     public SymbolTable globalSymbolTable() {
-        return globalSymbolTable;
+        return rootCompilationUnit.getSymbolTable();
     }
 
     @Override
@@ -244,7 +238,7 @@ public final class CompilationContext implements ICompilationContext
 
     @Override
     public IArchitecture getArchitecture() {
-        return config.getArchitecture();
+        return architecture;
     }
 
     @Override
@@ -279,16 +273,7 @@ public final class CompilationContext implements ICompilationContext
     }
 
     @Override
-    public boolean isGenerateRelocations() {
-        return generateLocations;
-    }
-
-    @Override
     public void addRelocation(Relocation reloc) {
         objectCodeWriter.addRelocation( reloc );
-    }
-    
-    public void setGenerateRelocations(boolean yesNo) {
-        this.generateLocations = yesNo;
     }
 }

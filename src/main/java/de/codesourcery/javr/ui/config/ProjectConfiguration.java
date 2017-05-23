@@ -19,11 +19,13 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Properties;
-import java.util.stream.Stream;
+import java.util.Set;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
@@ -32,10 +34,11 @@ import de.codesourcery.javr.assembler.ResourceFactory;
 import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.Architecture;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
-import de.codesourcery.javr.assembler.arch.impl.ATMega328p;
 import de.codesourcery.javr.assembler.util.FileResource;
 import de.codesourcery.javr.assembler.util.FileResourceFactory;
 import de.codesourcery.javr.assembler.util.Resource;
+import de.codesourcery.javr.ui.IProject;
+import de.codesourcery.javr.ui.IProject.ProjectType;
 import de.codesourcery.javr.ui.Project;
 
 public class ProjectConfiguration implements ResourceFactory
@@ -49,12 +52,12 @@ public class ProjectConfiguration implements ResourceFactory
         ELF_EXECUTABLE,
         ELF_RELOCATABLE 
         {
-            public boolean supportsRelocation() {
+            public boolean requiresRelocationInfo() {
                 return true;
             }            
         };
         
-        public boolean supportsRelocation() {
+        public boolean requiresRelocationInfo() {
             return false;
         }
     }
@@ -88,17 +91,20 @@ public class ProjectConfiguration implements ResourceFactory
         }        
     }   
     
-    private final Map<Segment,OutputSpec> outputFormats = new HashMap<>();
     private FileResourceFactory resourceFactory;
     
+    private ProjectType projectType = ProjectType.EXECUTABLE;
     private String projectName = "unnamed project";
     private String uploadCommand;
-    private String outputName;
-    private OutputFormat outputFormat = OutputFormat.INTEL_HEX;
-    private IArchitecture architecture = new ATMega328p();
     private CompilerSettings compilerSettings = new CompilerSettings();
-    private String compilationRoot = "main.asm";
     private String sourceFolder = "src";
+    
+    private String editorIndentString = "  ";
+    
+    // Set of file endings that files needing compilation will have (so basically, everything that is not a .h file)
+    private final Set<String> asmFileEndings = new HashSet<>( Arrays.asList( ".s" , ".asm" ) );
+    
+    private String sourceFileEncoding = "UTF-8";
     
     /*
      * <project>
@@ -111,64 +117,26 @@ public class ProjectConfiguration implements ResourceFactory
      */
     public ProjectConfiguration(ProjectConfiguration other) 
     {
-        this.outputFormats.clear();
-        this.outputFormats.putAll( other.outputFormats );
-        this.resourceFactory = (FileResourceFactory) FileResourceFactory.createInstance( other.resourceFactory.getBaseDir() );
-        
+        populateFrom( other );
+    }
+    
+    public void populateFrom(ProjectConfiguration other) 
+    {
         this.projectName = other.projectName;
         this.uploadCommand = other.uploadCommand;
-        this.outputName = other.outputName;
-        this.outputFormat = other.outputFormat;
-        this.architecture = other.architecture;
         this.compilerSettings = other.compilerSettings.createCopy();
-        this.compilationRoot = other.compilationRoot;
         this.sourceFolder = other.sourceFolder;
+        this.sourceFileEncoding = other.sourceFileEncoding;
+        this.asmFileEndings.addAll( other.asmFileEndings );
+        this.resourceFactory = other.resourceFactory;        
+        this.projectType = other.projectType;
     }
     
     public ProjectConfiguration() 
     {
         resourceFactory = (FileResourceFactory) FileResourceFactory.createInstance( Project.getCurrentWorkingDirectory() );
-        Stream.of( Segment.values() ).forEach( segment -> outputFormats.put( segment ,null ) );
-        setupOutputResources();        
     }
 
-    private void setupOutputResources() 
-    {
-        for ( Segment segment : this.outputFormats.keySet() ) 
-        {
-            final String fileEnding;
-            switch( outputFormat )
-            {
-                case INTEL_HEX: fileEnding = ".hex"; break;
-                case RAW: fileEnding = ".raw"; break;
-                case ELF_EXECUTABLE: fileEnding = ".out" ; break;
-                case ELF_RELOCATABLE: fileEnding = ".o" ; break;                
-                default:
-                    throw new RuntimeException("Unhandled file format: "+outputFormat);
-            }
-            final String suffix;
-            switch( segment ) 
-            {
-                case EEPROM: suffix = ".eeprom"; break;
-                case FLASH: suffix = ".flash"; break;
-                case SRAM: suffix = ".sram"; break;
-                default:
-                    throw new RuntimeException("Unhandled segment: "+segment);
-            }
-            
-            try 
-            {
-                final Resource resource = resourceFactory.resolveResource( getOutputName() + suffix + fileEnding );
-                outputFormats.put( segment , new OutputSpec( resource , segment , outputFormat ) );
-            } 
-            catch (IOException e) 
-            {
-                LOG.error("ProjectConfiguration() : ",e);
-                throw new RuntimeException(e);
-            }
-        }
-    }
-    
     public ProjectConfiguration createCopy() {
         return new ProjectConfiguration(this);
     }
@@ -181,22 +149,16 @@ public class ProjectConfiguration implements ResourceFactory
     {
         Validate.notNull(baseDir, "baseDir must not be NULL");
         this.resourceFactory = (FileResourceFactory) FileResourceFactory.createInstance( baseDir );
-        setupOutputResources();
     }
     
-    public Map<Segment, OutputSpec> getOutputFormats() {
-        return outputFormats;
+    public void setOutputFormat(OutputFormat format,ProjectType type) 
+    {
+        this.projectType = type;
+        getCompilerSettings().setOutputFormat( format );
     }
     
     public OutputFormat getOutputFormat() {
-        return outputFormat;
-    }
-    
-    public void setOutputFormat(OutputFormat format) 
-    {
-        Validate.notNull(format, "format must not be NULL");
-        this.outputFormat = format;
-        setupOutputResources();
+        return getCompilerSettings().getOutputFormat();
     }
     
     public String getUploadCommand() {
@@ -217,16 +179,6 @@ public class ProjectConfiguration implements ResourceFactory
         return resourceFactory.resolveResource(parent, child);
     }
     
-    public String getOutputName() {
-        return outputName != null ? outputName : projectName;
-    }
-    
-    public void setOutputName(String outputName) 
-    {
-        this.outputName = outputName;
-        setupOutputResources();
-    }
-    
     public void save(OutputStream out) throws IOException 
     {
         Validate.notNull(out, "out must not be NULL");
@@ -236,13 +188,10 @@ public class ProjectConfiguration implements ResourceFactory
         if ( uploadCommand != null ) {
             props.put("uploadCommand" , uploadCommand );
         }
-        if ( outputName != null ) {
-            props.put("outputName" , outputName );
-        }
         props.put( "sourceFolder" , sourceFolder );
-        props.put( "compilationRoot" , compilationRoot );
-        props.put( "outputFormat" , outputFormat.name() );
-        props.put( "architecture" , architecture.getType().name() );
+        props.put( "outputFormat" , getCompilerSettings().getOutputFormat().name() );
+        props.put( "projectType" , getProjectType().name() );
+        props.put( "architecture" , getCompilerSettings().getArchitecture().getType().name() );
         props.put( "failOnAddressOutOfBounds" , Boolean.toString( getCompilerSettings().isFailOnAddressOutOfRange() ) );
         props.store( out , "DO NOT EDIT - GENERATED FILE, WILL BE OVERWRITTEN" );
     }
@@ -257,6 +206,8 @@ public class ProjectConfiguration implements ResourceFactory
         props.load( in );
         
         final ProjectConfiguration config = new ProjectConfiguration();
+        final CompilerSettings settings = config.getCompilerSettings();
+        
         for ( String key : props.stringPropertyNames() ) 
         {
             final String value = props.getProperty( key );
@@ -266,19 +217,60 @@ public class ProjectConfiguration implements ResourceFactory
             {
                 case "projectName": config.setProjectName( value ); break;
                 case "uploadCommand" : config.setUploadCommand( value ); break;
-                case "outputFormat" : config.setOutputFormat( OutputFormat.valueOf( value ) ); break;
-                case "architecture" : config.setArchitecture( Architecture.valueOf( value ) ); break;
-                case "outputName": config.setOutputName( value); break;
+                case "architecture" : settings.setArchitecture( Architecture.valueOf( value ).getImplementation() ); break;
                 case "sourceFolder": config.setSourceFolder( value); break;
-                case "compilationRoot": config.setCompilationRoot( value); break;
                 default:
                     LOG.warn("load(): Ignored unknown property '"+key+"'");
             }
         }
         
+        if ( props.containsKey("outputFormat") || props.containsKey("projectType" ) ) 
+        { 
+            final String output = props.getProperty( "outputFormat" );
+            final String type = props.getProperty( "projectType" );
+            final OutputFormat outputFormat = StringUtils.isBlank( output ) ? null : OutputFormat.valueOf( output );
+            final ProjectType projType = StringUtils.isBlank( type ) ?  null : ProjectType.valueOf( type );
+            
+            // FIXME: Remove logic that deals with only one of the values present...this is only for backwards compatibility with older save files
+            if ( outputFormat != null && projType != null )
+            {
+                config.setOutputFormat( outputFormat , projType );
+            } 
+            else if ( projType != null ) 
+            {
+                switch( projType ) 
+                {
+                    case EXECUTABLE:
+                        config.setOutputFormat( OutputFormat.RAW , projType );
+                        break;
+                    case LIBRARY:
+                        config.setOutputFormat( OutputFormat.ELF_RELOCATABLE, projType );
+                        break;
+                    default:
+                        throw new RuntimeException("Unhandled switch/case: "+projType);
+                }
+            }
+            else 
+            {
+                switch( outputFormat ) 
+                {
+                    case ELF_RELOCATABLE:
+                        config.setOutputFormat( outputFormat , ProjectType.LIBRARY );
+                        break;
+                    case ELF_EXECUTABLE:
+                    case INTEL_HEX:
+                    case RAW:
+                        config.setOutputFormat( outputFormat , ProjectType.EXECUTABLE);
+                        break;
+                    default:
+                        break;
+                    
+                }
+            }
+        }
+        
         config.setBaseDir( baseDir );
         
-        final CompilerSettings settings = new CompilerSettings();
         if ( props.containsKey( "failOnAddressOutOfBounds" ) ) 
         {
             settings.setFailOnAddressOutOfRange( Boolean.valueOf( props.getProperty( "failOnAddressOutOfBounds"  ) ) );
@@ -288,57 +280,47 @@ public class ProjectConfiguration implements ResourceFactory
         return config;
     }
     
-    public void setProjectName(String projectName) {
+    public void setProjectName(String projectName) 
+    {
         Validate.notBlank(projectName, "projectName must not be NULL or blank");
         this.projectName = projectName;
     }
     
     public IArchitecture getArchitecture() {
-        return architecture;
-    }
-    
-    public void setArchitecture(Architecture architecture) 
-    {
-        Validate.notNull(architecture, "architecture must not be NULL");
-        if ( this.architecture.getType() != architecture ) 
-        {
-            this.architecture = architecture.createImplementation();
-        }
+        return getCompilerSettings().getArchitecture();
     }
     
     public CompilerSettings getCompilerSettings() {
-        return compilerSettings.createCopy();
+        return compilerSettings;
     }
     
     public void setCompilerSettings(CompilerSettings compilerSettings) 
     {
         Validate.notNull(compilerSettings, "compilerSettings must not be NULL");
         this.compilerSettings = compilerSettings.createCopy();
-        this.compilerSettings = compilerSettings;
     }
     
     public String getProjectName() {
         return projectName;
     }
     
+    /**
+    * Returns the source folder's location relative to this project's root folder.     
+     * @return
+     */
     public String getSourceFolder() {
         return sourceFolder;
     }
 
+    /**
+     * Sets the source folder's location relative to this project's root folder.
+     * 
+     * @param sourceFolder
+     */
     public void setSourceFolder(String sourceFolder) 
     {
         Validate.notBlank(sourceFolder, "sourceFolder must not be NULL or blank");
         this.sourceFolder = sourceFolder;
-    }
-    
-    public String getCompilationRoot() {
-        return compilationRoot;
-    }
-    
-    public void setCompilationRoot(String compilationRoot) 
-    {
-        Validate.notBlank(compilationRoot,"compilationRoot must not be NULL or blank");
-        this.compilationRoot = compilationRoot;
     }
     
     public Resource getSourceFile(String name) throws IOException 
@@ -353,9 +335,57 @@ public class ProjectConfiguration implements ResourceFactory
         return new FileResource( file , Resource.ENCODING_UTF );
     }
     
-    public Resource getCompilationRootResource() throws IOException 
-    {
-        return getSourceFile( getCompilationRoot() );
+    @Override
+    public List<Resource> getAllAssemblerFiles(IProject project) throws IOException {
+        // TODO Auto-generated method stub
+        throw new RuntimeException("method not implemented: getAllAssemblerFiles");
     }
     
+    /**
+     * Returns filename suffixes that all files needing compilation must have.
+     * 
+     *  The files need to be stored below the {@link #getSourceFolder()}. All
+     *  filename suffixes are compared case-insensitive.
+     *  
+     * @param fileEndings
+     */
+    public void setAsmFileNameSuffixes(Set<String> fileEndings) {
+        
+        Validate.notNull(fileEndings, "fileEndings must not be NULL");
+        if ( fileEndings == null || fileEndings.isEmpty() ) {
+            throw new IllegalArgumentException("at least one file ending is required");
+        }
+        for ( String ending : fileEndings ) {
+            if ( StringUtils.isBlank( ending ) ) {
+                throw new IllegalArgumentException("NULL/blank file endings are not allowed");
+            }
+        }
+        this.asmFileEndings.clear();
+        this.asmFileEndings.addAll( fileEndings );
+    }
+    
+    public Set<String> getAsmFileNameSuffixes() {
+        return new HashSet<>( asmFileEndings );
+    }
+    
+    public void setSourceFileEncoding(String sourceFileEncoding) {
+        this.sourceFileEncoding = sourceFileEncoding;
+    }
+    
+    public String getSourceFileEncoding() {
+        return sourceFileEncoding;
+    }
+    
+    public String getEditorIndentString() {
+        return editorIndentString;
+    }
+    
+    public void setEditorIndentString(String editorIndentString) {
+        Validate.notNull(editorIndentString,"editorIndentString must not be NULL");
+        this.editorIndentString = editorIndentString;
+    }
+    
+    public ProjectType getProjectType() {
+        return projectType;
+    }
 }

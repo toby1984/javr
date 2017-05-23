@@ -135,7 +135,7 @@ public class SyntaxCheckPhase implements Phase
                        case DEVICE: // currently ignored
                            break;
                        case IRQ_ROUTINE: // checked during code generation
-                           if ( ! context.isGenerateRelocations() ) 
+                           if ( ! context.getCompilationSettings().isGenerateRelocations() ) 
                            {
                                context.message( CompilationMessage.attention( context.currentCompilationUnit() , ".irq has no effect as the current output format does not support relocation" , node  ) );
                                return;

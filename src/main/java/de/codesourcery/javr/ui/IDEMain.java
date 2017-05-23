@@ -24,7 +24,6 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -39,8 +38,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
-import de.codesourcery.javr.assembler.CompilationUnit;
-import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.ui.config.ApplicationConfigProvider;
 import de.codesourcery.javr.ui.config.IApplicationConfig;
 import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
@@ -222,7 +219,7 @@ public class IDEMain
                                 throw new IOException("Failed to create source folder "+sourceFolder.getAbsolutePath());
                             }
                         }
-                        result.add( new Project( new CompilationUnit( config.getCompilationRootResource() )  ,config ) );
+                        result.add( new Project( config ) );
                     } 
                     catch(Exception e) 
                     {
@@ -315,21 +312,7 @@ public class IDEMain
             config.save( out );
         }
 
-        final IProject project = new Project( new CompilationUnit( config.getCompilationRootResource() ) , config );
-        assertCompilationRootExists(project);
-        return project;
-    }
-
-    private static void assertCompilationRootExists(IProject project) throws IOException 
-    {
-        final ProjectConfiguration config = project.getConfiguration();
-        final Resource file = config.getSourceFile( config.getCompilationRoot() );
-        if ( ! file.exists() ) 
-        {
-            try ( BufferedWriter writer = new BufferedWriter( new OutputStreamWriter(file.createOutputStream() ) ) ) {
-                writer.write("\n");
-            }
-        }		
+       return  new Project( config );
     }
 
     private void run() throws Exception 
@@ -342,7 +325,6 @@ public class IDEMain
 
         final IProject currentProject = selectProjectToOpen( workspaceDir );
         LOG.info("run(): Opening project "+currentProject.getConfiguration().getBaseDir().getAbsolutePath());
-        assertCompilationRootExists( currentProject ); // required so that editor can display something to the user
 
         // FIXME: Setting the project here before anybody had a chance to register themselves
         // FIXME: as a IProjectListener is obviously a problem....

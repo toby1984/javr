@@ -215,12 +215,10 @@ public class Parser
         if ( arch == null ) {
             throw new IllegalStateException("architecture must be set");
         }
-        
         this.context = context;
-        // this.lexer = new DebugLexer( lexer );
         this.lexer = lexer;
         this.ast = new AST();
-        unit.setAst( ast );
+        unit.setAST( ast );
         ast.setCompilationUnit( unit );        
     }
     
@@ -259,7 +257,7 @@ public class Parser
                 }
             }
         }
-        unit.setAst( ast );        
+        unit.setAST( ast );        
         return ast;
     }
     
@@ -454,7 +452,7 @@ public class Parser
         return null;
     }
     
-    public ASTNode parseSingleLineMacro() 
+    private ASTNode parseSingleLineMacro() 
     {
         final Parser p = new Parser( this.context.getArchitecture() );
         

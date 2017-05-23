@@ -44,6 +44,7 @@ import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.FileResourceFactory;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
+import de.codesourcery.javr.ui.IProject;
 import junit.framework.TestCase;
 
 public class PreprocessingLexerTest extends TestCase 
@@ -192,11 +193,6 @@ public class PreprocessingLexerTest extends TestCase
         }
 
         @Override
-        public boolean isGenerateRelocations() {
-            return false;
-        }
-
-        @Override
         public void addRelocation(Relocation reloc) {
         }
     };
@@ -244,6 +240,11 @@ public class PreprocessingLexerTest extends TestCase
                 assertEquals("funky",child);
                 return new StringResource("funky", "#message test");
             }
+
+            @Override
+            public List<Resource> getAllAssemblerFiles(IProject project) throws IOException {
+                throw new RuntimeException("method not implemented: getAllAssemblerFiles");
+            }
         };
         unitFactory = res -> 
         {
@@ -274,6 +275,11 @@ public class PreprocessingLexerTest extends TestCase
             {
                 assertEquals("funky",child);
                 return new StringResource("funky", "#message test");
+            }
+
+            @Override
+            public List<Resource> getAllAssemblerFiles(IProject project) throws IOException {
+                throw new RuntimeException("method not implemented: getAllAssemblerFiles");
             }
         };
         unitFactory = res -> 

@@ -17,19 +17,28 @@ package de.codesourcery.javr.assembler.util;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.ResourceFactory;
+import de.codesourcery.javr.ui.IProject;
+import de.codesourcery.javr.ui.config.ProjectConfiguration;
 
 public class FileResourceFactory implements ResourceFactory {
 
-    private final File baseDir;
+    private File baseDir2;
     
-    private FileResourceFactory(File parentPath) 
+    public FileResourceFactory() {
+    }
+    
+    public FileResourceFactory(File parentPath) 
     {
         Validate.notNull(parentPath, "parentPath must not be NULL or blank");
-        this.baseDir = parentPath;
+        this.baseDir2 = parentPath;
     }
     
     public static ResourceFactory createInstance(File parentPath) 
@@ -38,7 +47,7 @@ public class FileResourceFactory implements ResourceFactory {
     }    
 
     public File getBaseDir() {
-        return baseDir;
+        return baseDir2;
     }
     
     @Override
@@ -46,7 +55,7 @@ public class FileResourceFactory implements ResourceFactory {
     {
     	if ( child.startsWith("/" ) ) 
     	{
-            return new FileResource( new File(baseDir,child) ,  Resource.ENCODING_UTF );
+            return new FileResource( new File( getBaseDir() ,child) ,  Resource.ENCODING_UTF );
     	}
     	if ( parent instanceof FileResource) {
     		 final File root = ((FileResource) parent).getFile().getParentFile();
@@ -58,6 +67,49 @@ public class FileResourceFactory implements ResourceFactory {
     @Override
     public Resource resolveResource(String child) throws IOException 
     {
-        return new FileResource( new File(baseDir , child ) , Resource.ENCODING_UTF );
+        return new FileResource( new File(getBaseDir() , child ) , Resource.ENCODING_UTF );
+    }
+
+    @Override
+    public List<Resource> getAllAssemblerFiles(IProject project) throws IOException 
+    {
+        final Set<String> suffixes = new HashSet<>();
+        for ( String suffix : project.getConfiguration().getAsmFileNameSuffixes() ) {
+            suffixes.add( suffix.toLowerCase() );
+        }
+        
+        final ProjectConfiguration projectConfig = project.getConfiguration();
+        final String srcFolder = projectConfig.getSourceFolder();
+        final File folder = new File( projectConfig.getBaseDir() , srcFolder );
+        final String encoding = projectConfig.getSourceFileEncoding();
+        
+        final List<Resource> result = new ArrayList<>();
+        collect( folder , suffixes , encoding , result );
+        return result;
     }    
+    
+    private void collect(File currentFile,Set<String> suffixes, String  fileEncoding, List<Resource> result ) throws IOException 
+    {
+        if ( currentFile.isDirectory() ) 
+        {
+            File[] files = currentFile.listFiles();
+            if ( files == null ) {
+                throw new IOException("Failed to list files in "+currentFile);
+            }
+            for ( File f : files ) {
+                collect( f , suffixes , fileEncoding , result );
+            }
+        } 
+        else
+        {
+            for ( String suffix : suffixes ) 
+            {
+                if ( currentFile.getName().toLowerCase().endsWith( suffix ) ) 
+                {
+                    result.add( new FileResource( currentFile , fileEncoding ) ); 
+                    break;
+                }
+            }
+        }
+    }
 }

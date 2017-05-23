@@ -161,7 +161,7 @@ public class ElfSymbolTable
 
     private static String name(Symbol symbol) 
     {
-        if ( ! symbol.hasType( Type.ADDRESS_LABEL ) || symbol.isGlobalLabel() ) {
+        if ( ! symbol.hasType( Type.ADDRESS_LABEL ) || symbol.isGlobalSymbol() ) {
             return symbol.name().value;
         }
         // local label
@@ -220,7 +220,7 @@ public class ElfSymbolTable
          * The first global symbol is identified by the symbol table sh_info value. 
          * Local and global symbols are always kept separate in this manner, and cannot be mixed together.
          */
-        final List<Symbol> globalSymbols = table.getAllSymbolsUnsorted().stream().filter( s -> s.hasType(Type.ADDRESS_LABEL) && ! s.isLocalLabel() ).collect( Collectors.toList() );
+        final List<Symbol> globalSymbols = table.getAllSymbolsUnsorted().stream().filter( s -> s.hasType(Type.ADDRESS_LABEL) && ! s.isLocalSymbol() ).collect( Collectors.toList() );
         
         // add local SECTION symbol for .text segment at index #1
         textSectionSymbol= new ElfSymbol();

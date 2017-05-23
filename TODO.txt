@@ -1,0 +1,6 @@
+- make sure when recompiling a unit that everything that depends on it also gets recompiled (in the right order of course)
+  => otherwise calculated symbols like
+
+         .equ A = B + 1
+
+     where B has been defined in a separate compilation unit will be wrong. 

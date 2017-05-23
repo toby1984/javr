@@ -674,7 +674,7 @@ public abstract class AbstractArchitecture implements IArchitecture
 
         final int dstValue;
         final int srcValue;
-        if ( encoding.mayNeedRelocation && context.isGenerateRelocations() ) 
+        if ( encoding.mayNeedRelocation && context.getCompilationSettings().isGenerateRelocations() ) 
         {
             // code is simple her as 8-bit AVRs will only require relocation of either the src or destination but not both arguments
             RelocationInfo relocationInfo = null;

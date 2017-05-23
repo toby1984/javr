@@ -40,8 +40,8 @@ public class ObjectCodeWriterWrapper implements IObjectCodeWriter {
     }
     
     @Override
-    public void reset() throws IOException {
-        delegate.reset();
+    public void reset(ICompilationContext context) throws IOException {
+        delegate.reset(context);
     }
 
     @Override
@@ -75,8 +75,8 @@ public class ObjectCodeWriterWrapper implements IObjectCodeWriter {
     }
 
     @Override
-    public void finish(ICompilationContext context,boolean success) throws IOException {
-        delegate.finish(context,success);
+    public void finish(CompilationUnit unit,ICompilationContext context,boolean success) throws IOException {
+        delegate.finish(unit,context,success);
     }
 
     @Override
@@ -107,5 +107,10 @@ public class ObjectCodeWriterWrapper implements IObjectCodeWriter {
     @Override
     public List<Relocation> getRelocations(Segment segment) {
         return delegate.getRelocations( segment );
+    }
+
+    @Override
+    public boolean isCompilationSuccess() {
+        return delegate.isCompilationSuccess();
     }
 }

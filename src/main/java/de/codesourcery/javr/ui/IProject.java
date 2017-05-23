@@ -16,20 +16,57 @@
 package de.codesourcery.javr.ui;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 
+import org.apache.commons.lang3.Validate;
+
 import de.codesourcery.javr.assembler.CompilationUnit;
-import de.codesourcery.javr.assembler.IObjectCodeWriter;
 import de.codesourcery.javr.assembler.ResourceFactory;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
-import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Resource;
-import de.codesourcery.javr.ui.config.IConfigProvider;
 import de.codesourcery.javr.ui.config.ProjectConfiguration;
 
-public interface IProject extends ResourceFactory,IConfigProvider
+public interface IProject extends ResourceFactory
 {
     public static final String PROJECT_FILE = ".javr_project.properties";
+    
+    public static final class CheckResult 
+    {
+        public boolean uploadPossible;
+        public String message;
+        
+        private CheckResult(boolean yesNo,String msg) {
+            Validate.notBlank( msg , "msg must not be NULL or blank");
+            this.uploadPossible = yesNo;
+            this.message = msg;
+        }
+        
+        public static CheckResult uploadPossible(String message) { return new CheckResult(true,message); };
+        public static CheckResult uploadNotPossible(String message) { return new CheckResult(false,message); };
+    }
+    
+    public static enum ProjectType 
+    {
+        /**
+         * Compiling this project produces one or more executables.
+         * 
+         * Compilation units that have a 'main' function are considered to
+         * be compilation roots.
+         * 
+         * @see IProject#getCompilationRoots()
+         * @see CompilationUnit
+         */
+        EXECUTABLE,
+        /**
+         * Compiling this project produces relocatable files, one for
+         * each compilation unit.
+         * 
+         * @see IProject#getCompilationRoots()
+         * @see CompilationUnit
+         */
+        LIBRARY;
+    }
     
     public interface IProjectChangeListener 
     {
@@ -40,17 +77,17 @@ public interface IProject extends ResourceFactory,IConfigProvider
     	public default void unitRemoved(Project project,CompilationUnit newUnit) {}   	
     }
     
+    public Long getID();
+    
+    public void setID(long projectId);
+    
     public IArchitecture getArchitecture();
-    
-    public IObjectCodeWriter getObjectCodeWriter();
-    
-    public CompilationUnit getCompileRoot();
     
     public ProjectConfiguration getConfiguration();
     
-    public void setConfiguration(ProjectConfiguration other) throws IOException;
+    public void setConfiguration(ProjectConfiguration config);
     
-    public boolean canUploadToController();
+    public CheckResult checkCanUploadToController();
     
     public void uploadToController() throws IOException; 
     
@@ -60,11 +97,23 @@ public interface IProject extends ResourceFactory,IConfigProvider
     
     public CompilationUnit getCompilationUnit(Resource resource);
     
-    public SymbolTable getGlobalSymbolTable();
-
 	public void removeCompilationUnit(CompilationUnit newUnit);
 	
 	public void addProjectChangeListener(IProjectChangeListener listener);
 	
 	public void removeProjectChangeListener(IProjectChangeListener listener);
+	
+    /**
+     * Returns the root {@link CompilationUnit}s that will each be passed to the compiler.
+     * 
+     * @return
+     */
+    public List<CompilationUnit> getCompilationRoots() throws IOException;
+    
+    public default boolean hasProjectType(ProjectType type) 
+    {
+        return type.equals( getProjectType() );
+    }
+    
+    public ProjectType getProjectType();
 }

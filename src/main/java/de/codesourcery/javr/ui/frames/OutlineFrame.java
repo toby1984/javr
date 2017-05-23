@@ -173,7 +173,6 @@ public class OutlineFrame extends JInternalFrame implements IWindow , IProjectCh
 	@Override
 	public void compilationFinished(IProject project, boolean sucess) 
 	{
-		model.setObject( project.getCompileRoot() );
 	}
 	
 	public void setDoubleClickListener(Consumer<Symbol> doubleClickListener) {

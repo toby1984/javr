@@ -40,6 +40,8 @@ public class ObjectCodeWriter implements IObjectCodeWriter
     
     private Buffer currentBuffer;
     
+    private boolean compilationSuccess = false;
+    
     protected static final class ByteArrayBuffer implements Buffer 
     {
         public final Segment segment;
@@ -174,13 +176,20 @@ public class ObjectCodeWriter implements IObjectCodeWriter
         }
     }
     
-    public ObjectCodeWriter() {
-        reset();
+    public ObjectCodeWriter() 
+    {
+        initialize();
     }
     
     @Override
-    public void reset()
+    public void reset(ICompilationContext context)
     {
+        initialize();
+    }
+    
+    private void initialize() 
+    {
+        compilationSuccess = false;
         codeBuffer = createBuffer( Segment.FLASH );
         sramBuffer = createBuffer( Segment.SRAM );
         eepromBuffer = createBuffer( Segment.EEPROM);
@@ -238,8 +247,9 @@ public class ObjectCodeWriter implements IObjectCodeWriter
     }
     
     @Override
-    public void finish(ICompilationContext context,boolean success) throws IOException 
+    public void finish(CompilationUnit unit,ICompilationContext context,boolean success) throws IOException 
     {
+        this.compilationSuccess = success;
     }
 
     @Override
@@ -274,4 +284,9 @@ public class ObjectCodeWriter implements IObjectCodeWriter
     public List<Relocation> getRelocations(Segment segment) {
         return getBuffer( segment ).getRelocations();
     }
+    
+    @Override
+    public boolean isCompilationSuccess() {
+        return compilationSuccess;
+    }    
 }

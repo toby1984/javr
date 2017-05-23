@@ -15,19 +15,29 @@
  */
 package de.codesourcery.javr.assembler;
 
+import org.apache.commons.lang3.Validate;
+
 import de.codesourcery.javr.assembler.ICompilationContext.ICompilerSettings;
+import de.codesourcery.javr.assembler.arch.Architecture;
+import de.codesourcery.javr.assembler.arch.IArchitecture;
+import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputFormat;
 
 public class CompilerSettings implements ICompilerSettings {
 
     private int maxErrors = 100;
-    
     private boolean failOnAddressOutOfRange=true;
+    private IArchitecture architecture = Architecture.ATMEGA328P.getImplementation();
+    private OutputFormat outputFormat = OutputFormat.INTEL_HEX;
 
     public CompilerSettings() {
     }
     
     public CompilerSettings(CompilerSettings other) {
         populateFrom( other );
+    }
+    
+    public boolean isGenerateRelocations() {
+        return outputFormat.requiresRelocationInfo();
     }
     
     public CompilerSettings createCopy() {
@@ -55,6 +65,22 @@ public class CompilerSettings implements ICompilerSettings {
     {
         this.failOnAddressOutOfRange = other.isFailOnAddressOutOfRange();
         this.maxErrors = other.getMaxErrors();
+        this.outputFormat = other.getOutputFormat();
+        this.architecture = other.getArchitecture();
+    }
+    
+    /**
+     * Returns the architecture to compile for.
+     * @return
+     */
+    public IArchitecture getArchitecture() {
+        return architecture;
+    }
+    
+    @Override
+    public void setArchitecture(IArchitecture architecture) {
+        Validate.notNull(architecture,"architecture must not be NULL");
+        this.architecture = architecture;
     }
     
     /**
@@ -86,4 +112,18 @@ public class CompilerSettings implements ICompilerSettings {
         this.maxErrors = maxErrors;
         return this;
     }
+    
+    public OutputFormat getOutputFormat() {
+        return outputFormat;
+    }
+    
+    public boolean hasOutputFormat(OutputFormat format) {
+        return format.equals( this.outputFormat );
+    }
+    
+    public void setOutputFormat(OutputFormat format) 
+    {
+        Validate.notNull(format, "format must not be NULL");
+        this.outputFormat = format;
+    }    
 }

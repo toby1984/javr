@@ -141,6 +141,7 @@ import de.codesourcery.javr.ui.CaretPositionTracker.CaretPosition;
 import de.codesourcery.javr.ui.EditorSettings.SourceElement;
 import de.codesourcery.javr.ui.IDEMain;
 import de.codesourcery.javr.ui.IProject;
+import de.codesourcery.javr.ui.IProject.CheckResult;
 import de.codesourcery.javr.ui.config.IApplicationConfig;
 import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
 import de.codesourcery.javr.ui.frames.EditorFrame;
@@ -508,7 +509,7 @@ public abstract class EditorPanel extends JPanel
         }
 
         private String replaceTabs(String in) {
-            return in.replace("\t" ,  project.getConfig().getEditorIndentString() );
+            return in.replace("\t" ,  project.getConfiguration().getEditorIndentString() );
         }
 
         public void replace(FilterBypass fb, int offs, int length, String str, AttributeSet a) throws BadLocationException
@@ -863,7 +864,7 @@ public abstract class EditorPanel extends JPanel
             {
                 if ( previousGlobalSymbol != null ) 
                 {
-                    if ( symbol.isLocalLabel() ) 
+                    if ( symbol.isLocalSymbol() ) 
                     {
                         if ( symbol.getGlobalNamePart().equals( previousGlobalSymbol.name() ) )
                         {
@@ -880,7 +881,7 @@ public abstract class EditorPanel extends JPanel
                 else 
                 {
                     // no previous global symbol, only consider global labels
-                    if ( symbol.isGlobalLabel() && matches( symbol.name() , userInput ) ) 
+                    if ( symbol.isGlobalSymbol() && matches( symbol.name() , userInput ) ) 
                     {
                         return true;
                     }
@@ -920,7 +921,7 @@ public abstract class EditorPanel extends JPanel
                         case ADDRESS_LABEL:
                             if ( matches(symbol , lower ) ) 
                             {
-                                if ( symbol.isLocalLabel() ) {
+                                if ( symbol.isLocalSymbol() ) {
                                     localMatches.add(symbol);
                                 } else {
                                     globalMatches.add(symbol); 
@@ -953,7 +954,7 @@ public abstract class EditorPanel extends JPanel
             @Override
             public String getStringToInsert(Symbol value) 
             {
-                if ( value.isLocalLabel() ) {
+                if ( value.isLocalSymbol() ) {
                     return value.getLocalNamePart().value;
                 }
                 return value.name().value;
@@ -996,7 +997,7 @@ public abstract class EditorPanel extends JPanel
             {
                 final Component result = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
                 final Symbol symbol = (Symbol) value;
-                setText( symbol.isLocalLabel() ? symbol.getLocalNamePart().value : symbol.name().value );
+                setText( symbol.isLocalSymbol() ? symbol.getLocalNamePart().value : symbol.name().value );
                 return result;
             };
         });
@@ -1326,13 +1327,12 @@ public abstract class EditorPanel extends JPanel
         });
 
         // setup auto-indent
-        //        ((AbstractDocument) doc).setDocumentFilter( new IndentFilter() );
+        // ((AbstractDocument) doc).setDocumentFilter( new IndentFilter() );
 
         undoManager.discardAllEdits();
 
         doc.addUndoableEditListener( new UndoableEditListener()
         {
-
             @Override
             public void undoableEditHappened(UndoableEditEvent e)
             {
@@ -1493,7 +1493,8 @@ public abstract class EditorPanel extends JPanel
 
     private void uploadToController() 
     {
-        if ( project.canUploadToController() ) 
+        final CheckResult checkResult = project.checkCanUploadToController();
+        if ( checkResult.uploadPossible ) 
         {
             try 
             {
@@ -1507,7 +1508,7 @@ public abstract class EditorPanel extends JPanel
         }
         else 
         {
-            JOptionPane.showMessageDialog(null, "Upload not possible", "Program upload", JOptionPane.INFORMATION_MESSAGE );
+            JOptionPane.showMessageDialog(null, checkResult.message, "Program upload", JOptionPane.INFORMATION_MESSAGE );
         }
     }
 
@@ -1554,7 +1555,7 @@ public abstract class EditorPanel extends JPanel
         astTreeModel.setAST( new AST() );
 
         // do not use the current unit directly as this will break because
-        // all the symbols are already defined
+        // all the symbols that are already defined
         final CompilationUnit tmpUnit = new CompilationUnit( currentUnit.getResource() );
 
         final long parseStart =  System.currentTimeMillis();
@@ -1562,9 +1563,8 @@ public abstract class EditorPanel extends JPanel
         {
             final CompilerSettings compilerSettings = new CompilerSettings();
             final IObjectCodeWriter writer = new ObjectCodeWriter();
-            final SymbolTable globalSymbolTable = new SymbolTable( SymbolTable.GLOBAL ); // fake global symbol table so we don't fail parsing because of duplicate symbols already in the real one
-            final ICompilationContext context = new CompilationContext( tmpUnit , globalSymbolTable , writer , project , compilerSettings , project.getConfig() );
-            ParseSourcePhase.parseWithoutIncludes( context, tmpUnit , project );
+            final ICompilationContext context = new CompilationContext( tmpUnit , writer , project , compilerSettings );
+            ParseSourcePhase.parseWithoutIncludes( context, tmpUnit );
         } 
         catch(Exception e) {
             LOG.error("Parsing source failed",e);
@@ -1577,8 +1577,6 @@ public abstract class EditorPanel extends JPanel
 
         final long highlightEnd =  System.currentTimeMillis();
         // assemble
-        final CompilationUnit root = project.getCompileRoot();
-
         boolean compilationSuccessful = false;
         try 
         {
@@ -1587,7 +1585,7 @@ public abstract class EditorPanel extends JPanel
         catch(Exception e) 
         {
             e.printStackTrace();
-            root.addMessage( toCompilationMessage( currentUnit, e ) );
+            currentUnit.addMessage( toCompilationMessage( currentUnit, e ) );
         }
         symbolModel.setSymbolTable( currentUnit.getSymbolTable() );    
 
@@ -1600,7 +1598,7 @@ public abstract class EditorPanel extends JPanel
         final long highlightTime = highlightEnd - parseEnd;
         final long compileTime = compileEnd - highlightEnd;
 
-        final String assembleTime = "parsing: "+parseTime+" ms,highlighting: "+highlightTime+" ms,compile: "+compileTime+" ms";
+        final String assembleTime = "parsing: "+parseTime+" ms,highlighting: "+highlightTime+" ms,total compile time: "+compileTime+" ms";
 
         currentUnit.addMessage( CompilationMessage.info(currentUnit,"Compilation "+success+" ("+assembleTime+") on "+df.format( ZonedDateTime.now() ) ) );
 
@@ -1608,22 +1606,34 @@ public abstract class EditorPanel extends JPanel
             showPrettyPrint( prettyPrintWindow.gnuSyntax );
         }
 
-        final List<CompilationMessage> allMessages = root.getMessages(true);
+        final List<CompilationMessage> allMessages = new ArrayList<>();
 
         // create warnings for symbols defined in this unit but not used anywhere
         if ( compilationSuccessful ) 
         {
-            project.getGlobalSymbolTable().visitSymbols( (symbol) -> 
+            List<CompilationUnit> roots = new ArrayList<>();
+            try {
+                roots = project.getCompilationRoots();
+            } catch (IOException e) {
+                LOG.error("compile(): Failed to get compilation roots",e);
+            }
+            for ( CompilationUnit unit : roots ) 
             {
-                if ( symbol.getCompilationUnit().hasSameResourceAs( this.currentUnit ) ) 
+                allMessages.addAll( unit.getMessages( true ) );
+                unit.getSymbolTable().visitSymbols( (symbol) -> 
                 {
-                    if ( ! symbol.isReferenced() ) 
+                    if ( symbol.getCompilationUnit().hasSameResourceAs( this.currentUnit ) ) 
                     {
-                        allMessages.add( CompilationMessage.warning( currentUnit, "Symbol '"+symbol.name()+"' is not referenced" , symbol.getNode() ) );
+                        if ( ! symbol.isReferenced() ) 
+                        {
+                            allMessages.add( CompilationMessage.warning( currentUnit, "Symbol '"+symbol.name()+"' is not referenced" , symbol.getNode() ) );
+                        }
                     }
-                }
-                return true;
-            });
+                    return true;
+                });
+            }
+        } else {
+            allMessages.addAll( currentUnit.getMessages(true) );
         }
 
         messageFrame.addAll( allMessages );        

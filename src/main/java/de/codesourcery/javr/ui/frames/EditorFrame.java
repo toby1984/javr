@@ -44,7 +44,7 @@ public class EditorFrame extends JInternalFrame implements IWindow
 	
 	private final CaretPositionTracker caretTracker;
 	
-	public EditorFrame(IProject project,CompilationUnit compUnit,IApplicationConfigProvider appConfigProvider,MessageFrame messageFrame,CaretPositionTracker caretTracker) throws IOException {
+	public EditorFrame(IProject project,IApplicationConfigProvider appConfigProvider,MessageFrame messageFrame,CaretPositionTracker caretTracker) throws IOException {
 
 	    this.messageFrame = messageFrame;
 	    this.appConfigProvider = appConfigProvider;
@@ -52,8 +52,6 @@ public class EditorFrame extends JInternalFrame implements IWindow
 	    
 		tabbedPane = new JTabbedPane();
 		 
-		openEditor( project , compUnit );
-		
 		messageFrame.setDoubleClickListener( this::gotoMessage );
 		
         final GridBagConstraints cnstrs = new GridBagConstraints();

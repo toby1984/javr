@@ -116,7 +116,7 @@ public class PrettyPrinter extends AbstractASTVisitor {
     
     private String getMappedSymbolName(Symbol s) 
     {
-        if ( s.isLocalLabel() ) 
+        if ( s.isLocalSymbol() ) 
         {
             if ( gnuSyntax ) 
             {

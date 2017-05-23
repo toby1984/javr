@@ -381,7 +381,8 @@ public class PreprocessingLexer implements Lexer
                 final String path = tokens.stream().map( tok -> tok.value ).collect( Collectors.joining() );
                 try 
                 {
-                    final Resource res = compilationContext.getResourceFactory().resolveResource(compilationContext.currentCompilationUnit().getResource(), path );
+                    final Resource parentResource = compilationContext.currentCompilationUnit().getResource();
+                    final Resource res = compilationContext.getResourceFactory().resolveResource(parentResource, path );
                     final CompilationUnit newUnit = compilationContext.newCompilationUnit(res);
                     if ( ! compilationContext.pushCompilationUnit( newUnit ) ) {
                         throw new ParseException( "Aborting compilation due to circular dependency", tokens.get(0) );

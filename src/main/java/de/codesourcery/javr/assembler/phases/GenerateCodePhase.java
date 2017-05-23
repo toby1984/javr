@@ -17,7 +17,6 @@ package de.codesourcery.javr.assembler.phases;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 import org.apache.log4j.Logger;
 
@@ -37,9 +36,8 @@ import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
 import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
 import de.codesourcery.javr.assembler.symbols.Symbol;
-import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.symbols.Symbol.ObjectType;
-import de.codesourcery.javr.assembler.symbols.Symbol.Type;
+import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 /**
  * Performs the actual code generation.
@@ -171,12 +169,12 @@ public class GenerateCodePhase extends AbstractPhase
                             previousDataSymbols.forEach( s -> s.incObjectSize( size ) );
                         }
                         
-                        if ( context.isGenerateRelocations() ) {
+                        if ( context.getCompilationSettings().isGenerateRelocations() ) {
                             ((DirectiveNode) node).addRelocations( context );
                         }
                     }
 
-                    final boolean checkForRelocation =  directive == Directive.INIT_WORDS && ! isInResolvePhase && context.isGenerateRelocations();
+                    final boolean checkForRelocation =  directive == Directive.INIT_WORDS && ! isInResolvePhase && context.getCompilationSettings().isGenerateRelocations();
                     for ( ASTNode child : node.children() ) 
                     {
                         final boolean relocated = checkForRelocation && RelocationHelper.getRelocationInfo( child ) != null;

@@ -65,15 +65,14 @@ public class CompilationUnit
         this.symbolTable = symbolTable;
     }    
     
-    public void beforeCompilationStarts(SymbolTable parentSymbolTable) 
+    public void beforeCompilationStarts() 
     {
         clearMessages();
         this.symbolTable.clear();
-        this.symbolTable.setParent( parentSymbolTable );
         this.dependencies.clear();
         this.ast = new AST();
     }
-
+    
     public void clearMessages() {
         messages.clear();
     }
@@ -106,7 +105,7 @@ public class CompilationUnit
         return ast;
     }
 
-    public void setAst(AST ast) {
+    public void setAST(AST ast) {
         Validate.notNull(ast, "AST must not be NULL");
         this.ast = ast;
     }

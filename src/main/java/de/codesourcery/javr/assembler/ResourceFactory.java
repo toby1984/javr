@@ -16,8 +16,10 @@
 package de.codesourcery.javr.assembler;
 
 import java.io.IOException;
+import java.util.List;
 
 import de.codesourcery.javr.assembler.util.Resource;
+import de.codesourcery.javr.ui.IProject;
 
 /**
  * Responsible for locating {@link Resource}s.
@@ -26,6 +28,14 @@ import de.codesourcery.javr.assembler.util.Resource;
  */
 public interface ResourceFactory 
 {
+    /**
+     * Returns all files (not .h / .inc) for a given project that may need compiling.
+     * @param project
+     * @return
+     * @throws IOException
+     */
+    public List<Resource> getAllAssemblerFiles(IProject project) throws IOException;
+    
     public Resource resolveResource(String child) throws IOException;
     
     public Resource resolveResource(Resource parent,String child) throws IOException;

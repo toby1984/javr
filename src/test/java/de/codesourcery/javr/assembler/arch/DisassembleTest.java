@@ -23,6 +23,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.util.List;
 
 import org.apache.commons.io.IOUtils;
 import org.junit.Test;
@@ -34,21 +35,17 @@ import de.codesourcery.javr.assembler.ObjectCodeWriter;
 import de.codesourcery.javr.assembler.ResourceFactory;
 import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.IArchitecture.DisassemblerSettings;
-import de.codesourcery.javr.assembler.arch.impl.ATMega88;
-import de.codesourcery.javr.assembler.parser.Lexer;
-import de.codesourcery.javr.assembler.parser.LexerImpl;
-import de.codesourcery.javr.assembler.parser.Parser;
+import de.codesourcery.javr.assembler.arch.impl.ATXmega;
 import de.codesourcery.javr.assembler.parser.Parser.Severity;
-import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
+import de.codesourcery.javr.ui.IProject;
 import de.codesourcery.javr.ui.Project;
-import de.codesourcery.javr.ui.config.IConfig;
-import de.codesourcery.javr.ui.config.IConfigProvider;
+import de.codesourcery.javr.ui.config.ProjectConfiguration;
 
 public class DisassembleTest  {
 
-    private final ATMega88 arch = new ATMega88();
+    private final ATXmega arch = new ATXmega();
     
     private static final DisassemblerSettings settings = new DisassemblerSettings();
     
@@ -174,7 +171,6 @@ public class DisassembleTest  {
         }
      
         final Assembler asm = new Assembler();
-        asm.getCompilerSettings().setFailOnAddressOutOfRange( false );
         
         final CompilationUnit unit = new CompilationUnit( new StringResource("dummy" , source ) );
         final ResourceFactory factory = new ResourceFactory() 
@@ -188,44 +184,23 @@ public class DisassembleTest  {
             public Resource resolveResource(String child) throws IOException {
                 throw new UnsupportedOperationException();
             }
-        };
-        
-        final IConfig config = new IConfig() {
-            
+
             @Override
-            public String getEditorIndentString() {
-                return "  ";
-            }
-            
-            @Override
-            public IArchitecture getArchitecture() {
-                return arch;
-            }
-            
-            @Override
-            public Parser createParser() {
-                return new Parser(arch);
-            }
-            
-            @Override
-            public Lexer createLexer(Scanner s) {
-                return new LexerImpl( s );
+            public List<Resource> getAllAssemblerFiles(IProject project) throws IOException {
+                throw new UnsupportedOperationException();
             }
         };
         
-        final IConfigProvider configProvider = new IConfigProvider() {
-            
-            @Override
-            public IConfig getConfig() {
-                return config;
-            }
-        };
         System.err.println("Compiling ...");
         System.err.flush();
         final ObjectCodeWriter objectCodeWriter = new ObjectCodeWriter();
         
-        final Project project = new Project(unit);
-        final boolean success = asm.compile(project, objectCodeWriter, factory , configProvider );
+        final Project project = new Project(new ProjectConfiguration() );
+        project.addCompilationUnit( unit );
+        project.getConfiguration().getCompilerSettings().setFailOnAddressOutOfRange( false );
+        project.getConfiguration().getCompilerSettings().setArchitecture(  Architecture.XMEGA.getImplementation() );
+        
+        final boolean success = asm.compile(unit, project.getConfiguration().getCompilerSettings() , objectCodeWriter, factory );
         System.err.println("Compilation finished");
         System.err.flush();
         if ( ! success ) {

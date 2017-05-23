@@ -26,8 +26,6 @@ import de.codesourcery.javr.assembler.parser.LexerImpl;
 import de.codesourcery.javr.assembler.parser.Parser;
 import de.codesourcery.javr.assembler.parser.PreprocessingLexer;
 import de.codesourcery.javr.assembler.parser.Scanner;
-import de.codesourcery.javr.ui.config.IConfig;
-import de.codesourcery.javr.ui.config.IConfigProvider;
 
 /**
  * Uses the preprocessor lexer to turn the source file(s) into an abstract syntax tree (AST).
@@ -42,14 +40,6 @@ import de.codesourcery.javr.ui.config.IConfigProvider;
  */
 public class ParseSourcePhase implements Phase 
 {
-    private final IConfigProvider provider;
-    
-    public ParseSourcePhase(IConfigProvider provider) 
-    {
-        Validate.notNull(provider, "provider must not be NULL");
-        this.provider = provider;
-    }
-    
     @Override
     public String getName() {
         return "parse";
@@ -58,28 +48,22 @@ public class ParseSourcePhase implements Phase
     @Override
     public void run(ICompilationContext context) throws IOException 
     {
-        parse(context,context.currentCompilationUnit(),provider);
-    }
-
-    public static void parse(ICompilationContext context,CompilationUnit unit,IConfigProvider provider) 
-    {
+        final CompilationUnit unit = context.currentCompilationUnit();
         Validate.notNull(unit, "compilation unit must not be NULL");
         final Scanner scanner = new Scanner( unit.getResource() );
         
-        final IConfig config = provider.getConfig();
-        final Lexer lexer = new PreprocessingLexer( config.createLexer( scanner ) , context );
-        final Parser parser = config.createParser();
+        final Lexer lexer = new PreprocessingLexer( new LexerImpl( scanner ) , context );
+        final Parser parser = new Parser( context.getArchitecture() );
         
         parser.parse( context , unit , lexer ); // assigns AST to unit as well!
     }
     
-    public static void parseWithoutIncludes(ICompilationContext context,CompilationUnit unit,IConfigProvider provider) 
+    public static void parseWithoutIncludes(ICompilationContext context,CompilationUnit unit) 
     {
         final Scanner scanner = new Scanner( unit.getResource() );
         
-        final IConfig config = provider.getConfig();
         final Lexer lexer = new LexerImpl( scanner );
-        final Parser parser = config.createParser();
+        final Parser parser = new Parser( context.getArchitecture() );
         
         parser.parse( context , unit , lexer ); // assigns AST to unit as well!
     }    

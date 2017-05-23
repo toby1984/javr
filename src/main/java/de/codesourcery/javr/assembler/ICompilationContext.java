@@ -21,6 +21,7 @@ import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.Resource;
+import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputFormat;
 
 /**
  * Provides access to the state of the current compilation process.
@@ -46,12 +47,51 @@ public interface ICompilationContext
         public int getMaxErrors();
         
         /**
+         * Whether the compiler needs to generate relocation information.
+         * 
+         * @return
+         */
+        public boolean isGenerateRelocations();
+        
+        /**
+         * Returns the architecture to compile for.
+         * @return
+         */
+        public IArchitecture getArchitecture();        
+        
+        /**
+         * Sets the architecture to compile for.
+         * @param architecture
+         */
+        public void setArchitecture(IArchitecture architecture);      
+        
+        /**
          * Sets the max. number of error messages permitted before compilation is aborted.
          *      
          * @param maxErrors
          * @return this instance (for chaining)     
          */
         public ICompilerSettings setMaxErrors(int maxErrors);        
+        
+        /**
+         * Returns the kind of output files to generate.
+         * @return
+         */
+        public OutputFormat getOutputFormat();
+        
+        /**
+         * Checks whether a given output format is active.
+         * @param format
+         * @return
+         */
+        public boolean hasOutputFormat(OutputFormat format);
+        
+        /**
+         * Sets the output file format to use.
+         * 
+         * @param format
+         */
+        public void setOutputFormat(OutputFormat format);         
     }
     
     public void setStartAddress(int address);
@@ -79,8 +119,6 @@ public interface ICompilationContext
     public void allocateWord();
     
     public void allocateBytes(int numberOfBytes);    
-    
-    public boolean isGenerateRelocations();
     
     public void addRelocation(Relocation reloc);
     

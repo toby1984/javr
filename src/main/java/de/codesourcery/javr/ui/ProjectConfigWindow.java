@@ -32,6 +32,7 @@ import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.CompilerSettings;
 import de.codesourcery.javr.assembler.arch.Architecture;
+import de.codesourcery.javr.ui.IProject.ProjectType;
 import de.codesourcery.javr.ui.config.ProjectConfiguration;
 import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputFormat;
 
@@ -40,10 +41,9 @@ public abstract class ProjectConfigWindow extends JPanel
     private ProjectConfiguration toEdit;
     
     private JTextField projectName = new JTextField();
-    private JTextField outputName = new JTextField();
-    private JTextField compilationRoot = new JTextField();
     private JComboBox<OutputFormat> outputFormat = new JComboBox<>( OutputFormat.values() );
     private JComboBox<Architecture> architecture = new JComboBox<>( Architecture.values() );
+    private JComboBox<IProject.ProjectType> projectType = new JComboBox<>( IProject.ProjectType.values() );
     private JCheckBox failOnAddressOutOfBounds = new JCheckBox();
     private JTextField uploadCommand = new JTextField();
     
@@ -53,10 +53,9 @@ public abstract class ProjectConfigWindow extends JPanel
         this.toEdit = currentConfig.createCopy();
         
         projectName.setText( currentConfig.getProjectName() );
-        outputName.setText( currentConfig.getOutputName() );
-        compilationRoot.setText( currentConfig.getCompilationRoot() );
-        outputFormat.setSelectedItem( currentConfig.getOutputFormat() );
+        outputFormat.setSelectedItem( currentConfig.getCompilerSettings().getOutputFormat() );
         architecture.setSelectedItem( currentConfig.getArchitecture().getType() );
+        projectType.setSelectedItem( currentConfig.getProjectType() );
         failOnAddressOutOfBounds.setSelected( currentConfig.getCompilerSettings().isFailOnAddressOutOfRange() );
         uploadCommand.setText( currentConfig.getUploadCommand() );
         
@@ -65,14 +64,13 @@ public abstract class ProjectConfigWindow extends JPanel
         cancel.addActionListener( ev -> onCancel() );
         save.addActionListener( ev -> 
         {
-        	toEdit.setCompilationRoot( compilationRoot.getText() );
             toEdit.setProjectName( projectName.getText() );
-            toEdit.setOutputName( outputName.getText() );
-            toEdit.setOutputFormat( (OutputFormat) outputFormat.getSelectedItem() );
-            toEdit.setArchitecture( (Architecture) architecture.getSelectedItem() );
+            toEdit.setOutputFormat( (OutputFormat) outputFormat.getSelectedItem() , (ProjectType) projectType.getSelectedItem() );
             toEdit.setUploadCommand( uploadCommand.getText() );
             
             final CompilerSettings settings = new CompilerSettings();
+            settings.setOutputFormat( (OutputFormat) outputFormat.getSelectedItem() );
+            settings.setArchitecture(  ((Architecture) architecture.getSelectedItem() ).getImplementation() );
             settings.setFailOnAddressOutOfRange( failOnAddressOutOfBounds.isSelected() );
             toEdit.setCompilerSettings( settings );
             
@@ -82,9 +80,8 @@ public abstract class ProjectConfigWindow extends JPanel
         setLayout( new GridBagLayout() );
         int y = 0;
         addRow( y++ , "Project name" , projectName );
-        addRow( y++ , "Output name" , outputName );
-        addRow( y++ , "Compilation root" , compilationRoot );
         addRow( y++ , "Output format" , outputFormat );
+        addRow( y++ , "Project type" , projectType );
         addRow( y++ , "Architecture" , architecture );
         addRow( y++ , "Upload command" , uploadCommand);
         addRow( y++ , "Fail on out-of-bounds addresses" , failOnAddressOutOfBounds);

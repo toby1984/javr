@@ -37,7 +37,6 @@ import javax.swing.JInternalFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
-import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
 
 import org.apache.commons.io.FileUtils;
@@ -87,12 +86,10 @@ public class TopLevelWindow implements IWindow
 
     private IProjectListener listener = new IProjectListener()
     {
-
         @Override
         public void projectOpened(IProject project)
         {
             project.addProjectChangeListener( outlineFrame );    
-            outlineFrame.setCompilationUnit( project.getCompileRoot() );            
         }
 
         @Override
@@ -216,7 +213,7 @@ public class TopLevelWindow implements IWindow
     private void addWindows(JDesktopPane pane) throws IOException 
     {
         final IProject currentProject = currentProject();
-        editorFrame = new EditorFrame( currentProject , currentProject.getCompileRoot() , applicationConfigProvider, messageFrame , caretTracker );
+        editorFrame = new EditorFrame( currentProject , applicationConfigProvider, messageFrame , caretTracker );
         addWindow(pane,messageFrame);
         addWindow(pane,editorFrame);
         addWindow(pane,outlineFrame);
@@ -346,7 +343,7 @@ public class TopLevelWindow implements IWindow
     private void editProjectConfiguration() 
     {
         final JDialog dialog = new JDialog( (Frame) null, "Edit project configuration", true );
-        dialog.getContentPane().add( new ProjectConfigWindow( currentProject().getConfiguration() ) 
+        dialog.getContentPane().add( new ProjectConfigWindow( currentProject().getConfiguration().createCopy() ) 
         {
             private final IProject project = currentProject();
 
@@ -357,7 +354,7 @@ public class TopLevelWindow implements IWindow
                 LOG.info("editProjectConfiguration(): Saving configuration to "+configFile.getAbsolutePath());
                 try ( FileOutputStream out = new FileOutputStream( configFile ) ) 
                 {
-                    project.setConfiguration( config );
+                    project.getConfiguration().populateFrom( config );
                     config.save( out );
                 } catch(Exception e) {
                     IDEMain.fail(e);
@@ -399,8 +396,7 @@ public class TopLevelWindow implements IWindow
                 {
                     LOG.info("Opening project configuration "+realFile.getAbsolutePath());
                     final ProjectConfiguration config = ProjectConfiguration.load( realFile.getParentFile() , in );
-                    final CompilationUnit unit = new CompilationUnit( config.getCompilationRootResource() );
-                    projectProvider.setProject( new Project( unit , config ) );
+                    projectProvider.setProject( new Project( config ) );
                 } 
                 catch(Exception e) 
                 {

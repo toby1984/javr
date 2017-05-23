@@ -34,8 +34,8 @@ import de.codesourcery.javr.assembler.IObjectCodeWriter;
 import de.codesourcery.javr.assembler.ObjectCodeWriter;
 import de.codesourcery.javr.assembler.ResourceFactory;
 import de.codesourcery.javr.assembler.Segment;
+import de.codesourcery.javr.assembler.arch.Architecture;
 import de.codesourcery.javr.assembler.arch.IArchitecture;
-import de.codesourcery.javr.assembler.arch.impl.ATMega328p;
 import de.codesourcery.javr.assembler.elf.ElfWriter.Endianess;
 import de.codesourcery.javr.assembler.elf.ProgramTableEntry.SegmentFlag;
 import de.codesourcery.javr.assembler.elf.ProgramTableEntry.SegmentType;
@@ -45,6 +45,7 @@ import de.codesourcery.javr.assembler.elf.SectionTableEntry.SpecialSection;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.util.FileResourceFactory;
 import de.codesourcery.javr.assembler.util.Resource;
+import de.codesourcery.javr.ui.IProject.ProjectType;
 import de.codesourcery.javr.ui.Project;
 import de.codesourcery.javr.ui.config.ProjectConfiguration;
 import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputFormat;
@@ -142,28 +143,24 @@ public class ElfFile
         final Resource res = Resource.forString("dummy", src );
         final CompilationUnit root = new CompilationUnit( res );
         
-        final Project project = new Project( root );
-        project.setArchitecture( new ATMega328p() );
-        
         /*
          * TODO: Hacky... Project class assumes that sources are in local filesystem so Project#setConfiguration(IProjectConfiguration)
          * TODO: will actually try to resolve the root compilation unit from the filesystem , overwriting
          * TODO: the compilation root we previously set when calling new Project( compilationRoot) 
          */
-        ProjectConfiguration copy = project.getConfiguration(); 
-        copy.setOutputFormat( outputFormat );
-        project.setConfiguration( copy ); // compilationRoot get
+        final ProjectConfiguration copy = new ProjectConfiguration();
+        copy.getCompilerSettings().setArchitecture( Architecture.ATMEGA328P.getImplementation() );
+        copy.setOutputFormat( outputFormat  , ProjectType.LIBRARY );
         
-        // discard compilation root from filesystem and try again... 
-        final CompilationUnit oldRoot = project.getCompileRoot();
-        project.setCompileRoot( root );
-        project.removeCompilationUnit( oldRoot );
+        final Project project = new Project( copy );
+        project.setConfiguration( copy );
+        project.addCompilationUnit( root );
         
         final ObjectCodeWriter writer = new ObjectCodeWriter();
         
         final ResourceFactory resFactory = FileResourceFactory.createInstance( baseDir );
         
-        if ( ! asm.compile( project , writer , resFactory , project ) ) {
+        if ( ! asm.compile( root , project.getConfiguration().getCompilerSettings() , writer , resFactory ) ) {
             throw new IllegalStateException("Compilation failed");
         }
         
@@ -172,7 +169,7 @@ public class ElfFile
         
         final String outputFile = "/home/tobi/tmp/my.elf";
         try ( FileOutputStream out = new FileOutputStream( outputFile ) ) {
-            new ElfFile(outputFormat).write( project.getArchitecture() , writer , project.getGlobalSymbolTable(), out );
+            new ElfFile(outputFormat).write( project.getArchitecture() , writer , root.getSymbolTable(), out );
         }
         System.out.println("Wrote to "+outputFile);
     }
