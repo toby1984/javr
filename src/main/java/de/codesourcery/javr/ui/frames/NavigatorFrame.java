@@ -80,6 +80,10 @@ public class NavigatorFrame extends JInternalFrame implements IWindow
         browser.pathChanged( browser.getRoot() );
     }    
     
+    public void fileAdded(File file) {
+        browser.pathChanged( file );
+    }
+    
     public void refreshPath(File topLevelDir) {
         browser.pathChanged( topLevelDir );
     }

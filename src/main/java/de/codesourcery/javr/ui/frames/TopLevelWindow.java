@@ -37,6 +37,7 @@ import javax.swing.JInternalFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
 
 import org.apache.commons.io.FileUtils;
@@ -296,28 +297,26 @@ public class TopLevelWindow implements IWindow
                 });
                 addMenuItem(menu,"New source file" , () -> 
                 {
-
                     final DirNode parentNode = dirNode.file.isDirectory() ? dirNode :dirNode.parent;
                     final File parent = parentNode.file;
 
-                    int index = 0;
-                    File newFile = new File( parent , "new_file.asm" );
-                    while ( newFile.exists() ) 
+                    JFileChooser chooser = new JFileChooser( parent );
+                    int result = chooser.showSaveDialog( null );
+                    if ( result == JFileChooser.APPROVE_OPTION ) 
                     {
-                        index++;
-                        newFile = new File( parent , "new_file_"+index+".asm" );
-                    }
-                    try 
-                    {
-                        if ( ! newFile.createNewFile() ) {
-                            throw new IOException("Failed to create "+newFile.getAbsolutePath());
+                        File newFile = chooser.getSelectedFile();
+                        try 
+                        {
+                            if ( ! newFile.createNewFile() ) {
+                                throw new IOException("Failed to create "+newFile.getAbsolutePath());
+                            }
+                            openFile( newFile );
+                            navigator.fileAdded( newFile );
                         }
-                        openFile( newFile );
-                        navigator.refreshPath();
-                    }
-                    catch (Exception e) {
-                        LOG.error("newFile(): Failed to create file "+newFile.getAbsolutePath(),e);
-                        IDEMain.fail(e);
+                        catch (Exception e) {
+                            LOG.error("newFile(): Failed to create file "+newFile.getAbsolutePath(),e);
+                            IDEMain.fail(e);
+                        }
                     }
                 });                
                 return menu;

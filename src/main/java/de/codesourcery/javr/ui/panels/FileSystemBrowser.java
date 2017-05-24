@@ -25,6 +25,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -79,39 +80,71 @@ public class FileSystemBrowser extends JPanel
 		public List<DirNode> children() {
 			return children;
 		}
+		
+		public void remove() {
+		    if ( parent == null ) {
+		        throw new UnsupportedOperationException("Cannot unlink tree node that has no parent");
+		    } 
+		    parent.removeChild( this );
+		}
+		
+		public void removeChild(DirNode child) 
+		{
+		    for (Iterator<DirNode> iterator = children.iterator(); iterator.hasNext();) 
+		    {
+                final DirNode n = iterator.next();
+                if ( n == child ) {
+		            iterator.remove();
+		            return;
+		        }
+            }
+		    throw new IllegalArgumentException("Failed to remove child "+child+" from parent "+this+" -- not found");
+		}
 
 		@Override
 		public String toString() {
 			return file.getAbsolutePath();
 		}
 		
-		public DirNode findClosestNode(File file) 
+		public DirNode findClosestNode(File toFind) 
 		{
-		    final String absPath = file.getAbsolutePath();
+		    final String absPath = toFind.getAbsolutePath();
 		    if ( absPath.equals( this.file.getAbsolutePath() ) ) {
-		        return this;
+		        return this; // perfect match
 		    }
-		    DirNode max = null;
-		    int maxLen = -1;
+		    if ( ! absPath.startsWith( this.file.getAbsolutePath() ) ) {
+		        return null;
+		    }
+		    DirNode longestMatch = null;
+		    int longestMatchPrefix = 0;
+		    
 		    for ( DirNode child : children) 
 		    {
-		        int len = child.getPathPrefixLen( absPath );
-		        if ( len == absPath.length() ) {
-		            return child;
-		        }
-		        if ( len> 0 && len > maxLen ) {
-		            maxLen = len;
-		            max=child;
+		        int prefixLen = child.getMatchingPathPrefixLen( absPath );
+		        if ( prefixLen > 0 && ( longestMatch == null || prefixLen > longestMatchPrefix ) ) {
+		            longestMatch = child;
+		            longestMatchPrefix = prefixLen;
 		        }
 		    }
-		    if ( max != null ) 
-		    {
-		        return max.findClosestNode( file );
+		    if ( longestMatch != null ) {
+		        DirNode result = longestMatch.findClosestNode( toFind );
+		        if ( result != null ) 
+		        {
+		            if ( ! result.file.getAbsolutePath().equals( absPath ) ) // we found something but it's not a full match
+		            {
+		                if ( ! result.file.isDirectory() ) // we failed to find a full match so return the directory where we found the match instead
+		                {
+		                    return result.parent;
+		                }
+		            }
+		            return result;
+		        }
+		        return longestMatch;
 		    }
 		    return null;
 		}
 		
-		private int getPathPrefixLen(String path) 
+		private int getMatchingPathPrefixLen(String path) 
 		{
 		    final String thisPath = this.file.getAbsolutePath();
 		    final int len = Math.min( path.length() , thisPath.length());
@@ -176,10 +209,10 @@ public class FileSystemBrowser extends JPanel
             });
             node.dataFetched = true;
             
-            final List<DirNode> nodes = node.getPathToRoot();
-            final TreePath path = new TreePath( nodes.toArray( new DirNode[0] ) );
-            final TreeModelEvent ev = new TreeModelEvent( this , path );
+            final List<DirNode> nodes = node.getPathToRoot(); // element[0] = root , ...
+            final TreePath path = new TreePath( nodes.toArray() );
             
+            final TreeModelEvent ev = new TreeModelEvent( this , path );
             notifyListeners( l -> l.treeStructureChanged( ev ) );
 		}
 
@@ -466,6 +499,8 @@ public class FileSystemBrowser extends JPanel
                 final int idx = treeModel.getIndexOfChild(  current.parent , current );
                 final TreePath path = current.parent.getTreePathToRoot();
                 
+                current.parent.children.remove( current );
+                
                 final TreeModelEvent ev = new TreeModelEvent( this , path , new int[] {idx} , new DirNode[] { current } );
                 treeModel.notifyListeners( l -> l.treeNodesRemoved( ev ) );
             } 
@@ -481,7 +516,6 @@ public class FileSystemBrowser extends JPanel
         final DirNode current = treeModel.getRoot().findClosestNode( topLevelDir );
         if ( current != null ) 
         {
-            System.out.println("TopLevelDir: "+topLevelDir.getAbsolutePath()+" -> node: "+current.file.getAbsolutePath());
             treeModel.subtreeChanged( current );
         }
     }
