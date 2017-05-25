@@ -22,7 +22,7 @@ extern void framebuffer_clear(void);
 extern void framebuffer_set_pixel(char x,char y);
 
 /*
- * Utility methods
+ * Utility functions
  */
 extern void util_msleep(char millis);
 extern void debug_green_led(char enable);
@@ -37,10 +37,16 @@ extern void debug_toggle_green_led(void);
 extern void debug_toggle_red_led(void);
 
 /*
- * PS/2 methods
+ * PS/2 functions
  */
-extern void ps2_reset();
+extern void ps2_reset(void);
 extern char ps2_keybuffer_read(char *buffer,char bufsize);
 extern char ps2_get_overflow_counter(void);
 extern char ps2_get_last_error(void);
 extern char ps2_write_byte(char cmd);
+
+/*
+ * IR functions
+ */
+extern void ir_setup(void);
+extern char ir_receive(unsigned short *buffer,char bufferSize);
