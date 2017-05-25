@@ -5,7 +5,7 @@
 #define true 1
 #define false 0
 
-static unsigned short buffer[200];
+static unsigned short ir_buffer[200];
 
 /*
  * Functions
@@ -37,20 +37,20 @@ int main()
   framebuffer_update_display();    
   
   while ( true ) {
-      char received = ir_receive( &buffer[0] , 199 );
+      unsigned char received = ir_receive( &ir_buffer[0] , 50 );
       if ( received == 0xff || received == 0xfe) {
           print("error: ");
           println_hex( received );
           framebuffer_update_display();      
           debug_blink_red(1);
-      } else if ( received > 0 ) {
+      } else if ( received != 0 ) {
           println("pulses: ");
           println_hex( received );
           
-          unsigned short last = buffer[0];
-          char count = 0;
-          for ( int i = 1 ; i < received ; i++ ) {
-              if ( buffer[i] == last ) {
+          unsigned short last = ir_buffer[0];
+          unsigned char count = 1;
+          for ( unsigned char i = 1 ; i < received ; i++ ) {
+              if ( ir_buffer[i] == last ) {
                 count++;
               } else {
                   print_dec( count );
@@ -63,7 +63,7 @@ int main()
                   }
                   print(",");
                   count = 1;
-                  last = buffer[i];
+                  last = ir_buffer[i];
               }
           }
           

@@ -1258,7 +1258,6 @@ ir_setup:
 .def timeout_value = X
 .def buffer_size = r22
 ir_receive:
-	rcall debug_green_led_off
 	movw r31:r30,r25:r24
 	clr bytes_received
 	ldi r27,0xff
@@ -1272,19 +1271,12 @@ ir_receive:
 .wait_hi
 	sbic PIND,IR_DATA_PIN
 	rjmp is_hi
-	clr r1
-	clr r1
-	clr r1
-	clr r1
 	sbiw X,1
 	brne wait_hi
 	rjmp timeout
 .is_hi
-	rcall debug_green_led_on
-
 	movw X,r25:r24
 .measure_pulse
-          rcall debug_toggle_green_led
 	sbis PIND,IR_DATA_PIN ; 2 cycles on skip
 	rjmp pulse_done ; 2 cycles
 	sbiw X,1 ; 2 cycles
@@ -1293,7 +1285,6 @@ ir_receive:
 	breq timeout ; => no, timeout
 	rjmp ok ; end of transmission
 .pulse_done
-	rcall debug_green_led_off
 	cp bytes_received,buffer_size
 	breq buffer_full
 	adiw X,1
@@ -1305,11 +1296,9 @@ ir_receive:
 	rjmp wait_low
 	
 .buffer_full
-	rcall debug_green_led_off
 	ldi bytes_received,0xfe
 	rjmp ok	
 .timeout
-	rcall debug_green_led_off
 	ldi bytes_received,0xff	
 .ok	
 	mov r24,bytes_received
