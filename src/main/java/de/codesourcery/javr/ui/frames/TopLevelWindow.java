@@ -188,6 +188,7 @@ public class TopLevelWindow implements IWindow
             final IProject project = currentProject();
             final CompilationUnit unit = project.getCompilationUnit( new FileResource( file , Resource.ENCODING_UTF ) );
             editorFrame.openEditor( project , unit );
+            outlineFrame.setCompilationUnit( unit );
         } 
         catch (IOException e) 
         {

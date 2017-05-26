@@ -177,7 +177,8 @@ public class OutlinePanel extends JPanel
 			return Optional.empty();
 		}
 		SymbolTable table = currentUnit.getSymbolTable();
-		return Optional.ofNullable( table == null ? null : table.getTopLevelTable() );
+		SymbolTable parent = table != null && table.hasParent() ? table.getParent() : null;
+		return Optional.ofNullable( parent != null ? parent : table );
 	}
 	
 	private Stream<Symbol> symbolStream() 
