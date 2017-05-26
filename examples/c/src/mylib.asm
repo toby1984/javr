@@ -1260,21 +1260,23 @@ ir_setup:
 ir_receive:
 	movw r31:r30,r25:r24
 	clr bytes_received
-	ldi r27,0xff
-	ldi r26,0xff
-	movw r25:r24,timeout_value ; backup
-.wait_low
+	ldi r25,0xff
+	ldi r24,0xff
+; skip start bit 
+.wait_low1
 	sbic PIND,IR_DATA_PIN ; 2 
-	rjmp wait_low; 2 
-.cont
-	movw X,r25:r24
-.wait_hi
-	sbic PIND,IR_DATA_PIN
-	rjmp is_hi
-	sbiw X,1
-	brne wait_hi
-	rjmp timeout
-.is_hi
+	rjmp wait_low1
+.wait_hi1
+	sbis PIND,IR_DATA_PIN ; 2 
+	rjmp wait_hi1
+; regular loop
+.wait_low2
+	sbic PIND,IR_DATA_PIN ; 2 
+	rjmp wait_low2
+.wait_hi2
+	sbis PIND,IR_DATA_PIN ; 2 
+	rjmp wait_hi2	
+
 	movw X,r25:r24
 .measure_pulse
 	sbis PIND,IR_DATA_PIN ; 2 cycles on skip
@@ -1293,7 +1295,7 @@ ir_receive:
 	st Z+,r27
 	st Z+,r26
 	inc bytes_received ; increment byte counter
-	rjmp wait_low
+	rjmp wait_hi2
 	
 .buffer_full
 	ldi bytes_received,0xfe

@@ -17,6 +17,7 @@ void framebuffer_write_string(char *string,char x,char y);
 void linefeed(void);
 
 void print_hex(char value);
+void print_hex_nibble(char value);
 void println_hex(char value);
 
 void print(char* s);

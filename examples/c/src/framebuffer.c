@@ -1,8 +1,8 @@
 #include <mylib.h>
 #include <framebuffer.h>
 
-static char cursorx=0;
-static char cursory=0;
+static unsigned char cursorx=0;
+static unsigned char cursory=0;
 
 static char hexChars[] = {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'};
 
@@ -38,6 +38,15 @@ void print_hex(char value)
   buffer[0] = hexChars[ ( value & 0xf0) >> 4 ];
   buffer[1] = hexChars[ ( value & 0x0f)      ];    
   buffer[2]=0;
+  print( &buffer[0] );
+}
+
+void print_hex_nibble(char value) 
+{
+  char buffer[2];
+  
+  buffer[0] = hexChars[ ( value & 0x0f) ];
+  buffer[1]=0;
   print( &buffer[0] );
 }
 

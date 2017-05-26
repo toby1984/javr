@@ -37,36 +37,38 @@ int main()
   framebuffer_update_display();    
   
   while ( true ) {
+      
+      util_msleep(200);
       unsigned char received = ir_receive( &ir_buffer[0] , 50 );
       if ( received == 0xff || received == 0xfe) {
           print("error: ");
           println_hex( received );
           framebuffer_update_display();      
           debug_blink_red(1);
-      } else if ( received != 0 ) {
-          println("pulses: ");
-          println_hex( received );
-          
-          unsigned short last = ir_buffer[0];
-          unsigned char count = 1;
-          for ( unsigned char i = 1 ; i < received ; i++ ) {
-              if ( ir_buffer[i] == last ) {
-                count++;
-              } else {
-                  print_dec( count );
-                  print("x");
-                  if ( (char) (last & 0xff00) == (char) 0 ) {
-                     print_hex( (char) (last & 0xff));
-                  } else {
-                    print_hex( (char) (last & 0xff) >> 8 );
-                    print_hex( (char) (last & 0xff) );
+      } 
+      else if ( received != 0 ) 
+      {
+          linefeed();
+          print("pulses: ");
+          print_dec( received );
+          linefeed();
+          if ( received == 32 ) 
+          {
+            for ( unsigned char i = 0 ; i < received ; i+=8 ) 
+            {
+                unsigned char decoded = 0;
+                for ( unsigned char bit = 0 ; bit < 8 && (i+bit) < received ; bit++) 
+                {
+                  unsigned char value = ir_buffer[i+bit] & 0xff;                
+                  decoded <<= 1;
+                  if ( value > 0x05 && value <= 0x11 ) {
+                    decoded |= 1;
                   }
-                  print(",");
-                  count = 1;
-                  last = ir_buffer[i];
-              }
+                }
+                print_hex( decoded );
+            }
+            linefeed();              
           }
-          
           framebuffer_update_display();           
       }
   }
