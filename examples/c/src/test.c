@@ -19,6 +19,8 @@ void sleep_one_sec(void);
 
 int main() 
 {  
+    // debug_blink_red(100);
+  
   i2c_setup( LCD_ADR );
   
   if ( ! lcd_reset_display() ) {
@@ -31,49 +33,25 @@ int main()
     goto error;
   }
   
-  ir_setup();
-  
   framebuffer_clear();        
+  println("ready");
   framebuffer_update_display();    
   
-  while ( true ) {
-      
-      util_msleep(200);
-      unsigned char received = ir_receive( &ir_buffer[0] , 50 );
-      if ( received == 0xff || received == 0xfe) {
-          print("error: ");
-          println_hex( received );
-          framebuffer_update_display();      
-          debug_blink_red(1);
-      } 
-      else if ( received != 0 ) 
-      {
-          linefeed();
-          print("pulses: ");
-          print_dec( received );
-          linefeed();
-          if ( received == 32 ) 
-          {
-            for ( unsigned char i = 0 ; i < received ; i+=8 ) 
-            {
-                unsigned char decoded = 0;
-                for ( unsigned char bit = 0 ; bit < 8 && (i+bit) < received ; bit++) 
-                {
-                  unsigned char value = ir_buffer[i+bit] & 0xff;                
-                  decoded <<= 1;
-                  if ( value > 0x05 && value <= 0x11 ) {
-                    decoded |= 1;
-                  }
-                }
-                print_hex( decoded );
-            }
-            linefeed();              
-          }
-          framebuffer_update_display();           
-      }
+  /*
+  adc_setup( ADC_TEMP );
+  
+  while ( 1 ) {
+    unsigned short value = adc_read();
+    print_hex( (value >> 8 ) & 0xff );
+    print_hex( value & 0xff );
+    print( "..." );
+    framebuffer_update_display();       
+    sleep_one_sec();
   }
-  
-  
+  debug_blink_red(250);
+  debug_red_led_on();
+  debug_green_led_on();
+  */
   error:
   while (1 ) {
   }
@@ -82,4 +60,7 @@ int main()
 void sleep_one_sec(void) {
   util_msleep(200);    
   util_msleep(200);   
+  util_msleep(200);    
+  util_msleep(200);   
+  util_msleep(200);    
 }

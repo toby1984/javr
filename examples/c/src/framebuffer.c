@@ -9,7 +9,7 @@ static char hexChars[] = {'0','1','2','3','4','5','6','7','8','9','a','b','c','d
 /*
  * Writes a byte value as decimal string to the display.
  */
-void print_dec(char value) {
+void print_dec(unsigned char value) {
   
   char buffer[4];
   int ptr = 0;
@@ -31,7 +31,7 @@ void print_dec(char value) {
 /*
  * Writes a byte value as hexadecimal string to the display.
  */
-void print_hex(char value) 
+void print_hex(unsigned char value) 
 {
   char buffer[3];
   
@@ -41,7 +41,7 @@ void print_hex(char value)
   print( &buffer[0] );
 }
 
-void print_hex_nibble(char value) 
+void print_hex_nibble(unsigned char value) 
 {
   char buffer[2];
   
@@ -53,7 +53,7 @@ void print_hex_nibble(char value)
 /*
  * Writes a byte value as hexadecimal string to the display.
  */
-void println_hex(char value)  {
+void println_hex(unsigned char value)  {
   print_hex(value);
   linefeed();
 }

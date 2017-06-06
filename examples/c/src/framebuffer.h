@@ -16,13 +16,13 @@ void framebuffer_write_string(char *string,char x,char y);
 
 void linefeed(void);
 
-void print_hex(char value);
-void print_hex_nibble(char value);
-void println_hex(char value);
+void print_hex(unsigned char value);
+void print_hex_nibble(unsigned char value);
+void println_hex(unsigned char value);
 
 void print(char* s);
 void println(char* s);
 
-void print_dec(char value);
+void print_dec(unsigned char value);
 
 #endif
