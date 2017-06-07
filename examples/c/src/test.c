@@ -23,35 +23,35 @@ int main()
   
   i2c_setup( LCD_ADR );
   
-  if ( ! lcd_reset_display() ) {
-    debug_blink_red(2);
-    goto error;    
+//   if ( ! lcd_reset_display() ) {
+//     debug_blink_red(2);
+//     goto error;    
+//   }
+//   
+//   if ( ! lcd_display_on() ) {
+//     debug_blink_red(3);
+//     goto error;
+//   }
+  
+  for (unsigned char c = 2 ; c != 0xff ; c++ ) 
+  {
+    i2c_set_slave_address(c);
+    si7021_reset();
   }
   
-  if ( ! lcd_display_on() ) {
-    debug_blink_red(3);
-    goto error;
-  }
+//   framebuffer_clear();        
+//   println("ready");
+//   framebuffer_update_display();    
+//   
+//   while ( 1 ) {
+//     short value = si7021_read_temperature();
+//     print_hex( (value >> 8 ) & 0xff );
+//     print_hex( value & 0xff );
+//     print( "..." );
+//     framebuffer_update_display();       
+//     sleep_one_sec();
+//   }
   
-  framebuffer_clear();        
-  println("ready");
-  framebuffer_update_display();    
-  
-  /*
-  adc_setup( ADC_TEMP );
-  
-  while ( 1 ) {
-    unsigned short value = adc_read();
-    print_hex( (value >> 8 ) & 0xff );
-    print_hex( value & 0xff );
-    print( "..." );
-    framebuffer_update_display();       
-    sleep_one_sec();
-  }
-  debug_blink_red(250);
-  debug_red_led_on();
-  debug_green_led_on();
-  */
   error:
   while (1 ) {
   }

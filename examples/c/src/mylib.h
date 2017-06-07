@@ -7,6 +7,13 @@ extern void  i2c_setup(unsigned char deviceAdr);
 extern char  i2c_send_byte(unsigned char value);
 extern void  i2c_send_stop(void);
 extern char  i2c_send_start(void);
+extern void  i2c_set_slave_address(unsigned char deviceAdr);
+
+/*
+ *  SI7021
+ */
+extern short si7021_read_temperature(void);
+extern unsigned char si7021_reset(void);
 
 /*
  * LCD display
