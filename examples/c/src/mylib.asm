@@ -66,8 +66,8 @@ Return values:
 ; LSB indicates Read (1) or Write (0) operation 
 #define LCD_ADR %01111000 
 
-#define SI7021_READ_ADR 0x41
-#define SI7021_WRITE_ADR 0x40
+#define SI7021_READ_ADR 0x81
+#define SI7021_WRITE_ADR 0x80
 
 #define RX_TIMEOUT_STARTBIT 0xff
 
