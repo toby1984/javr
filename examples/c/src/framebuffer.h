@@ -25,4 +25,9 @@ void println(char* s);
 
 void print_dec(unsigned char value);
 
+void cursor_home(void);
+
+void print_float(float f);
+void println_float(float f);
+
 #endif

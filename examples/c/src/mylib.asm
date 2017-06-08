@@ -153,17 +153,37 @@ si7021_reset:
 	ret
 
 ; ====
-; Read temperature via I2C bus
+; Read temperature from Si7021 via I2C bus
 ; RETURN: r25:r24 - temperature value
 ; SCRATCHED: r18,r19
 ; ====
 si7021_read_temperature:
+	ldi r25,0xe3
+	rjmp si7021_read
+
+; ====
+; Read humidity from Si7021 via I2C bus.
+;
+; RETURN: r25:r24 - humidity value
+; SCRATCHED: r18,r19
+; ====
+si7021_read_humidity:
+	ldi r25,0xe5
+	rjmp si7021_read
+
+; ====
+; Send one-byte command to Si7021 and receive two bytes in Hold Master mode
+; INPUT: r25 - command to send
+; RETURN: r25:r24 - received bytes 
+; SCRATCHED: r18,r19,r24,r25
+; ====
+si7021_read:
 ; send start with SLA+W
 	ldi r24,SI7021_WRITE_ADR
 	rcall i2c_set_slave_address
 	rcall send_start
 	brcs error	
-	rcall debug_red_led_on
+
 ; request temperature
 	ldi r24,0xe3
 	rcall i2c_send_byte
@@ -174,10 +194,16 @@ si7021_read_temperature:
 	rcall i2c_set_slave_address
 	rcall send_start ; repeat start
 	brcs error
+
+          rcall i2c_send_ack
+
 ; receive 	MSB
 	rcall i2c_read
 	brcs error
 	mov r19,r24
+
+	rcall i2c_send_nack
+
 ; receive LSB
 	rcall i2c_read
 	brcs error
@@ -208,7 +234,15 @@ i2c_read:
 ; Sends a NACK via I2C
 ; =====
 i2c_send_nack:
-	ldi r24 ,(1<<TWINT) | (1<<TWEN)
+	ldi r24 ,(1<<TWINT)  | 1<<TWEN
+	sts TWCR, r24	
+	ret	
+
+; =====
+; Sends a ACK via I2C
+; =====
+i2c_send_ack:
+	ldi r24 ,(1<<TWINT)  | (1<<TWEA) | 1<<TWEN
 	sts TWCR, r24	
 	ret	
 	
@@ -318,7 +352,7 @@ i2c_setup:
         andi r24,%11111100
         sts TWSR,r24 ; prescaler bits = 00 => factor 1x
 
-        ldi r24,32 ; 100 kHz @ 8 Mhz CPU speed
+        ldi r24,8 ; 100 kHz @ 8 Mhz CPU speed
 ;        ldi r24,16 ; 100 kHz @ 8 Mhz CPU speed
         sts TWBR,r24 ; factor
 

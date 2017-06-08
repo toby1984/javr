@@ -13,6 +13,7 @@ extern void  i2c_set_slave_address(unsigned char deviceAdr);
  *  SI7021
  */
 extern short si7021_read_temperature(void);
+extern short si7021_read_humidity(void);
 extern unsigned char si7021_reset(void);
 
 /*

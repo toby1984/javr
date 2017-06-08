@@ -108,3 +108,48 @@ void framebuffer_write_string(char *string,char x,char y) {
   cursorx = currentX;
   cursory = currentY;
 }
+
+void cursor_home(void) {
+    cursorx = cursory = 0;
+}
+
+void println_float(float f) 
+{
+    print_float(f);
+    linefeed();
+}
+
+void print_float(float f) 
+{
+    char buffer[8]; // +ddd.ff
+
+    buffer[0] = '+';
+    buffer[4] = '.';
+    buffer[7] = 0;
+
+    int value = f*100;
+    if ( f < 0 ) {
+        buffer[0] = '-';
+        value = -f*100;
+    }
+    
+    int tmp = value / 10000;
+    buffer[1] = (char) ('0'+tmp);
+    value -= (tmp*10000);
+    
+    tmp = value / 1000;
+    buffer[2] = (char) ('0'+tmp);
+    value -= (tmp*1000);
+    
+    tmp = value / 100;
+    buffer[3] = (char) ('0'+tmp);
+    value -= (tmp*100);
+    
+    tmp = value / 10;
+    buffer[5] = (char) ('0'+tmp);
+    value -= (tmp*10);
+    
+    buffer[6] = (char) ('0'+value);
+    
+    print( &buffer[0] );    
+}
