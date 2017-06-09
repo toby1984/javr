@@ -38,7 +38,7 @@ Return values:
 => Arguments to functions with variable argument lists (printf etc.) are all passed on stack, and char is extended to int.
 */
 
-.equ CPU_FREQUENCY = 1000000 ; 8 Mhz
+.equ CPU_FREQUENCY = 8000000 ; 8 Mhz
 
 .equ CYCLES_PER_MS = CPU_FREQUENCY/1000
 
@@ -75,6 +75,12 @@ Return values:
 .equ BYTES_PER_ROW = DISPLAY_WIDTH_IN_PIXEL/GLYPH_WIDTH_IN_BITS
 
 .equ BYTES_PER_GLYPH = (GLYPH_WIDTH_IN_BITS*GLYPH_HEIGHT_IN_BITS)/8
+
+; serial interface
+
+#define UART_BAUD 11520
+
+.equ UART_BAUD_REG=(CPU_FREQUENCY-16*UART_BAUD)/(16*UART_BAUD)
 
 ; Display commands
 
@@ -1521,6 +1527,95 @@ adc_read:
 	lds r25,ADCH
 	ret
 
+; ====
+; Setup UART
+; SCRATCHED: r18,r19
+; ====
+uart_setup:
+; Set baud rate 
+; TODO: Hardcoded to 11520 @ 8 Mhz
+; TODO: Make sure to take double transmission speed bit UCSR0A into account here !!!
+	ldi r19,HIGH(8) ; HIGH(UART_BAUD_REG)
+	ldi r18,LOW(8) ; LOW(UART_BAUD_REG)
+	sts UBRR0H, r19
+	sts UBRR0L, r18
+; Enable receiver and transmitter
+	ldi r18, (1<<RXEN0)|(1<<TXEN0)
+	sts UCSR0B,r18
+; Set frame format: 8 data bits, 1 stop bit
+	ldi r18, %00000110
+	sts UCSR0C,r18
+; Double transmission speed
+	ldi r18,UCSR0A
+	ori r18,1<<U2X0
+	sts UCSR0A,r18
+	ret
+
+; ====
+; Send bytes using UART.
+; INPUT: r25:r24 - pointer to bytes to send
+; INPUT: r22 - number of bytes to send
+; SCRATCHED: r18,r22,r24,r30,r31
+; RESULT: r24 - 0 on error, 1 on success
+; =====
+uart_send:
+	movw r31:r30 , r25:r24
+; Wait for empty transmit buffer
+.wait_buffer_empty
+	lds r24, UCSR0A
+	sbrs r24, UDRE0
+	rjmp wait_buffer_empty
+; Put data (r16) into buffer, sends the data
+	ld r24,Z+
+	sts UDR0,r24
+	dec r22
+	brne wait_buffer_empty
+
+	ldi r24,1
+	ret
+.error
+	clr r24
+	ret
+
+; ===================
+; Receive bytes using UART.
+; INPUT: r25:r24 - pointer to buffer where received bytes should be stored
+; INPUT: r22 - size of buffer
+; SCRATCHED: r18,r24,r30,r31
+; RESULT: r24 - 0 on error, 1 on success
+; =====
+uart_receive:
+	movw r31:r30,r25:r24
+; Wait for data to be received
+.next_byte
+	ldi r25,0xff
+	ldi r24,0xff
+.wait_data_received
+	lds r24, UCSR0A
+	sbrc r24, RXC0
+	rjmp got_byte
+	sbiw r25:r24,1
+	brne wait_data_received
+	rjmp error
+.got_byte
+; check error status
+	andi r24,(1<<FE0)|(1<<DOR0)|(1<<UPE0) ; frame error | buffer overrun | parity error
+	brne error
+; Get and return received data from buffer
+	tst r22
+	breq error
+	dec r22
+	lds r18, UDR0
+	st Z+,r18
+	rjmp next_byte
+.success
+	ldi r24,1
+	ret
+.error
+	clr r24
+	ret
+
+; display commands
 commands: .dw cmd1,2
           .dw cmd2,3
           .dw cmd3,3

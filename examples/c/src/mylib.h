@@ -67,6 +67,13 @@ extern unsigned char ir_receive(unsigned short *buffer,unsigned char bufferSize)
 extern void adc_setup(unsigned char adcInput);
 extern unsigned short adc_read(void);
 
+/*
+ * UART functions
+ */
+extern void uart_setup(void);
+extern void uart_send(char *buffer,char bufsize);
+extern char uart_receive(char *buffer,char bufsize);
+
 #define ADC_0 0 // 0000 (0) - ADC0
 #define ADC_1 1 // 0000 (0) - ADC0
 #define ADC_2 2 // 0001 (1) - ADC1
