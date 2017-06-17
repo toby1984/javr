@@ -20,6 +20,8 @@ void print_hex(unsigned char value);
 void print_hex_nibble(unsigned char value);
 void println_hex(unsigned char value);
 
+void print_char(unsigned char c);
+
 void print(char* s);
 void println(char* s);
 

@@ -72,7 +72,9 @@ extern unsigned short adc_read(void);
  */
 extern void uart_setup(void);
 extern void uart_send(char *buffer,char bufsize);
-extern char uart_receive(char *buffer,char bufsize);
+extern short uart_receive(char *buffer,unsigned short bufsize);
+extern void uart_set115k2(void);
+extern void uart_set38k4(void);
 
 #define ADC_0 0 // 0000 (0) - ADC0
 #define ADC_1 1 // 0000 (0) - ADC0

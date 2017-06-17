@@ -50,6 +50,30 @@ void print_hex_nibble(unsigned char value)
   print( &buffer[0] );
 }
 
+void print_char(unsigned char c) 
+{
+    if ( c != 0x0d ) 
+    {
+        if ( c == 0x0a ) {
+          linefeed();
+        } 
+        else 
+        {
+            if ( c >= 'A' && c <= 'Z' ) {
+                c += 32;
+            } 
+            if ( cursorx >= COLUMNS ) {
+              cursorx=0;
+              if ( ++cursory >= ROWS ) {
+                framebuffer_scroll_up();
+                cursory = ROWS-1;
+              }
+            }
+            framebuffer_write_char( c , cursorx++, cursory);              
+        }          
+    }
+}
+
 /*
  * Writes a byte value as hexadecimal string to the display.
  */

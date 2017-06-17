@@ -1532,23 +1532,30 @@ adc_read:
 ; SCRATCHED: r18,r19
 ; ====
 uart_setup:
-; Set baud rate 
-; TODO: Hardcoded to 11520 @ 8 Mhz
-; TODO: Make sure to take double transmission speed bit UCSR0A into account here !!!
-	ldi r19,HIGH(8) ; HIGH(UART_BAUD_REG)
+	rcall uart_set115k2
+; Set frame format: 8N1
+	ldi r18, %00000110
+	sts UCSR0C,r18
+	ret
+
+uart_set115k2:
+	ldi r18,UCSR0A
+	ori r18,1<<U2X0  ; enable "double transmission" speed
+	sts UCSR0A,r18
+	ldi r19,HIGH(0) ; HIGH(UART_BAUD_REG)
 	ldi r18,LOW(8) ; LOW(UART_BAUD_REG)
 	sts UBRR0H, r19
 	sts UBRR0L, r18
-; Enable receiver and transmitter
-	ldi r18, (1<<RXEN0)|(1<<TXEN0)
-	sts UCSR0B,r18
-; Set frame format: 8 data bits, 1 stop bit
-	ldi r18, %00000110
-	sts UCSR0C,r18
-; Double transmission speed
+	ret
+
+uart_set38k4:
 	ldi r18,UCSR0A
-	ori r18,1<<U2X0
+	cbr r18,1<<U2X0  ; disable "double transmission" speed
 	sts UCSR0A,r18
+	ldi r19,HIGH(0) ; HIGH(UART_BAUD_REG)
+	ldi r18,LOW(12) ; LOW(UART_BAUD_REG)
+	sts UBRR0H, r19
+	sts UBRR0L, r18
 	ret
 
 ; ====
@@ -1559,6 +1566,9 @@ uart_setup:
 ; RESULT: r24 - 0 on error, 1 on success
 ; =====
 uart_send:
+	ldi r18,1<<TXEN0
+	sts UCSR0B,r18
+
 	movw r31:r30 , r25:r24
 ; Wait for empty transmit buffer
 .wait_buffer_empty
@@ -1580,39 +1590,68 @@ uart_send:
 ; ===================
 ; Receive bytes using UART.
 ; INPUT: r25:r24 - pointer to buffer where received bytes should be stored
-; INPUT: r22 - size of buffer
-; SCRATCHED: r18,r24,r30,r31
-; RESULT: r24 - 0 on error, 1 on success
+; INPUT: r23:r22 - size of buffer
+; SCRATCHED: r21,r22,r23,r24,r26,r27,r30,r31
+; RESULT: r25:r24 - number of bytes received or -1 on error
 ; =====
 uart_receive:
-	movw r31:r30,r25:r24
+; enable receiver
+	ldi r18,1<<RXEN0
+	sts UCSR0B,r18
+
+;         Set frame format: 8N1
+	ldi r18, %00000110
+	sts UCSR0C,r18
+
+	movw r31:r30,r25:r24 ; copy buffer ptr
+	movw r27:r26,r23:r22 ; copy  buffer size
 ; Wait for data to be received
 .next_byte
-	ldi r25,0xff
-	ldi r24,0xff
+	ldi r25,0xff ; timeout HI
+	ldi r24,0xff ; timeout LO
 .wait_data_received
-	lds r24, UCSR0A
-	sbrc r24, RXC0
+	lds r21, UCSR0A
+	sbrc r21, RXC0
 	rjmp got_byte
-	sbiw r25:r24,1
+	sbiw r25:r24,1 ; dec timeout counter
 	brne wait_data_received
-	rjmp error
+	rjmp success ; timeout elapsed
 .got_byte
 ; check error status
-	andi r24,(1<<FE0)|(1<<DOR0)|(1<<UPE0) ; frame error | buffer overrun | parity error
-	brne error
-; Get and return received data from buffer
-	tst r22
-	breq error
-	dec r22
-	lds r18, UDR0
-	st Z+,r18
+;	sbrc r21,FE0
+;	rjmp rx_error_frame
+	sbrc r21,DOR0
+	rjmp rx_error_lost
+	sbrc r21,UPE0
+	rjmp rx_error_parity
+	lds r21, UDR0 ; read data
+; make sure buffer still has enough space left
+	tst r26
+	brne bufnotempty
+          tst r27
+          breq buffer_too_small ; => buffer too small to hold all bytes
+.bufnotempty
+	sbiw r27:r26,1 ; decrement remaining bytes count
+; write byte to buffer
+	st Z+,r21
 	rjmp next_byte
 .success
-	ldi r24,1
+	sub r22,r26
+	sbc r23,r27
+	movw r25:r24,r23:r22
 	ret
-.error
-	clr r24
+.buffer_too_small
+	ldi r25,0xff
+	ldi r24,0xff
+	ret
+.rx_error_lost
+	ldi r25,0xff
+	ldi r24,0xfd
+	ret
+	ret
+.rx_error_parity
+	ldi r25,0xff
+	ldi r24,0xfc
 	ret
 
 ; display commands

@@ -35,3 +35,5 @@ download: binary
 # disable clk/8 divider
 disable_clockdiv:
 	/usr/bin/avrdude -F $(SPEED) -c stk500v2 -p ATMEGA328P -P /dev/ttyACM0 -v -U lfuse:w:0xE2:m 
+ext_crystal:
+	/usr/bin/avrdude -F $(SPEED) -c stk500v2 -p ATMEGA328P -P /dev/ttyACM0 -v -U lfuse:w:0xFD:m 
