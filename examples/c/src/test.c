@@ -78,18 +78,31 @@ void send(char *data) {
 unsigned char send_at_cmd(char *cmd) 
 {
     char *temp[5];  
-    unsigned char retryCnt = 3;
+    unsigned char retryCnt = 6;
     
     while ( retryCnt-- > 0 ) 
-    {
+    {  
       send( cmd );
     
       short cnt = receive(&temp,5);
-      if ( cnt == 1 && equals("ok",temp[0]) ) 
+      if ( cnt > 0 ) 
       {
-        return 1;
+        for ( int i = 0 ; i < cnt ; i++ ) {
+          print("got: ");
+          println( temp[i] );
+        }
+        if ( cnt == 1 && equals("ok",temp[0]) ) 
+        {
+          return 1;
+        }
+      } else {
+        print("err: ");  
+        print_hex( (cnt>>8) & 0xff );
+        println_hex( cnt & 0xff );
       }
+      framebuffer_update_display();
       sleep_one_sec();        
+      sleep_one_sec();       
     }
     return 0;    
 }
@@ -109,27 +122,58 @@ int main()
     debug_blink_red(3);
     goto error;
   }
-    
+
+  framebuffer_clear();    
+  framebuffer_update_display();   
+  
   sleep_one_sec();  
   
   uart_setup();    
-   
-  framebuffer_clear();    
-  framebuffer_update_display();   
   
   println("ready");
   framebuffer_update_display();   
           
-  send( "AT+UART=38400,8,1,0,0\r\n" );  
+  // send( "AT+UART=38400,8,1,0,0\r\n" );  
     
   uart_set38k4();
   
-  if ( send_at_cmd( "ATE0\r\n" ) ) {
-    println("success");    
-  } else {
-    println("fail");    
+  char errCode=1;
+  println("echo off");
+  if ( send_at_cmd( "ATE0\r\n" ) ) 
+  {
+    println("mux on");
+    if ( send_at_cmd("AT+CIPMUX=1\r\n") ) 
+    {
+        println("server on");
+        if ( send_at_cmd("AT+CIPSERVER=1") ) {
+          errCode = 0;
+        } else {
+          errCode = 3;
+        }
+    } else {
+      errCode = 2;  
+    }
   }
+  print("result: ");    
+  print_hex( errCode );
   framebuffer_update_display();    
+  
+  char *temp[5];   
+  while ( errCode == 0 ) 
+  {
+        sleep_one_sec();  
+        send("AT+CIPSTATUS\r\n");
+        
+        short code = receive( &temp , 5 );
+        if ( code > 0 ) 
+        {
+            for ( short i = 0 ; i < code ; i++ ) {
+              println( temp[i] );  
+            }
+        } else {
+            println("error");
+        }
+  }
     
     
 //   while ( 1 ) 
@@ -157,10 +201,9 @@ int main()
   }
 }
 
-void sleep_one_sec(void) {
-  util_msleep(200);    
-  util_msleep(200);   
-  util_msleep(200);    
-  util_msleep(200);   
-  util_msleep(200);    
+void sleep_one_sec(void) 
+{
+  for ( unsigned char i = 5 ; i > 0  ; i--) {
+    util_msleep(200);    
+  }
 }
