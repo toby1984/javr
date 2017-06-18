@@ -17,28 +17,54 @@ static char buffer[256];
  *  Globals
  */    
 
-void receive() 
+short receive(char* data[],unsigned short arraySize) 
 {
     short recv = uart_receive( &buffer[0], sizeof( buffer ) );
-    print("status: ");
-    print_hex( (recv >> 8) & 0xff);
-    println_hex(  recv & 0xff);    
-    if ( recv > 0 ) {
-      
-      for ( short i = 0 ; i < recv ; i++ ) {
-        print_hex( buffer[i] );
-        print_char(',');
-//         print_char( buffer[i] );
-      }
+    if ( recv <= 0 ) {
+      return recv;  
     }
-    framebuffer_update_display();        
+    // replace all \r\n with 0-bytes
+    for ( short i = 0 ; i < recv ; i++ ) 
+    {
+      char c = buffer[i];
+      if ( c < 32 ) {
+        buffer[i] = 0;
+      }
+    }      
+    
+    char *start = 0;  
+    short idx = 0;
+    for ( unsigned short i = 0 ; i < recv ; i++ ) 
+    {
+        unsigned char c = buffer[i];
+        if ( c ) {
+          if ( c > 64 && c < 91 ) {
+            buffer[i] = c + 32; 
+          }
+          if ( ! start ) {
+            start = &buffer[i];              
+          }                           
+        } else { // c == 0 
+            if ( start ) {
+              if ( idx == arraySize) {
+                  return -5; // buffer overflow 
+              }
+              data[idx++] = start;
+              start = 0;
+            }
+        }
+    }
+    return idx;
 }
 
-void print_buffer(char *buffer,unsigned short len) {
-    
-  for ( unsigned short i = 0 ; i <len ; i++) { 
-    
-  }  
+unsigned char equals(char *c1,char *c2) {
+      while ( *c1 && *c2 ) 
+      {
+        if ( *c1++ != *c2++ ) {
+            return 0;
+        }
+      }
+      return 1;
 }
 
 void send(char *data) {
@@ -49,9 +75,27 @@ void send(char *data) {
     uart_send(data,len);  
 }
 
+unsigned char send_at_cmd(char *cmd) 
+{
+    char *temp[5];  
+    unsigned char retryCnt = 3;
+    
+    while ( retryCnt-- > 0 ) 
+    {
+      send( cmd );
+    
+      short cnt = receive(&temp,5);
+      if ( cnt == 1 && equals("ok",temp[0]) ) 
+      {
+        return 1;
+      }
+      sleep_one_sec();        
+    }
+    return 0;    
+}
+
 int main() 
 {  
-    // debug_blink_red(100);  
   sleep_one_sec();  
   
   i2c_setup( LCD_ADR );
@@ -66,29 +110,26 @@ int main()
     goto error;
   }
     
-  framebuffer_clear();        
-  println("ready");
-  framebuffer_update_display();
-  
   sleep_one_sec();  
   
   uart_setup();    
    
-  println("done");
+  framebuffer_clear();    
   framebuffer_update_display();   
-      
-    // send( "AT+CWMODE=1\r\n" );
+  
+  println("ready");
+  framebuffer_update_display();   
+          
+  send( "AT+UART=38400,8,1,0,0\r\n" );  
     
-    uart_set38k4();
-    
-    send( "AT+GMR\r\n" );  
-    
-    // send( "AT+UART_CUR=38400,8,1,0,0\r\n" );    
-
-    // uart_set38k4();
-    
-    receive();
-    
+  uart_set38k4();
+  
+  if ( send_at_cmd( "ATE0\r\n" ) ) {
+    println("success");    
+  } else {
+    println("fail");    
+  }
+  framebuffer_update_display();    
     
     
 //   while ( 1 ) 

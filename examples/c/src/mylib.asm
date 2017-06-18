@@ -1534,8 +1534,8 @@ adc_read:
 uart_setup:
 	rcall uart_set115k2
 ; Set frame format: 8N1
-	ldi r18, %00000110
-	sts UCSR0C,r18
+;	ldi r18, %00000110
+;	sts UCSR0C,r18
 	ret
 
 uart_set115k2:
@@ -1600,8 +1600,8 @@ uart_receive:
 	sts UCSR0B,r18
 
 ;         Set frame format: 8N1
-	ldi r18, %00000110
-	sts UCSR0C,r18
+;	ldi r18, %00000110
+;	sts UCSR0C,r18
 
 	movw r31:r30,r25:r24 ; copy buffer ptr
 	movw r27:r26,r23:r22 ; copy  buffer size
