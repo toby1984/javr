@@ -1,8 +1,8 @@
 CC      = /usr/bin/avr-gcc
 LD      = /usr/bin/avr-ld
 LSCRIPT = /usr/lib/avr/lib/ldscripts/avr5.x
-CFLAGS  = -mmcu=atmega328p -O2 -funsigned-char -funsigned-bitfields -fpack-struct -fshort-enums -Wall -Wundef -std=gnu99 -T /usr/lib/avr/lib/ldscripts/avr5.x -Isrc
-# CFLAGS  = -mmcu=atmega328p
+# CFLAGS  = -mmcu=atmega328p -O2 -funsigned-char -funsigned-bitfields -fpack-struct -fshort-enums -Wall -Wundef -std=gnu99 -T /usr/lib/avr/lib/ldscripts/avr5.x -Isrc
+CFLAGS  = -mmcu=atmega328p -Os -funsigned-char -funsigned-bitfields -fpack-struct -fshort-enums -Wall -Wundef -std=gnu99 -T /usr/lib/avr/lib/ldscripts/avr5.x -Isrc
 OBJS = framebuffer.o  ps2.o  test.o
 # DEVICE = /dev/ttyACM0
 DEVICE = /dev/ttyACM1

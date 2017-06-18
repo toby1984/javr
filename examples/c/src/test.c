@@ -10,6 +10,7 @@
  */
 
 void sleep_one_sec(void);
+void sleep_seconds(unsigned char secs);
 
 static char buffer[256];
 
@@ -67,6 +68,28 @@ unsigned char equals(char *c1,char *c2) {
       return 1;
 }
 
+unsigned char starts_with_ignore_case(char *string, char *expected) {
+  
+      while ( *string ) 
+      {
+        if ( *expected == 0 ) {
+          return 1;
+        }
+        char c1 = *string++;
+        char c2 = *expected++;
+        if ( c1 >= 'A' && c1 <= 'Z' ) {
+          c1 += 32;  
+        }
+        if ( c2 >= 'A' && c2 <= 'Z' ) {
+          c2 += 32;  
+        }        
+        if ( c1 != c2 ) {
+            return 0;
+        }
+      }
+      return 0;   
+}
+
 void send(char *data) {
     unsigned short len = 0;
     for ( char *ptr=data ; *ptr != 0 ; ptr++) {
@@ -81,19 +104,19 @@ unsigned char send_at_cmd(char *cmd)
     unsigned char retryCnt = 6;
     
     while ( retryCnt-- > 0 ) 
-    {  
+    {        
       send( cmd );
     
       short cnt = receive(&temp,5);
       if ( cnt > 0 ) 
       {
         for ( int i = 0 ; i < cnt ; i++ ) {
-          print("got: ");
-          println( temp[i] );
-        }
-        if ( cnt == 1 && equals("ok",temp[0]) ) 
-        {
-          return 1;
+          print("got>");
+          print( temp[i] );
+          println("<");
+          if ( equals("ok",temp[i]) ) {
+            return 1;  
+          }            
         }
       } else {
         print("err: ");  
@@ -105,6 +128,21 @@ unsigned char send_at_cmd(char *cmd)
       sleep_one_sec();       
     }
     return 0;    
+}
+
+unsigned char send_at_cmds(char *cmds[],unsigned char count) 
+{
+    for ( unsigned char i= 0 ; i < count ; i++) 
+    {
+      print("send: ");
+      println( cmds[i] );
+      linefeed();
+      if ( ! send_at_cmd( cmds[i] ) )  {
+        return 0;
+      }
+      framebuffer_update_display();         
+    }
+    return 1;  
 }
 
 int main() 
@@ -126,41 +164,39 @@ int main()
   framebuffer_clear();    
   framebuffer_update_display();   
   
-  sleep_one_sec();  
+  sleep_seconds(3);  
   
   uart_setup();    
   
   println("ready");
   framebuffer_update_display();   
           
-  // send( "AT+UART=38400,8,1,0,0\r\n" );  
+  send( "AT+UART=38400,8,1,0,0\r\n" );  
     
   uart_set38k4();
   
-  char errCode=1;
-  println("echo off");
-  if ( send_at_cmd( "ATE0\r\n" ) ) 
-  {
-    println("mux on");
-    if ( send_at_cmd("AT+CIPMUX=1\r\n") ) 
-    {
-        println("server on");
-        if ( send_at_cmd("AT+CIPSERVER=1") ) {
-          errCode = 0;
-        } else {
-          errCode = 3;
-        }
-    } else {
-      errCode = 2;  
-    }
-  }
+  char *cmds[] = { "ATE0\r\n",
+                   "AT+CWMODE_CUR=2\r\n",
+                   "AT+CWSAP_CUR=\"esp8266\",\"1234567890\",5,3,1\r\n",
+                   "AT+CWDHCP_CUR=0,1\r\n",
+                   "AT+CIPMUX=1\r\n",
+                   "AT+CIPSERVER=1,1001\r\n"
+  };
+                 
+  unsigned char errCode=send_at_cmds( cmds , 6 ); 
+                                
   print("result: ");    
   print_hex( errCode );
   framebuffer_update_display();    
   
+//   if ( errCode ) {
+//     lcd_display_off();  
+//   }
   char *temp[5];   
-  while ( errCode == 0 ) 
+outer:
+  while ( errCode ) 
   {
+        framebuffer_update_display();      
         sleep_one_sec();  
         send("AT+CIPSTATUS\r\n");
         
@@ -168,8 +204,21 @@ int main()
         if ( code > 0 ) 
         {
             for ( short i = 0 ; i < code ; i++ ) {
-              println( temp[i] );  
+              if ( starts_with_ignore_case( temp[i] , "+CIPSTATUS:0" ) ) 
+              {                
+                println("connected!");
+                
+                send("AT+CIPSENDEX=0,6\r\n");
+                sleep_one_sec(); 
+                send("HALLO\n");
+                sleep_one_sec(); 
+                send("AT+CIPCLOSE=0\r\n");
+                sleep_one_sec(); 
+                goto outer;  
+              } 
+              println( temp[i] );
             }
+            println("no con");
         } else {
             println("error");
         }
@@ -200,6 +249,14 @@ int main()
   while (1 ) {
   }
 }
+
+void sleep_seconds(unsigned char secs) 
+{
+  for ( unsigned char i = secs ; i > 0 ; i-- ) {
+    sleep_one_sec();
+  }
+}
+  
 
 void sleep_one_sec(void) 
 {

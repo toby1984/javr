@@ -20,6 +20,7 @@ extern unsigned char si7021_reset(void);
  * LCD display
  */ 
 extern char lcd_display_on(void);
+extern char lcd_display_off(void);
 extern char lcd_reset_display(void);
 
 /*

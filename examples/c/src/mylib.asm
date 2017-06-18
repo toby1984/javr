@@ -88,6 +88,7 @@ Return values:
 .equ CMD_ROW_ADDRESSING_MODE = 1
 .equ CMD_PAGE_ADDRESSING_MODE = 2
 .equ CMD_DISPLAY_CHARGEPUMP_ON = 3
+.equ CMD_DISPLAY_OFF = 4
 
 ; SSD1306 request types
 
@@ -699,8 +700,19 @@ mark_page_dirty:
 lcd_display_on:
 	ldi r24, LCD_ADR
 	rcall i2c_set_slave_address
-;          ldi r24,CMD_DISPLAY_ON
 	ldi r24,CMD_DISPLAY_CHARGEPUMP_ON
+          rcall send_command
+          ret
+
+; ==================
+; Switch LCD displays off
+; SCRATCHED: r18,r22,r23,r24,r26,r27,r30,r31
+; RESULT: r24 != 0 => no errors, r24 = 0 => tx errors
+; ==================
+lcd_display_off:
+	ldi r24, LCD_ADR
+	rcall i2c_set_slave_address
+          ldi r24,CMD_DISPLAY_OFF
           rcall send_command
           ret
 
@@ -1659,11 +1671,14 @@ commands: .dw cmd1,2
           .dw cmd2,3
           .dw cmd3,3
           .dw cmd4,4
+          .dw cmd5,2
           
 cmd1:     .db REQ_SINGLE_COMMAND,0xaf ; switch display on
 cmd2:     .db REQ_COMMAND_STREAM,0x20, %00 ; set horizontal addressing mode (00), vertical = (01),page = 10
 cmd3:     .db REQ_COMMAND_STREAM,0x20, %10 ; set horizontal addressing mode (00), vertical = (01),page = 10)
 cmd4:     .db REQ_COMMAND_STREAM,0x8d,0x14,0xaf ; switch display on
+cmd5:     .db REQ_SINGLE_COMMAND,0xae ; switch display off
+
 
 charset:
     .db 0x00,0x3e,0x7f,0x41,0x4d,0x4f,0x2e,0x00 ; '@' (offset 0)
