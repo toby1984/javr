@@ -153,10 +153,18 @@ void println_float(float f)
     linefeed();
 }
 
-void print_float(float f) 
-{
+void print_float(float f) {
     char buffer[8]; // +ddd.ff
+    unsigned char len = sprint_float(f,&buffer[0],8);
+    buffer[len]=0;    
+    print( &buffer[0] );        
+}
 
+unsigned char sprint_float(float f,char *buffer,unsigned char buffersize) 
+{
+    if ( buffersize < 7 ) {
+       return 0; 
+    }
     buffer[0] = '+';
     buffer[4] = '.';
     buffer[7] = 0;
@@ -184,6 +192,5 @@ void print_float(float f)
     value -= (tmp*10);
     
     buffer[6] = (char) ('0'+value);
-    
-    print( &buffer[0] );    
+    return 7;
 }

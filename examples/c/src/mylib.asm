@@ -144,8 +144,8 @@ send_byte:
 ; ====
 si7021_reset:
 ; send start with SLA+W
-;	ldi r24,SI7021_WRITE_ADR
-;	rcall i2c_set_slave_address
+	ldi r24,SI7021_WRITE_ADR
+	rcall i2c_set_slave_address
 	rcall send_start
 	brcs error	
 	ldi r24,0xfe

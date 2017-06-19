@@ -30,6 +30,9 @@ void print_dec(unsigned char value);
 void cursor_home(void);
 
 void print_float(float f);
+
+// buffer NEEDS to be at least 7 characters in size
+unsigned char sprint_float(float f,char *buffer,unsigned char buffersize);
 void println_float(float f);
 
 #endif

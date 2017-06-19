@@ -12,7 +12,11 @@
 void sleep_one_sec(void);
 void sleep_seconds(unsigned char secs);
 
+unsigned char strcpy(char *src,char*dst);
+void serve_request(void);
+
 static char buffer[256];
+static char buffer2[50];
 
 /*
  *  Globals
@@ -98,10 +102,11 @@ void send(char *data) {
     uart_send(data,len);  
 }
 
-unsigned char send_at_cmd(char *cmd) 
+
+
+unsigned char send_at_cmd_retry(char *cmd,unsigned char retryCnt) 
 {
     char *temp[5];  
-    unsigned char retryCnt = 6;
     
     while ( retryCnt-- > 0 ) 
     {        
@@ -116,7 +121,8 @@ unsigned char send_at_cmd(char *cmd)
           println("<");
           if ( equals("ok",temp[i]) ) {
             return 1;  
-          }            
+          }           
+          framebuffer_update_display();          
         }
       } else {
         print("err: ");  
@@ -125,9 +131,12 @@ unsigned char send_at_cmd(char *cmd)
       }
       framebuffer_update_display();
       sleep_one_sec();        
-      sleep_one_sec();       
     }
     return 0;    
+}
+
+unsigned char send_at_cmd(char *cmd)  {
+   return send_at_cmd_retry(cmd,6); 
 }
 
 unsigned char send_at_cmds(char *cmds[],unsigned char count) 
@@ -147,8 +156,6 @@ unsigned char send_at_cmds(char *cmds[],unsigned char count)
 
 int main() 
 {  
-  sleep_one_sec();  
-  
   i2c_setup( LCD_ADR );
   
   if ( ! lcd_reset_display() ) {
@@ -160,7 +167,7 @@ int main()
     debug_blink_red(3);
     goto error;
   }
-
+  
   framebuffer_clear();    
   framebuffer_update_display();   
   
@@ -173,25 +180,33 @@ int main()
           
   send( "AT+UART=38400,8,1,0,0\r\n" );  
     
+  sleep_one_sec();  
+  sleep_one_sec();  
+  
   uart_set38k4();
   
-  char *cmds[] = { "ATE0\r\n",
-                   "AT+CWMODE_CUR=2\r\n",
-                   "AT+CWSAP_CUR=\"esp8266\",\"1234567890\",5,3,1\r\n",
-                   "AT+CWDHCP_CUR=0,1\r\n",
-                   "AT+CIPMUX=1\r\n",
-                   "AT+CIPSERVER=1,1001\r\n"
+  char *cmds1[] = { "ATE0\r\n",
+                    "AT+CWMODE_CUR=1\r\n" };
+                   
+  unsigned char errCode=send_at_cmds( cmds1 , 2 ); 
+  
+  send_at_cmd_retry("AT+CWJAP=\"Black hole 24\",\"2l33t2sp3ak\"\r\n",1);
+  
+  sleep_one_sec();  
+  sleep_one_sec();  
+  sleep_one_sec();  
+  
+  char *cmds2[] = { "AT+CIPMUX=1\r\n",
+                    "AT+CIPSERVER=1,1001\r\n"
+                    // ,"AT+SLEEP=1\r\n"
   };
                  
-  unsigned char errCode=send_at_cmds( cmds , 6 ); 
+  errCode=send_at_cmds( cmds2 , 2 ); 
                                 
   print("result: ");    
   print_hex( errCode );
   framebuffer_update_display();    
   
-//   if ( errCode ) {
-//     lcd_display_off();  
-//   }
   char *temp[5];   
 outer:
   while ( errCode ) 
@@ -206,14 +221,8 @@ outer:
             for ( short i = 0 ; i < code ; i++ ) {
               if ( starts_with_ignore_case( temp[i] , "+CIPSTATUS:0" ) ) 
               {                
-                println("connected!");
-                
-                send("AT+CIPSENDEX=0,6\r\n");
-                sleep_one_sec(); 
-                send("HALLO\n");
-                sleep_one_sec(); 
-                send("AT+CIPCLOSE=0\r\n");
-                sleep_one_sec(); 
+                println("connected!");                
+                serve_request();
                 goto outer;  
               } 
               println( temp[i] );
@@ -223,31 +232,51 @@ outer:
             println("error");
         }
   }
-    
-    
-//   while ( 1 ) 
-//   {
-//     framebuffer_clear();  
-//     cursor_home();
-//     
-//     short value = si7021_read_temperature();
-//     float tmp = ((175.72*value)/65536)-46.85;    
-//     print_float( tmp );
-//     println( " c" );
-// 
-//     value = si7021_read_humidity();
-//     tmp = ((125.0*value)/65536)-6;    
-//     print_float( tmp );
-//     println( " %" );
-//     
-//     framebuffer_update_display();       
-//     sleep_one_sec();
-//     sleep_one_sec();
-//   }
   
   error:
   while (1 ) {
   }
+}
+
+unsigned char strcpy(char *src,char*dst) 
+{
+  unsigned char len = 0;
+  while ( *src ) {
+    *dst++ = *src++;  
+    len++;
+  }  
+  return len;
+}
+
+void serve_request() 
+{
+    char *ptr = &buffer2[0];
+    
+    // read temperature
+    short value = si7021_read_temperature();
+    float tmp = ((175.72*value)/65536)-46.85;    
+    
+    // append temperature to buffer
+    ptr += sprint_float( tmp , ptr , sizeof(buffer2) );
+    ptr += strcpy( " c\n" , ptr );
+    
+    // read humidity
+    value = si7021_read_humidity();
+    tmp = ((125.0*value)/65536)-6;    
+    
+    // append humidity to buffer
+    ptr += sprint_float( tmp , ptr , sizeof(buffer2) );
+    ptr += strcpy(" %\n",ptr);
+    
+    // tell ESP8266 to send data
+    send("AT+CIPSENDEX=0,20\r\n");    
+    sleep_seconds(3);     
+    uart_send(&buffer2[0],20);     
+    
+    // close connection afterwards
+    sleep_seconds(3);
+    send("AT+CIPCLOSE=0\r\n");
+    sleep_one_sec();     
 }
 
 void sleep_seconds(unsigned char secs) 
