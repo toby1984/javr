@@ -1059,7 +1059,10 @@ public abstract class AbstractArchitecture implements IArchitecture
                     return fail("Operand needs to be an 8-bit constant",node,context);
                 }
                 if ( ! fitsInBitfield( result , 8 ) ) {
-                    return fail("Operand out of 8-bit range: "+result,node,context);
+                    if ( result > 0 || result < -128 ) {
+                        return fail("Operand out of 8-bit range: "+result,node,context);
+                    }
+                    return result & 0xff;
                 }
                 return result;
             case SIX_BIT_CONSTANT:
