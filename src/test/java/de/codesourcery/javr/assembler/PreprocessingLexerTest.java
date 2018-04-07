@@ -254,7 +254,7 @@ public class PreprocessingLexerTest extends TestCase
         };
         
         final Iterator<Token> tokens = lex("#include \"funky\"");
-        assertToken( TokenType.EOF, "" , 29 , tokens ); 
+        assertToken( TokenType.EOF, "" , 16 , tokens ); 
         assertEquals(1,messages.size());
         assertEquals("test", messages.get(0).message );
         assertEquals( Severity.INFO , messages.get(0).severity );        
@@ -285,7 +285,7 @@ public class PreprocessingLexerTest extends TestCase
         };
         
         final Iterator<Token> tokens = lex("#define test blubb\n#include \"funky\"");
-        assertToken( TokenType.EOF, "" , 30 , tokens ); 
+        assertToken( TokenType.EOF, "" , 35 , tokens ); 
         assertEquals(1,messages.size());
         assertEquals("blubb", messages.get(0).message );
         assertEquals( Severity.INFO , messages.get(0).severity );        
@@ -377,7 +377,7 @@ public class PreprocessingLexerTest extends TestCase
         final Iterator<Token> tokens = lex("#define a 42\n"
                 + "a");
         assertToken(TokenType.DIGITS,"42",13,tokens);
-        assertToken(TokenType.EOF,"",15,tokens);
+        assertToken(TokenType.EOF,"",14,tokens);
         assertFalse( tokens.hasNext() );
     }	
 
@@ -405,7 +405,7 @@ public class PreprocessingLexerTest extends TestCase
         final Iterator<Token> tokens = lex("#define a xxxxx\n"
                 + "a");
         assertToken(TokenType.TEXT,"xxxxx",16,tokens);
-        assertToken(TokenType.EOF,"",21,tokens);
+        assertToken(TokenType.EOF,"",17,tokens);
         assertFalse( tokens.hasNext() );
     }	
     
@@ -426,7 +426,7 @@ public class PreprocessingLexerTest extends TestCase
         final Iterator<Token> tokens = lex("#define TEST X\n"
                 + "TEST");
         assertToken(TokenType.TEXT,"X",15,tokens);
-        assertToken(TokenType.EOF,"",16,tokens);
+        assertToken(TokenType.EOF,"",19,tokens);
         assertFalse( tokens.hasNext() );
     }	
 
@@ -437,7 +437,7 @@ public class PreprocessingLexerTest extends TestCase
         assertToken(TokenType.TEXT,"y",17,tokens);
         assertToken(TokenType.OPERATOR,"+",18,tokens);
         assertToken(TokenType.TEXT,"y",19,tokens);
-        assertToken(TokenType.EOF,"",20,tokens);
+        assertToken(TokenType.EOF,"",21,tokens);
         assertFalse( tokens.hasNext() );
     }	
 
@@ -448,14 +448,14 @@ public class PreprocessingLexerTest extends TestCase
         assertToken(TokenType.DIGITS,"2",20,tokens);
         assertToken(TokenType.OPERATOR,"+",21,tokens);
         assertToken(TokenType.DIGITS,"2",22,tokens);
-        assertToken(TokenType.EOF,"",23,tokens);
+        assertToken(TokenType.EOF,"",27,tokens);
         assertFalse( tokens.hasNext() );
     }	
     
     public void testSymbolGetsExpandedInMessage() 
     {
         final Iterator<Token> tokens = lex("#define test blubb\n#message test");
-        assertToken(TokenType.EOF,"",33,tokens);        
+        assertToken(TokenType.EOF,"",32,tokens);        
         assertEquals(1,messages.size());
         assertEquals("blubb", messages.get(0).message );
         assertEquals( Severity.INFO , messages.get(0).severity );
@@ -515,7 +515,7 @@ public class PreprocessingLexerTest extends TestCase
         assertToken(TokenType.DIGITS,"1",22,tokens);
         assertToken(TokenType.OPERATOR,"+",23,tokens);
         assertToken(TokenType.DIGITS,"2",24,tokens);
-        assertToken(TokenType.EOF,"",25,tokens);
+        assertToken(TokenType.EOF,"",31,tokens);
         assertFalse( tokens.hasNext() );
     }   
 
@@ -526,7 +526,7 @@ public class PreprocessingLexerTest extends TestCase
         assertToken(TokenType.DIGITS,"1",24,tokens);
         assertToken(TokenType.OPERATOR,"+",26,tokens);
         assertToken(TokenType.DIGITS,"2",28,tokens);
-        assertToken(TokenType.EOF,"",29,tokens);
+        assertToken(TokenType.EOF,"",33,tokens);
         assertFalse( tokens.hasNext() );
     }    
     
