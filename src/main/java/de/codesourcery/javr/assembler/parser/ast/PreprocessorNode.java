@@ -15,18 +15,28 @@
  */
 package de.codesourcery.javr.assembler.parser.ast;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.apache.commons.lang3.Validate;
+import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.parser.TextRegion;
+import de.codesourcery.javr.assembler.util.FileResource;
+import de.codesourcery.javr.assembler.util.Resource;
 
-public class PreprocessorNode extends AbstractASTNode implements Resolvable {
+public class PreprocessorNode extends NodeWithMemoryLocation implements Resolvable {
+
+    private static final Logger LOG = Logger.getLogger( PreprocessorNode.class );
 
     public final Preprocessor type;
     public final List<String> arguments;
+    
+    private Resource file;
     
     public static enum Preprocessor 
     {
@@ -34,6 +44,7 @@ public class PreprocessorNode extends AbstractASTNode implements Resolvable {
         IF_NDEFINE("ifndef"),
         PRAGMA("pragma"),
         INCLUDE("include"),
+        INCLUDE_BINARY("incbin"),
         ENDIF("endif"),
         ERROR("error"),
         WARNING("warning"),
@@ -74,7 +85,9 @@ public class PreprocessorNode extends AbstractASTNode implements Resolvable {
     @Override
     protected PreprocessorNode createCopy() 
     {
-        return new PreprocessorNode( this.type , this.arguments , getTextRegion().createCopy() );
+        final PreprocessorNode result = new PreprocessorNode( this.type , this.arguments , getTextRegion().createCopy() );
+        result.file = this.file;
+        return result;
     }
 
     @Override
@@ -89,7 +102,7 @@ public class PreprocessorNode extends AbstractASTNode implements Resolvable {
     @Override
     public boolean resolve(ICompilationContext context) 
     {
-        if ( type == Preprocessor.DEFINE ) 
+        if ( hasType( Preprocessor.DEFINE ) ) 
         {
             children().forEach( child -> child.visitDepthFirst( (n,ctx) -> 
             { 
@@ -97,7 +110,76 @@ public class PreprocessorNode extends AbstractASTNode implements Resolvable {
                     ((Resolvable)n).resolve( context ); 
                 }
             }));
+        } 
+        else if ( hasType( Preprocessor.INCLUDE_BINARY ) ) 
+        {
+            try {
+                this.file = getResource(context).orElse( null );
+            } 
+            catch (IOException e) 
+            {
+                context.error("Failed to open file: "+e.getMessage(),this);
+                this.file = null;
+            }
         }
         return true;
+    }
+
+    @Override
+    public boolean hasMemoryLocation() {
+        return type == Preprocessor.INCLUDE_BINARY;
+    }
+    
+    public boolean hasType(Preprocessor includeBinary) 
+    {
+        if ( this.type == null ) {
+            throw new IllegalStateException("No type set");
+        }
+        return includeBinary.equals( this.type );
+    }    
+    
+    public Resource getFile() 
+    {
+        return file;
+    }
+    
+    public Optional<Resource> getResource(ICompilationContext context) throws IOException 
+    {
+        if ( getArguments().size() != 1 ) {
+            return Optional.empty();
+        }        
+        
+        String path = getArguments().get(0);
+        if ( path.startsWith("\"") &&  path.endsWith("\"") ) {
+            path = path.substring(1,path.length()-1 );
+        } else {
+            throw new RuntimeException("Internal error, filename is not in quotes");
+        }
+        return Optional.of( context.getResourceFactory().resolveResource( context.currentCompilationUnit().getResource(), path ) );
+    }
+    
+    public boolean isValidFile(Resource file) 
+    {
+        if ( file instanceof FileResource) 
+        {
+            final File f = ((FileResource) file).getFile();
+            final boolean exists = f.exists();
+            final boolean isFile = f.isFile();
+            final boolean canRead = f.canRead();
+            final boolean isOk = exists && isFile && canRead;
+            if ( ! isOk ) {
+                LOG.error("isValidFile(): #incbin failed to read "+f.getAbsolutePath()+" (exists: "+exists+" | is_file: "+isFile+" | can_read: "+canRead+")");
+            }
+            return isOk;
+        }
+        return true;
+    }
+    
+    @Override
+    public int getSizeInBytes() throws IllegalStateException {
+        if ( file == null ) {
+            throw new IllegalStateException("Called although file has not been resolved?");
+        }
+        return file.size();
     }
 }

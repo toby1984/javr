@@ -15,9 +15,13 @@
  */
 package de.codesourcery.javr.assembler.phases;
 
+import java.io.BufferedInputStream;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 import org.apache.log4j.Logger;
 
@@ -36,10 +40,11 @@ import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
 import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
+import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
+import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode.Preprocessor;
 import de.codesourcery.javr.assembler.symbols.Symbol;
-import de.codesourcery.javr.assembler.symbols.SymbolTable;
 import de.codesourcery.javr.assembler.symbols.Symbol.ObjectType;
-import de.codesourcery.javr.assembler.symbols.Symbol.Type;
+import de.codesourcery.javr.assembler.symbols.SymbolTable;
 
 /**
  * Performs the actual code generation.
@@ -259,9 +264,31 @@ public class GenerateCodePhase extends AbstractPhase
                     break;
                 default:
                     break;
-                
             }
             ctx.dontGoDeeper();
+        } 
+        else if ( node instanceof PreprocessorNode ) 
+        {
+            final PreprocessorNode pn = (PreprocessorNode) node;
+            if ( pn.hasType( Preprocessor.INCLUDE_BINARY ) ) 
+            {
+                if ( isInResolvePhase ) {
+                    context.allocateBytes( pn.getFile().size() ); 
+                } 
+                else 
+                {
+                    try ( InputStream in = new BufferedInputStream( pn.getFile().createInputStream() ) ) 
+                    {
+                        int data=0;
+                        while ( ( data = in.read() ) != -1 ) 
+                        {
+                            context.writeByte( data );
+                        }
+                    } catch (IOException e) {
+                        context.message( CompilationMessage.error( context.currentCompilationUnit() , "Failed to read "+pn.getFile(),node ) );
+                    }
+                }
+            }
         }
         return true;
     }    

@@ -15,10 +15,13 @@
  */
 package de.codesourcery.javr.assembler;
 
+import java.util.List;
+
 import org.junit.Test;
 
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.OperatorType;
+import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.CharacterLiteralNode;
@@ -53,6 +56,81 @@ public class ParserTest extends ParseTestHelper
         assertFalse( ast.hasChildren() );
         assertEquals( 0 ,  ast.childCount() );        
     }
+    
+    @Test
+    public void testParseIncludeBinary() 
+    {
+        AST ast = parse("#incbin \"test\"");
+        assertNotNull(ast);
+        assertEquals(1 , ast.childCount() );
+        
+        final ASTNode stmt = ast.child(0);
+        assertEquals( StatementNode.class     , stmt.getClass() );
+        assertEquals( 1 , stmt.childCount() );
+        
+        ASTNode child = stmt.child(0);
+        assertEquals( PreprocessorNode.class , child.getClass() );
+
+        final PreprocessorNode pn = (PreprocessorNode) child;
+        assertEquals( Preprocessor.INCLUDE_BINARY , pn.type );
+        final List<String> args = pn.getArguments();
+        assertEquals(1,args.size());
+        assertEquals("test",args.get(0) );
+        final TextRegion region = pn.getTextRegion();
+        assertEquals(0,region.start());
+        assertEquals(14,region.length());
+    }    
+    
+    @Test
+    public void testParseIncludeBinaryWithWhitespace() 
+    {
+        AST ast = parse("#incbin \"test1 test2\"");
+        assertNotNull(ast);
+        assertEquals(1 , ast.childCount() );
+        
+        final ASTNode stmt = ast.child(0);
+        assertEquals( StatementNode.class     , stmt.getClass() );
+        assertEquals( 1 , stmt.childCount() );
+        
+        ASTNode child = stmt.child(0);
+        assertEquals( PreprocessorNode.class , child.getClass() );
+
+        final PreprocessorNode pn = (PreprocessorNode) child;
+        assertEquals( Preprocessor.INCLUDE_BINARY , pn.type );
+        final List<String> args = pn.getArguments();
+        assertEquals(1,args.size());
+        assertEquals("test1 test2",args.get(0) );
+        final TextRegion region = pn.getTextRegion();
+        assertEquals(0,region.start());
+        assertEquals(21,region.length());
+    }      
+    
+    @Test
+    public void testParseIncludeBinaryNoArgs() 
+    {
+        AST ast = parse("#incbin");
+        assertTrue( unit.hasErrors( false ) );
+        assertNotNull(ast);
+        assertEquals(0 , ast.childCount() );
+    }
+    
+    @Test
+    public void testParseIncludeBinaryTooManyArgs() 
+    {
+        AST ast = parse("#incbin \"a\" \"b\"");
+        assertTrue( unit.hasErrors( false ) );
+        assertNotNull(ast);
+        assertEquals(0 , ast.childCount() );
+    }  
+    
+    @Test
+    public void testParseIncludeBinaryWrongArg() 
+    {
+        AST ast = parse("#incbin 3");
+        assertTrue( unit.hasErrors( false ) );
+        assertNotNull(ast);
+        assertEquals(0 , ast.childCount() );
+    }    
     
     @Test
     public void testParseCommentAfterEQUWithPreprocessingLexer() 

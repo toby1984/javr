@@ -15,8 +15,10 @@
  */
 package de.codesourcery.javr.assembler.phases;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.Segment;
@@ -29,7 +31,9 @@ import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
 import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
+import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
 import de.codesourcery.javr.assembler.symbols.Symbol.ObjectType;
+import de.codesourcery.javr.assembler.util.Resource;
 
 /**
  * Performs semantic checks on the AST.
@@ -63,7 +67,37 @@ public class SyntaxCheckPhase implements Phase
             @Override
             public void visit(ASTNode node, IIterationContext<?> ctx) 
             {
-                if ( node instanceof LabelNode ) 
+                if ( node instanceof PreprocessorNode) 
+                {
+                    final PreprocessorNode pn = (PreprocessorNode) node;
+                    if ( pn.hasType( PreprocessorNode.Preprocessor.INCLUDE_BINARY ) ) 
+                    {
+                        try {
+                            Optional<Resource> file = pn.getResource(context);
+                            if ( ! file.isPresent() ) {
+                                if ( ! context.error("Could not determine file to include" , node ) ) {
+                                    ctx.stop();
+                                }
+                            } 
+                            else 
+                            {
+                                if ( ! pn.isValidFile( file.get() ) ) 
+                                {
+                                    if ( ! context.error("Could not determine file to include: "+file.get() , node ) ) {
+                                        ctx.stop();
+                                    }                                
+                                }
+                            }                            
+                        } 
+                        catch (IOException e) 
+                        {
+                            if ( ! context.error("Failed to open file "+e.getMessage() , node ) ) {
+                                ctx.stop();
+                            }
+                        }
+                    }
+                } 
+                else if ( node instanceof LabelNode ) 
                 {
                     previousAddressLabels.add( (LabelNode) node );
                     if ( ((LabelNode) node).isGlobal() ) 

@@ -260,6 +260,40 @@ public class PreprocessingLexerTest extends TestCase
         assertEquals( Severity.INFO , messages.get(0).severity );        
     }
     
+    @Test public void testIncludeBinary() 
+    {
+        resFactory = new ResourceFactory() {
+
+            @Override
+            public Resource resolveResource(String child) throws IOException {
+                throw new RuntimeException("method not implemented: resolveResource");
+            }
+
+            @Override
+            public Resource resolveResource(Resource parent, String child) throws IOException 
+            {
+                assertEquals("funky",child);
+                return new StringResource("funky", "#message test");
+            }
+        };
+        unitFactory = res -> 
+        {
+            assertTrue( res instanceof StringResource);
+            final String resName = ((StringResource) res).getName();
+            assertTrue( "Expected ://funky but got "+resName , resName.endsWith("://funky") );
+            return new CompilationUnit( res , fakeContext.currentSymbolTable() );
+        };
+        
+        final Iterator<Token> tokens = lex("#incbin \"test string\"");
+        assertToken( TokenType.HASH, "#" , 0 , tokens ); 
+        assertToken( TokenType.TEXT, "incbin" , 1 , tokens ); 
+        assertToken( TokenType.DOUBLE_QUOTE, "\"" , 8 , tokens ); 
+        assertToken( TokenType.TEXT, "test" , 9 , tokens ); 
+        assertToken( TokenType.TEXT, "string" , 14 , tokens ); 
+        assertToken( TokenType.DOUBLE_QUOTE, "\"" , 20 , tokens ); 
+        assertToken( TokenType.EOF, "" , 21 , tokens ); 
+    }    
+    
     @Test public void testIncludeWithSymbolFromParentScope() 
     {
         resFactory = new ResourceFactory() 

@@ -15,6 +15,8 @@
  */
 package de.codesourcery.javr.assembler.parser;
 
+import static org.hamcrest.CoreMatchers.instanceOf;
+
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -352,6 +354,27 @@ public class Parser
                     throw new ParseException("Unknown preprocessor instruction: "+keywordToken,keywordToken);
                 }
                 
+                if ( proc == Preprocessor.INCLUDE_BINARY ) // #incbin
+                {
+                    final TextRegion r = new TextRegion( offset , lexer.peek().offset - offset, keywordToken.line , keywordToken.column );
+                    if ( ! lexer.peek( TokenType.DOUBLE_QUOTE ) ) {
+                        throw new ParseException("#incbin requires a file name in double quotes",lexer.peek());
+                    }
+                    ASTNode expr = parseExpression(lexer);
+                    if ( expr == null ) {
+                        throw new ParseException("Expected a string literal", lexer.peek() );
+                    }   
+                    if ( !(expr instanceof StringLiteral) ) {
+                        throw new ParseException("Expected a string literal", expr.getTextRegion().start() );
+                    }                     
+                    r.merge( expr.getTextRegion() );
+                    
+                    final List<String> args = new ArrayList<>();
+                    final StringLiteral stringLiteral = (StringLiteral) expr;
+                    args.add( '"'+stringLiteral.value+'"' );
+                    return new PreprocessorNode( proc , args , r );
+                }
+                
                 if ( proc == Preprocessor.PRAGMA ) // #pragma is currently ignored 
                 {
                     final TextRegion r = new TextRegion( offset , lexer.peek().offset - offset, keywordToken.line , keywordToken.column );
@@ -449,7 +472,7 @@ public class Parser
                 final TextRegion r = new TextRegion( offset , lexer.peek().offset - offset , keywordToken.line , keywordToken.column);
                 return new PreprocessorNode( proc , args , r );
             }
-            throw new ParseException("Expected a keyword",lexer.peek());
+            throw new ParseException("Expected a keyword but got "+lexer.peek().type,lexer.peek());
         }
         return null;
     }

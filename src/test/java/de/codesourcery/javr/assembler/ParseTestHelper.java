@@ -34,7 +34,7 @@ public class ParseTestHelper extends TestCase
     private final IArchitecture arch = new ATMega88();
     
     private CompilationContext compilationContext;
-    
+    protected CompilationUnit unit;
     
     // helper functions
     protected AST parse(String s) 
@@ -54,7 +54,7 @@ public class ParseTestHelper extends TestCase
         }
         final Parser p = new Parser(arch);
         final StringResource resource = new StringResource("dummy", s);
-        final CompilationUnit unit = new CompilationUnit( resource );
+        unit = new CompilationUnit( resource );
         
         final IProject project = new Project(unit);
         final ObjectCodeWriter writer = new ObjectCodeWriter();

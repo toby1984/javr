@@ -230,6 +230,9 @@ public class PrettyPrinter extends AbstractASTVisitor {
             case INCLUDE:
                 append("#include ");
                 break;
+            case INCLUDE_BINARY:
+                append("#incbin ");
+                break;                
             case MESSAGE:
                 append("#message ");
                 break;

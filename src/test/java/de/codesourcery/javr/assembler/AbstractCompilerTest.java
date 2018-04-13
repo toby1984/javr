@@ -17,10 +17,23 @@ package de.codesourcery.javr.assembler;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileAttribute;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+
+import org.junit.After;
+import org.junit.Before;
 
 import de.codesourcery.javr.assembler.arch.Architecture;
 import de.codesourcery.javr.assembler.elf.Relocation;
@@ -32,11 +45,106 @@ import de.codesourcery.javr.ui.config.ProjectConfiguration;
 import de.codesourcery.javr.ui.config.ProjectConfiguration.OutputFormat;
 import junit.framework.TestCase;
 
-public abstract class AbstractCompilerTest extends TestCase 
+public abstract class AbstractCompilerTest extends TestCase
 {
+    private final long time = System.currentTimeMillis();
+    private final AtomicLong index = new AtomicLong(0);
+    
+    private final List<File> toDelete = new ArrayList<>();
+    private File tmpDir;
+    
     protected CompilationUnit compilationUnit;
     protected ObjectCodeWriter objectCodeWriter;    
     protected Project project;
+    
+    protected ResourceFactory resourceFactory;
+    
+    protected final File createTmpDir() throws IOException 
+    {
+        final File dir = new File( tmpDir , "dir_"+time+"_"+index.incrementAndGet());
+        Files.createDirectories( dir.toPath() );
+        toDelete.add(dir);
+        return dir;
+    }
+    @Before
+    @Override
+    protected void setUp() throws Exception 
+    {
+        final File parent = new File( System.getProperty("java.io.tmpdir") );
+        tmpDir = new File( parent, "inbintest_"+time+"_"+index.incrementAndGet());
+        if ( ! tmpDir.mkdirs() ) {
+            throw new IOException("Failed to create temp dir "+tmpDir.getAbsolutePath());
+        }
+        toDelete.add( tmpDir );
+        
+        resourceFactory = new ResourceFactory() {
+            
+            @Override
+            public Resource resolveResource(Resource parent, String child) throws IOException {
+                throw new RuntimeException("method not implemented: resolveResource(Resource,String)");
+            }
+            
+            @Override
+            public Resource resolveResource(String child) throws IOException {
+                throw new RuntimeException("method not implemented: resolveResource(String)");
+            }
+        };
+    }
+    
+    @After
+    @Override
+    protected void tearDown() 
+    {
+        try {
+            for ( File f : toDelete ) 
+            {
+                try {
+                    delete( f );
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        } finally {
+            toDelete.clear();
+        }
+    }    
+    
+    protected final File createFile(String name,String content) throws FileNotFoundException, IOException {
+        return createFile(name,content.getBytes());
+    }
+    
+    protected final File createFile(String name,byte[] content) throws FileNotFoundException, IOException 
+    {
+        return writeFile( new File( tmpDir, name ), content );
+    }
+    
+    protected final File writeFile(File f,byte[] data) throws FileNotFoundException, IOException {
+        try ( FileOutputStream out = new FileOutputStream( f ) ) {
+            out.write( data );
+        }
+        return f;
+    }
+    
+    protected final void delete(File file) throws IOException 
+    {
+        if ( ! file.exists() ) {
+            return;
+        }
+        Path directory = file.toPath();
+        Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
+           @Override
+           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+               Files.delete(file);
+               return FileVisitResult.CONTINUE;
+           }
+
+           @Override
+           public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+               Files.delete(dir);
+               return FileVisitResult.CONTINUE;
+           }
+        });        
+    }    
     
     protected void assertNoOtherRelocationsExceptIn(Segment segment)
     {
@@ -136,24 +244,16 @@ public abstract class AbstractCompilerTest extends TestCase
     
     protected void compile(String s) throws IOException 
     {
+        compile( new StringResource( "in-memory" , s ) );
+    }
+    
+    protected void compile(Resource source) throws IOException 
+    {
         final Assembler asm = new Assembler();
-        
-        final ResourceFactory resourceFactory = new ResourceFactory() {
-            
-            @Override
-            public Resource resolveResource(Resource parent, String child) throws IOException {
-                throw new RuntimeException("method not implemented: resolveResource");
-            }
-            
-            @Override
-            public Resource resolveResource(String child) throws IOException {
-                throw new RuntimeException("method not implemented: resolveResource");
-            }
-        };
         
         objectCodeWriter = new ObjectCodeWriter();
         
-        compilationUnit = new CompilationUnit( new StringResource( "in-memory" , s ) );
+        compilationUnit = new CompilationUnit(source);
         final ProjectConfiguration projConfig = new ProjectConfiguration();
         projConfig.setArchitecture( Architecture.ATMEGA328P );
         projConfig.setBaseDir( new File("/tmp") );

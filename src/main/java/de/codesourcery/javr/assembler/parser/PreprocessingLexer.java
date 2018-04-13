@@ -317,7 +317,15 @@ public class PreprocessingLexer implements Lexer
                 }
                 continue;
             }
-
+            
+            if ( "incbin".equalsIgnoreCase( lexer().peek().value ) )  // #incbin is handled by parser
+            {
+                if ( compilationEnabled ) {
+                    unexpandedTokens.add( next );
+                }
+                continue;                
+            }
+            
             if ( "pragma".equalsIgnoreCase( lexer().peek().value ) )  // TODO: #pragma is currently ignored
             {
                 expandTokens();
@@ -337,6 +345,7 @@ public class PreprocessingLexer implements Lexer
             // We found a Preprocessor directive.
             final String directive = lexer().peek().value;
             consume(); // consume keyword
+            
             if ( directive.equalsIgnoreCase( "include" ) ) // #include "file"
             {
                 expandTokens();
