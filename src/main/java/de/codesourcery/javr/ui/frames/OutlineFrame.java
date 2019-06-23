@@ -40,18 +40,20 @@ import de.codesourcery.javr.ui.panels.OutlinePanel;
 
 public class OutlineFrame extends JInternalFrame implements IWindow , IProjectChangeListener
 {
-	private IModel<CompilationUnit> model = new IModel<CompilationUnit>() 
+	private IModel<CompilationUnit> model = new IModel<>()
 	{
 		private CompilationUnit unit;
-		
+
 		@Override
-		public CompilationUnit getObject() {
+		public CompilationUnit getObject()
+		{
 			return unit;
 		}
-		public void setObject(CompilationUnit obj) 
+
+		public void setObject(CompilationUnit obj)
 		{
 			this.unit = obj;
-			panel.setModel(this);
+			panel.setModel( this );
 		}
 	};
 	

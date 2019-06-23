@@ -163,7 +163,7 @@ public abstract class EditorPanel extends JPanel
 
     private final IApplicationConfigProvider appConfigProvider;
 
-    private final Consumer<IApplicationConfig> configListener = config -> 
+    private final Consumer<IApplicationConfig> configListener = config ->
     {
         setupStyles();
     };
@@ -204,36 +204,36 @@ public abstract class EditorPanel extends JPanel
     private ASTNode highlight;
     private boolean controlKeyPressed;
 
-    private boolean wasCompiledAtLeastOnce = false; 
+    private boolean wasCompiledAtLeastOnce = false;
     private final List<Runnable> afterCompilation = new ArrayList<>();
 
-    protected class MyMouseListener extends MouseAdapter 
+    protected class MyMouseListener extends MouseAdapter
     {
         private final Point point = new Point();
 
         @Override
-        public void mouseClicked(MouseEvent e) 
+        public void mouseClicked(MouseEvent e)
         {
-            if ( e.getClickCount() == 1 && e.getButton() == MouseEvent.BUTTON1 ) 
+            if ( e.getClickCount() == 1 && e.getButton() == MouseEvent.BUTTON1 )
             {
                 final IdentifierNode node = getNodeOnlyIfCtrl( e );
-                if ( node != null ) 
+                if ( node != null )
                 {
                     final Symbol symbol = getSymbol( node );
-                    if ( symbol != null && symbol.getTextRegion() != null ) 
+                    if ( symbol != null && symbol.getTextRegion() != null )
                     {
                         final TextRegion region = symbol.getTextRegion();
                         if ( symbol.getCompilationUnit().hasSameResourceAs( currentUnit ) ) {
                             setSelection( region );
-                        } 
-                        else 
+                        }
+                        else
                         {
-                            try 
+                            try
                             {
                                 final EditorPanel editor = topLevelWindow.openEditor( project , symbol.getCompilationUnit() );
                                 SwingUtilities.invokeLater( () -> editor.setSelection( region ) );
-                            } 
-                            catch (IOException e1) 
+                            }
+                            catch (IOException e1)
                             {
                                 e1.printStackTrace();
                             }
@@ -243,34 +243,34 @@ public abstract class EditorPanel extends JPanel
             }
         }
 
-        private Symbol getSymbol(IdentifierNode node) 
+        private Symbol getSymbol(IdentifierNode node)
         {
             Symbol result = node.getSymbol();
-            if ( result == null ) 
+            if ( result == null )
             {
                 final SymbolTable table = currentUnit.getSymbolTable().getTopLevelTable();
                 result = table.maybeGet( node.name ).orElse( null );
-                if ( result == null ) 
-                { 
+                if ( result == null )
+                {
                     // maybe this is the name of a local variable.
                     //
                     // Traverse the AST backwards until we find the next global label while looking for a match,
                     // if this fails try traversing the AST forwards until we reach the next global label
                     StatementNode statement = node.getStatement();
-                    while ( true ) 
+                    while ( true )
                     {
                         final List<LabelNode> labels = statement.findLabels();
                         boolean foundGlobalLabel = false;
-                        for ( LabelNode ln : labels ) 
+                        for ( LabelNode ln : labels )
                         {
-                            if ( ln.isGlobal() ) 
+                            if ( ln.isGlobal() )
                             {
                                 foundGlobalLabel = true;
                                 result = table.maybeGet( Identifier.newLocalGlobalIdentifier( ln.identifier , node.name ) ).orElse( null );
                                 if ( result != null ) {
                                     return result;
                                 }
-                            } 
+                            }
                         }
                         final int previousIdx = statement.getParent().indexOf( statement )-1;
                         if ( foundGlobalLabel || previousIdx < 0 ) {
@@ -284,11 +284,11 @@ public abstract class EditorPanel extends JPanel
         }
 
         @Override
-        public void mouseMoved(MouseEvent e) 
+        public void mouseMoved(MouseEvent e)
         {
             final IdentifierNode node = getNode( e );
             String toolTipText = null;
-            if ( node != null ) 
+            if ( node != null )
             {
                 final Symbol symbol = getSymbol( node );
                 if ( symbol != null ) {
@@ -296,7 +296,7 @@ public abstract class EditorPanel extends JPanel
                     if ( value != AbstractArchitecture.VALUE_UNAVAILABLE ) {
                         toolTipText = symbol.name()+" = "+value+" (0x"+Integer.toHexString( (int) value )+")";
                         System.out.println("TOOLTIP: "+toolTipText);
-                    } 
+                    }
                 }
             }
             editor.setToolTipText( toolTipText );
@@ -305,41 +305,41 @@ public abstract class EditorPanel extends JPanel
             }
         }
 
-        private IdentifierNode getNode(MouseEvent e) 
+        private IdentifierNode getNode(MouseEvent e)
         {
             point.x = e.getX();
             point.y = e.getY();
             final int pos = editor.viewToModel( point );
             ASTNode node = null;
-            if ( pos >= 0 ) 
+            if ( pos >= 0 )
             {
                 node = astTreeModel.getAST().getNodeAtOffset( pos );
             }
             return node == null || node.getTextRegion() == null || !(node instanceof IdentifierNode)? null : (IdentifierNode) node;
         }
 
-        private IdentifierNode getNodeOnlyIfCtrl(MouseEvent e) 
+        private IdentifierNode getNodeOnlyIfCtrl(MouseEvent e)
         {
-            return controlKeyPressed ? getNode( e ) : null; 
+            return controlKeyPressed ? getNode( e ) : null;
         }
     }
 
-    protected class SearchHelper 
+    protected class SearchHelper
     {
         private int currentPosition;
         private String term;
 
-        public boolean searchBackward() 
+        public boolean searchBackward()
         {
-            if ( ! canSearch() ) 
+            if ( ! canSearch() )
             {
                 return false;
-            } 
+            }
             String text = editor.getText().toLowerCase();
             if ( currentPosition ==0 ) {
                 System.out.println("At start of text, starting from end");
                 currentPosition = text.length()-1;
-            }            
+            }
             System.out.println("Starting to search  backwards @ "+currentPosition);
 
             int startIndex = 0;
@@ -348,7 +348,7 @@ public abstract class EditorPanel extends JPanel
             boolean searchWrapped = false;
             while ( previousMatch != -1 && startIndex < ( text.length()-1 ) ) {
                 final int match = text.indexOf( searchTerm , startIndex );
-                if ( match == -1 || match >= (currentPosition-1) ) 
+                if ( match == -1 || match >= (currentPosition-1) )
                 {
                     if ( searchWrapped || previousMatch < (currentPosition-1 ) ) {
                         break;
@@ -356,8 +356,8 @@ public abstract class EditorPanel extends JPanel
                     startIndex = 0;
                     currentPosition = text.length();
                     searchWrapped = true;
-                    continue;                    
-                } 
+                    continue;
+                }
                 previousMatch = match;
                 startIndex = previousMatch+1;
             }
@@ -369,21 +369,21 @@ public abstract class EditorPanel extends JPanel
             return false;
         }
 
-        private void gotoMatch(int cursorPos) 
+        private void gotoMatch(int cursorPos)
         {
             editor.setCaretPosition( cursorPos );
             editor.select( cursorPos , cursorPos+term.length() );
             editor.requestFocus();
             currentPosition = cursorPos+1;
-            System.out.println("Found match at "+cursorPos);            
+            System.out.println("Found match at "+cursorPos);
         }
 
-        public boolean searchForward() 
+        public boolean searchForward()
         {
-            if ( ! canSearch() ) 
+            if ( ! canSearch() )
             {
                 return false;
-            }            
+            }
             final String text = editor.getText();
             if ( currentPosition >= text.length()) {
                 System.out.println("At end of text, starting from 0");
@@ -391,7 +391,7 @@ public abstract class EditorPanel extends JPanel
             }
             System.out.println("Starting to search @ "+currentPosition);
             final int nextMatch = text.substring( currentPosition , text.length() ).toLowerCase().indexOf( term.toLowerCase() );
-            if ( nextMatch != -1 ) 
+            if ( nextMatch != -1 )
             {
                 gotoMatch( currentPosition + nextMatch );
                 return true;
@@ -405,7 +405,7 @@ public abstract class EditorPanel extends JPanel
             currentPosition = 0;
         }
 
-        public boolean canSearch() 
+        public boolean canSearch()
         {
             final String text = editor.getText();
             return term != null && term.length() > 0 && text != null && text.length() != 0;
@@ -427,17 +427,17 @@ public abstract class EditorPanel extends JPanel
 
         private Function<T,Boolean> filterFunc = x -> true;
 
-        public void setFilterFunc(Function<T,Boolean> filterFunc ) 
+        public void setFilterFunc(Function<T,Boolean> filterFunc )
         {
             Validate.notNull(filterFunc, "filterFunc must not be NULL");
             this.filterFunc = filterFunc;
             doFilter();
         }
 
-        private void doFilter() 
+        private void doFilter()
         {
             filtered.clear();
-            for ( T elem : unfiltered ) 
+            for ( T elem : unfiltered )
             {
                 if ( filterFunc.apply( elem ) == Boolean.TRUE ) {
                     filtered.add( elem );
@@ -446,7 +446,7 @@ public abstract class EditorPanel extends JPanel
         }
 
         @Override
-        public boolean addAll(Collection<? extends T> c) 
+        public boolean addAll(Collection<? extends T> c)
         {
             boolean result = false;
             for ( T elem : c ) {
@@ -456,7 +456,7 @@ public abstract class EditorPanel extends JPanel
         }
 
         @Override
-        public boolean add(T e) 
+        public boolean add(T e)
         {
             Validate.notNull(e, "e must not be NULL");
             unfiltered.add( e );
@@ -479,7 +479,7 @@ public abstract class EditorPanel extends JPanel
         }
 
         @Override
-        public T get(int index) 
+        public T get(int index)
         {
             return filtered.get(index);
         }
@@ -490,13 +490,13 @@ public abstract class EditorPanel extends JPanel
         }
     }
 
-    protected class IndentFilter extends DocumentFilter 
+    protected class IndentFilter extends DocumentFilter
     {
         private static final String NEWLINE = "\n";
 
         public void insertString(FilterBypass fb, int offs, String str, AttributeSet a) throws BadLocationException
         {
-            if ( isNewline( str ) ) 
+            if ( isNewline( str ) )
             {
                 str = addWhiteSpace(fb.getDocument(), offs);
             }
@@ -540,7 +540,7 @@ public abstract class EditorPanel extends JPanel
                 }
             }
             return whiteSpace.toString();
-        }        
+        }
     }
 
     protected final class RecompilationThread extends Thread {
@@ -556,19 +556,19 @@ public abstract class EditorPanel extends JPanel
             setName("recompilation");
         }
 
-        public void run() 
+        public void run()
         {
-            while ( ! terminate.get() ) 
+            while ( ! terminate.get() )
             {
-                long ts = -1;                    
-                synchronized( SLEEP_LOCK ) 
+                long ts = -1;
+                synchronized( SLEEP_LOCK )
                 {
                     try
                     {
                         SLEEP_LOCK.wait();
                         ts = lastChange;
                     }
-                    catch (InterruptedException e) { /* */ } 
+                    catch (InterruptedException e) { /* */ }
                 }
 
                 if ( ts == -1 ) {
@@ -576,23 +576,23 @@ public abstract class EditorPanel extends JPanel
                 }
 
                 boolean doRecompile = false;
-                while( ! terminate.get() ) 
+                while( ! terminate.get() )
                 {
                     try { Thread.sleep( (int) RECOMPILATION_DELAY.toMillis() ); } catch(Exception e) { /* */ }
 
-                    synchronized( SLEEP_LOCK ) 
+                    synchronized( SLEEP_LOCK )
                     {
-                        if( lastChange == ts ) 
+                        if( lastChange == ts )
                         {
                             lastChange = -1;
                             doRecompile = true;
                             break;
-                        } 
+                        }
                         ts = lastChange;
                     }
                 }
 
-                if ( doRecompile ) 
+                if ( doRecompile )
                 {
                     try {
                         SwingUtilities.invokeAndWait( () -> compile() );
@@ -604,10 +604,10 @@ public abstract class EditorPanel extends JPanel
             }
         }
 
-        public void documentChanged(DocumentEvent event) 
+        public void documentChanged(DocumentEvent event)
         {
             // new Exception("===============> Document changed").printStackTrace();
-            synchronized ( SLEEP_LOCK ) 
+            synchronized ( SLEEP_LOCK )
             {
                 lastChange = System.currentTimeMillis();
                 SLEEP_LOCK.notifyAll();
@@ -630,9 +630,9 @@ public abstract class EditorPanel extends JPanel
             final List<Symbol> allSymbolsSorted = table.getAllSymbolsSorted();
             this.symbols.addAll( allSymbolsSorted );
             tableChanged();
-        }        
+        }
 
-        public void clear() 
+        public void clear()
         {
             symbols.clear();
             setFilterString( this.filterString );
@@ -643,17 +643,17 @@ public abstract class EditorPanel extends JPanel
             listeners.forEach( l -> l.tableChanged( ev ) );
         }
 
-        public void setFilterString(String s) 
+        public void setFilterString(String s)
         {
             this.filterString = s == null ? null : s.toLowerCase();
             final Function<Symbol,Boolean> func;
-            if ( filterString == null ) 
+            if ( filterString == null )
             {
                 func = symbol -> true;
             } else {
                 func = symbol -> filterString == null ? Boolean.TRUE : Boolean.valueOf( symbol.name().value.toLowerCase().contains( filterString ) );
             }
-            symbols.setFilterFunc( func );        
+            symbols.setFilterFunc( func );
             tableChanged();
         }
 
@@ -673,7 +673,7 @@ public abstract class EditorPanel extends JPanel
             }
         }
         @Override
-        public String getColumnName(int columnIndex) 
+        public String getColumnName(int columnIndex)
         {
             switch(columnIndex) {
                 case 0:
@@ -681,9 +681,9 @@ public abstract class EditorPanel extends JPanel
                 case 1:
                     return "Symbol Type";
                 case 2:
-                    return "Object Type";		
+                    return "Object Type";
                 case 3:
-                    return "Object Size";                       
+                    return "Object Size";
                 case 4:
                     return "Segment";
                 case 5:
@@ -698,7 +698,7 @@ public abstract class EditorPanel extends JPanel
         }
 
         @Override
-        public Class<?> getColumnClass(int columnIndex) 
+        public Class<?> getColumnClass(int columnIndex)
         {
             assertValidColumn(columnIndex);
             return String.class;
@@ -710,7 +710,7 @@ public abstract class EditorPanel extends JPanel
         }
 
         @Override
-        public Object getValueAt(int rowIndex, int columnIndex) 
+        public Object getValueAt(int rowIndex, int columnIndex)
         {
             final Symbol symbol = symbols.get(rowIndex);
             switch( columnIndex ) {
@@ -724,16 +724,16 @@ public abstract class EditorPanel extends JPanel
                     return Integer.toString( symbol.getObjectSize() );
                 case 4:
                     final Segment segment = symbol.getSegment();
-                    return segment == null ? "--" : segment.toString();					
+                    return segment == null ? "--" : segment.toString();
                 case 5:
-                    final Object value = symbol.getValue(); 
+                    final Object value = symbol.getValue();
                     return value == null ? "<no value>" : value.toString();
                 case 6:
                     return symbol.getNode() == null ? null : symbol.getNode().toString();
                 case 7:
                     return symbol.getCompilationUnit().getResource().toString();
                 default:
-                    throw new RuntimeException("Invalid column: "+columnIndex);                 
+                    throw new RuntimeException("Invalid column: "+columnIndex);
             }
         }
 
@@ -753,13 +753,13 @@ public abstract class EditorPanel extends JPanel
         }
     }
 
-    private final class ASTTreeModel implements TreeModel 
+    private final class ASTTreeModel implements TreeModel
     {
         private final List<TreeModelListener> listeners = new ArrayList<>();
 
         private AST ast = new AST();
 
-        public void setAST(AST ast) 
+        public void setAST(AST ast)
         {
             this.ast = ast;
 
@@ -767,7 +767,7 @@ public abstract class EditorPanel extends JPanel
             listeners.forEach( l -> l.treeStructureChanged( ev  ) );
         }
 
-        public AST getAST() 
+        public AST getAST()
         {
             return ast;
         }
@@ -778,7 +778,7 @@ public abstract class EditorPanel extends JPanel
         }
 
         @Override
-        public Object getChild(Object parent, int index) 
+        public Object getChild(Object parent, int index)
         {
             return ((ASTNode) parent).child(index);
         }
@@ -794,7 +794,7 @@ public abstract class EditorPanel extends JPanel
         }
 
         @Override
-        public void valueForPathChanged(TreePath path, Object newValue) 
+        public void valueForPathChanged(TreePath path, Object newValue)
         {
             final TreeModelEvent ev = new TreeModelEvent(this , path );
             listeners.forEach( l -> l.treeNodesChanged( ev  ) );
@@ -817,7 +817,7 @@ public abstract class EditorPanel extends JPanel
     }
 
     public EditorPanel(IProject project, EditorFrame topLevelWindow , CompilationUnit unit,IApplicationConfigProvider appConfigProvider,MessageFrame messageFrame,
-            CaretPositionTracker caretTracker) throws IOException 
+            CaretPositionTracker caretTracker) throws IOException
     {
         Validate.notNull(project, "project must not be NULL");
         Validate.notNull(unit, "unit must not be NULL");
@@ -832,18 +832,18 @@ public abstract class EditorPanel extends JPanel
         this.caretTracker = caretTracker;
 
         // symbol auto completion callback
-        autoComplete.setCallback( new DefaultAutoCompleteCallback<Symbol>() 
+        autoComplete.setCallback( new DefaultAutoCompleteCallback<Symbol>()
         {
             private Symbol previousGlobalSymbol;
 
             private final char[] separatorChars = new char[] {'(',')',','};
 
-            private boolean matches(Identifier name,String userInput) 
+            private boolean matches(Identifier name,String userInput)
             {
-                for ( int i = 0 , matchCount = 0 , len = name.value.length() < userInput.length() ? name.value.length() : userInput.length() ; i < len ; i++ ) 
+                for ( int i = 0 , matchCount = 0 , len = name.value.length() < userInput.length() ? name.value.length() : userInput.length() ; i < len ; i++ )
                 {
                     final char c = Character.toLowerCase( name.value.charAt( i ) );
-                    if ( c == userInput.charAt(i) ) 
+                    if ( c == userInput.charAt(i) )
                     {
                         matchCount++;
                         if ( matchCount == 3 ) {
@@ -852,18 +852,18 @@ public abstract class EditorPanel extends JPanel
                     } else {
                         break;
                     }
-                }		        
+                }
                 if ( name.value.toLowerCase().contains( userInput ) ) {
                     return true;
                 }
                 return false;
             }
 
-            private boolean matches(Symbol symbol,String userInput) 
+            private boolean matches(Symbol symbol,String userInput)
             {
-                if ( previousGlobalSymbol != null ) 
+                if ( previousGlobalSymbol != null )
                 {
-                    if ( symbol.isLocalLabel() ) 
+                    if ( symbol.isLocalLabel() )
                     {
                         if ( symbol.getGlobalNamePart().equals( previousGlobalSymbol.name() ) )
                         {
@@ -871,16 +871,16 @@ public abstract class EditorPanel extends JPanel
                                 return true;
                             }
                         }
-                    } 
+                    }
                     else if ( matches( symbol.name() , userInput ) ) // global label 
                     {
                         return true;
                     }
-                } 
-                else 
+                }
+                else
                 {
                     // no previous global symbol, only consider global labels
-                    if ( symbol.isGlobalLabel() && matches( symbol.name() , userInput ) ) 
+                    if ( symbol.isGlobalLabel() && matches( symbol.name() , userInput ) )
                     {
                         return true;
                     }
@@ -889,12 +889,12 @@ public abstract class EditorPanel extends JPanel
             }
 
             @Override
-            protected boolean isSeparatorChar(char c) 
+            protected boolean isSeparatorChar(char c)
             {
                 if ( Character.isWhitespace( c ) ) {
                     return true;
                 }
-                for ( int i = 0, len = separatorChars.length ; i < len ; i++ ) 
+                for ( int i = 0, len = separatorChars.length ; i < len ; i++ )
                 {
                     if ( c == separatorChars[i] ) {
                         return true;
@@ -904,7 +904,7 @@ public abstract class EditorPanel extends JPanel
             }
 
             @Override
-            public List<Symbol> getProposals(String input) 
+            public List<Symbol> getProposals(String input)
             {
                 System.out.println("*** Looking for >"+input+"<");
                 final String lower = input.toLowerCase();
@@ -913,23 +913,23 @@ public abstract class EditorPanel extends JPanel
                 final List<Symbol> localMatches = new ArrayList<>();
 
                 final SymbolTable globalTable = currentUnit.getSymbolTable().getTopLevelTable();
-                globalTable.visitSymbols( (symbol) -> 
+                globalTable.visitSymbols( (symbol) ->
                 {
-                    switch( symbol.getType() ) 
+                    switch( symbol.getType() )
                     {
                         case ADDRESS_LABEL:
-                            if ( matches(symbol , lower ) ) 
+                            if ( matches(symbol , lower ) )
                             {
                                 if ( symbol.isLocalLabel() ) {
                                     localMatches.add(symbol);
                                 } else {
-                                    globalMatches.add(symbol); 
+                                    globalMatches.add(symbol);
                                 }
                             }
                             break;
                         case EQU:
                         case PREPROCESSOR_MACRO:
-                            if ( symbol.name().value.toLowerCase().contains( lower ) ) 
+                            if ( symbol.name().value.toLowerCase().contains( lower ) )
                             {
                                 globalMatches.add( symbol );
                             }
@@ -951,7 +951,7 @@ public abstract class EditorPanel extends JPanel
             }
 
             @Override
-            public String getStringToInsert(Symbol value) 
+            public String getStringToInsert(Symbol value)
             {
                 if ( value.isLocalLabel() ) {
                     return value.getLocalNamePart().value;
@@ -960,21 +960,21 @@ public abstract class EditorPanel extends JPanel
             }
 
             @Override
-            public InitialUserInput getInitialUserInput(JTextComponent editor, int caretPosition) 
+            public InitialUserInput getInitialUserInput(JTextComponent editor, int caretPosition)
             {
                 previousGlobalSymbol = null;
                 final ASTNode node = astTreeModel.getAST().getNodeAtOffset( caretPosition-1 );
-                if ( node != null ) 
+                if ( node != null )
                 {
                     final SymbolTable globalTable = currentUnit.getSymbolTable().getTopLevelTable();
-                    node.searchBackwards( n -> 
+                    node.searchBackwards( n ->
                     {
-                        if ( n instanceof LabelNode) 
+                        if ( n instanceof LabelNode)
                         {
-                            if ( ((LabelNode) n).isGlobal() ) 
+                            if ( ((LabelNode) n).isGlobal() )
                             {
                                 final Optional<Symbol> symbol = globalTable.maybeGet( ((LabelNode) n).identifier , Type.ADDRESS_LABEL );
-                                if ( symbol.isPresent() ) 
+                                if ( symbol.isPresent() )
                                 {
                                     previousGlobalSymbol = symbol.get();
                                     return true;
@@ -992,7 +992,7 @@ public abstract class EditorPanel extends JPanel
 
         autoComplete.setListCellRenderer( new DefaultListCellRenderer() {
 
-            public Component getListCellRendererComponent(javax.swing.JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) 
+            public Component getListCellRendererComponent(javax.swing.JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus)
             {
                 final Component result = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
                 final Symbol symbol = (Symbol) value;
@@ -1005,34 +1005,34 @@ public abstract class EditorPanel extends JPanel
         autoComplete.setVisibleRowCount( 10 );
 
         editor.setFont( new Font(Font.MONOSPACED, Font.PLAIN, 12) );
-        editor.addCaretListener( new CaretListener() 
+        editor.addCaretListener( new CaretListener()
         {
             @Override
-            public void caretUpdate(CaretEvent e) 
+            public void caretUpdate(CaretEvent e)
             {
                 cursorPositionLabel.setText( Integer.toString( e.getDot()  ) );
             }
         });
-        final MyMouseListener mouseListener = new MyMouseListener(); 
+        final MyMouseListener mouseListener = new MyMouseListener();
 
         editor.addMouseMotionListener( mouseListener);
         editor.addMouseListener( mouseListener );
-        editor.addKeyListener( new KeyAdapter() 
+        editor.addKeyListener( new KeyAdapter()
         {
 
             @Override
-            public void keyPressed(KeyEvent e) 
+            public void keyPressed(KeyEvent e)
             {
                 if ( isCtrlDown( e ) && e.getKeyCode() == KeyEvent.VK_W ) {
                     EditorPanel.this.close( true );
-                } 
+                }
                 else if ( e.getKeyCode() == KeyEvent.VK_CONTROL ) {
                     controlKeyPressed = true;
                 }
             }
 
             @Override
-            public void keyReleased(KeyEvent e) 
+            public void keyReleased(KeyEvent e)
             {
                 if ( e.getKeyCode() == KeyEvent.VK_CONTROL ) {
                     setHighlight( null );
@@ -1040,26 +1040,26 @@ public abstract class EditorPanel extends JPanel
                 }
             }
 
-            private boolean isCtrlDown(KeyEvent e) 
+            private boolean isCtrlDown(KeyEvent e)
             {
-                return ( e.getModifiersEx() & KeyEvent.CTRL_DOWN_MASK ) != 0; 
+                return ( e.getModifiersEx() & KeyEvent.CTRL_DOWN_MASK ) != 0;
             }
 
-            private boolean isAltDown(KeyEvent e) 
+            private boolean isAltDown(KeyEvent e)
             {
-                return ( e.getModifiersEx() & KeyEvent.ALT_DOWN_MASK ) != 0; 
-            }		    
+                return ( e.getModifiersEx() & KeyEvent.ALT_DOWN_MASK ) != 0;
+            }
 
             /**
              * Returns a {@link TextRegion} for the line that holds a given
              * caret position.
-             * 
+             *
              * Note that the returned region <b>include</b> the EOL character at the end of the line (if any).
-             * 
+             *
              * @param caretPosition
              * @return region describing the current line or <code>NULL</code> if the text editor is empty.
              */
-            private TextRegion getLineAt(int caretPosition) 
+            private TextRegion getLineAt(int caretPosition)
             {
                 final String text = editor.getText();
                 final int len = text.length();
@@ -1075,17 +1075,17 @@ public abstract class EditorPanel extends JPanel
                     atStartOfLine = text.charAt( caretPosition-1 ) == 'n';
                 }
 
-                if ( atStartOfLine ) 
+                if ( atStartOfLine )
                 {
                     // search ahead
                     int end = caretPosition;
-                    while ( (end+1) < len ) 
+                    while ( (end+1) < len )
                     {
                         end++;
                         if ( text.charAt( end ) == '\n') {
                             break;
                         }
-                    }                    
+                    }
                     return new TextRegion(caretPosition , (end-caretPosition)+1 , 1 , 1);
                 }
 
@@ -1097,8 +1097,8 @@ public abstract class EditorPanel extends JPanel
                     caretPosition--;
                 }
 
-                if ( atEndOfLine ) 
-                { 
+                if ( atEndOfLine )
+                {
                     // search backwards
                     int start = caretPosition;
                     while ( (start-1) >= 0 && text.charAt( start-1 ) != '\n' ) {
@@ -1109,13 +1109,13 @@ public abstract class EditorPanel extends JPanel
 
                 // somewhere in-between, search forwards and backwards
                 int end = caretPosition;
-                while ( (end+1) < len ) 
+                while ( (end+1) < len )
                 {
                     end++;
                     if ( text.charAt( end ) == '\n') {
                         break;
                     }
-                }                 
+                }
                 int start = caretPosition;
                 while ( (start-1) >= 0 && text.charAt( start-1 ) != '\n' ) {
                     start--;
@@ -1124,29 +1124,29 @@ public abstract class EditorPanel extends JPanel
             }
 
             @Override
-            public void keyTyped(KeyEvent e) 
+            public void keyTyped(KeyEvent e)
             {
                 if ( isAltDown(e) ) {
                     final byte[] bytes = Character.toString( e.getKeyChar() ).getBytes();
                     System.out.println("Bytes: "+bytes.length+" , "+Integer.toHexString( bytes[0] ) );
-                } 
-                else if ( isCtrlDown(e) ) 
+                }
+                else if ( isCtrlDown(e) )
                 {
                     final byte[] bytes = Character.toString( e.getKeyChar() ).getBytes();
                     System.out.println("Bytes: "+bytes.length+" , "+Integer.toHexString( bytes[0] ) );
                     if ( e.getKeyChar() == 6 ) // CTRL-F ... search
                     {
                         toggleSearchWindow();
-                    } 
+                    }
                     else if ( e.getKeyChar() == 0x12 ) // CTRL-R   ... delete to end of line
                     {
                         final TextRegion line = getLineAt( editor.getCaretPosition() );
                         if ( line != null && editor.getText().charAt( line.start() ) != '\n' )
                         {
-                            try 
+                            try
                             {
                                 editor.getDocument().remove( editor.getCaretPosition() , line.end() - editor.getCaretPosition() );
-                            } 
+                            }
                             catch (BadLocationException e1) {
                                 e1.printStackTrace();
                             }
@@ -1157,33 +1157,33 @@ public abstract class EditorPanel extends JPanel
                         final TextRegion line = getLineAt( editor.getCaretPosition() );
                         if ( line != null )
                         {
-                            try 
+                            try
                             {
                                 editor.getDocument().remove( line.start() , line.length() );
-                            } 
+                            }
                             catch (BadLocationException e1) {
                                 e1.printStackTrace();
                             }
                         }
-                    }					
+                    }
                     else if ( e.getKeyChar() == 0x0b && searchHelper.canSearch() ) // CTRL-K ... search forward
                     {
                         searchHelper.searchForward();
-                    } 
+                    }
                     else if ( e.getKeyChar() == 0x02 && searchHelper.canSearch() ) // CTRL-B ... search backwards
                     {
                         searchHelper.searchBackward();
-                    }                     
+                    }
                     else if ( e.getKeyChar() == 0x07 ) // CTRL-G ... goto line
                     {
                         gotoLine();
-                    }                    
+                    }
                     else if ( e.getKeyChar() == 0x0d ) // CTRL+S ... save 
-                    { 
+                    {
                         try {
                             saveSource();
-                        } 
-                        catch (IOException e1) 
+                        }
+                        catch (IOException e1)
                         {
                             IDEMain.fail(e1);
                         }
@@ -1217,7 +1217,7 @@ public abstract class EditorPanel extends JPanel
         addAncestorListener( new AncestorListener() {
 
             @Override
-            public void ancestorRemoved(AncestorEvent event) { 
+            public void ancestorRemoved(AncestorEvent event) {
                 appConfigProvider.removeChangeListener( configListener );
             }
 
@@ -1225,7 +1225,7 @@ public abstract class EditorPanel extends JPanel
             public void ancestorMoved(AncestorEvent event) { }
 
             @Override
-            public void ancestorAdded(AncestorEvent event) 
+            public void ancestorAdded(AncestorEvent event)
             {
                 appConfigProvider.addChangeListener( configListener );
             }
@@ -1258,7 +1258,7 @@ public abstract class EditorPanel extends JPanel
         setProject( project , currentUnit );
     }
 
-    private void setupStyles() 
+    private void setupStyles()
     {
         final StyleContext ctx = new StyleContext();
 
@@ -1269,9 +1269,9 @@ public abstract class EditorPanel extends JPanel
         STYLE_NUMBER   = createStyle( "numberStyle" , SourceElement.NUMBER, ctx );
         STYLE_REGISTER = createStyle( "registerStyle" , SourceElement.REGISTER , ctx );
         STYLE_MNEMONIC = createStyle( "mnemonicStyle" , SourceElement.MNEMONIC, ctx );
-        STYLE_COMMENT  = createStyle( "commentStyle" , SourceElement.COMMENT , ctx );     
-        STYLE_TODO = createStyle( "todoStyle" , SourceElement.TODO , ctx );     
-        STYLE_PREPROCESSOR = createStyle( "preprocStyle" , SourceElement.PREPROCESSOR , ctx );   
+        STYLE_COMMENT  = createStyle( "commentStyle" , SourceElement.COMMENT , ctx );
+        STYLE_TODO = createStyle( "todoStyle" , SourceElement.TODO , ctx );
+        STYLE_PREPROCESSOR = createStyle( "preprocStyle" , SourceElement.PREPROCESSOR , ctx );
 
         // highlight
         STYLE_HIGHLIGHTED = ctx.addStyle( "highlight", topLevelStyle );
@@ -1279,7 +1279,7 @@ public abstract class EditorPanel extends JPanel
         STYLE_HIGHLIGHTED.addAttribute(StyleConstants.Underline, Boolean.TRUE );
     }
 
-    private Style createStyle(String name,SourceElement sourceElement,StyleContext ctx) 
+    private Style createStyle(String name,SourceElement sourceElement,StyleContext ctx)
     {
         final Color col = appConfigProvider.getApplicationConfig().getEditorSettings().getColor( sourceElement );
         System.out.println("Element "+sourceElement+" has color "+col);
@@ -1288,7 +1288,7 @@ public abstract class EditorPanel extends JPanel
         return style;
     }
 
-    private Document createDocument() 
+    private Document createDocument()
     {
         final Document doc = editor.getEditorKit().createDefaultDocument();
 
@@ -1296,9 +1296,9 @@ public abstract class EditorPanel extends JPanel
 
         ignoreEditEvents = false;
 
-        doc.addDocumentListener( new DocumentListener() 
+        doc.addDocumentListener( new DocumentListener()
         {
-            @Override public void insertUpdate(DocumentEvent e) 
+            @Override public void insertUpdate(DocumentEvent e)
             {
                 if ( ! ignoreEditEvents ) {
                     lastEditLocation = e.getOffset();
@@ -1306,17 +1306,17 @@ public abstract class EditorPanel extends JPanel
                     recompilationThread.documentChanged(e);
                 }
             }
-            @Override public void removeUpdate(DocumentEvent e) 
-            { 
-                if ( ! ignoreEditEvents ) 
+            @Override public void removeUpdate(DocumentEvent e)
+            {
+                if ( ! ignoreEditEvents )
                 {
                     lastEditLocation = e.getOffset();
                     caretTracker.rememberCaretPosition(e.getOffset(),currentUnit);
-                    recompilationThread.documentChanged(e); 
+                    recompilationThread.documentChanged(e);
                 }
             }
-            @Override public void changedUpdate(DocumentEvent e) 
-            { 
+            @Override public void changedUpdate(DocumentEvent e)
+            {
                 if ( ! ignoreEditEvents ) {
                     lastEditLocation = e.getOffset();
                     caretTracker.rememberCaretPosition(e.getOffset(),currentUnit);
@@ -1336,7 +1336,7 @@ public abstract class EditorPanel extends JPanel
             @Override
             public void undoableEditHappened(UndoableEditEvent e)
             {
-                if ( ! ignoreEditEvents ) 
+                if ( ! ignoreEditEvents )
                 {
                     if ( e.getEdit() instanceof AttributeUndoableEdit || e.getEdit().getClass().getName().contains("StyleChangeUndoableEdit") ) {
                         System.out.println("EDIT: "+e.getEdit());
@@ -1349,7 +1349,7 @@ public abstract class EditorPanel extends JPanel
         return doc;
     }
 
-    private JToolBar createToolbar() 
+    private JToolBar createToolbar()
     {
         final JToolBar result = new JToolBar(JToolBar.HORIZONTAL);
 
@@ -1359,20 +1359,21 @@ public abstract class EditorPanel extends JPanel
         result.add( button("Goto previous" , ev -> setCaretPosition( caretTracker.getPreviousCaretPosition() ) ) );
         result.add( button("Goto next" , ev -> setCaretPosition( caretTracker.getNextCaretPosition() ) ) );
 
+        result.add( button("Indent" , ev -> this.indentSources() ) );
         result.add( button("Symbols" , ev -> this.toggleSymbolTableWindow() ) );
         result.add( button("Upload to uC" , ev -> this.uploadToController() ) );
 
-        result.add( button("Show as avr-as" , ev -> 
+        result.add( button("Show as avr-as" , ev ->
         {
             hidePrettyPrint();
             showPrettyPrint(true);
         } ) );
 
-        result.add( button("Pretty print" , ev -> 
+        result.add( button("Pretty print" , ev ->
         {
             hidePrettyPrint();
             showPrettyPrint(false);
-        } ) );		
+        } ) );
 
         result.add( new JLabel("Cursor pos:" ) );
         result.add( cursorPositionLabel );
@@ -1391,15 +1392,15 @@ public abstract class EditorPanel extends JPanel
 
         public boolean gnuSyntax = true;
 
-        public void astChanged() 
+        public void astChanged()
         {
             final PrettyPrinter printer = new PrettyPrinter();
             try {
                 printer.setGNUSyntax( gnuSyntax );
                 final String source = printer.prettyPrint( getCompilationUnit().getAST() );
                 textArea.setText( source );
-            } 
-            catch(Exception e) 
+            }
+            catch(Exception e)
             {
                 final ByteArrayOutputStream out = new ByteArrayOutputStream();
                 try ( PrintWriter pw = new PrintWriter( out ) ) {
@@ -1411,7 +1412,7 @@ public abstract class EditorPanel extends JPanel
             textArea.setCaretPosition( 0 );
         }
 
-        public PrettyPrintWindow() 
+        public PrettyPrintWindow()
         {
             super("Pretty print");
             setMinimumSize( new Dimension(400,200 ) );
@@ -1432,12 +1433,12 @@ public abstract class EditorPanel extends JPanel
             getContentPane().add( new JScrollPane( textArea ) , cnstrs );
             pack();
             setVisible( true );
-            textArea.setFont( new Font( Font.MONOSPACED , getFont().getStyle() , getFont().getSize() ) );	        
+            textArea.setFont( new Font( Font.MONOSPACED , getFont().getStyle() , getFont().getSize() ) );
             setDefaultCloseOperation( JFrame.DO_NOTHING_ON_CLOSE );
-            addWindowListener( new WindowAdapter() 
+            addWindowListener( new WindowAdapter()
             {
                 @Override
-                public void windowClosing(WindowEvent e) 
+                public void windowClosing(WindowEvent e)
                 {
                     prettyPrintWindow = null;
                     dispose();
@@ -1450,17 +1451,17 @@ public abstract class EditorPanel extends JPanel
         return prettyPrintWindow != null;
     }
 
-    private void hidePrettyPrint() 
+    private void hidePrettyPrint()
     {
-        if ( isPrettyPrintShown() ) 
+        if ( isPrettyPrintShown() )
         {
             prettyPrintWindow.dispose();
         }
     }
 
-    private void showPrettyPrint(boolean gnuSyntax) 
+    private void showPrettyPrint(boolean gnuSyntax)
     {
-        if ( ! isPrettyPrintShown() ) 
+        if ( ! isPrettyPrintShown() )
         {
             prettyPrintWindow = new PrettyPrintWindow();
         }
@@ -1469,66 +1470,66 @@ public abstract class EditorPanel extends JPanel
         prettyPrintWindow.toFront();
     }
 
-    private void gotoLastEditLocation() 
+    private void gotoLastEditLocation()
     {
-        if ( lastEditLocation != -1 ) 
+        if ( lastEditLocation != -1 )
         {
-            runAfterCompilation( () -> 
+            runAfterCompilation( () ->
             {
-                if ( lastEditLocation != -1 ) 
+                if ( lastEditLocation != -1 )
                 {
-                    editor.setCaretPosition( lastEditLocation ); 
+                    editor.setCaretPosition( lastEditLocation );
                     editor.requestFocus();
                 }
             });
         }
     }
 
-    private void setCaretPosition(CaretPosition position) 
+    private void setCaretPosition(CaretPosition position)
     {
         if ( position != null ) {
             setCaretPosition( position.offset );
         }
     }
 
-    private void uploadToController() 
+    private void uploadToController()
     {
-        if ( project.canUploadToController() ) 
+        if ( project.canUploadToController() )
         {
-            try 
+            try
             {
                 project.uploadToController();
-            } 
-            catch(Exception e) 
+            }
+            catch(Exception e)
             {
                 LOG.error("UPLOAD failed",e);
                 IDEMain.fail("Upload failed",e);
-            } 
+            }
         }
-        else 
+        else
         {
             JOptionPane.showMessageDialog(null, "Upload not possible", "Program upload", JOptionPane.INFORMATION_MESSAGE );
         }
     }
 
-    private void saveSource() throws IOException 
+    private void saveSource() throws IOException
     {
         String text = editor.getText();
         text = text == null ? "" : text;
 
         final Resource resource = currentUnit.getResource();
         LOG.info("saveSource(): Saving source to "+currentUnit.getResource());
-        try ( OutputStream out = currentUnit.getResource().createOutputStream() ) 
+        try ( OutputStream out = currentUnit.getResource().createOutputStream() )
         {
             final byte[] bytes = text.getBytes( resource.getEncoding() );
             out.write( bytes );
         }
     }
 
-    public void compile() 
+    public void compile()
     {
         // new Exception("##################################### COMPILE TRIGGERED ##################").printStackTrace();
-        
+
         highlight = null;
 
         messageFrame.clearMessages();
@@ -1541,8 +1542,8 @@ public abstract class EditorPanel extends JPanel
         // save source to file
         try {
             saveSource();
-        } 
-        catch(IOException e) 
+        }
+        catch(IOException e)
         {
             LOG.error("compile(): Failed to save changes",e);
             currentUnit.addMessage( CompilationMessage.error( currentUnit, "Failed to save changes: "+e.getMessage()) );
@@ -1558,14 +1559,14 @@ public abstract class EditorPanel extends JPanel
         final CompilationUnit tmpUnit = new CompilationUnit( currentUnit.getResource() );
 
         final long parseStart =  System.currentTimeMillis();
-        try 
+        try
         {
             final CompilerSettings compilerSettings = new CompilerSettings();
             final IObjectCodeWriter writer = new ObjectCodeWriter();
             final SymbolTable globalSymbolTable = new SymbolTable( SymbolTable.GLOBAL ); // fake global symbol table so we don't fail parsing because of duplicate symbols already in the real one
             final ICompilationContext context = new CompilationContext( tmpUnit , globalSymbolTable , writer , project , compilerSettings , project.getConfig() );
             ParseSourcePhase.parseWithoutIncludes( context, tmpUnit , project );
-        } 
+        }
         catch(Exception e) {
             LOG.error("Parsing source failed",e);
         }
@@ -1580,20 +1581,20 @@ public abstract class EditorPanel extends JPanel
         final CompilationUnit root = project.getCompileRoot();
 
         boolean compilationSuccessful = false;
-        try 
+        try
         {
             compilationSuccessful = project.compile();
-        } 
-        catch(Exception e) 
+        }
+        catch(Exception e)
         {
             e.printStackTrace();
             root.addMessage( toCompilationMessage( currentUnit, e ) );
         }
-        symbolModel.setSymbolTable( currentUnit.getSymbolTable() );    
+        symbolModel.setSymbolTable( currentUnit.getSymbolTable() );
 
         final long compileEnd =  System.currentTimeMillis();
 
-        final String success = compilationSuccessful ? "successful" : "failed"; 
+        final String success = compilationSuccessful ? "successful" : "failed";
         final DateTimeFormatter df = DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss");
 
         final long parseTime = parseEnd - parseStart;
@@ -1611,13 +1612,13 @@ public abstract class EditorPanel extends JPanel
         final List<CompilationMessage> allMessages = root.getMessages(true);
 
         // create warnings for symbols defined in this unit but not used anywhere
-        if ( compilationSuccessful ) 
+        if ( compilationSuccessful )
         {
-            project.getGlobalSymbolTable().visitSymbols( (symbol) -> 
+            project.getGlobalSymbolTable().visitSymbols( (symbol) ->
             {
-                if ( symbol.getCompilationUnit().hasSameResourceAs( this.currentUnit ) ) 
+                if ( symbol.getCompilationUnit().hasSameResourceAs( this.currentUnit ) )
                 {
-                    if ( ! symbol.isReferenced() ) 
+                    if ( ! symbol.isReferenced() )
                     {
                         allMessages.add( CompilationMessage.warning( currentUnit, "Symbol '"+symbol.name()+"' is not referenced" , symbol.getNode() ) );
                     }
@@ -1626,10 +1627,10 @@ public abstract class EditorPanel extends JPanel
             });
         }
 
-        messageFrame.addAll( allMessages );        
+        messageFrame.addAll( allMessages );
 
         wasCompiledAtLeastOnce = true;
-        if ( ! afterCompilation.isEmpty() ) 
+        if ( ! afterCompilation.isEmpty() )
         {
             for ( Runnable r : afterCompilation ) {
                 try {
@@ -1645,26 +1646,26 @@ public abstract class EditorPanel extends JPanel
     private static CompilationMessage toCompilationMessage(CompilationUnit unit,Exception e)
     {
         if ( e instanceof ParseException ) {
-            return new CompilationMessage(unit,Severity.ERROR , e.getMessage() , new TextRegion( ((ParseException ) e).getOffset() , 0 ,-1 , -1 ) ); 
-        } 
+            return new CompilationMessage(unit,Severity.ERROR , e.getMessage() , new TextRegion( ((ParseException ) e).getOffset() , 0 ,-1 , -1 ) );
+        }
         return new CompilationMessage(unit,Severity.ERROR , e.getMessage() );
     }
 
-    private void doSyntaxHighlighting() 
+    private void doSyntaxHighlighting()
     {
         doSyntaxHighlighting(astTreeModel.getAST());
     }
 
-    private void doSyntaxHighlighting(ASTNode subtree) 
+    private void doSyntaxHighlighting(ASTNode subtree)
     {
         ignoreEditEvents = true;
-        try 
+        try
         {
             final StyledDocument doc = editor.getStyledDocument();
-            final IASTVisitor visitor = new IASTVisitor() 
+            final IASTVisitor visitor = new IASTVisitor()
             {
                 @Override
-                public void visit(ASTNode node, IIterationContext<?> ctx) 
+                public void visit(ASTNode node, IIterationContext<?> ctx)
                 {
                     setNodeStyle( node , doc );
                 }
@@ -1672,26 +1673,26 @@ public abstract class EditorPanel extends JPanel
             subtree.visitBreadthFirst( visitor );
         } finally {
             ignoreEditEvents = false;
-        }        
+        }
     }
 
-    private void setNodeStyle(ASTNode node,StyledDocument styledDoc) 
+    private void setNodeStyle(ASTNode node,StyledDocument styledDoc)
     {
         final TextRegion region = node.getTextRegion();
-        if ( region != null ) 
+        if ( region != null )
         {
             Style style = null;
             if ( node instanceof PreprocessorNode ) {
                 style = STYLE_PREPROCESSOR;
-            } 
+            }
             else if ( node instanceof RegisterNode) {
                 style = STYLE_REGISTER;
-            } 
-            else if ( node instanceof InstructionNode ) 
+            }
+            else if ( node instanceof InstructionNode )
             {
                 style = STYLE_MNEMONIC;
-            } 
-            else if ( node instanceof CommentNode ) 
+            }
+            else if ( node instanceof CommentNode )
             {
                 final String comment = ((CommentNode) node).value;
                 if ( comment.contains("TODO") ) {
@@ -1699,16 +1700,16 @@ public abstract class EditorPanel extends JPanel
                 } else {
                     style = STYLE_COMMENT;
                 }
-            }     
-            else if ( node instanceof LabelNode || node instanceof IdentifierNode) 
+            }
+            else if ( node instanceof LabelNode || node instanceof IdentifierNode)
             {
                 style = STYLE_LABEL;
-            }      
-            else if ( node instanceof NumberLiteralNode ) 
+            }
+            else if ( node instanceof NumberLiteralNode )
             {
                 style = STYLE_NUMBER;
-            }                      
-            if ( style != null ) 
+            }
+            if ( style != null )
             {
                 styledDoc.setCharacterAttributes( region.start(), region.length() , style , true );
             } else {
@@ -1717,7 +1718,7 @@ public abstract class EditorPanel extends JPanel
         }
     }
 
-    private void setHighlight(ASTNode newHighlight) 
+    private void setHighlight(ASTNode newHighlight)
     {
         if ( this.highlight == newHighlight ) {
             return;
@@ -1736,7 +1737,7 @@ public abstract class EditorPanel extends JPanel
             doSyntaxHighlighting( this.highlight );
         }
         this.highlight = newHighlight;
-        if ( newHighlight != null ) 
+        if ( newHighlight != null )
         {
             System.out.println("Highlighting "+newHighlight.getTextRegion());
             final TextRegion region = newHighlight.getTextRegion();
@@ -1755,7 +1756,7 @@ public abstract class EditorPanel extends JPanel
         return astButton;
     }
 
-    private void toggleASTWindow() 
+    private void toggleASTWindow()
     {
         if ( astWindow != null ) {
             astWindow.dispose();
@@ -1769,7 +1770,7 @@ public abstract class EditorPanel extends JPanel
         astWindow.setVisible( true );
     }
 
-    private void toggleSearchWindow() 
+    private void toggleSearchWindow()
     {
         if ( searchWindow != null ) {
             searchWindow.dispose();
@@ -1781,9 +1782,59 @@ public abstract class EditorPanel extends JPanel
         searchWindow.pack();
         searchWindow.setLocationRelativeTo( this );
         searchWindow.setVisible( true );
-    }    
+    }
 
-    private void toggleSymbolTableWindow() 
+    private void indentSources()
+    {
+        editor.setText( indent( this.editor.getText() ) );
+    }
+
+    public static String indent(String text)
+    {
+        final int indent = 2;
+
+        if ( text == null ) {
+            return text;
+        }
+
+        final String[] lines = text.split("\n");
+        final StringBuilder result = new StringBuilder();
+        for (int i = 0; i < lines.length; i++)
+        {
+            final String line = lines[i];
+            if ( line.length() == 0 ) {
+                result.append("\n");
+                continue;
+            }
+            if ( isWhitespace( line.charAt(0) ) )
+            {
+                int j = 0;
+                int len=line.length();
+                for (  ; j < len && isWhitespace( line.charAt(j) ); j++ ) {
+                }
+                for ( int k = indent ;  k > 0 ; k-- ) {
+                    result.append( ' ');
+                }
+                for ( ; j < len ; j++ ) {
+                    result.append( line.charAt(j) );
+                }
+            } else {
+                result.append( line );
+            }
+            // append trailing newline except for when we're on the last line
+            if ( (i+1) < lines.length ) {
+                result.append("\n");
+            }
+        }
+        System.out.println("INDENTED: \n"+result);
+        return result.toString();
+    }
+
+    private static boolean isWhitespace(char c) {
+        return c == ' ' || c == '\t';
+    }
+
+    private void toggleSymbolTableWindow()
     {
         if ( symbolWindow != null ) {
             symbolWindow.dispose();
@@ -1797,7 +1848,7 @@ public abstract class EditorPanel extends JPanel
         symbolWindow.setVisible( true );
     }
 
-    private JFrame createASTWindow() 
+    private JFrame createASTWindow()
     {
         final JFrame frame = new JFrame("AST");
 
@@ -1812,14 +1863,14 @@ public abstract class EditorPanel extends JPanel
 
         final JTree tree = new JTree( astTreeModel );
 
-        final MouseAdapter mouseListener = new MouseAdapter() 
+        final MouseAdapter mouseListener = new MouseAdapter()
         {
-            public void mouseClicked(MouseEvent e) 
+            public void mouseClicked(MouseEvent e)
             {
-                if ( e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1 ) 
+                if ( e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1 )
                 {
                     final TreePath path = tree.getClosestPathForLocation( e.getX() ,  e.getY() );
-                    if ( path != null && path.getPath() != null && path.getPath().length >= 1 ) 
+                    if ( path != null && path.getPath() != null && path.getPath().length >= 1 )
                     {
                         final ASTNode node = (ASTNode) path.getLastPathComponent();
                         if ( node.getTextRegion() != null ) {
@@ -1831,23 +1882,23 @@ public abstract class EditorPanel extends JPanel
         };
         tree.addMouseListener( mouseListener);
 
-        tree.setCellRenderer( new DefaultTreeCellRenderer() 
+        tree.setCellRenderer( new DefaultTreeCellRenderer()
         {
             @Override
             public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel, boolean expanded, boolean leaf, int row, boolean hasFocus)
             {
                 final Component result = super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row,hasFocus);
-                if ( value instanceof ASTNode) 
+                if ( value instanceof ASTNode)
                 {
                     final ASTNode node = (ASTNode) value;
                     String text=node.getClass().getSimpleName();
 
                     if ( node instanceof FunctionCallNode ) {
                         text = ((FunctionCallNode) node).functionName.value+"(...)";
-                    } 
+                    }
                     else if ( node instanceof DirectiveNode) {
                         text = "."+((DirectiveNode) node).directive.literal;
-                    } 
+                    }
                     else  if ( node instanceof PreprocessorNode) {
                         text = "#"+((PreprocessorNode) node).type.literal;
                     } else if ( node instanceof OperatorNode) {
@@ -1857,14 +1908,14 @@ public abstract class EditorPanel extends JPanel
                     }
                     else if ( node instanceof StatementNode) {
                         text = "StatementNode";
-                    }                     
+                    }
                     else if ( node instanceof LabelNode) {
                         text = "LabelNode:"+((LabelNode) node).identifier.value;
-                    } 
+                    }
                     else if ( node instanceof CommentNode) {
                         text = "CommentNode: "+((CommentNode) node).value;
-                    }                     
-                    else if ( node instanceof NumberLiteralNode ) 
+                    }
+                    else if ( node instanceof NumberLiteralNode )
                     {
                         final NumberLiteralNode node2 = (NumberLiteralNode) value;
                         switch( node2.getType() ) {
@@ -1880,12 +1931,12 @@ public abstract class EditorPanel extends JPanel
                             default:
                                 throw new RuntimeException("Unreachable code reached");
                         }
-                    } 
-                    else if ( node instanceof InstructionNode ) 
+                    }
+                    else if ( node instanceof InstructionNode )
                     {
                         text = "insn: "+((InstructionNode) node).instruction.getMnemonic();
                     }
-                    else if ( node instanceof RegisterNode) 
+                    else if ( node instanceof RegisterNode)
                     {
                         text = "reg: "+((RegisterNode) node).register.toString();
                     }
@@ -1908,10 +1959,10 @@ public abstract class EditorPanel extends JPanel
         return frame;
     }
 
-    private JFrame createSearchWindow() 
+    private JFrame createSearchWindow()
     {
         final boolean[] wrap = { true };
-        
+
         final JFrame frame = new JFrame("Search");
 
         frame.addWindowListener( new WindowAdapter() {
@@ -1940,7 +1991,7 @@ public abstract class EditorPanel extends JPanel
             @Override
             public void changedUpdate(DocumentEvent e) { resetLabel(); }
 
-            private void resetLabel() 
+            private void resetLabel()
             {
                 label.setText( "Hit enter to start searching");
                 searchHelper.startFromBeginning();
@@ -1948,24 +1999,24 @@ public abstract class EditorPanel extends JPanel
         });
 
         filterField.addKeyListener( new KeyAdapter() {
-            
+
             @Override
             public void keyReleased(KeyEvent e)
             {
-                if ( e.getKeyCode() == KeyEvent.VK_ESCAPE ) 
+                if ( e.getKeyCode() == KeyEvent.VK_ESCAPE )
                 {
                     e.consume();
                     toggleSearchWindow();
                 }
             }
         });
-        filterField.addActionListener( ev -> 
+        filterField.addActionListener( ev ->
         {
             searchHelper.setTerm( filterField.getText() );
             boolean foundMatch  = false;
-            if ( searchHelper.canSearch() ) 
+            if ( searchHelper.canSearch() )
             {
-                foundMatch = searchHelper.searchForward(); 
+                foundMatch = searchHelper.searchForward();
                 if ( ! foundMatch && wrap[0] )
                 {
                     searchHelper.startFromBeginning();
@@ -1978,7 +2029,7 @@ public abstract class EditorPanel extends JPanel
                 label.setText("Hit enter to continue searching");
             } else {
                 label.setText("No (more) matches.");
-            }            
+            }
         });
 
         final JPanel panel = new JPanel();
@@ -1990,36 +2041,36 @@ public abstract class EditorPanel extends JPanel
         cnstrs.gridheight = 1 ; cnstrs.gridwidth = 1;
         cnstrs.gridx = 0; cnstrs.gridy = 0;
         cnstrs.fill = GridBagConstraints.HORIZONTAL;
-        
+
         panel.add( filterField , cnstrs );
-        
+
         // add 'wrap?' checkbox
         final JCheckBox wrapCheckbox = new JCheckBox("Wrap?" , wrap[0] );
-        wrapCheckbox.addActionListener( ev -> 
+        wrapCheckbox.addActionListener( ev ->
         {
-            wrap[0] = wrapCheckbox.isSelected(); 
+            wrap[0] = wrapCheckbox.isSelected();
         });
         cnstrs = new GridBagConstraints();
         cnstrs.weightx = 1.0; cnstrs.weightx = 0.33;
         cnstrs.gridheight = 1 ; cnstrs.gridwidth = 1;
         cnstrs.gridx = 0; cnstrs.gridy = 1;
-        cnstrs.fill = GridBagConstraints.HORIZONTAL;        
-        panel.add( wrapCheckbox , cnstrs );        
-        
+        cnstrs.fill = GridBagConstraints.HORIZONTAL;
+        panel.add( wrapCheckbox , cnstrs );
+
         // add status line
         cnstrs = new GridBagConstraints();
         cnstrs.weightx = 1.0; cnstrs.weightx = 0.33;
         cnstrs.gridheight = 1 ; cnstrs.gridwidth = 1;
         cnstrs.gridx = 0; cnstrs.gridy = 2;
-        cnstrs.fill = GridBagConstraints.HORIZONTAL;        
+        cnstrs.fill = GridBagConstraints.HORIZONTAL;
         panel.add( label , cnstrs );
-        
+
         frame.getContentPane().add( panel );
         frame.setPreferredSize( new Dimension(200,100 ) );
         return frame;
-    }      
+    }
 
-    private JFrame createSymbolWindow() 
+    private JFrame createSymbolWindow()
     {
         final JFrame frame = new JFrame("Symbols");
 
@@ -2034,7 +2085,7 @@ public abstract class EditorPanel extends JPanel
 
         final JTextField filterField = new JTextField();
 
-        filterField.addActionListener( ev -> 
+        filterField.addActionListener( ev ->
         {
             symbolModel.setFilterString( filterField.getText() );
         });
@@ -2061,20 +2112,20 @@ public abstract class EditorPanel extends JPanel
 
         frame.getContentPane().add( panel );
         return frame;
-    }    
+    }
 
     private void gotoLine() {
 
         final String lineNo = JOptionPane.showInputDialog(null, "Enter line number", "Go to line", JOptionPane.QUESTION_MESSAGE );
-        if ( StringUtils.isNotBlank( lineNo ) ) 
+        if ( StringUtils.isNotBlank( lineNo ) )
         {
             int no = -1;
             try {
-                no = Integer.parseInt( lineNo );                    
+                no = Integer.parseInt( lineNo );
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            if ( no > 0 ) 
+            if ( no > 0 )
             {
                 String text = editor.getText();
                 if ( text == null ) {
@@ -2086,8 +2137,8 @@ public abstract class EditorPanel extends JPanel
                     if ( c == '\r' && (offset+1) < len && text.charAt(offset+1) == '\n' ) {
                         no--;
                         offset++;
-                    } 
-                    else if ( c == '\n' ) 
+                    }
+                    else if ( c == '\n' )
                     {
                         no--;
                     }
@@ -2098,7 +2149,7 @@ public abstract class EditorPanel extends JPanel
         }
     }
 
-    public void setProject(IProject project,CompilationUnit unit) throws IOException 
+    public void setProject(IProject project,CompilationUnit unit) throws IOException
     {
         Validate.notNull(project, "project must not be NULL");
         Validate.notNull(unit, "unit must not be NULL");
@@ -2107,7 +2158,7 @@ public abstract class EditorPanel extends JPanel
         this.project = project;
         this.currentUnit = unit;
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        try ( InputStream in = unit.getResource().createInputStream() ) 
+        try ( InputStream in = unit.getResource().createInputStream() )
         {
             IOUtils.copy( in , out );
         }
@@ -2123,9 +2174,9 @@ public abstract class EditorPanel extends JPanel
         editor.setCaretPosition( 0 );
     }
 
-    public void save(File file) throws FileNotFoundException 
+    public void save(File file) throws FileNotFoundException
     {
-        try ( PrintWriter w = new PrintWriter(file ) ) 
+        try ( PrintWriter w = new PrintWriter(file ) )
         {
             if ( editor.getText() != null )  {
                 w.write( editor.getText() );
@@ -2134,7 +2185,7 @@ public abstract class EditorPanel extends JPanel
         }
     }
 
-    public boolean close(boolean askIfDirty) 
+    public boolean close(boolean askIfDirty)
     {
         lastEditLocation = -1;
         setVisible( false );
@@ -2158,10 +2209,10 @@ public abstract class EditorPanel extends JPanel
         return currentUnit;
     }
 
-    public void gotoMessage(CompilationMessage message) 
+    public void gotoMessage(CompilationMessage message)
     {
         final int len = editor.getText().length();
-        if ( message.region != null && 0 <= message.region.start() && message.region.start() < len ) 
+        if ( message.region != null && 0 <= message.region.start() && message.region.start() < len )
         {
             setSelection( message.region );
         } else {
@@ -2169,7 +2220,7 @@ public abstract class EditorPanel extends JPanel
         }
     }
 
-    public void setSelection(TextRegion region) 
+    public void setSelection(TextRegion region)
     {
         final Runnable r = () -> {
             editor.setCaretPosition( region.start() );
@@ -2180,7 +2231,7 @@ public abstract class EditorPanel extends JPanel
         runAfterCompilation(r);
     }
 
-    private void runAfterCompilation(Runnable r) 
+    private void runAfterCompilation(Runnable r)
     {
         if ( wasCompiledAtLeastOnce ) {
             r.run();
@@ -2193,8 +2244,8 @@ public abstract class EditorPanel extends JPanel
         setCaretPosition( region.start() );
     }
 
-    public void setCaretPosition(int position) 
+    public void setCaretPosition(int position)
     {
         runAfterCompilation( () -> editor.setCaretPosition( position ) );
-    }	
+    }
 }
