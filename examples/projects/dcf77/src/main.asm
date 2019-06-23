@@ -1,31 +1,5 @@
 #include "m328Pdef.inc"
-
-jmp init  ; RESET
-jmp onirq ; INT0 - ext IRQ 0
-jmp onirq ; INT1 - ext IRQ 1
-jmp onirq ; PCINT0 - pin change IRQ 
-jmp onirq ; PCINT1 - pin change IRQ
-jmp onirq ; PCINT2 - pin change IRQ
-jmp onirq ; WDT - watchdog IRQ
-jmp onirq ; TIMER2_COMPA - timer/counter 2 compare match A
-jmp onirq ; TIMER2_COMPB - timer/counter 2 compare match B
-jmp onirq ; TIMER2_OVF - timer/counter 2 overflow
-jmp onirq ; TIMER1_CAPT - timer/counter 1 capture event
-jmp onirq ; TIMER1_COMPA
-jmp onirq ; TIMER1_COMPB
-jmp onirq ; TIMER1_OVF
-jmp onirq ; TIMER0_COMPA
-jmp onirq ; TIMER0_COMPB
-jmp onirq ; TIMER0_OVF
-jmp onirq ; STC - serial transfer complete (SPI)
-jmp onirq ; USUART Rx complete
-jmp onirq ; USUART Data register empty
-jmp onirq ; USUART Tx complete
-jmp onirq ; ADC conversion complete
-jmp onirq ; EEPROM ready
-jmp onirq ; Analog comparator
-jmp onirq ; 2-wire interface I2C
-jmp onirq ; Store program memory ready
+#include "enc28j60.asm"
 
 .equ CPU_FREQ = 8000000 ; 8 Mhz
 
@@ -33,14 +7,40 @@ jmp onirq ; Store program memory ready
 .equ SPI_SS_ETHERNET_BIT = 0
 .equ SPI_SS_DCF77_BIT = 1
 .equ SPI_SS_ETHERNET = 1<<SPI_SS_ETHERNET_BIT
-.equ SPI_SS_DCF77 = 1<<SPI_SS_DCF77_BIT
 
 ; Number of cycles to wait before assuming no more data will be sent
 .equ SPI_READ_TIMEOUT_CYCLES = 1000
 
 ; scratch registers
-.def scratch0 = r17
-.def scratch1 = r18
+.def scratch0 = r24
+.def scratch1 = r25
+
+  jmp init  ; RESET
+  jmp onirq ; INT0 - ext IRQ 0
+  jmp onirq ; INT1 - ext IRQ 1
+  jmp onirq ; PCINT0 - pin change IRQ 
+  jmp onirq ; PCINT1 - pin change IRQ
+  jmp onirq ; PCINT2 - pin change IRQ
+  jmp onirq ; WDT - watchdog IRQ
+  jmp onirq ; TIMER2_COMPA - timer/counter 2 compare match A
+  jmp onirq ; TIMER2_COMPB - timer/counter 2 compare match B
+  jmp onirq ; TIMER2_OVF - timer/counter 2 overflow
+  jmp onirq ; TIMER1_CAPT - timer/counter 1 capture event
+  jmp onirq ; TIMER1_COMPA
+  jmp onirq ; TIMER1_COMPB
+  jmp onirq ; TIMER1_OVF
+  jmp onirq ; TIMER0_COMPA
+  jmp onirq ; TIMER0_COMPB
+  jmp onirq ; TIMER0_OVF
+  jmp onirq ; STC - serial transfer complete (SPI)
+  jmp onirq ; USUART Rx complete
+  jmp onirq ; USUART Data register empty
+  jmp onirq ; USUART Tx complete
+  jmp onirq ; ADC conversion complete
+  jmp onirq ; EEPROM ready
+  jmp onirq ; Analog comparator
+  jmp onirq ; 2-wire interface I2C
+  jmp onirq ; Store program memory ready
 
 ; ========================
 ; HW init
@@ -62,38 +62,73 @@ onirq:
   jmp 0x00
 
 main:
+  call spi_init ; enable SPI master mode 0
+  call eth_init
   ret
 
 ; ======================
-; SPI interfacing 
+; ENC28J60 interfacing
 ; ======================
 
-; With non-inverted clock polarity (i.e., the clock is at logic low when slave select transitions to logic low):
+eth_init:
+; prepare for sending
+  cbi PORTB, SPI_SS_ETHERNET_BIT ; slave-select low
+  call spi_tx_delay
+; >>>>>>>>>>>>>>>>>>>>>>>>>> TODO: Implement initialization <<<<<<<<<<<<<<<<<<<<
+; ENC28J60 has 8 KB of internal buffer,
+; all buffer not setup for receiving is used for transmission
+; >>>>>>>>>>>>>>>>>>>>>>>>>> TODO: Implement initialization <<<<<<<<<<<<<<<<<<<<
+; done
+  sbi PORTB, SPI_SS_ETHERNET_BIT ; slave-select hi  
+  ret
+
+; ===================
+; >>> Careful, this method does NOT touch slave-select <<<
+; Write to control register in current bank
 ;
-; Mode 0: Clock phase is configured such that data is sampled on the rising edge of the clock pulse and shifted out on the falling edge of ;   the clock pulse. 
-; This corresponds to the first blue clock trace in the above diagram. Note that data must be available before the first rising edge of the clock.
-
-; =======
-; Init SPI in mode 0
-; SCRATCHED: scratch0
-; =======
-spi_init:
-; Port B - Set MOSI and SCK output, all others input
-; MOSI = PB3 
-; SCK =  PB5
-; MISO = PB4
-; SS = PB2
-; DDR = 1 -> OUTPUT PIN
-; DDR = 0 -> INPUT PIN
-  ldi scratch0,(1<<PB3)|(1<<PB5)|SPI_SS_ETHERNET|SPI_SS_DCF77
-  out  DDRB,scratch0
-; set SPI SS pins HIGH (inactive)
-  ldi scratch0, (SPI_SS_ETHERNET|SPI_SS_DCF77)
-  out PORTB, scratch0
-; Enable SPI, Master, set clock rate fck/4
-  ldi scratch0,(1<<SPE)|(1<<MSTR)
-  out  SPCR,scratch0
+; INPUT: r16 - register to write to
+;        r17 - value to write        
+; SCRATCHED: r16, scratch0
+; ===================
+eth_write_ctrl_register_no_ss:
+  andi r16,%00011111
+  ori r16 ,%10100000
+  call spi_transmit
+  mov r16, r17
+  call spi_transmit
   ret
+
+; =============
+; >>> Careful, this method does NOT touch slave-select <<<
+; Switch to a given memory bank
+; INPUT: r2 - Bank to switch to
+; RESULT: r1 - 0 -> success, 0xff = timeout during read 
+; SCRATCHED: r1,r16, scratch0
+; ============
+eth_switch_bank_no_ss:
+; read ECON1
+  ldi r16,ETH_ECON1
+  call spi_transmit
+  call spi_receive
+  tst r1            ; check for timeout error
+  brne error
+; r0 contains current ECON1 register value
+  mov scratch0,r0
+  andi scratch0, %111 ; mask everything except the current bank number
+  cp scratch0,r2 ; check whether the desired bank is already enabled
+  breq success ; yes, nothing to do
+; 
+  mov r16,r0
+  andi r16, %11111000 ; clear bank-select bits
+  or r16,r2
+  call spi_transmit
+
+.success
+  clr r1
+  ret  
+.error
+  ret  
+
 
 ; =======
 ; ECN28J60 SPI transmit 1 byte, read nothing
@@ -126,7 +161,7 @@ spi_transmit_eth_1w1r: ; 1 byte written, 1 byte read
 
 ; =======
 ; ECN28J60 SPI transmit 1 byte, read 2 bytes
-; INPUT: r0 - byte to send
+; INPUT: r16 - byte to send
 ; RESULT: r0 - second received byte
 ;         r1 - 0 -> success, 0xff = timeout during read
 ;         r2 - first received byte
@@ -135,7 +170,6 @@ spi_transmit_eth_1w1r: ; 1 byte written, 1 byte read
 spi_transmit_eth_1w2r: ; 1 byte written, 2 bytes read
   cbi PORTB, SPI_SS_ETHERNET_BIT ; slave-select low
   call spi_tx_delay
-  mov r16, r0
   call spi_transmit
   call spi_receive
   tst r1
@@ -164,22 +198,54 @@ spi_transmit_eth_write_buffer:
   sbi PORTB, SPI_SS_ETHERNET_BIT ; slave-select hi  
   ret
 
+; ======================
+; SPI interfacing 
+; ======================
+
+; With non-inverted clock polarity (i.e., the clock is at logic low when slave select transitions to logic low):
+;
+; Mode 0: Clock phase is configured such that data is sampled on the rising edge of the clock pulse and shifted out on the falling edge of ;   the clock pulse. 
+; This corresponds to the first blue clock trace in the above diagram. Note that data must be available before the first rising edge of the clock.
+
+; =======
+; Init SPI in mode 0
+; SCRATCHED: scratch0
+; =======
+spi_init:
+; Port B - Set MOSI and SCK output, all others input
+; MOSI = PB3 
+; SCK =  PB5
+; MISO = PB4
+; SS = PB2
+; DDR = 1 -> OUTPUT PIN
+; DDR = 0 -> INPUT PIN
+  ldi scratch0,(1<<PB3)|(1<<PB5)|SPI_SS_ETHERNET
+  out  DDRB,scratch0
+; set SPI SS pins HIGH (inactive)
+  ldi scratch0, SPI_SS_ETHERNET
+  out PORTB, scratch0
+; Enable SPI, Master, set clock rate fck/4
+  ldi scratch0,(1<<SPE)|(1<<MSTR)
+  out  SPCR,scratch0
+  ret
+
 ; ========
-; Receives one byte via SPI
+; Receives one byte via SPI.
+;
 ; RESULT: r0 - byte that was read
 ;         r1 - 0 -> success, 0xff = timeout during read
 ; SCRATCHED: scratch0,scratch 1
 ; ========
 spi_receive:
-   ldi scratch0, LOW(SPI_READ_TIMEOUT_CYCLES)
-   ldi scratch1, HIGH(SPI_READ_TIMEOUT_CYCLES)
-   clr r1 ; assume success
+  ldi scratch0, LOW(SPI_READ_TIMEOUT_CYCLES)
+  ldi scratch1, HIGH(SPI_READ_TIMEOUT_CYCLES)
+  clr r1 ; assume success
 .loop
   ; wait for SPIF flag to be set
   in r0,SPSR
   sbrc r0, SPIF
   rjmp leave ; -> SPIF set
- 
+  
   dec scratch0
   brne skip1
   dec scratch1

@@ -1,6 +1,9 @@
 target
 bin
+.idea
 .project
 .settings
 .classpath
 rebel.xml
+*.iml
+*.o
