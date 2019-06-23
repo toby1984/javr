@@ -15,6 +15,7 @@
  */
 package de.codesourcery.javr.ui.config;
 
+import java.awt.Color;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import de.codesourcery.javr.ui.EditorSettings;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
@@ -50,7 +52,16 @@ public class ApplicationConfigProvider implements IApplicationConfigProvider {
         {
             json = reader.lines().collect( Collectors.joining() );
         }
-        return (IApplicationConfig) JsonReader.jsonToJava( json );
+        final IApplicationConfig result = (IApplicationConfig) JsonReader.jsonToJava( json );
+
+        // TODO: Hack -- brute-force fix colors that are hardly readable
+        LOG.error("load(): Overriding colors for LABEL and COMMENT");
+        final EditorSettings settings = result.getEditorSettings();
+        settings.setColor(EditorSettings.SourceElement.LABEL , new Color( 0x039b38) );
+        settings.setColor(EditorSettings.SourceElement.COMMENT, new Color( 0xffb200) );
+        result.setEditorSettings( settings );
+        // TODO: End hack
+        return result;
     }
     
     public static void save(IApplicationConfig config,OutputStream out) throws UnsupportedEncodingException, IOException 

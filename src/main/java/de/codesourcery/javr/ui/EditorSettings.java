@@ -33,7 +33,7 @@ public class EditorSettings
     
     static 
     {
-        DEFAULT_COLORS.put( SourceElement.LABEL , Color.GREEN );
+        DEFAULT_COLORS.put( SourceElement.LABEL , new Color(0x8e50e5 ) );
         DEFAULT_COLORS.put( SourceElement.NUMBER, Color.BLUE);
         DEFAULT_COLORS.put( SourceElement.REGISTER, Color.BLUE);
         DEFAULT_COLORS.put( SourceElement.MNEMONIC, Color.MAGENTA );
@@ -67,6 +67,10 @@ public class EditorSettings
     
     public void setIndentString(String indentString) {
         this.indentString = indentString;
+    }
+
+    public void setColor(SourceElement elem, Color color) {
+        this.colors.put( elem, color );
     }
     
     public Map<SourceElement, Color> getColors() {
