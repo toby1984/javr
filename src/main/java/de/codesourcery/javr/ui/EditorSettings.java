@@ -31,10 +31,10 @@ public class EditorSettings
     
     private static final Map<SourceElement,Color> DEFAULT_COLORS = new HashMap<>();
     
-    static 
+    static
     {
-        DEFAULT_COLORS.put( SourceElement.LABEL , new Color(0x8e50e5 ) );
-        DEFAULT_COLORS.put( SourceElement.NUMBER, Color.BLUE);
+        DEFAULT_COLORS.put( SourceElement.LABEL , new Color( 0x039b38 ) );
+        DEFAULT_COLORS.put( SourceElement.NUMBER, new Color( 0xffb200) );
         DEFAULT_COLORS.put( SourceElement.REGISTER, Color.BLUE);
         DEFAULT_COLORS.put( SourceElement.MNEMONIC, Color.MAGENTA );
         DEFAULT_COLORS.put( SourceElement.COMMENT , Color.ORANGE );
