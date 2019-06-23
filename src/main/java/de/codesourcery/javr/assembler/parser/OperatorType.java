@@ -366,7 +366,8 @@ public enum OperatorType
                 final Optional<Symbol> result = context.currentSymbolTable().maybeGet( identifier );
                 return result.isPresent() && result.get().getType() == Type.PREPROCESSOR_MACRO;
             } 
-            if ( name.equals("HIGH") || name.equals("LOW" ) ) 
+            if ( fn.functionName.equals( FunctionCallNode.BUILDIN_FUNCTION_HIGH ) ||
+                 fn.functionName.equals( FunctionCallNode.BUILDIN_FUNCTION_LOW) )
             {
                 if ( child instanceof Resolvable) {
                     ((Resolvable) child).resolve( context );
@@ -375,11 +376,18 @@ public enum OperatorType
                 if ( v == null ) {
                     return false;
                 }
-                
-                switch ( name ) {
-                    case "HIGH": v = ( v.intValue() >>> 8 ) & 0xff; break;
-                    case "LOW ": v = v.intValue() & 0xff; break;
-                    default: throw new RuntimeException("Unreachable code reached");
+
+                if ( fn.functionName.equals( FunctionCallNode.BUILDIN_FUNCTION_HIGH ) )
+                {
+                    v = (v.intValue() >>> 8) & 0xff;
+                }
+                else if ( fn.functionName.equals( FunctionCallNode.BUILDIN_FUNCTION_LOW) )
+                {
+                    v = v.intValue() & 0xff;
+                }
+                else
+                {
+                    throw new RuntimeException("Unreachable code reached");
                 }
                 return v;
             }

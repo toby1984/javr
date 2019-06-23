@@ -994,7 +994,17 @@ public class Parser
                 {
                     if ( node instanceof IdentifierNode && lexer.peek(TokenType.PARENS_OPEN ) ) 
                     {
+                        // function invocation - <identifier>( ...
                         final Identifier id = ((IdentifierNode) node).name;
+
+                        // parseAtom() will automatically add all identifiers to the
+                        // current symbol table - make sure built-in functions are marked as such
+                        if ( FunctionCallNode.isBuiltinFunction(id) )
+                        {
+                            final Symbol symbol = context.currentSymbolTable().get(id);
+                            symbol.setType(Symbol.Type.BUILTIN_FUNCTION);
+                            symbol.markAsReferenced();
+                        }
                         yard.pushOperator( new ExpressionToken(ExpressionTokenType.FUNCTION , new FunctionCallNode( id , node.getTextRegion() ) ) );
                     } else {
                         yard.pushValue( node );

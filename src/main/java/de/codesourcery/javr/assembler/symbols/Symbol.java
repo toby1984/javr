@@ -87,12 +87,12 @@ public final class Symbol
         return new Symbol(this,name);
     }
     
-    public static enum ObjectType 
+    public enum ObjectType
     {
         FUNCTION,DATA,UNDEFINED;
     }
     
-    public static enum Type 
+    public enum Type
     {
         /**
          * Symbol marks a memory address.
@@ -110,6 +110,10 @@ public final class Symbol
          * Symbol was defined through a <code>#define xxxxx &lt;expr&gt;</code> directive.
          */
         PREPROCESSOR_MACRO,
+        /**
+         * Symbol refers to a built-in function.
+         */
+        BUILTIN_FUNCTION,
         /**
          * Symbol was declared but not defined yet (=unresolved symbol).
          */        
@@ -162,6 +166,20 @@ public final class Symbol
     
     public final Object getValue() {
         return value;
+    }
+
+    public final void setType(Type type)
+    {
+        Validate.notNull(type, "type must not be NULL");
+
+        if ( LOG.isDebugEnabled() ) {
+            LOG.debug("setType("+name+") = "+type);
+        }
+        if ( ! hasType(Type.UNDEFINED ) && ! type.equals( this.type ) )
+        {
+            throw new IllegalStateException("Refusing to change type of symbol '"+name+"' that already has a type "+this);
+        }
+        this.type = type;
     }
     
     public final void setValue(Object value,Type type) 
@@ -332,7 +350,7 @@ public final class Symbol
      * Set the type of object this label refers to.
      * 
      * Currently only labels of type {@link Symbol.Type#ADDRESS_LABEL} have
-     * an objec type set. 
+     * an object type set.
      * 
      * @param objectType
      * @throws UnsupportedOperationException If trying to call this method on a symbol that is not an address symbol.

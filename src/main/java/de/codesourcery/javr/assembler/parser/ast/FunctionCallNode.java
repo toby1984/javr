@@ -42,6 +42,13 @@ public class FunctionCallNode extends AbstractASTNode implements IValueNode, Res
         this.functionName = functionName;
     }
 
+    public static boolean isBuiltinFunction(Identifier id)
+    {
+        return BUILDIN_FUNCTION_DEFINED.equals( id ) ||
+                   BUILDIN_FUNCTION_HIGH.equals( id ) ||
+                   BUILDIN_FUNCTION_LOW.equals( id );
+    }
+
     @Override
     protected FunctionCallNode createCopy() {
         return new FunctionCallNode(this.functionName , getTextRegion().createCopy() );
@@ -61,7 +68,7 @@ public class FunctionCallNode extends AbstractASTNode implements IValueNode, Res
                 }
                 final Identifier identifier = ((IdentifierNode) child).name;
                 final Optional<Symbol> result = context.currentSymbolTable().maybeGet( identifier );
-                result.ifPresent( s -> s.markAsReferenced() );
+                result.ifPresent(Symbol::markAsReferenced);
                 this.value = result.isPresent() && result.get().getType() == Type.PREPROCESSOR_MACRO;
                 return true;
             } 
