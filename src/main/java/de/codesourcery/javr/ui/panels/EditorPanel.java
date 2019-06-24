@@ -80,6 +80,7 @@ import javax.swing.event.TreeModelListener;
 import javax.swing.event.UndoableEditEvent;
 import javax.swing.event.UndoableEditListener;
 import javax.swing.table.TableModel;
+import javax.swing.text.AbstractDocument;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultStyledDocument.AttributeUndoableEdit;
@@ -496,10 +497,6 @@ public abstract class EditorPanel extends JPanel
 
         public void insertString(FilterBypass fb, int offs, String str, AttributeSet a) throws BadLocationException
         {
-            if ( isNewline( str ) )
-            {
-                str = addWhiteSpace(fb.getDocument(), offs);
-            }
             super.insertString(fb, offs, replaceTabs(str) , a);
         }
 
@@ -513,33 +510,16 @@ public abstract class EditorPanel extends JPanel
 
         public void replace(FilterBypass fb, int offs, int length, String str, AttributeSet a) throws BadLocationException
         {
-            if ( isNewline( str ) ) {
-                str = addWhiteSpace(fb.getDocument(), offs);
-            }
-            super.replace(fb, offs, length, replaceTabs(str) , a);
-        }
 
-        private String addWhiteSpace(Document doc, int offset) throws BadLocationException
-        {
-            final StringBuilder whiteSpace = new StringBuilder("\n");
-            final Element rootElement = doc.getDefaultRootElement();
-            final int line = rootElement.getElementIndex( offset );
-
-            int i = rootElement.getElement(line).getStartOffset();
-            while (true)
+            if ( isNewline( str ) )
             {
-                final String temp = doc.getText(i, 1);
-
-                if (temp.equals(" ") || temp.equals("\t"))
-                {
-                    whiteSpace.append(temp);
-                    i++;
-                }
-                else {
-                    break;
-                }
+                str = "\n  ";
             }
-            return whiteSpace.toString();
+            else
+            {
+                str = replaceTabs( str );
+            }
+            super.replace( fb, offs, length, str, a );
         }
     }
 
@@ -817,7 +797,7 @@ public abstract class EditorPanel extends JPanel
     }
 
     public EditorPanel(IProject project, EditorFrame topLevelWindow , CompilationUnit unit,IApplicationConfigProvider appConfigProvider,MessageFrame messageFrame,
-            CaretPositionTracker caretTracker) throws IOException
+                       CaretPositionTracker caretTracker) throws IOException
     {
         Validate.notNull(project, "project must not be NULL");
         Validate.notNull(unit, "unit must not be NULL");
@@ -914,32 +894,32 @@ public abstract class EditorPanel extends JPanel
 
                 final SymbolTable globalTable = currentUnit.getSymbolTable().getTopLevelTable();
                 globalTable.visitSymbols( (symbol) ->
-                {
-                    switch( symbol.getType() )
-                    {
-                        case ADDRESS_LABEL:
-                            if ( matches(symbol , lower ) )
-                            {
-                                if ( symbol.isLocalLabel() ) {
-                                    localMatches.add(symbol);
-                                } else {
-                                    globalMatches.add(symbol);
-                                }
-                            }
-                            break;
-                        case EQU:
-                        case PREPROCESSOR_MACRO:
-                            if ( symbol.name().value.toLowerCase().contains( lower ) )
-                            {
-                                globalMatches.add( symbol );
-                            }
-                            break;
-                        default:
-                            break;
-                    }
+                                          {
+                                              switch( symbol.getType() )
+                                              {
+                                                  case ADDRESS_LABEL:
+                                                      if ( matches(symbol , lower ) )
+                                                      {
+                                                          if ( symbol.isLocalLabel() ) {
+                                                              localMatches.add(symbol);
+                                                          } else {
+                                                              globalMatches.add(symbol);
+                                                          }
+                                                      }
+                                                      break;
+                                                  case EQU:
+                                                  case PREPROCESSOR_MACRO:
+                                                      if ( symbol.name().value.toLowerCase().contains( lower ) )
+                                                      {
+                                                          globalMatches.add( symbol );
+                                                      }
+                                                      break;
+                                                  default:
+                                                      break;
+                                              }
 
-                    return Boolean.TRUE;
-                });
+                                              return Boolean.TRUE;
+                                          });
 
                 globalMatches.sort( (a,b) -> a.name().value.compareTo( b.name().value ) );
                 localMatches.sort( (a,b) -> a.getLocalNamePart().value.compareTo( b.getLocalNamePart().value ) );
@@ -968,21 +948,21 @@ public abstract class EditorPanel extends JPanel
                 {
                     final SymbolTable globalTable = currentUnit.getSymbolTable().getTopLevelTable();
                     node.searchBackwards( n ->
-                    {
-                        if ( n instanceof LabelNode)
-                        {
-                            if ( ((LabelNode) n).isGlobal() )
-                            {
-                                final Optional<Symbol> symbol = globalTable.maybeGet( ((LabelNode) n).identifier , Type.ADDRESS_LABEL );
-                                if ( symbol.isPresent() )
-                                {
-                                    previousGlobalSymbol = symbol.get();
-                                    return true;
-                                }
-                            }
-                        }
-                        return false;
-                    } );
+                                          {
+                                              if ( n instanceof LabelNode)
+                                              {
+                                                  if ( ((LabelNode) n).isGlobal() )
+                                                  {
+                                                      final Optional<Symbol> symbol = globalTable.maybeGet( ((LabelNode) n).identifier , Type.ADDRESS_LABEL );
+                                                      if ( symbol.isPresent() )
+                                                      {
+                                                          previousGlobalSymbol = symbol.get();
+                                                          return true;
+                                                      }
+                                                  }
+                                              }
+                                              return false;
+                                          } );
                 } else {
                     System.err.println("Failed to find AST node for current offset ?");
                 }
@@ -1157,13 +1137,16 @@ public abstract class EditorPanel extends JPanel
                         final TextRegion line = getLineAt( editor.getCaretPosition() );
                         if ( line != null )
                         {
-                            try
-                            {
-                                editor.getDocument().remove( line.start() , line.length() );
-                            }
-                            catch (BadLocationException e1) {
-                                e1.printStackTrace();
-                            }
+                            restoreCaretPositionAfter( () -> {
+                                try
+                                {
+                                    editor.getDocument().remove( line.start(), line.length() );
+                                }
+                                catch (BadLocationException e1)
+                                {
+                                    e1.printStackTrace();
+                                }
+                            });
                         }
                     }
                     else if ( e.getKeyChar() == 0x0b && searchHelper.canSearch() ) // CTRL-K ... search forward
@@ -1188,11 +1171,16 @@ public abstract class EditorPanel extends JPanel
                             IDEMain.fail(e1);
                         }
                     } else if ( e.getKeyChar() == 0x1a && undoManager.canUndo() ) { // CTRL-Z
-                        undoManager.undo();
-                        e.consume();
+
+                        restoreCaretPositionAfter( () -> {
+                            undoManager.undo();
+                            e.consume();
+                        });
                     }  else if ( e.getKeyChar() == 0x19 && undoManager.canRedo() ) { // CTRL-Y
-                        undoManager.redo();
-                        e.consume();
+                        restoreCaretPositionAfter( () -> {
+                            undoManager.redo();
+                            e.consume();
+                        });
                     }
                 }
             }
@@ -1258,6 +1246,17 @@ public abstract class EditorPanel extends JPanel
         setProject( project , currentUnit );
     }
 
+    private void restoreCaretPositionAfter(Runnable r)
+    {
+        final int oldPos = editor.getCaretPosition();
+        r.run();
+        try {
+            editor.setCaretPosition( oldPos );
+        } catch(IllegalArgumentException e) {
+            // can't help it, probably the last line got deleted or something else
+        }
+    }
+
     private void setupStyles()
     {
         final StyleContext ctx = new StyleContext();
@@ -1296,6 +1295,9 @@ public abstract class EditorPanel extends JPanel
 
         ignoreEditEvents = false;
 
+        // setup auto-indent
+        ((AbstractDocument) doc).setDocumentFilter( new IndentFilter() );
+
         doc.addDocumentListener( new DocumentListener()
         {
             @Override public void insertUpdate(DocumentEvent e)
@@ -1324,9 +1326,6 @@ public abstract class EditorPanel extends JPanel
                 }
             }
         });
-
-        // setup auto-indent
-        //        ((AbstractDocument) doc).setDocumentFilter( new IndentFilter() );
 
         undoManager.discardAllEdits();
 
@@ -1475,13 +1474,13 @@ public abstract class EditorPanel extends JPanel
         if ( lastEditLocation != -1 )
         {
             runAfterCompilation( () ->
-            {
-                if ( lastEditLocation != -1 )
-                {
-                    editor.setCaretPosition( lastEditLocation );
-                    editor.requestFocus();
-                }
-            });
+                                 {
+                                     if ( lastEditLocation != -1 )
+                                     {
+                                         editor.setCaretPosition( lastEditLocation );
+                                         editor.requestFocus();
+                                     }
+                                 });
         }
     }
 
@@ -1615,16 +1614,16 @@ public abstract class EditorPanel extends JPanel
         if ( compilationSuccessful )
         {
             project.getGlobalSymbolTable().visitSymbols( (symbol) ->
-            {
-                if ( symbol.getCompilationUnit().hasSameResourceAs( this.currentUnit ) )
-                {
-                    if ( ! symbol.isReferenced() )
-                    {
-                        allMessages.add( CompilationMessage.warning( currentUnit, "Symbol '"+symbol.name()+"' is not referenced" , symbol.getNode() ) );
-                    }
-                }
-                return true;
-            });
+                                                         {
+                                                             if ( symbol.getCompilationUnit().hasSameResourceAs( this.currentUnit ) )
+                                                             {
+                                                                 if ( ! symbol.isReferenced() )
+                                                                 {
+                                                                     allMessages.add( CompilationMessage.warning( currentUnit, "Symbol '"+symbol.name()+"' is not referenced" , symbol.getNode() ) );
+                                                                 }
+                                                             }
+                                                             return true;
+                                                         });
         }
 
         messageFrame.addAll( allMessages );
@@ -2011,26 +2010,26 @@ public abstract class EditorPanel extends JPanel
             }
         });
         filterField.addActionListener( ev ->
-        {
-            searchHelper.setTerm( filterField.getText() );
-            boolean foundMatch  = false;
-            if ( searchHelper.canSearch() )
-            {
-                foundMatch = searchHelper.searchForward();
-                if ( ! foundMatch && wrap[0] )
-                {
-                    searchHelper.startFromBeginning();
-                    foundMatch = searchHelper.searchForward();
-                }
-            }
-            frame.toFront();
-            filterField.requestFocus();
-            if ( foundMatch ) {
-                label.setText("Hit enter to continue searching");
-            } else {
-                label.setText("No (more) matches.");
-            }
-        });
+                                       {
+                                           searchHelper.setTerm( filterField.getText() );
+                                           boolean foundMatch  = false;
+                                           if ( searchHelper.canSearch() )
+                                           {
+                                               foundMatch = searchHelper.searchForward();
+                                               if ( ! foundMatch && wrap[0] )
+                                               {
+                                                   searchHelper.startFromBeginning();
+                                                   foundMatch = searchHelper.searchForward();
+                                               }
+                                           }
+                                           frame.toFront();
+                                           filterField.requestFocus();
+                                           if ( foundMatch ) {
+                                               label.setText("Hit enter to continue searching");
+                                           } else {
+                                               label.setText("No (more) matches.");
+                                           }
+                                       });
 
         final JPanel panel = new JPanel();
         panel.setLayout( new GridBagLayout() );
@@ -2047,9 +2046,9 @@ public abstract class EditorPanel extends JPanel
         // add 'wrap?' checkbox
         final JCheckBox wrapCheckbox = new JCheckBox("Wrap?" , wrap[0] );
         wrapCheckbox.addActionListener( ev ->
-        {
-            wrap[0] = wrapCheckbox.isSelected();
-        });
+                                        {
+                                            wrap[0] = wrapCheckbox.isSelected();
+                                        });
         cnstrs = new GridBagConstraints();
         cnstrs.weightx = 1.0; cnstrs.weightx = 0.33;
         cnstrs.gridheight = 1 ; cnstrs.gridwidth = 1;
@@ -2086,9 +2085,9 @@ public abstract class EditorPanel extends JPanel
         final JTextField filterField = new JTextField();
 
         filterField.addActionListener( ev ->
-        {
-            symbolModel.setFilterString( filterField.getText() );
-        });
+                                       {
+                                           symbolModel.setFilterString( filterField.getText() );
+                                       });
         filterField.getDocument().addDocumentListener( new DocumentListener() {
 
             @Override

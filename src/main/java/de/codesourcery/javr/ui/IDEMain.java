@@ -348,10 +348,8 @@ public class IDEMain
         // FIXME: as a IProjectListener is obviously a problem....
         projectProvider.setProject( currentProject );
         
-        final TopLevelWindow topLevel = new TopLevelWindow( projectProvider , applicationConfigProvider );
+        new TopLevelWindow( projectProvider , applicationConfigProvider );
         projectProvider.setProject( currentProject );
-        
-        applicationConfigProvider.getApplicationConfig().apply( topLevel );
     }
 
     public IProject selectProjectToOpen(File workspaceDir) throws IOException 

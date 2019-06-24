@@ -20,13 +20,13 @@ import java.awt.Point;
 
 public interface IWindow 
 {
-    public String getWindowId();
+    String getWindowId();
     
-    public Point getLocation();
+    Point getLocation();
     
-    public void setLocation(Point p);
+    void setLocation(Point p);
     
-    public Dimension getSize();
+    Dimension getSize();
     
-    public void setSize(Dimension size);
+    void setSize(Dimension size);
 }

@@ -50,10 +50,10 @@ init:
   eor scratch0,scratch0
   out 0x3f,scratch0
 ; initialize stack pointer  
-  ldi scratch0,0x08
-  out 0x3e,scratch0	; SPH = 0x08
+  ldi scratch0,0x08  
+  out 0x3e,scratch0  ; SPH = 0x08
   ldi scratch0,0xff  
-  out 0x3d,scratch0	; SPL = 0xff
+  out 0x3d,scratch0  ; SPL = 0xff
 ; call main program
   call main
 again:
@@ -156,7 +156,7 @@ spi_transmit_eth_1w1r: ; 1 byte written, 1 byte read
   mov r16, r0
   call spi_transmit
   call spi_receive
-  sbi PORTB, SPI_SS_ETHERNET_BIT ; slave-select hi
+  sbi PORTB, SPI_SS_ETHERNET_BIT ; slave-select hi  
   ret
 
 ; =======

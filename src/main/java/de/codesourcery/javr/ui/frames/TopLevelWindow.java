@@ -136,19 +136,15 @@ public class TopLevelWindow implements IWindow
             }
         });
 
-        topLevelFrame.setPreferredSize( new Dimension(640,480));
-        topLevelFrame.setMinimumSize( new Dimension(640,480));
         topLevelFrame.setContentPane( desktopPane );
-        topLevelFrame.pack();
-        topLevelFrame.setLocationRelativeTo( null );
-        topLevelFrame.setVisible( true );
-        topLevelFrame.setExtendedState(topLevelFrame.getExtendedState() | JFrame.MAXIMIZED_BOTH);
 
-        applicationConfigProvider.getApplicationConfig().apply( this );
         applicationConfigProvider.getApplicationConfig().apply( editorFrame );
         applicationConfigProvider.getApplicationConfig().apply( messageFrame );
         applicationConfigProvider.getApplicationConfig().apply( navigator );           
-        applicationConfigProvider.getApplicationConfig().apply( outlineFrame );        
+        applicationConfigProvider.getApplicationConfig().apply( outlineFrame );
+        applicationConfigProvider.getApplicationConfig().apply( this );
+
+        topLevelFrame.setVisible( true );
     }
 
     public void quit() 
@@ -519,6 +515,7 @@ public class TopLevelWindow implements IWindow
 
     @Override
     public void setSize(Dimension size) {
+        topLevelFrame.setPreferredSize( size );
         topLevelFrame.setSize( size );
     }    
 }

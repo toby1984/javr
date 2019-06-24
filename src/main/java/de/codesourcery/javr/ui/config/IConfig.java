@@ -22,11 +22,11 @@ import de.codesourcery.javr.assembler.parser.Scanner;
 
 public interface IConfig 
 {
-    public IArchitecture getArchitecture();
+    IArchitecture getArchitecture();
     
-    public Lexer createLexer(Scanner s);
+    Lexer createLexer(Scanner s);
+
+    Parser createParser();
     
-    public Parser createParser();
-    
-    public String getEditorIndentString();
+    String getEditorIndentString();
 }

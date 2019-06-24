@@ -25,7 +25,7 @@ import de.codesourcery.javr.ui.frames.IWindow;
 
 public interface IApplicationConfig 
 {
-    public static final class WindowProperties 
+    final class WindowProperties
     {
         public String windowId;
         public int x;
@@ -73,13 +73,13 @@ public interface IApplicationConfig
         }
     }
     
-    public EditorSettings getEditorSettings();
+    EditorSettings getEditorSettings();
     
-    public void setEditorSettings(EditorSettings settings);
+    void setEditorSettings(EditorSettings settings);
     
-    public IApplicationConfig createCopy();
+    IApplicationConfig createCopy();
     
-    public void apply(IWindow window);
+    void apply(IWindow window);
     
-    public void save(IWindow window);
+    void save(IWindow window);
 }

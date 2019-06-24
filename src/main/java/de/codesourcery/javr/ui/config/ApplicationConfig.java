@@ -56,7 +56,12 @@ public class ApplicationConfig implements IApplicationConfig
     public void apply(IWindow window) 
     {
         final Optional<WindowProperties> props = windowProperties.stream().filter( w -> w.windowId.equals( window.getWindowId() ) ).findFirst();
-        props.ifPresent( p -> p.apply( window ) );
+        if ( props.isPresent() ) {
+            System.out.println("Applying existing properties for "+window.getWindowId());
+            props.get().apply( window );
+        } else {
+            System.out.println("Found NO properties for "+window.getWindowId());
+        }
     }
 
     @Override
@@ -64,11 +69,13 @@ public class ApplicationConfig implements IApplicationConfig
     {
         final Optional<WindowProperties> props = windowProperties.stream().filter( w -> w.windowId.equals( window.getWindowId() ) ).findFirst();
         if ( props.isPresent() ) {
+            System.out.println("Updating existing properties for "+window.getWindowId());
             props.get().populateFrom( window );
-        } 
-        else 
+        }
+        else
         {
-            WindowProperties p = new WindowProperties();
+            System.out.println("Storing new properties for "+window.getWindowId());
+            final WindowProperties p = new WindowProperties();
             p.populateFrom( window );
             this.windowProperties.add( p );
         }
