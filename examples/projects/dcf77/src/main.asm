@@ -151,15 +151,18 @@ dcf77_timeout_irq:
   push r16
   in r16,SREG
   push r16
-;--  
+;-- START IRQ routine
+; inc error counter  
   lds r16,no_signal_timeout
   inc r16
+; make sure we overflow to 1, not zero
   brne cont
   ldi r16,1
 .cont  
   sts no_signal_timeout,r16
-  call debug_toggle_red_led
-; ---  
+  
+  call debug_red_led_on
+; ---  END IRQ routine
   pop r16
   out SREG,r16
   pop r16    
