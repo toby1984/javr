@@ -292,6 +292,7 @@ public class IDEMain
     private IProject createNewProject(File workspaceDir) throws FileNotFoundException, IOException 
     {
         final ProjectConfiguration config = new ProjectConfiguration();
+        config.setUploadCommand("/usr/bin/avrdude -F -V -c stk500v2 -p ATMEGA328P -P /dev/ttyACM1 -b 115200 -U flash:w:%f");
         final File projDir = new File( workspaceDir , config.getProjectName() );
         if ( ! projDir.mkdirs() ) {
             throw new IOException("Failed to create folder "+projDir.getAbsolutePath());

@@ -4,14 +4,17 @@
 .equ CPU_FREQ = 16000000 ; 16 Mhz
 .equ PRESCALE_FACTOR = 1024
 
-.equ RECEIVE_TIMEOUT_MICROS = 2500000
+.equ RECEIVE_TIMEOUT_SECONDS = 3
+  
 ; number of  16-bit TIMER ticks before we 
 ; assume we got no signal
-.equ RECEIVE_TIMEOUT_TICKS = (RECEIVE_TIMEOUT_MICROS*PRESCALE_FACTOR)/CPU_FREQ
+.equ RECEIVE_TIMEOUT_TICKS = (RECEIVE_TIMEOUT_SECONDS*CPU_FREQ)/PRESCALE_FACTOR
+  
+.equ RED_LED_BIT = PB0
+.equ RED_LED_MASK = 1<<RED_LED_BIT
   
 ; SPI slave-select output pins on PortB to
 .equ SPI_SS_ETHERNET_BIT = 0
-.equ SPI_SS_DCF77_BIT = 1
 .equ SPI_SS_ETHERNET = 1<<SPI_SS_ETHERNET_BIT
 
 ; Number of cycles to wait before assuming no more data will be sent
@@ -31,9 +34,9 @@
   jmp onirq ; TIMER2_COMPA - timer/counter 2 compare match A
   jmp onirq ; TIMER2_COMPB - timer/counter 2 compare match B
   jmp onirq ; TIMER2_OVF - timer/counter 2 overflow
-  jmp onirq ; TIMER1_CAPT - timer/counter 1 capture event
-  jmp onirq ; TIMER1_COMPA
-  jmp onirq ; TIMER1_COMPB
+  jmp dcf77_timeout_irq ; TIMER1_CAPT - timer/counter 1 capture event
+  jmp dcf77_timeout_irq ; TIMER1_COMPA
+  jmp dcf77_timeout_irq ; TIMER1_COMPB
   jmp dcf77_timeout_irq ; TIMER1_OVF
   jmp onirq ; TIMER0_COMPA
   jmp onirq ; TIMER0_COMPB
@@ -70,8 +73,14 @@ onirq:
 main:
 ;  call spi_init ; enable SPI master mode 0
 ;  call eth_init
+  ldi r16,1
+  out DDRB,r16
+
+  sei  
   call dcf77_init
-  ret
+
+.loop
+  rjmp loop  
   
 ; ======================
 ; DCF77 part
@@ -80,14 +89,21 @@ main:
 ; ======================  
   
 dcf77_init:  
+;  call setup_acomp
+; setup 16-bit timer for timeout interrupt generation
+  call dcf77_setup_timeout_irq  
+  ret
+  
+; ======================
+; Setup analog converter
+; ======================  
+dcf77_setup_acomp:
 ; setup analog comparator  
   ldi r16,0
   sts ADCSRB,r16
 ; TODO: More Comparator setup needed ???  
-; setup 16-bit timer for timeout interrupt generation
-  call dcf77_setup_timeout_irq  
-  ret
- 
+  ret  
+  
 ; ======================
 ; Setup Timer 1 for tracking
 ; "no signal received" timeout.
@@ -106,24 +122,24 @@ dcf77_setup_timeout_irq:
   
 ; setup upper bound of 16-bit timer to trigger IRQ
   ldi r16,HIGH(RECEIVE_TIMEOUT_TICKS)
-  sts OCR1AH,r16 ; 65535-X because timer counts upwards
-  ldi r16,LOW(65535-RECEIVE_TIMEOUT_TICKS)
+  sts OCR1AH,r16
+  ldi r16,LOW(RECEIVE_TIMEOUT_TICKS)
   sts OCR1AL,r16
   
 ; setup 16-bit timer prescaler
-  ldi r16,(1<<3)|%101 ; --> clk/1024, WGM12 = 1, WGM13 = 0
+  ldi r16,%1101 ; --> clk/1024, WGM12 = 1, WGM13 = 0
   sts TCCR1B,r16  
-; enable overflow interrupt  
-  ldi r16,%1
-  sts TIMSK1,r16 
+; clear pending IRQ
+  ldi r16,%100
+  out TIFR1,r16 ; Clear TOV1/ Clear pending interrupts  
 ; Enable Timer 1 Overflow interrupt
-  ldi r16,1
+  ldi r16,%100
   sts TIMSK1,r16 ; TOIE - Timer Overflow Interrupt Enable 
 ; Reset 16-bit timer counter to zero
   clr r16
   sts TCNT1H,r16
   sts TCNT1L,r16  
-  ret;
+  ret
   
 ; ====
 ; Invoked every time the
@@ -133,11 +149,38 @@ dcf77_setup_timeout_irq:
 .irq 13 ; TODO: Are the IRQ vector numbers zero-based or one-based ?
 dcf77_timeout_irq:
   push r16
-  ldi r16,0xff
+  in r16,SREG
+  push r16
+;--  
+  lds r16,no_signal_timeout
+  inc r16
+  brne cont
+  ldi r16,1
+.cont  
   sts no_signal_timeout,r16
+  call debug_toggle_red_led
+; ---  
   pop r16
-  ret;
+  out SREG,r16
+  pop r16    
+  reti
+  
+debug_toggle_red_led:
+  sbic   PINB, RED_LED_BIT
+  cbi    PORTB, RED_LED_BIT
 
+  sbis   PINB, RED_LED_BIT
+  sbi    PORTB, RED_LED_BIT
+  ret      
+  
+debug_red_led_on:
+  sbi    PORTB, RED_LED_BIT
+  ret
+  
+debug_red_led_off:
+  cbi PORTB, RED_LED_BIT
+  ret
+  
 ; ======================
 ; ENC28J60 interfacing
 ; ======================
@@ -291,7 +334,8 @@ spi_init:
 ; SS = PB2
 ; DDR = 1 -> OUTPUT PIN
 ; DDR = 0 -> INPUT PIN
-  ldi scratch0,(1<<PB3)|(1<<PB5)|SPI_SS_ETHERNET
+  in scratch0, DDRB
+  ori scratch0,(1<<PB3)|(1<<PB5)|SPI_SS_ETHERNET
   out  DDRB,scratch0
 ; set SPI SS pins HIGH (inactive)
   ldi scratch0, SPI_SS_ETHERNET
