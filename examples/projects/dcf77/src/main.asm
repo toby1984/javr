@@ -79,7 +79,27 @@ main:
 ; rising edge  
 ; ======================  
   
-dcf77_init:
+dcf77_init:  
+; setup analog comparator  
+  ldi r16,0
+  sts ADCSRB,r16
+; TODO: More Comparator setup needed ???  
+; setup 16-bit timer for timeout interrupt generation
+  call dcf77_setup_timeout_irq  
+  ret
+ 
+; ======================
+; Setup Timer 1 for tracking
+; "no signal received" timeout.
+;
+; The timer will run in CTC mode
+; (counting upwards until the MAX value is reached
+; trigger an IRQ and the restart counting up at zero).
+;
+; The IRQ handler will just store the fact that a 
+; timeout happened in a SRAM location      
+; ======================    
+dcf77_setup_timeout_irq:    
 ; clear 'no signal received' timeout
   ldi r16,0
   sts no_signal_timeout,r16
@@ -91,16 +111,18 @@ dcf77_init:
   sts OCR1AL,r16
   
 ; setup 16-bit timer prescaler
-  ldi r16,%101 ; --> clk/1024
+  ldi r16,(1<<3)|%101 ; --> clk/1024, WGM12 = 1, WGM13 = 0
   sts TCCR1B,r16  
 ; enable overflow interrupt  
   ldi r16,%1
-  sts TIMSK1,r16
-  
-; setup analog comparator  
-  ldi r16,0
-  sts ADCSRB,r16
-; TODO: Start 16-bit timer  
+  sts TIMSK1,r16 
+; Enable Timer 1 Overflow interrupt
+  ldi r16,1
+  sts TIMSK1,r16 ; TOIE - Timer Overflow Interrupt Enable 
+; Reset 16-bit timer counter to zero
+  clr r16
+  sts TCNT1H,r16
+  sts TCNT1L,r16  
   ret;
   
 ; ====
@@ -108,7 +130,10 @@ dcf77_init:
 ; 16-bit timer overflows
 ; ====   
 dcf77_timeout_irq:
-  
+  push r16
+  ldi r16,0xff
+  sts no_signal_timeout,r16
+  pop r16
   ret;
 
 ; ======================
