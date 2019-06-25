@@ -34,7 +34,7 @@
   jmp onirq ; TIMER1_CAPT - timer/counter 1 capture event
   jmp onirq ; TIMER1_COMPA
   jmp onirq ; TIMER1_COMPB
-  jmp onirq ; TIMER1_OVF
+  jmp dcf77_timeout_irq ; TIMER1_OVF
   jmp onirq ; TIMER0_COMPA
   jmp onirq ; TIMER0_COMPB
   jmp onirq ; TIMER0_OVF
@@ -129,6 +129,8 @@ dcf77_setup_timeout_irq:
 ; Invoked every time the
 ; 16-bit timer overflows
 ; ====   
+  
+.irq 13 ; TODO: Are the IRQ vector numbers zero-based or one-based ?
 dcf77_timeout_irq:
   push r16
   ldi r16,0xff
