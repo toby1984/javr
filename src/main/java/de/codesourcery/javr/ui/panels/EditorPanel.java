@@ -1785,7 +1785,9 @@ public abstract class EditorPanel extends JPanel
 
     private void indentSources()
     {
-        editor.setText( indent( this.editor.getText() ) );
+        restoreCaretPositionAfter( () -> {
+            editor.setText( indent( this.editor.getText() ) );
+        });
     }
 
     public static String indent(String text)

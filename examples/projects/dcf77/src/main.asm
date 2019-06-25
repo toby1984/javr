@@ -1,8 +1,14 @@
 #include "m328Pdef.inc"
 #include "enc28j60.asm"
 
-.equ CPU_FREQ = 8000000 ; 8 Mhz
+.equ CPU_FREQ = 16000000 ; 16 Mhz
+.equ PRESCALE_FACTOR = 1024
 
+.equ RECEIVE_TIMEOUT_MICROS = 2500000
+; number of  16-bit TIMER ticks before we 
+; assume we got no signal
+.equ RECEIVE_TIMEOUT_TICKS = (RECEIVE_TIMEOUT_MICROS*PRESCALE_FACTOR)/CPU_FREQ
+  
 ; SPI slave-select output pins on PortB to
 .equ SPI_SS_ETHERNET_BIT = 0
 .equ SPI_SS_DCF77_BIT = 1
@@ -62,9 +68,34 @@ onirq:
   jmp 0x00
 
 main:
-  call spi_init ; enable SPI master mode 0
-  call eth_init
+;  call spi_init ; enable SPI master mode 0
+;  call eth_init
+  call dcf77_init
   ret
+  
+; ======================
+; DCF77 part
+; Uses the analog comparator to detect
+; rising edge  
+; ======================  
+  
+dcf77_init:
+; clear 'no signal received' timeout
+  ldi r16,0
+  sts no_signal_timeout,r16
+  
+; setup 16-bit timer to trigger after timeout 
+; has elapsed
+  ldi r16,HIGH(RECEIVE_TIMEOUT_TICKS)
+  sts TCNT1H,r16
+  ldi r16,LOW(RECEIVE_TIMEOUT_TICKS)
+  sts TCNT1L,r16
+  
+; setup analog comparator  
+  ldi r16,0
+  sts ADCSRB,r16
+; TODO: Start 16-bit timer  
+  ret;
 
 ; ======================
 ; ENC28J60 interfacing
@@ -286,3 +317,9 @@ spi_transmit:
 spi_tx_delay:
   nop
   ret
+  
+.dseg
+  
+no_signal_timeout: 
+  .byte 1  
+  

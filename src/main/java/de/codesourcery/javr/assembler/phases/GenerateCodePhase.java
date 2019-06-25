@@ -251,10 +251,13 @@ public class GenerateCodePhase extends AbstractPhase
                             foundMemDirective = true;
                             if ( ! isInResolvePhase && ! previousDataSymbols.isEmpty() )
                             {
-                                final int size = ((DirectiveNode) node).getSizeInBytes();
+                                final int size = node.getSizeInBytes();
                                 previousDataSymbols.forEach( s -> s.incObjectSize( size ) );
                             }                        
                             final Number value = (Number) ((IValueNode) node.child(0)).getValue();
+                            if ( value.intValue() < 1 ) {
+                                context.error("Refusing to allocate less than 1 byte", node.child(0));
+                            }
                             context.allocateBytes( value.intValue() );
                             break;
                         default:
