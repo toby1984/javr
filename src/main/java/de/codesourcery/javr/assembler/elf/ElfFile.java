@@ -576,7 +576,7 @@ public class ElfFile
         }
         
         // .data segment        
-        if ( objWriter.getBuffer( Segment.SRAM).isNotEmpty() ) {
+        if ( objWriter.getBuffer( Segment.SRAM ).isNotEmpty() ) {
             dataSegmentEntry = new SectionTableEntry(this);
             dataSegmentEntry.setType( SpecialSection.DATA );
             dataSegmentEntry.sh_addralign = 2;

@@ -1125,7 +1125,7 @@ public abstract class EditorPanel extends JPanel
                         {
                             try
                             {
-                                editor.getDocument().remove( editor.getCaretPosition() , line.end() - editor.getCaretPosition() );
+                                editor.getDocument().remove( editor.getCaretPosition() , line.end() - editor.getCaretPosition()-1 );
                             }
                             catch (BadLocationException e1) {
                                 e1.printStackTrace();

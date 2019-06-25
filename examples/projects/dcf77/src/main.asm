@@ -84,17 +84,31 @@ dcf77_init:
   ldi r16,0
   sts no_signal_timeout,r16
   
-; setup 16-bit timer to trigger after timeout 
-; has elapsed
+; setup upper bound of 16-bit timer to trigger IRQ
   ldi r16,HIGH(RECEIVE_TIMEOUT_TICKS)
-  sts TCNT1H,r16
-  ldi r16,LOW(RECEIVE_TIMEOUT_TICKS)
-  sts TCNT1L,r16
+  sts OCR1AH,r16 ; 65535-X because timer counts upwards
+  ldi r16,LOW(65535-RECEIVE_TIMEOUT_TICKS)
+  sts OCR1AL,r16
+  
+; setup 16-bit timer prescaler
+  ldi r16,%101 ; --> clk/1024
+  sts TCCR1B,r16  
+; enable overflow interrupt  
+  ldi r16,%1
+  sts TIMSK1,r16
   
 ; setup analog comparator  
   ldi r16,0
   sts ADCSRB,r16
 ; TODO: Start 16-bit timer  
+  ret;
+  
+; ====
+; Invoked every time the
+; 16-bit timer overflows
+; ====   
+dcf77_timeout_irq:
+  
   ret;
 
 ; ======================
@@ -318,6 +332,9 @@ spi_tx_delay:
   nop
   ret
   
+; =====
+; SRAM data
+; =====    
 .dseg
   
 no_signal_timeout: 
