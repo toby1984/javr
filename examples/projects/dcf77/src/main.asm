@@ -34,10 +34,10 @@
   jmp onirq ; TIMER2_COMPA - timer/counter 2 compare match A
   jmp onirq ; TIMER2_COMPB - timer/counter 2 compare match B
   jmp onirq ; TIMER2_OVF - timer/counter 2 overflow
-  jmp dcf77_timeout_irq ; TIMER1_CAPT - timer/counter 1 capture event
-  jmp dcf77_timeout_irq ; TIMER1_COMPA
+  jmp onirq ; TIMER1_CAPT - timer/counter 1 capture event
+  jmp onirq ; TIMER1_COMPA
   jmp dcf77_timeout_irq ; TIMER1_COMPB
-  jmp dcf77_timeout_irq ; TIMER1_OVF
+  jmp onirq ; TIMER1_OVF
   jmp onirq ; TIMER0_COMPA
   jmp onirq ; TIMER0_COMPB
   jmp onirq ; TIMER0_OVF
@@ -45,10 +45,10 @@
   jmp onirq ; USUART Rx complete
   jmp onirq ; USUART Data register empty
   jmp onirq ; USUART Tx complete
-  jmp onirq ; ADC conversion complete
-  jmp onirq ; EEPROM ready
-  jmp onirq ; Analog comparator
-  jmp onirq ; 2-wire interface I2C
+  jmp dcf77_acomp_irq; ADC conversion complete
+  jmp dcf77_acomp_irq ; EEPROM ready
+  jmp dcf77_acomp_irq ; Analog comparator
+  jmp dcf77_acomp_irq ; 2-wire interface I2C
   jmp onirq ; Store program memory ready
 
 ; ========================
@@ -75,12 +75,11 @@ main:
 ;  call eth_init
   ldi r16,1
   out DDRB,r16
-
   sei  
   call dcf77_init
 
 .loop
-  rjmp loop  
+  rjmp loop
   
 ; ======================
 ; DCF77 part
@@ -89,20 +88,39 @@ main:
 ; ======================  
   
 dcf77_init:  
-;  call setup_acomp
-; setup 16-bit timer for timeout interrupt generation
-  call dcf77_setup_timeout_irq  
+  call dcf77_setup_acomp
+;  call dcf77_setup_timeout_irq  
   ret
   
 ; ======================
 ; Setup analog converter
 ; ======================  
 dcf77_setup_acomp:
-; setup analog comparator  
-  ldi r16,0
-  sts ADCSRB,r16
-; TODO: More Comparator setup needed ???  
+  ; disable pull-ups
+;  ldi r16,0
+;  sts DDRD,r16
+;  ldi r16,0
+;  sts PORTD,r16  
+; disable digital input buffers  
+;  ldi r16,%11
+;  sts DIDR1,r16
+  ; setup analog comparator    
+  ldi r16,%11011
+  sts ACSR,r16
   ret  
+  
+  .irq 23
+dcf77_acomp_irq:
+  push r16
+  in r16,SREG
+  push r16
+;-- START IRQ routine  
+  call debug_red_led_on
+; ---  END IRQ routine
+  pop r16
+  out SREG,r16
+  pop r16    
+  reti
   
 ; ======================
 ; Setup Timer 1 for tracking
@@ -114,12 +132,9 @@ dcf77_setup_acomp:
 ;
 ; The IRQ handler will just store the fact that a 
 ; timeout happened in a SRAM location      
+; Scratched: r16  
 ; ======================    
 dcf77_setup_timeout_irq:    
-; clear 'no signal received' timeout
-  ldi r16,0
-  sts no_signal_timeout,r16
-  
 ; setup upper bound of 16-bit timer to trigger IRQ
   ldi r16,HIGH(RECEIVE_TIMEOUT_TICKS)
   sts OCR1AH,r16
@@ -136,17 +151,27 @@ dcf77_setup_timeout_irq:
   ldi r16,%100
   sts TIMSK1,r16 ; TOIE - Timer Overflow Interrupt Enable 
 ; Reset 16-bit timer counter to zero
+  rjmp dcf77_reset_timeout
+  
+; ========
+; Resets the timeout counter
+; Scratched: r16
+; ========
+dcf77_reset_timeout:
+; clear 'no signal received' timeout
+  ldi r16,0
+  sts no_signal_timeout,r16  
   clr r16
   sts TCNT1H,r16
   sts TCNT1L,r16  
-  ret
+  ret  
   
 ; ====
 ; Invoked every time the
 ; 16-bit timer overflows
 ; ====   
   
-.irq 13 ; TODO: Are the IRQ vector numbers zero-based or one-based ?
+.irq 12 ; TODO: Are the IRQ vector numbers zero-based or one-based ?
 dcf77_timeout_irq:
   push r16
   in r16,SREG
@@ -161,7 +186,7 @@ dcf77_timeout_irq:
 .cont  
   sts no_signal_timeout,r16
   
-  call debug_red_led_on
+;  call debug_toggle_red_led
 ; ---  END IRQ routine
   pop r16
   out SREG,r16
