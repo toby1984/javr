@@ -45,10 +45,10 @@
   jmp onirq ; USUART Rx complete
   jmp onirq ; USUART Data register empty
   jmp onirq ; USUART Tx complete
-  jmp dcf77_acomp_irq; ADC conversion complete
-  jmp dcf77_acomp_irq ; EEPROM ready
+  jmp onirq; ADC conversion complete
+  jmp onirq ; EEPROM ready
   jmp dcf77_acomp_irq ; Analog comparator
-  jmp dcf77_acomp_irq ; 2-wire interface I2C
+  jmp onirq ; 2-wire interface I2C
   jmp onirq ; Store program memory ready
 
 ; ========================
@@ -105,8 +105,8 @@ dcf77_setup_acomp:
 ;  ldi r16,%11
 ;  sts DIDR1,r16
   ; setup analog comparator    
-  ldi r16,%11011
-  sts ACSR,r16
+  ldi r16,%00011011
+  out ACSR,r16
   ret  
   
   .irq 23
@@ -115,7 +115,7 @@ dcf77_acomp_irq:
   in r16,SREG
   push r16
 ;-- START IRQ routine  
-  call debug_red_led_on
+  call debug_toggle_red_led
 ; ---  END IRQ routine
   pop r16
   out SREG,r16
@@ -171,7 +171,9 @@ dcf77_reset_timeout:
 ; 16-bit timer overflows
 ; ====   
   
-.irq 12 ; TODO: Are the IRQ vector numbers zero-based or one-based ?
+.irq 12 
+; TODO: Are the IRQ vector numbers zero-based or one-based ?
+  
 dcf77_timeout_irq:
   push r16
   in r16,SREG
