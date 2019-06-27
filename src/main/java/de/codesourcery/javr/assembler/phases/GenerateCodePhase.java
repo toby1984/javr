@@ -23,6 +23,8 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import de.codesourcery.javr.assembler.Instruction;
+import de.codesourcery.javr.assembler.arch.AbstractArchitecture;
 import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.Address;
@@ -120,12 +122,39 @@ public class GenerateCodePhase extends AbstractPhase
                         LOG.debug("generateCode(): Allocating "+bytes+" at "+context.currentAddress()+" segment for "+node);
                     }
                     context.allocateBytes( bytes );
-                } 
+                }
                 else 
                 {
                     if ( LOG.isDebugEnabled() ) {
                         LOG.debug("generateCode(): Compiling instruction at "+context.currentAddress()+" segment for "+node);
-                    }                    
+                    }
+
+                    if ( context.getCompilationSettings().isWarnIfInOutCanBeUsed() )
+                    {
+                        final String mnemonic = ((InstructionNode) node).instruction.getMnemonic();
+                        int adrArgIdx = -1;
+                        if ( mnemonic.equalsIgnoreCase( "sts" ) ) {
+                            adrArgIdx = 0;
+                        }
+                        else if ( mnemonic.equalsIgnoreCase( "lds" ) )
+                        {
+                            adrArgIdx = 1;
+                        }
+                        if ( adrArgIdx != -1 )
+                        {
+                            final Object value = ((IValueNode) node.child( adrArgIdx ) ).getValue();
+                            final long addr = AbstractArchitecture.toIntValue( value );
+                            if ( (addr & ~0b11111) == 0 )
+                            {
+                                final String alternative = "sts".equalsIgnoreCase( mnemonic ) ?
+                                        "OUT" : "IN";
+                                context.message( CompilationMessage.warning(
+                                        context.currentCompilationUnit(),
+                                        "Destination address fits in 5 bits, could use "+alternative+" instruction", node ) );
+                            }
+                        }
+                    }
+
                     int ptr = context.currentOffset();
                     context.getArchitecture().compile( (InstructionNode) node , context );
                     final int delta = context.currentOffset() - ptr;

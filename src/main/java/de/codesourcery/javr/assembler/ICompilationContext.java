@@ -32,18 +32,23 @@ import de.codesourcery.javr.assembler.util.Resource;
  */
 public interface ICompilationContext
 {
-    public interface ICompilerSettings 
+    interface ICompilerSettings
     {
-        public boolean isFailOnAddressOutOfRange();
+        /**
+         * Whether compilation should fail if generated code does not fit
+         * into the memory of the target architecture.
+         *
+         */
+        boolean isFailOnAddressOutOfRange();
         
-        public ICompilerSettings setFailOnAddressOutOfRange(boolean failOnAddressOutOfRange);
+        ICompilerSettings setFailOnAddressOutOfRange(boolean failOnAddressOutOfRange);
         
         /**
          * Returns the max. number of error messages permitted before compilation is aborted.
          * 
          * @return
          */
-        public int getMaxErrors();
+        int getMaxErrors();
         
         /**
          * Sets the max. number of error messages permitted before compilation is aborted.
@@ -51,7 +56,27 @@ public interface ICompilationContext
          * @param maxErrors
          * @return this instance (for chaining)     
          */
-        public ICompilerSettings setMaxErrors(int maxErrors);        
+        ICompilerSettings setMaxErrors(int maxErrors);
+
+        /**
+         * Returns whether a warning should be generated when
+         * LDS/STS are used with a register address that's within
+         * the IN/OUT instruction's range.
+         *
+         * @return
+         * @see #setWarnIfInOutCanBeUsed(boolean)
+         */
+        boolean isWarnIfInOutCanBeUsed();
+
+        /**
+         * Returns whether a warning should be generated when
+         * LDS/STS are used with a register address that's within
+         * the IN/OUT instruction's range.
+         *
+         * @return
+         * @see #setWarnIfInOutCanBeUsed(boolean)
+         */
+        void setWarnIfInOutCanBeUsed(boolean warnIfInOutCanBeUsed);
     }
     
     public void setStartAddress(int address);
@@ -117,7 +142,7 @@ public interface ICompilationContext
      * are #define'd or #undef'ined
      */
     public CompilationUnit newCompilationUnit(Resource res);
-    
+
     // misc
     public ResourceFactory getResourceFactory();
     

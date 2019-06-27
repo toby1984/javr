@@ -259,6 +259,7 @@ public abstract class AbstractCompilerTest extends TestCase
         projConfig.setBaseDir( new File("/tmp") );
         
         final CompilerSettings compilerSettings = new CompilerSettings();
+        decorateCompilerSettings( compilerSettings );
         projConfig.setCompilerSettings( compilerSettings );
         projConfig.setOutputFormat(OutputFormat.ELF_RELOCATABLE);
         
@@ -267,5 +268,9 @@ public abstract class AbstractCompilerTest extends TestCase
         if ( ! asm.compile(project , objectCodeWriter, resourceFactory , project) ) {
             throw new RuntimeException("Compilation failed: "+compilationUnit.getMessages( true ).stream().map( m -> m.message ).collect( Collectors.joining(",") ) );
         }
+    }
+
+    protected void decorateCompilerSettings( CompilerSettings settings) {
+
     }
 }

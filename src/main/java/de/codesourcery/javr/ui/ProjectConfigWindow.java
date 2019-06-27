@@ -45,6 +45,7 @@ public abstract class ProjectConfigWindow extends JPanel
     private JComboBox<OutputFormat> outputFormat = new JComboBox<>( OutputFormat.values() );
     private JComboBox<Architecture> architecture = new JComboBox<>( Architecture.values() );
     private JCheckBox failOnAddressOutOfBounds = new JCheckBox();
+    private JCheckBox warnIfInOutCanBeUsed = new JCheckBox();
     private JTextField uploadCommand = new JTextField();
     
     public ProjectConfigWindow(ProjectConfiguration currentConfig) 
@@ -59,6 +60,7 @@ public abstract class ProjectConfigWindow extends JPanel
         architecture.setSelectedItem( currentConfig.getArchitecture().getType() );
         failOnAddressOutOfBounds.setSelected( currentConfig.getCompilerSettings().isFailOnAddressOutOfRange() );
         uploadCommand.setText( currentConfig.getUploadCommand() );
+        warnIfInOutCanBeUsed.setSelected( currentConfig.getCompilerSettings().isWarnIfInOutCanBeUsed() );
         
         final JButton save = new JButton("Save changes");
         final JButton cancel = new JButton("Cancel");
@@ -71,9 +73,10 @@ public abstract class ProjectConfigWindow extends JPanel
             toEdit.setOutputFormat( (OutputFormat) outputFormat.getSelectedItem() );
             toEdit.setArchitecture( (Architecture) architecture.getSelectedItem() );
             toEdit.setUploadCommand( uploadCommand.getText() );
-            
+
             final CompilerSettings settings = new CompilerSettings();
             settings.setFailOnAddressOutOfRange( failOnAddressOutOfBounds.isSelected() );
+            settings.setWarnIfInOutCanBeUsed( warnIfInOutCanBeUsed.isSelected() );
             toEdit.setCompilerSettings( settings );
             
             onSave( toEdit );
@@ -88,6 +91,7 @@ public abstract class ProjectConfigWindow extends JPanel
         addRow( y++ , "Architecture" , architecture );
         addRow( y++ , "Upload command" , uploadCommand);
         addRow( y++ , "Fail on out-of-bounds addresses" , failOnAddressOutOfBounds);
+        addRow( y++ , "Warn if IN/OUT could be used" , warnIfInOutCanBeUsed );
         
         final JPanel buttonRow = new JPanel();
         buttonRow.setLayout( new FlowLayout() );

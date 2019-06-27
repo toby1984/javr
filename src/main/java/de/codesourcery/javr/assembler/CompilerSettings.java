@@ -22,6 +22,7 @@ public class CompilerSettings implements ICompilerSettings {
     private int maxErrors = 100;
     
     private boolean failOnAddressOutOfRange=true;
+    private boolean warnIfInOutCanBeUsed = true;
 
     public CompilerSettings() {
     }
@@ -33,14 +34,19 @@ public class CompilerSettings implements ICompilerSettings {
     public CompilerSettings createCopy() {
         return new CompilerSettings(this);
     }
+
+    @Override
+    public boolean isWarnIfInOutCanBeUsed()
+    {
+        return warnIfInOutCanBeUsed;
+    }
+
+    @Override
+    public void setWarnIfInOutCanBeUsed(boolean warnIfInOutCanBeUsed)
+    {
+        this.warnIfInOutCanBeUsed = warnIfInOutCanBeUsed;
+    }
     
-    /**
-     * Sets whether compilation should fail if generated code does not fit
-     * into the memory of the target architecture.
-     * 
-     * @param failOnAddressOutOfRange
-     * @return this instance (for chaining)
-     */
     public CompilerSettings setFailOnAddressOutOfRange(boolean failOnAddressOutOfRange) {
         this.failOnAddressOutOfRange = failOnAddressOutOfRange;
         return this;
@@ -56,12 +62,7 @@ public class CompilerSettings implements ICompilerSettings {
         this.failOnAddressOutOfRange = other.isFailOnAddressOutOfRange();
         this.maxErrors = other.getMaxErrors();
     }
-    
-    /**
-     * Whether compilation should fail if generated code does not fit
-     * into the memory of the target architecture.
-     * 
-     */
+
     @Override
     public boolean isFailOnAddressOutOfRange() {
         return failOnAddressOutOfRange;

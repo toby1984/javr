@@ -99,7 +99,7 @@ public class ProjectConfiguration implements ResourceFactory
     private CompilerSettings compilerSettings = new CompilerSettings();
     private String compilationRoot = "main.asm";
     private String sourceFolder = "src";
-    
+
     /*
      * <project>
      *   <name></name>
@@ -243,7 +243,11 @@ public class ProjectConfiguration implements ResourceFactory
         props.put( "compilationRoot" , compilationRoot );
         props.put( "outputFormat" , outputFormat.name() );
         props.put( "architecture" , architecture.getType().name() );
+
+        // compiler settings
+        props.put( "warnIfInOutCanBeUsed" , Boolean.toString( getCompilerSettings().isWarnIfInOutCanBeUsed() ) );
         props.put( "failOnAddressOutOfBounds" , Boolean.toString( getCompilerSettings().isFailOnAddressOutOfRange() ) );
+
         props.store( out , "DO NOT EDIT - GENERATED FILE, WILL BE OVERWRITTEN" );
     }
     
@@ -283,11 +287,14 @@ public class ProjectConfiguration implements ResourceFactory
         {
             settings.setFailOnAddressOutOfRange( Boolean.valueOf( props.getProperty( "failOnAddressOutOfBounds"  ) ) );
         }
+        if ( props.containsKey( "warnIfInOutCanBeUsed" ) ) {
+            settings.setWarnIfInOutCanBeUsed( Boolean.valueOf( props.getProperty( "warnIfInOutCanBeUsed" ) ) );
+        }
         config.setCompilerSettings( settings );
         
         return config;
     }
-    
+
     public void setProjectName(String projectName) {
         Validate.notBlank(projectName, "projectName must not be NULL or blank");
         this.projectName = projectName;
