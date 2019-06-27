@@ -70,13 +70,18 @@ onirq:
   jmp 0x00
 
 main:
-;  call spi_init ; enable SPI master mode 0
-;  call eth_init
+    
+; switch port to output for red LED
   ldi r16,1
   out DDRB,r16
-  sei  
-  call dcf77_init
 
+  call init_sram
+;  call spi_init ; enable SPI master mode 0
+;  call eth_init  
+  call dcf77_setup_acomp  
+;  call dcf77_init
+  sei
+    
 .loop
   rjmp loop
   
@@ -87,8 +92,7 @@ main:
 ; ======================  
   
 dcf77_init:  
-  call dcf77_setup_acomp
-;  call dcf77_setup_timeout_irq  
+  call dcf77_setup_timeout_irq  
   ret
   
 ; ======================
@@ -432,11 +436,34 @@ spi_tx_delay:
   nop
   ret
   
+init_sram:
+  clr scratch0
+; clear timer value at last pulse  
+  sts last_pulse_ticks,scratch0
+  sts last_pulse_ticks+1,scratch0  
+  
+; clear tickets_per_second
+  sts ticks_per_second,scratch0  
+  sts ticks_per_second+1,scratch0  
+; clear missing pulse counter
+  sts successive_missing_pulse_count, scratch0
+  ret
+    
 ; =====
 ; SRAM data
 ; =====    
 .dseg
   
-no_signal_timeout: 
+; timer value the last time we received a tick
+last_pulse_ticks:
+  .byte 2  
+
+ticks_per_second:
+  .byte 2
+
+successive_missing_pulse_count:
+  .byte 1
+  
+no_signal_timeout: ; // TODO: Get rid of this, replaced by successive_missing_pulse_count
   .byte 1  
   
