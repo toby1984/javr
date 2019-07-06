@@ -2,13 +2,28 @@
 #include "enc28j60.asm"
 
 .equ CPU_FREQ = 16000000 ; 16 Mhz
-.equ PRESCALE_FACTOR = 1024
 
-.equ RECEIVE_TIMEOUT_SECONDS = 3
+.equ TIMER0_PRESCALE_FACTOR = 256
+    
+; NOTE: Prescaler needs to be configured so that 
+; a 16 bit counter covers roughly 2.5 - 3 seconds
+; as the DCF77 signal denotes the start of a new minute
+; by skipping the pulse on the 59th second
+; and we need to be able to reliably detect this
+; 2 second gap (even if the Arduino's clock is not that stable)
+.equ TIMER1_PRESCALE_FACTOR = 1024
+
+.equ TIMER1_TICKS_PER_SECOND = CPU_FREQ / TIMER1_PRESCALE_FACTOR
   
-; number of  16-bit TIMER ticks before we 
-; assume we got no signal
-.equ RECEIVE_TIMEOUT_TICKS = (RECEIVE_TIMEOUT_SECONDS*CPU_FREQ)/PRESCALE_FACTOR
+.equ TIMER1_TICKS_2_SECONDS = 2 * TIMER1_TICKS_PER_SECOND
+  
+.equ TIMER1_THRESHOLD = (TIMER1_TICKS_PER_SECOND*80)/100
+  
+.equ TIMER1_2_SECONDS_LOW_THRESHOLD = TIMER1_TICKS_2_SECONDS - TIMER1_THRESHOLD
+.equ TIMER1_2_SECONDS_HIGH_THRESHOLD = TIMER1_TICKS_2_SECONDS + TIMER1_THRESHOLD
+
+.equ TIMER1_1_SECOND_LOW_THRESHOLD = TIMER1_TICKS_PER_SECOND - TIMER1_THRESHOLD
+.equ TIMER1_1_SECOND_HIGH_THRESHOLD = TIMER1_TICKS_PER_SECOND + TIMER1_THRESHOLD
   
 .equ RED_LED_BIT = PB0
   
@@ -18,7 +33,7 @@
 
 ; Number of cycles to wait before assuming no more data will be sent
 .equ SPI_READ_TIMEOUT_CYCLES = 1000
-
+  
 ; scratch registers
 .def scratch0 = r24
 .def scratch1 = r25
@@ -35,11 +50,11 @@
   jmp onirq ; TIMER2_OVF - timer/counter 2 overflow
   jmp onirq ; TIMER1_CAPT - timer/counter 1 capture event
   jmp onirq ; TIMER1_COMPA
-  jmp dcf77_timeout_irq ; TIMER1_COMPB
-  jmp onirq ; TIMER1_OVF
+  jmp onirq ; TIMER1_COMPB
+  jmp timer1_overflow ; TIMER1_OVF
   jmp onirq ; TIMER0_COMPA
   jmp onirq ; TIMER0_COMPB
-  jmp onirq ; TIMER0_OVF
+  jmp timer0_overflow ; TIMER0_OVF
   jmp onirq ; STC - serial transfer complete (SPI)
   jmp onirq ; USUART Rx complete
   jmp onirq ; USUART Data register empty
@@ -63,7 +78,7 @@ init:
   ldi scratch0,0xff  
   out 0x3d,scratch0  ; SPL = 0xff
 ; call main program
-  call main
+  rcall main
 again:
   rjmp again
 onirq:
@@ -75,12 +90,11 @@ main:
   ldi r16,1
   out DDRB,r16
 
-  call init_sram
+  rcall init_sram
 ;  call spi_init ; enable SPI master mode 0
 ;  call eth_init  
-  call dcf77_setup_acomp  
-;  call dcf77_init
-  sei
+  
+  rcall dcf77_init
     
 .loop
   rjmp loop
@@ -88,25 +102,30 @@ main:
 ; ======================
 ; DCF77 part
 ; Uses the analog comparator to detect
-; rising edge  
+; rising edge on input pin
 ; ======================  
   
 dcf77_init:  
-  call dcf77_setup_timeout_irq  
+  cli
+  rcall dcf77_setup_acomp    
+  rcall setup_timer0  
+  rcall setup_timer1  
+  rcall restart_timers
+  sei
   ret
   
 ; ======================
 ; Setup analog converter
 ; ======================  
 dcf77_setup_acomp:
-  ; disable pull-ups
-;  ldi r16,0
-;  sts DDRD,r16
-;  ldi r16,0
-;  sts PORTD,r16  
+; disable pull-ups
+  ldi r16,0
+  out DDRD,r16
+  ldi r16,0
+  out PORTD,r16  
 ; disable digital input buffers  
-;  ldi r16,%11
-;  sts DIDR1,r16
+  ldi r16,%11
+  sts DIDR1,r16
   ; setup analog comparator    
   ldi r16,%00011011
   out ACSR,r16
@@ -114,61 +133,115 @@ dcf77_setup_acomp:
   
   .irq 23
 dcf77_acomp_irq:
-  push r16
+  push r16 ; preserve r16
   in r16,SREG
-  push r16
+  push r16 ; preserve SREG
+  push r17 ; preserve r17
+  push r18 ; preserve r18
+  push r19 ; preserve r19
+  push r20
+  push r21
 ;-- START IRQ routine  
-  call debug_toggle_red_led
+  
+; read current TIMER0 value  
+  lds r16, TCNT0
+  lds r17, timer0_overflows
+  lds r18, timer0_overflows+1
+; divide by 4 as TIMER0 runs at clk/256
+; while timer1 runs at clk/1024
+  lsr r16  
+  lsr r16  
+  lsr r17
+  lsr r17
+  lsr r18
+  lsr r18
+; sanity check value
+  brne out_of_range ; value >  0xffff
+; if we're not IN_SYNC yet, just wait for a two-second
+; gap to be detected
+  lds r19, is_in_sync
+  tst r19
+  breq check_two_seconds_elapsed    
+; TIMER1 is running at clk/1024 so will tick
+; 15625 times a second (=every 0,064 ms) and thus 
+; cover a time range of 0..4194,304 ms. 
+  lds r19, current_second
+; DCF77 does not send a pulse on the
+; 59th second to indicate the start of 
+; a new minute  
+  cpi r19, 59
+  breq check_two_seconds_elapsed
+  
+; roughly one second should've elapsed, check it!  
+  movw r20:r19, r17:r16
+  subi r19,LOW( TIMER1_1_SECOND_HIGH_THRESHOLD )
+  sbci r20, HIGH( TIMER1_1_SECOND_HIGH_THRESHOLD )
+  brpl out_of_range
+  
+  movw r20:r19, r17:r16
+  subi r19,LOW(TIMER1_1_SECOND_LOW_THRESHOLD )
+  sbci r20, HIGH( TIMER1_1_SECOND_LOW_THRESHOLD )
+  brlo out_of_range  
+  
+; ok, increment current second by 1
+; (we know we're not at 59 seconds here so no need to check for wrap-around)
+  lds r18, current_second
+  inc r18
+  sts current_second, r18
+; use new TIMER1 MAX and leave IRQ handler  
+  rjmp update_timer1_max
+          
+; roughly two seconds should've elapsed, check it!     
+.check_two_seconds_elapsed
+  movw r20:r19, r17:r16
+  subi r19,LOW( TIMER1_2_SECONDS_HIGH_THRESHOLD )
+  sbci r20, HIGH( TIMER1_2_SECONDS_HIGH_THRESHOLD )
+  brpl out_of_range    
+
+  movw r20:r19, r17:r16
+  subi r19,LOW( TIMER1_2_SECONDS_LOW_THRESHOLD )
+  sbci r20, HIGH( TIMER1_2_SECONDS_LOW_THRESHOLD )
+  brlo out_of_range    
+  
+; set state to IN_SYNC  
+  ldi r18, 0xff
+  sts is_in_sync,r18
+; set current_second to 00  
+  clr r18
+  sts current_second,r18
+; do not use the length of this 2 second interval
+; to update the TIMER1 MAX value, we'll just 
+; use what we already have to avoid increased jitter
+  rjmp leave_irq
+  
+.out_of_range   
+  clr r18
+  sts is_in_sync,r18
+  rjmp leave_irq
+
+; only update ticks_per_second
+; if the last pulse was not received too long ago
+; so we don't use a bogus value      
+.update_timer1_max
+  sts ticks_per_second, r16
+  sts ticks_per_second+1,r17
+  
+.leave_irq
+; TODO: Remove debug code ?    
+    call debug_toggle_red_led
+; restart timers in sync  
+  rcall restart_timers
 ; ---  END IRQ routine
-  pop r16
-  out SREG,r16
-  pop r16    
+  pop r21
+  pop r20
+  pop r19 ; restore r19
+  pop r18 ; restore r18  
+  pop r17 ; restore r17
+  pop r16 ; restore SREG
+  out SREG,r16 
+  pop r16 ; restore r16
   reti
-  
-; ======================
-; Setup Timer 1 for tracking
-; "no signal received" timeout.
-;
-; The timer will run in CTC mode
-; (counting upwards until the MAX value is reached
-; trigger an IRQ and the restart counting up at zero).
-;
-; The IRQ handler will just store the fact that a 
-; timeout happened in a SRAM location      
-; Scratched: r16  
-; ======================    
-dcf77_setup_timeout_irq:    
-; setup upper bound of 16-bit timer to trigger IRQ
-  ldi r16,HIGH(RECEIVE_TIMEOUT_TICKS)
-  sts OCR1AH,r16
-  ldi r16,LOW(RECEIVE_TIMEOUT_TICKS)
-  sts OCR1AL,r16
-  
-; setup 16-bit timer prescaler
-  ldi r16,%1101 ; --> clk/1024, WGM12 = 1, WGM13 = 0
-  sts TCCR1B,r16  
-; clear pending IRQ
-  ldi r16,%100
-  out TIFR1,r16 ; Clear TOV1/ Clear pending interrupts  
-; Enable Timer 1 Overflow interrupt
-  ldi r16,%100
-  sts TIMSK1,r16 ; TOIE - Timer Overflow Interrupt Enable 
-; Reset 16-bit timer counter to zero
-  rjmp dcf77_reset_timeout
-  
-; ========
-; Resets the timeout counter
-; Scratched: r16
-; ========
-dcf77_reset_timeout:
-; clear 'no signal received' timeout
-  ldi r16,0
-  sts no_signal_timeout,r16  
-  clr r16
-  sts TCNT1H,r16
-  sts TCNT1L,r16  
-  ret  
-  
+    
 ; ====
 ; Invoked every time the
 ; 16-bit timer overflows
@@ -177,20 +250,12 @@ dcf77_reset_timeout:
 .irq 12 
 ; TODO: Are the IRQ vector numbers zero-based or one-based ?
   
-dcf77_timeout_irq:
+timer1_overflow:
   push r16
   in r16,SREG
   push r16
 ;-- START IRQ routine
-; inc error counter  
-  lds r16,no_signal_timeout
-  inc r16
-; make sure we overflow to 1, not zero
-  brne cont
-  ldi r16,1
-.cont  
-  sts no_signal_timeout,r16
-  
+; TODO: Trigger sending UDP packet here
 ;  call debug_toggle_red_led
 ; ---  END IRQ routine
   pop r16
@@ -214,6 +279,100 @@ debug_red_led_off:
   cbi PORTB, RED_LED_BIT
   ret
   
+; ======================
+; Setup TIMER0 to count up continously
+; (used to measure time between DCF77 pulses).
+;
+; As we want need to measure times of up two
+; 2 seconds (DCF77 transmits no pulse at the 59th second
+; to indicate the start of the next minute) we're
+; going to use a clk/256 prescaler setting and
+; a 24-bit counter here.
+; 
+; Assuming 16 MHz CPU speed this will be enough
+; to cover ~268 seconds (16MHz/256 = 62500 ticks per second)
+; ======================
+
+setup_timer0:
+; enable overflow IRQ  
+  ldi r16,1
+  sts TIMSK0,r16   
+; setup clk/256 prescaler and start timer
+  ldi r16,%100
+  sts TCCR0B, r16    
+  ret 
+      
+timer0_overflow:
+  push r24 ; preserve r24
+  lds r24,SREG
+  push r24 ; preserve SREF
+  push r25 ; preserve r25
+  
+; start of actual IRQ handling
+  
+; increment 24-bit overflow counter
+; (the lowest 8 bits are stored in TCNT0)
+  lds r24, timer0_overflows
+  lds r25, timer0_overflows+1
+  adiw r25:r24,1
+  sts timer0_overflows,r24
+  sts timer0_overflows+1,r25
+
+; end of IRQ handling
+  pop r25 
+  pop r24
+  sts SREG,r24
+  pop r24
+  reti  
+  
+; ======================
+; Setup 16-bit TIMER1 to count up in CTC mode 4
+; and trigger an IRQ when OCR1A is reached.
+;
+; The actual MAX value to use will be measured by 
+; having the analog comparator trigger on a DCF77
+; pulse and calculate the elapsed time since the
+; previous pulse. If this value is within the expected
+; range, the TIMER1 MAX value will be set to it.
+;
+; Scratched: r16  
+; ======================    
+setup_timer1:    
+     
+; Enable IRQ on overflow
+  ldi r16,%1
+  sts TIMSK1,r16
+; set clk/1024 prescaler and CTC mode 4, start timer
+  ldi r16,%1101 
+  sts TCCR1B,r16  
+  ret
+   
+restart_timers:
+; disable prescaler for TIMER0 and TIMER1 (=stop both timers)
+  clr r17
+  ldi r16,%10000001
+  sts GTCCR, r16
+; reset 24-bit TIMER0 value
+  sts TCNT0,r17   
+; clear upper 2 bytes
+  sts timer0_overflow,r17
+  sts timer0_overflow+1,r17
+; load TIMER1 MAX
+  lds r16,ticks_per_second+1
+  sts OCR1AH,r16
+  lds r16,ticks_per_second
+  sts OCR1AL,r16   
+; reset TIMER1 counter value  
+  sts TCNT1H,r17
+  sts TCNT1L,r17
+; clear any pending OVERFLOW interrupts 
+  ldi r16,1
+  out TIFR0, r16  
+  out TIFR1, r16 ; Clear TOV1/ Clear pending interrupts  
+; re-enable prescaler for TIMER0 and TIMER1 (=start both at the same time)
+  sts GTCCR, r17
+  ret
+    
 ; ======================
 ; ENC28J60 interfacing
 ; ======================
@@ -438,15 +597,25 @@ spi_tx_delay:
   
 init_sram:
   clr scratch0
-; clear timer value at last pulse  
+; clear current_second  
+  sts current_second, scratch0
+; clear timer0 overflows
+  sts timer0_overflows,scratch0   
+  sts timer0_overflows+1,scratch0    
+; clear last_pulse_ticks  
   sts last_pulse_ticks,scratch0
-  sts last_pulse_ticks+1,scratch0  
-  
+  sts last_pulse_ticks+1,scratch0    
 ; clear tickets_per_second
   sts ticks_per_second,scratch0  
-  sts ticks_per_second+1,scratch0  
-; clear missing pulse counter
-  sts successive_missing_pulse_count, scratch0
+  sts ticks_per_second+1,scratch0   
+; reset ticks_per_second
+  ldi scratch0, LOW(TIMER1_TICKS_PER_SECOND)
+  sts ticks_per_second, scratch0
+  ldi scratch0, HIGH(TIMER1_TICKS_PER_SECOND)
+  sts ticks_per_second+1, scratch0  
+; reset state  
+  clr scratch0
+  sts is_in_sync, scratch0
   ret
     
 ; =====
@@ -454,16 +623,25 @@ init_sram:
 ; =====    
 .dseg
   
-; timer value the last time we received a tick
+; 24-bit elapsed TIMER0 time since the last DCF77 rising edge
 last_pulse_ticks:
-  .byte 2  
+  .byte 3
 
+; MAX value to be used by TIMER1 for
+; generating 1-second pulses
 ticks_per_second:
   .byte 2
-
-successive_missing_pulse_count:
+  
+; upper 2 byte of 24-bit counter
+; (TIMER0 CNT value is the lowest/first byte)
+timer0_overflows:
+  .byte 2
+  
+is_in_sync:
   .byte 1
   
-no_signal_timeout: ; // TODO: Get rid of this, replaced by successive_missing_pulse_count
-  .byte 1  
-  
+; incremented each time we receive a DCF77 pulse
+; so we know when the 2-second gap at the 59th second
+; is going to happen (and we don't flag it as an error)
+current_second:
+  .byte 1
