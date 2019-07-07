@@ -114,7 +114,7 @@ but with SPM you need to write
 
 ## Known issues
 
-- Some unit-tests are currently failing, need to investigate...
+- Generated relocation information when output format is ELF is not complete yet (see failing unit tests) 
 - Syntax coloring is off when using MSDOS-style line endings (won't fix this since it is related to the fact that Swing text components internally convert all EOL sequences to '\n' but my parser uses the 'true' text offsets)
 - parsing #define is currently broken when trying to #define stuff like (a+b)/c (gets irritated by the leading parens)
 - parsing of .def is quite picky when it comes to whitespace ( '.def x = r16' works but '.def x=r16' doesnt ...)
@@ -122,7 +122,7 @@ but with SPM you need to write
 
 ## To do
 
-- Fix failing unit-tests
+- Fix failing ELF relocation unit-tests
 - Add support for floating-point arithmetic in expressions
 - Fix NPE because of NULL ICompilationContext when certain tokens are present at the end of the top-level file. 
 - Implement object size calculation for ObjectType.FUNCTION symbols (though I didn't notice any avr-ld glitches caused by the missing size info yet)

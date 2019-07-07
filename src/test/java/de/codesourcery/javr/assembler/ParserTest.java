@@ -75,7 +75,7 @@ public class ParserTest extends ParseTestHelper
         assertEquals( Preprocessor.INCLUDE_BINARY , pn.type );
         final List<String> args = pn.getArguments();
         assertEquals(1,args.size());
-        assertEquals("test",args.get(0) );
+        assertEquals("\"test\"",args.get(0) );
         final TextRegion region = pn.getTextRegion();
         assertEquals(0,region.start());
         assertEquals(14,region.length());
@@ -99,7 +99,7 @@ public class ParserTest extends ParseTestHelper
         assertEquals( Preprocessor.INCLUDE_BINARY , pn.type );
         final List<String> args = pn.getArguments();
         assertEquals(1,args.size());
-        assertEquals("test1 test2",args.get(0) );
+        assertEquals("\"test1 test2\"",args.get(0) );
         final TextRegion region = pn.getTextRegion();
         assertEquals(0,region.start());
         assertEquals(21,region.length());
