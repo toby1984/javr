@@ -26,7 +26,9 @@
 .equ TIMER1_1_SECOND_HIGH_THRESHOLD = TIMER1_TICKS_PER_SECOND + TIMER1_THRESHOLD
   
 .equ RED_LED_BIT = PB0
-  
+.equ GREEN_LED_BIT = PB1  
+.equ YELLOW_LED_BIT = PB2
+      
 ; SPI slave-select output pins on PortB to
 .equ SPI_SS_ETHERNET_BIT = 0
 .equ SPI_SS_ETHERNET = 1<<SPI_SS_ETHERNET_BIT
@@ -77,17 +79,9 @@ init:
   out 0x3e,scratch0  ; SPH = 0x08
   ldi scratch0,0xff  
   out 0x3d,scratch0  ; SPL = 0xff
-; call main program
-  rcall main
-again:
-  rjmp again
-onirq:
-  jmp 0x00
-
-main:
     
-; switch port to output for red LED
-  ldi r16,1
+; switch port B to output for red and green LEDs
+  ldi r16,(1<<RED_LED_BIT)|(1<<GREEN_LED_BIT)|(1<<YELLOW_LED_BIT)
   out DDRB,r16
 
   rcall init_sram
@@ -95,9 +89,21 @@ main:
 ;  call eth_init  
   
   rcall dcf77_init
-    
-.loop
-  rjmp loop
+
+; main loop - wait for IRQ to 
+; tell us to send a packet
+mainloop:
+  lds r16, send_packet
+  tst r16
+  breq mainloop
+  clr r16
+  sts send_packet, r16
+; TODO: Send UDP packet
+  rcall yellow_led_toggle
+  rjmp mainloop
+  
+onirq:
+  jmp 0x00
   
 ; ======================
 ; DCF77 part
@@ -140,7 +146,6 @@ dcf77_acomp_irq:
   push r18 ; preserve r18
   push r19 ; preserve r19
   push r20
-  push r21
 ;-- START IRQ routine  
   
 ; read current TIMER0 value  
@@ -149,14 +154,14 @@ dcf77_acomp_irq:
   lds r18, timer0_overflows+1
 ; divide by 4 as TIMER0 runs at clk/256
 ; while timer1 runs at clk/1024
-  lsr r16  
-  lsr r16  
-  lsr r17
-  lsr r17
   lsr r18
+  ror r17  
+  ror r16
+; sanity check value  
   lsr r18
-; sanity check value
-  brne out_of_range ; value >  0xffff
+  brne out_of_range ; value >  0xffff  
+  ror r17  
+  ror r16  
 ; if we're not IN_SYNC yet, just wait for a two-second
 ; gap to be detected
   lds r19, is_in_sync
@@ -206,6 +211,8 @@ dcf77_acomp_irq:
 ; set state to IN_SYNC  
   ldi r18, 0xff
   sts is_in_sync,r18
+  sts warmup_done,r18
+  rcall red_led_off
 ; set current_second to 00  
   clr r18
   sts current_second,r18
@@ -215,6 +222,7 @@ dcf77_acomp_irq:
   rjmp leave_irq
   
 .out_of_range   
+  rcall red_led_on
   clr r18
   sts is_in_sync,r18
   rjmp leave_irq
@@ -227,12 +235,10 @@ dcf77_acomp_irq:
   sts ticks_per_second+1,r17
   
 .leave_irq
-; TODO: Remove debug code ?    
-    call debug_toggle_red_led
+  call green_led_toggle
 ; restart timers in sync  
   rcall restart_timers
 ; ---  END IRQ routine
-  pop r21
   pop r20
   pop r19 ; restore r19
   pop r18 ; restore r18  
@@ -255,30 +261,38 @@ timer1_overflow:
   in r16,SREG
   push r16
 ;-- START IRQ routine
-; TODO: Trigger sending UDP packet here
-;  call debug_toggle_red_led
-; ---  END IRQ routine
+  ldi r17,0xff ; r17 contains value written to 'send_packet' flag
+  lds r16, warmup_done
+  tst r16
+  breq never_synced_yet
+  ldi r16,0xff
+.leave_irq
+  sts send_packet,r16  
+; ---  END IRQ routine  
   pop r16
   out SREG,r16
   pop r16    
   reti
   
-debug_toggle_red_led:
-  sbic   PINB, RED_LED_BIT
-  cbi    PORTB, RED_LED_BIT
-
-  sbis   PINB, RED_LED_BIT
-  sbi    PORTB, RED_LED_BIT
-  ret      
+.never_synced_yet
+  clr r16
+  rjmp leave_irq
   
-debug_red_led_on:
+red_led_on:
   sbi    PORTB, RED_LED_BIT
   ret
   
-debug_red_led_off:
+red_led_off:
   cbi PORTB, RED_LED_BIT
   ret
   
+green_led_toggle:
+  sbi    PINB, GREEN_LED_BIT
+  ret      
+
+yellow_led_toggle:
+  sbi    PINB, YELLOW_LED_BIT
+  ret
 ; ======================
 ; Setup TIMER0 to count up continously
 ; (used to measure time between DCF77 pulses).
@@ -597,6 +611,10 @@ spi_tx_delay:
   
 init_sram:
   clr scratch0
+; clear 'send packet' flag
+  sts send_packet, scratch0
+; clear 'warmup done' flag
+  sts warmup_done, scratch0
 ; clear current_second  
   sts current_second, scratch0
 ; clear timer0 overflows
@@ -636,12 +654,25 @@ ticks_per_second:
 ; (TIMER0 CNT value is the lowest/first byte)
 timer0_overflows:
   .byte 2
+
+; flag indicating we achieved synchronization 
+; at least once so it's ok to generate 
+; UDP packets whenever TIMER1 overflows
+warmup_done:
+  .byte 1
   
+; flag indicating whether we detected a proper DCF77 signal
+; (value != zero) or not (value == zero)
 is_in_sync:
   .byte 1
   
 ; incremented each time we receive a DCF77 pulse
 ; so we know when the 2-second gap at the 59th second
-; is going to happen (and we don't flag it as an error)
+; is going to happen (and we don't flag it as 'signal missing')
 current_second:
+  .byte 1
+  
+; flag indicating whether a new UDP time packet
+; should be sent (value != 0)
+send_packet:
   .byte 1
