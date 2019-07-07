@@ -97,9 +97,9 @@ mainloop:
   tst r16
   breq mainloop
   clr r16
-  sts send_packet, r16
+  sts send_packet, r16 
 ; TODO: Send UDP packet
-  rcall yellow_led_toggle
+  rcall green_led_toggle
   rjmp mainloop
   
 onirq:
@@ -114,9 +114,9 @@ onirq:
 dcf77_init:  
   cli
   rcall dcf77_setup_acomp    
-  rcall setup_timer0  
-  rcall setup_timer1  
-  rcall restart_timers
+;  rcall setup_timer0  
+;  rcall setup_timer1  
+;  rcall restart_timers
   sei
   ret
   
@@ -125,13 +125,13 @@ dcf77_init:
 ; ======================  
 dcf77_setup_acomp:
 ; disable pull-ups
-  ldi r16,0
-  out DDRD,r16
-  ldi r16,0
-  out PORTD,r16  
+;  ldi r16,0
+;  out DDRD,r16
+;  ldi r16,0
+;  out PORTD,r16  
 ; disable digital input buffers  
-  ldi r16,%11
-  sts DIDR1,r16
+;  ldi r16,%11
+;  sts DIDR1,r16
   ; setup analog comparator    
   ldi r16,%00011011
   out ACSR,r16
@@ -152,6 +152,7 @@ dcf77_acomp_irq:
   lds r16, TCNT0
   lds r17, timer0_overflows
   lds r18, timer0_overflows+1
+  rcall red_led_on
 ; divide by 4 as TIMER0 runs at clk/256
 ; while timer1 runs at clk/1024
   lsr r18
@@ -235,7 +236,7 @@ dcf77_acomp_irq:
   sts ticks_per_second+1,r17
   
 .leave_irq
-  call green_led_toggle
+  call yellow_led_toggle
 ; restart timers in sync  
   rcall restart_timers
 ; ---  END IRQ routine
