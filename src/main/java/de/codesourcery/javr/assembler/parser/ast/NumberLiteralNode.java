@@ -37,7 +37,7 @@ public class NumberLiteralNode extends AbstractASTNode implements IValueNode
     private final LiteralType type;
     private final int value;
     
-    private NumberLiteralNode(int value,LiteralType type,TextRegion region) {
+    public NumberLiteralNode(int value,LiteralType type,TextRegion region) {
         super(region);
         Validate.notNull(type, "type must not be NULL");
         this.type = type;

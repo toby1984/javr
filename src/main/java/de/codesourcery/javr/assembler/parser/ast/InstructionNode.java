@@ -26,7 +26,7 @@ import de.codesourcery.javr.assembler.symbols.Symbol;
 
 public class InstructionNode extends NodeWithMemoryLocation implements Resolvable
 {
-    public final Instruction instruction;
+    public Instruction instruction;
     private int sizeInBytes;
 
     public InstructionNode(Instruction insn,TextRegion region) 

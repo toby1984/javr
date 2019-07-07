@@ -15,21 +15,10 @@
  */
 package de.codesourcery.javr.assembler.phases;
 
-import java.io.BufferedInputStream;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
-
-import de.codesourcery.javr.assembler.Instruction;
-import de.codesourcery.javr.assembler.arch.AbstractArchitecture;
-import org.apache.log4j.Logger;
-
 import de.codesourcery.javr.assembler.Address;
 import de.codesourcery.javr.assembler.ICompilationContext;
 import de.codesourcery.javr.assembler.RelocationHelper;
+import de.codesourcery.javr.assembler.arch.AbstractArchitecture;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.ast.AST;
@@ -47,6 +36,13 @@ import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode.Preprocessor;
 import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.symbols.Symbol.ObjectType;
 import de.codesourcery.javr.assembler.symbols.SymbolTable;
+import org.apache.log4j.Logger;
+
+import java.io.BufferedInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Performs the actual code generation.

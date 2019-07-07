@@ -37,6 +37,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
+import de.codesourcery.javr.assembler.Instruction;
+import de.codesourcery.javr.assembler.parser.TextRegion;
+import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
@@ -61,7 +64,7 @@ public abstract class AbstractArchitecture implements IArchitecture
 
     public static final long VALUE_UNAVAILABLE= 0xdeadabcdbeefdeadL;
 
-    public static enum ArgumentType 
+    public enum ArgumentType
     {
         // single register
         SINGLE_REGISTER,
@@ -565,6 +568,8 @@ public abstract class AbstractArchitecture implements IArchitecture
     @Override
     public boolean validate(InstructionNode node,ICompilationContext context) 
     {
+        node = maybeRewrite( node, context );
+
         ASTNode dstArgument = null;
         ASTNode srcArgument = null;
         switch( node.childCount() ) 
@@ -607,53 +612,113 @@ public abstract class AbstractArchitecture implements IArchitecture
         return result;
     }
 
+    private InstructionNode maybeRewrite(InstructionNode insn, ICompilationContext context) {
+
+        final InstructionNode originalInsn = insn;
+        final String mnemonic = insn.instruction.getMnemonic();
+
+        if (  mnemonic.equalsIgnoreCase("rol" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for ROL ...
+        {
+            // turn "rol rX" into "ADC rX,rX"
+            insn = (InstructionNode) insn.createCopy( true );
+            insn.instruction = new Instruction("adc");
+            if ( insn.childCount() == 1 )
+            {
+                insn.addChild( insn.child(0).createCopy( true ) );
+            } else {
+                context.error( "ROL accepts only one argument", originalInsn);
+            }
+        }
+        else if (  mnemonic.equalsIgnoreCase("clr" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for CLR ...
+        {
+            // turn "CLR rX" into "EOR rX,rX"
+            insn = (InstructionNode) insn.createCopy( true );
+            insn.instruction = new Instruction("eor");
+            if ( insn.childCount() == 1 )
+            {
+                insn.addChild( insn.child(0).createCopy( true ) );
+            } else {
+                context.error( "CLR accepts only one argument", originalInsn);
+            }
+        }
+        else if (  mnemonic.equalsIgnoreCase("lsl" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for LSL ...
+        {
+            // turn "LSL rX" into "ADD rX,rX"
+            insn = (InstructionNode) insn.createCopy( true );
+            insn.instruction = new Instruction("add");
+            if ( insn.childCount() == 1 )
+            {
+                insn.addChild( insn.child(0).createCopy( true ) );
+            } else {
+                context.error( "LSL accepts only one argument", originalInsn);
+            }
+        }
+        else if (  mnemonic.equalsIgnoreCase("tst" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for TST ...
+        {
+            // turn "TST rX" into "AND rX,rX"
+            insn = (InstructionNode) insn.createCopy( true );
+            insn.instruction = new Instruction("and");
+            if ( insn.childCount() == 1 )
+            {
+                insn.addChild( insn.child(0).createCopy( true ) );
+            } else {
+                context.error( "TST accepts only one argument", originalInsn);
+            }
+        }
+        else if (  mnemonic.equalsIgnoreCase("ser" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for SER ...
+        {
+            // turn "SER rX" into "LDI rX,0xff"
+            insn = (InstructionNode) insn.createCopy( true );
+            insn.instruction = new Instruction("ldi");
+            if ( insn.childCount() == 1 )
+            {
+                TextRegion region = insn.child(0).getTextRegion();
+                region = region == null ? new TextRegion(0,0,0,0) : region.createCopy();
+                insn.addChild( new NumberLiteralNode( 0xff, NumberLiteralNode.LiteralType.HEXADECIMAL, region) );
+            } else {
+                context.error( "SER accepts only one argument", originalInsn);
+            }
+        }
+        return insn;
+    }
+
     @Override
     public void compile(InstructionNode insn, ICompilationContext context) 
     {
         final String mnemonic = insn.instruction.getMnemonic();
-
         final EncodingEntry variants;
         
-        if (  mnemonic.equalsIgnoreCase("rol" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for rol ... 
+        if (  mnemonic.equalsIgnoreCase("rol" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for ROL ...
         {
-            variants = lookupInstruction( "adc" );
             // turn "rol rX" into "ADC rX,rX"
-            insn = (InstructionNode) insn.createCopy( true );
-            if ( insn.childCount() == 1 ) 
-            {
-                insn.addChild( insn.child(0).createCopy( true ) );
-            }
-        }  
-        else if (  mnemonic.equalsIgnoreCase("clr" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for clr ... 
+            variants = lookupInstruction( "adc" );
+            insn = maybeRewrite( insn, context );
+        }
+        else if (  mnemonic.equalsIgnoreCase("clr" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for CLR ...
         {
-            variants = lookupInstruction( "eor" );
             // turn "CLR rX" into "EOR rX,rX"
-            insn = (InstructionNode) insn.createCopy( true );
-            if ( insn.childCount() == 1 ) 
-            {
-                insn.addChild( insn.child(0).createCopy( true ) );
-            }
+            variants = lookupInstruction( "eor" );
+            insn = maybeRewrite( insn, context );
         } 
         else if (  mnemonic.equalsIgnoreCase("lsl" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for LSL ... 
         {
-            variants = lookupInstruction( "add" );
             // turn "LSL rX" into "ADD rX,rX"
-            insn = (InstructionNode) insn.createCopy( true );
-            if ( insn.childCount() == 1 ) 
-            {
-                insn.addChild( insn.child(0).createCopy( true ) );
-            }
+            variants = lookupInstruction( "add" );
+            insn = maybeRewrite( insn, context );
         } 
         else if (  mnemonic.equalsIgnoreCase("tst" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for TST ... 
         {
-            variants = lookupInstruction( "and" );
             // turn "TST rX" into "AND rX,rX"
-            insn = (InstructionNode) insn.createCopy( true );
-            if ( insn.childCount() == 1 ) 
-            {
-                insn.addChild( insn.child(0).createCopy( true ) );
-            }            
-        } else {
+            variants = lookupInstruction( "and" );
+            insn = maybeRewrite( insn, context );
+        }
+        else if (  mnemonic.equalsIgnoreCase("ser" ) ) // TODO: Dirty hack as our instruction encoding doesn't work properly for SER ...
+        {
+            // turn "SER rX" into "LDI rX,0xff"
+            variants = lookupInstruction( "ldi" );
+            insn = maybeRewrite( insn, context );
+        }
+        else {
             variants = lookupInstruction( mnemonic );
         }
 

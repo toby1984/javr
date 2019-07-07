@@ -16,6 +16,7 @@
 package de.codesourcery.javr.assembler;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -47,6 +48,19 @@ import junit.framework.TestCase;
 
 public abstract class AbstractCompilerTest extends TestCase
 {
+    public static final class CompilationFailedException extends RuntimeException {
+
+        public CompilationFailedException(String message)
+        {
+            super( message );
+        }
+
+        public CompilationFailedException(String message, Throwable cause)
+        {
+            super( message, cause );
+        }
+    }
+
     private final long time = System.currentTimeMillis();
     private final AtomicLong index = new AtomicLong(0);
     
@@ -242,12 +256,12 @@ public abstract class AbstractCompilerTest extends TestCase
         }        
     }
     
-    protected void compile(String s) throws IOException 
+    protected byte[] compile(String s) throws IOException, CompilationFailedException
     {
-        compile( new StringResource( "in-memory" , s ) );
+        return compile( new StringResource( "in-memory" , s ) );
     }
     
-    protected void compile(Resource source) throws IOException 
+    protected byte[] compile(Resource source) throws IOException, CompilationFailedException
     {
         final Assembler asm = new Assembler();
         
@@ -257,20 +271,37 @@ public abstract class AbstractCompilerTest extends TestCase
         final ProjectConfiguration projConfig = new ProjectConfiguration();
         projConfig.setArchitecture( Architecture.ATMEGA328P );
         projConfig.setBaseDir( new File("/tmp") );
-        
+
         final CompilerSettings compilerSettings = new CompilerSettings();
         decorateCompilerSettings( compilerSettings );
         projConfig.setCompilerSettings( compilerSettings );
-        projConfig.setOutputFormat(OutputFormat.ELF_RELOCATABLE);
-        
+        decorateProjectConfiguration( projConfig );
+
         project = new Project(compilationUnit,projConfig);
         
         if ( ! asm.compile(project , objectCodeWriter, resourceFactory , project) ) {
-            throw new RuntimeException("Compilation failed: "+compilationUnit.getMessages( true ).stream().map( m -> m.message ).collect( Collectors.joining(",") ) );
+            throw new CompilationFailedException("Compilation failed: "+compilationUnit.getMessages( true ).stream().map( m -> m.message ).collect( Collectors.joining(",") ) );
         }
+        return objectCodeWriter.getBuffer( Segment.FLASH ).toByteArray();
+    }
+
+    protected void decorateProjectConfiguration( ProjectConfiguration configuration) {
+        configuration.setOutputFormat(OutputFormat.ELF_RELOCATABLE);
     }
 
     protected void decorateCompilerSettings( CompilerSettings settings) {
 
+    }
+
+    protected String disassemble(byte[] data) throws IOException
+    {
+        final Disassembler disasm = new Disassembler();
+        disasm.setVerboseMode( false );
+        disasm.getSettings().printBytes = false;
+        disasm.getSettings().printAddresses = false;
+
+        final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        disasm.disassemble( new ByteArrayInputStream(data), bos );
+        return new String( bos.toByteArray(), "UTF8");
     }
 }
