@@ -244,7 +244,7 @@ public class DirectiveNode extends NodeWithMemoryLocation implements Resolvable
             return;
         }
 
-        final int vectorIdx = ((NumberLiteralNode) child(0)).getValue();
+        final int vectorIdx = ((IntNumberLiteralNode) child( 0)).getValue();
         if ( vectorIdx < 0 || vectorIdx >= context.getArchitecture().getIRQVectorCount() ) 
         {
             context.error("IRQ vector out of range, "+context.getArchitecture().getType()+" architecture only supports IRQ vectors 0-"+(context.getArchitecture().getIRQVectorCount()-1), child(0));

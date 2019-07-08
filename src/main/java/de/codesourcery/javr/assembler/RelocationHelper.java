@@ -30,7 +30,7 @@ import de.codesourcery.javr.assembler.parser.ast.ExpressionNode;
 import de.codesourcery.javr.assembler.parser.ast.FunctionCallNode;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
-import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
+import de.codesourcery.javr.assembler.parser.ast.IntNumberLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
 import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.assembler.symbols.Symbol.Type;
@@ -111,8 +111,8 @@ public class RelocationHelper
                 buffer.append( ((IdentifierNode) astNode).name.value );
                 return;
             } 
-            if ( astNode instanceof NumberLiteralNode ) {
-                buffer.append( ((NumberLiteralNode) astNode).getValue() );
+            if ( astNode instanceof IntNumberLiteralNode) {
+                buffer.append( ((IntNumberLiteralNode) astNode).getValue() );
                 return;
             } 
 
@@ -574,9 +574,9 @@ public class RelocationHelper
      */
     static Evaluated convert(ASTNode node) 
     {
-        if ( node instanceof NumberLiteralNode ) 
+        if ( node instanceof IntNumberLiteralNode)
         {
-            return new Evaluated( node , ((NumberLiteralNode) node).getValue() );
+            return new Evaluated( node , ((IntNumberLiteralNode) node).getValue() );
         }
         if ( node instanceof IdentifierNode) {
             final IdentifierNode id = (IdentifierNode) node;

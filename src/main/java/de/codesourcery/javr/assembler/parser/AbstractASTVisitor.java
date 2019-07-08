@@ -31,7 +31,7 @@ import de.codesourcery.javr.assembler.parser.ast.IdentifierDefNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
-import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
+import de.codesourcery.javr.assembler.parser.ast.IntNumberLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
 import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
@@ -81,8 +81,8 @@ public class AbstractASTVisitor {
         else if ( node instanceof LabelNode ) {
             visitNode( (LabelNode) node );
         }
-        else if ( node instanceof NumberLiteralNode ) {
-            visitNode( (NumberLiteralNode) node );
+        else if ( node instanceof IntNumberLiteralNode) {
+            visitNode( (IntNumberLiteralNode) node );
         }
         else if ( node instanceof OperatorNode ) {
             visitNode( (OperatorNode) node );
@@ -155,7 +155,7 @@ public class AbstractASTVisitor {
         visitChildren(node);
     }
 
-    protected void visitNode(NumberLiteralNode node) {
+    protected void visitNode(IntNumberLiteralNode node) {
         visitChildren(node);
     }
 

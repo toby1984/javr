@@ -17,6 +17,7 @@ package de.codesourcery.javr.assembler;
 
 import java.util.List;
 
+import de.codesourcery.javr.assembler.parser.ast.FloatNumberLiteralNode;
 import org.junit.Test;
 
 import de.codesourcery.javr.assembler.parser.Identifier;
@@ -37,8 +38,8 @@ import de.codesourcery.javr.assembler.parser.ast.IdentifierDefNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
-import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
-import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode.LiteralType;
+import de.codesourcery.javr.assembler.parser.ast.IntNumberLiteralNode;
+import de.codesourcery.javr.assembler.parser.ast.IntNumberLiteralNode.LiteralType;
 import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
 import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
 import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode.Preprocessor;
@@ -55,6 +56,27 @@ public class ParserTest extends ParseTestHelper
         assertNotNull(ast);
         assertFalse( ast.hasChildren() );
         assertEquals( 0 ,  ast.childCount() );        
+    }
+
+    @Test
+    public void testParseFloatingPointNumber() {
+        AST ast = parse(".equ a = 1.25");
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+
+        StatementNode stmt = (StatementNode) ast.child( 0);
+
+        System.out.println("GOT: ast = \n"+ast);
+
+        final DirectiveNode directive = (DirectiveNode) stmt.child( 0 );
+        assertEquals( Directive.EQU, directive.directive );
+
+        final ASTNode identifier = directive.child( 0 );
+        assertTrue( "Not an identifier node: "+identifier.getClass().getName() , identifier instanceof EquLabelNode );
+        assertEquals( "a" , ((EquLabelNode) identifier).name.value );
+
+        assertTrue( directive.child(1) instanceof FloatNumberLiteralNode);
+        assertEquals( 1.25d , ((FloatNumberLiteralNode) directive.child(1)).getValue() );
     }
     
     @Test
@@ -152,7 +174,7 @@ public class ParserTest extends ParseTestHelper
         final ASTNode directive = stmt.child(0);
         assertEquals( DirectiveNode.class     , directive.getClass() );
         assertEquals( EquLabelNode.class      , directive.child(0).getClass() );
-        assertEquals( NumberLiteralNode.class , directive.child(1).getClass() );
+        assertEquals( IntNumberLiteralNode.class , directive.child( 1).getClass() );
         
         final ASTNode commentNode = stmt.child(1);
         assertEquals( CommentNode.class       , commentNode.getClass() );
@@ -602,9 +624,9 @@ public class ParserTest extends ParseTestHelper
         assertNotNull(insn);
         assertEquals( "add" , insn.instruction.getMnemonic());
         
-        final NumberLiteralNode num = (NumberLiteralNode) insn.child( 0 );
+        final IntNumberLiteralNode num = (IntNumberLiteralNode) insn.child( 0 );
         assertEquals( 123 , num.getValue().intValue() );
-        assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num.getType() );
+        assertEquals( IntNumberLiteralNode.LiteralType.DECIMAL , num.getType() );
     }    
     
     @Test
@@ -624,13 +646,13 @@ public class ParserTest extends ParseTestHelper
         assertNotNull(insn);
         assertEquals( "add" , insn.instruction.getMnemonic());
         
-        final NumberLiteralNode num1 = (NumberLiteralNode) insn.child( 0 );
+        final IntNumberLiteralNode num1 = (IntNumberLiteralNode) insn.child( 0 );
         assertEquals( 123 , num1.getValue().intValue() );
-        assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num1.getType() );
+        assertEquals( IntNumberLiteralNode.LiteralType.DECIMAL , num1.getType() );
         
-        final NumberLiteralNode num2 = (NumberLiteralNode) insn.child( 1 );
+        final IntNumberLiteralNode num2 = (IntNumberLiteralNode) insn.child( 1 );
         assertEquals( 456 , num2.getValue().intValue()  );
-        assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num2.getType() );        
+        assertEquals( IntNumberLiteralNode.LiteralType.DECIMAL , num2.getType() );
     }  
     
     @Test
@@ -655,9 +677,9 @@ public class ParserTest extends ParseTestHelper
         assertEquals( OperatorType.PLUS , op.type );
         
         assertEquals( CurrentAddressNode.class , op.child(0).getClass() );
-        assertEquals( NumberLiteralNode.class , op.child(1).getClass() );
+        assertEquals( IntNumberLiteralNode.class , op.child( 1).getClass() );
         
-        assertEquals( 2 , ((NumberLiteralNode) op.child(1)).getValue().intValue() );
+        assertEquals( 2 , ((IntNumberLiteralNode) op.child( 1)).getValue().intValue() );
     }   
     
     @Test
@@ -682,9 +704,9 @@ public class ParserTest extends ParseTestHelper
         assertEquals( OperatorType.BINARY_MINUS , op.type );
         
         assertEquals( CurrentAddressNode.class , op.child(0).getClass() );
-        assertEquals( NumberLiteralNode.class , op.child(1).getClass() );
+        assertEquals( IntNumberLiteralNode.class , op.child( 1).getClass() );
         
-        assertEquals( 2 , ((NumberLiteralNode) op.child(1)).getValue().intValue() );
+        assertEquals( 2 , ((IntNumberLiteralNode) op.child( 1)).getValue().intValue() );
     }     
     
     @Test
@@ -793,8 +815,8 @@ public class ParserTest extends ParseTestHelper
         final OperatorNode num2 = (OperatorNode) insn.child( 1 );
         assertEquals( OperatorType.PLUS , num2.type );
         assertEquals( 2 , num2.childCount() );
-        assertEquals( 1 , ((NumberLiteralNode) num2.child(0)).getValue().intValue() );
-        assertEquals( 2 , ((NumberLiteralNode) num2.child(1)).getValue().intValue() );
+        assertEquals( 1 , ((IntNumberLiteralNode) num2.child( 0)).getValue().intValue() );
+        assertEquals( 2 , ((IntNumberLiteralNode) num2.child( 1)).getValue().intValue() );
     }  
 
     @Test
@@ -821,8 +843,8 @@ public class ParserTest extends ParseTestHelper
         final FunctionCallNode num2 = (FunctionCallNode) insn.child( 1 );
         assertEquals( new Identifier("HIGH") , num2.functionName );
         assertEquals( 2 , num2.childCount() );
-        assertEquals( 1 , ((NumberLiteralNode) num2.child(0)).getValue().intValue() );
-        assertEquals( 2 , ((NumberLiteralNode) num2.child(1)).getValue().intValue() );
+        assertEquals( 1 , ((IntNumberLiteralNode) num2.child( 0)).getValue().intValue() );
+        assertEquals( 2 , ((IntNumberLiteralNode) num2.child( 1)).getValue().intValue() );
     }    
     
     @Test
@@ -881,8 +903,8 @@ public class ParserTest extends ParseTestHelper
         assertEquals( Register.REG_Y , num2.register.getRegisterNumber() );
         
         assertEquals( 1 , num2.childCount() );
-        assertTrue( num2.child(0) instanceof NumberLiteralNode);
-        NumberLiteralNode num3 = (NumberLiteralNode) num2.child(0);
+        assertTrue( num2.child(0) instanceof IntNumberLiteralNode);
+        IntNumberLiteralNode num3 = (IntNumberLiteralNode) num2.child( 0);
         assertEquals( 42 , num3.getValue().intValue()  );
     }       
     
@@ -928,9 +950,9 @@ public class ParserTest extends ParseTestHelper
         assertNotNull(insn);
         assertEquals( "add" , insn.instruction.getMnemonic());
         
-        final NumberLiteralNode num = (NumberLiteralNode) insn.child( 0 );
+        final IntNumberLiteralNode num = (IntNumberLiteralNode) insn.child( 0 );
         assertEquals( 0x123 , num.getValue().intValue()  );
-        assertEquals( NumberLiteralNode.LiteralType.HEXADECIMAL , num.getType() );
+        assertEquals( IntNumberLiteralNode.LiteralType.HEXADECIMAL , num.getType() );
     }    
     
     @Test
@@ -949,9 +971,9 @@ public class ParserTest extends ParseTestHelper
         assertNotNull(node);
         assertEquals( 1 , node.childCount() );
         
-        final NumberLiteralNode num = (NumberLiteralNode) node.child( 0 );
+        final IntNumberLiteralNode num = (IntNumberLiteralNode) node.child( 0 );
         assertEquals( 10 , num.getValue().intValue()  );
-        assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num.getType() );
+        assertEquals( IntNumberLiteralNode.LiteralType.DECIMAL , num.getType() );
     }
     
     @Test
@@ -992,13 +1014,13 @@ public class ParserTest extends ParseTestHelper
         assertEquals( 2 , node.childCount() );
         assertEquals( Directive.INIT_BYTES , node.directive );
         
-        final NumberLiteralNode num = (NumberLiteralNode) node.child( 0 );
+        final IntNumberLiteralNode num = (IntNumberLiteralNode) node.child( 0 );
         assertEquals( 1 , num.getValue().intValue()  );
-        assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num.getType() );
+        assertEquals( IntNumberLiteralNode.LiteralType.DECIMAL , num.getType() );
         
-        final NumberLiteralNode num2 = (NumberLiteralNode) node.child( 1 );
+        final IntNumberLiteralNode num2 = (IntNumberLiteralNode) node.child( 1 );
         assertEquals( 2 , num2.getValue().intValue()  );
-        assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num2.getType() );        
+        assertEquals( IntNumberLiteralNode.LiteralType.DECIMAL , num2.getType() );
     }  
     
     @Test
@@ -1018,13 +1040,13 @@ public class ParserTest extends ParseTestHelper
         assertEquals( 2 , node.childCount() );
         assertEquals( Directive.INIT_WORDS , node.directive );
         
-        final NumberLiteralNode num = (NumberLiteralNode) node.child( 0 );
+        final IntNumberLiteralNode num = (IntNumberLiteralNode) node.child( 0 );
         assertEquals( 1 , num.getValue().intValue()  );
-        assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num.getType() );
+        assertEquals( IntNumberLiteralNode.LiteralType.DECIMAL , num.getType() );
         
-        final NumberLiteralNode num2 = (NumberLiteralNode) node.child( 1 );
+        final IntNumberLiteralNode num2 = (IntNumberLiteralNode) node.child( 1 );
         assertEquals( 2 , num2.getValue().intValue()  );
-        assertEquals( NumberLiteralNode.LiteralType.DECIMAL , num2.getType() );        
+        assertEquals( IntNumberLiteralNode.LiteralType.DECIMAL , num2.getType() );
     }      
     
     @Test
@@ -1045,7 +1067,7 @@ public class ParserTest extends ParseTestHelper
         assertEquals( 2 , node.childCount() );
 
         final EquLabelNode label = (EquLabelNode) node.child(0);
-        final NumberLiteralNode num2 = (NumberLiteralNode) node.child(1);
+        final IntNumberLiteralNode num2 = (IntNumberLiteralNode) node.child( 1);
         
         assertEquals( new Identifier("A") , label.name );
         assertEquals( 1 , num2.getValue().intValue() );
@@ -1068,7 +1090,7 @@ public class ParserTest extends ParseTestHelper
         assertNotNull(node);
         assertEquals( 1 , node.childCount() );
 
-        final NumberLiteralNode num2 = (NumberLiteralNode) node.child(0);
+        final IntNumberLiteralNode num2 = (IntNumberLiteralNode) node.child( 0);
         assertEquals( 12 , num2.getValue().intValue() );
     }     
     
@@ -1099,7 +1121,7 @@ public class ParserTest extends ParseTestHelper
         assertEquals( 2 , node.childCount() );
 
         final EquLabelNode label = (EquLabelNode) node.child(0);
-        final NumberLiteralNode num2 = (NumberLiteralNode) node.child(1);
+        final IntNumberLiteralNode num2 = (IntNumberLiteralNode) node.child( 1);
         assertEquals( LiteralType.HEXADECIMAL , num2.getType() );
         assertEquals( new Identifier("_SIGNATURE_000") , label.name );
         assertEquals( 0x1e , num2.getValue().intValue() );
@@ -1122,9 +1144,9 @@ public class ParserTest extends ParseTestHelper
         assertNotNull(insn);
         assertEquals( "add" , insn.instruction.getMnemonic());
         
-        final NumberLiteralNode num = (NumberLiteralNode) insn.child( 0 );
+        final IntNumberLiteralNode num = (IntNumberLiteralNode) insn.child( 0 );
         assertEquals( 0b1011 , num.getValue().intValue()  );
-        assertEquals( NumberLiteralNode.LiteralType.BINARY , num.getType() );
+        assertEquals( IntNumberLiteralNode.LiteralType.BINARY , num.getType() );
     }     
     
     @Test

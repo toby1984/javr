@@ -25,7 +25,7 @@ import de.codesourcery.javr.assembler.parser.ast.ExpressionNode;
 import de.codesourcery.javr.assembler.parser.ast.FunctionCallNode;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
-import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
+import de.codesourcery.javr.assembler.parser.ast.IntNumberLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
 import de.codesourcery.javr.assembler.parser.ast.StringLiteral;
 import de.codesourcery.javr.assembler.symbols.Symbol;
@@ -49,7 +49,7 @@ public class ExpressionEvaluator
     
     public Object evaluate(IValueNode node) 
     {
-        if ( node instanceof CharacterLiteralNode || node instanceof NumberLiteralNode || node instanceof StringLiteral ) 
+        if ( node instanceof CharacterLiteralNode || node instanceof IntNumberLiteralNode || node instanceof StringLiteral )
         {
             return node.getValue();
         } 

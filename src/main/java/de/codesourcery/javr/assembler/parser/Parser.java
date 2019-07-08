@@ -15,8 +15,6 @@
  */
 package de.codesourcery.javr.assembler.parser;
 
-import static org.hamcrest.CoreMatchers.instanceOf;
-
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -27,6 +25,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import de.codesourcery.javr.assembler.parser.ast.FloatNumberLiteralNode;
 import org.apache.commons.lang3.Validate;
 
 import de.codesourcery.javr.assembler.CompilationUnit;
@@ -53,7 +52,7 @@ import de.codesourcery.javr.assembler.parser.ast.IdentifierDefNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
-import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
+import de.codesourcery.javr.assembler.parser.ast.IntNumberLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
 import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
 import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode.Preprocessor;
@@ -454,7 +453,7 @@ public class Parser
                     } 
                     else if ( ! expectingFunctionBody ) 
                     {
-                    	funcDef.addChild( new NumberLiteralNode("1", nameToken.region() ) );
+                    	funcDef.addChild( new IntNumberLiteralNode( "1", nameToken.region() ) );
                     }
                     else 
                     { 
@@ -1099,13 +1098,38 @@ public class Parser
         return null;
     }
 
-    private static NumberLiteralNode parseNumber(Lexer lexer) 
+    private static ASTNode parseNumber(Lexer lexer) {
+        final Token tok = lexer.peek();
+        if ( tok.is( TokenType.DIGITS ) )
+        {
+            lexer.next(); // consume
+            if ( lexer.peek( TokenType.DOT ) ) { // floating-point number
+                final Token dot = lexer.next(); // consume '.'
+                final Token fraction = lexer.next();
+                if ( ! fraction.is( TokenType.DIGITS ) ) {
+                    throw new ParseException("Expected digits after decimal separator" , dot.offset );
+                }
+                final String string = tok.value + "." + fraction.value;
+                double doubleValue;
+                try {
+                    doubleValue = Double.parseDouble( string );
+                } catch(NumberFormatException e) {
+                    throw new ParseException("'"+string+"' is not a valid floating-point number ("+e.getMessage()+")" , tok.offset );
+                }
+                return new FloatNumberLiteralNode( doubleValue, tok.region().merge( fraction ) );
+            }
+            return new IntNumberLiteralNode( tok.value, tok.region() );
+        }
+        return parseIntegralNumber(lexer);
+    }
+
+    private static IntNumberLiteralNode parseIntegralNumber(Lexer lexer)
     {
         Token tok = lexer.peek();
-        if ( tok.is( TokenType.DIGITS ) || tok.is( TokenType.TEXT ) && NumberLiteralNode.isValidNumberLiteral( tok.value ) ) 
+        if ( tok.is( TokenType.DIGITS ) || tok.is( TokenType.TEXT ) && IntNumberLiteralNode.isValidNumberLiteral( tok.value ) )
         {
             lexer.next();
-            return new NumberLiteralNode( tok.value , tok.region() );
+            return new IntNumberLiteralNode( tok.value , tok.region() );
         }
         return null;
     }

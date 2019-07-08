@@ -86,7 +86,6 @@ import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultStyledDocument.AttributeUndoableEdit;
 import javax.swing.text.Document;
 import javax.swing.text.DocumentFilter;
-import javax.swing.text.Element;
 import javax.swing.text.JTextComponent;
 import javax.swing.text.Style;
 import javax.swing.text.StyleConstants;
@@ -126,7 +125,7 @@ import de.codesourcery.javr.assembler.parser.ast.FunctionCallNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
-import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
+import de.codesourcery.javr.assembler.parser.ast.IntNumberLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
 import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
@@ -1704,7 +1703,7 @@ public abstract class EditorPanel extends JPanel
             {
                 style = STYLE_LABEL;
             }
-            else if ( node instanceof NumberLiteralNode )
+            else if ( node instanceof IntNumberLiteralNode)
             {
                 style = STYLE_NUMBER;
             }
@@ -1916,9 +1915,9 @@ public abstract class EditorPanel extends JPanel
                     else if ( node instanceof CommentNode) {
                         text = "CommentNode: "+((CommentNode) node).value;
                     }
-                    else if ( node instanceof NumberLiteralNode )
+                    else if ( node instanceof IntNumberLiteralNode)
                     {
-                        final NumberLiteralNode node2 = (NumberLiteralNode) value;
+                        final IntNumberLiteralNode node2 = (IntNumberLiteralNode) value;
                         switch( node2.getType() ) {
                             case BINARY:
                                 text = "0b"+Integer.toBinaryString( node2.getValue() );

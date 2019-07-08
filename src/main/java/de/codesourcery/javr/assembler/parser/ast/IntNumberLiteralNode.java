@@ -23,11 +23,11 @@ import org.apache.commons.lang3.Validate;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.util.Misc;
 
-public class NumberLiteralNode extends AbstractASTNode implements IValueNode
+public class IntNumberLiteralNode extends AbstractASTNode implements IValueNode
 {
     private static final Pattern HEX_PATTERN = Pattern.compile("^[0-9A-Fa-f]+$");
     
-    public static enum LiteralType 
+    public enum LiteralType
     {
         DECIMAL,
         HEXADECIMAL,
@@ -37,14 +37,14 @@ public class NumberLiteralNode extends AbstractASTNode implements IValueNode
     private final LiteralType type;
     private final int value;
     
-    public NumberLiteralNode(int value,LiteralType type,TextRegion region) {
+    public IntNumberLiteralNode(int value, LiteralType type, TextRegion region) {
         super(region);
         Validate.notNull(type, "type must not be NULL");
         this.type = type;
         this.value = value;
     }
     
-    public NumberLiteralNode(String value, TextRegion region) 
+    public IntNumberLiteralNode(String value, TextRegion region)
     {
         super(region);
         if ( isHexadecimalNumber( value ) ) 
@@ -63,9 +63,9 @@ public class NumberLiteralNode extends AbstractASTNode implements IValueNode
     }
     
     @Override
-    protected NumberLiteralNode createCopy() 
+    protected IntNumberLiteralNode createCopy()
     {
-        return new NumberLiteralNode( this.value , this.type , getTextRegion().createCopy() );
+        return new IntNumberLiteralNode( this.value , this.type , getTextRegion().createCopy() );
     }
     
     @Override

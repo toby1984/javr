@@ -30,7 +30,7 @@ import de.codesourcery.javr.assembler.parser.ast.DirectiveNode.Directive;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
-import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
+import de.codesourcery.javr.assembler.parser.ast.IntNumberLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
 import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode.Preprocessor;
 import de.codesourcery.javr.assembler.symbols.Symbol;
@@ -182,7 +182,7 @@ public class GenerateCodePhase extends AbstractPhase
                          * __vector_X
                          * and if present, will generate an IRQ vector entry for vector X that jumps to this function.
                          */
-                        final int vectorIdx = ((NumberLiteralNode) node.child(0)).getValue();
+                        final int vectorIdx = ((IntNumberLiteralNode) node.child( 0)).getValue();
                         final Identifier symName = new Identifier("__vector_"+vectorIdx);
                         final Symbol nextGlobalFunc = ((DirectiveNode) node).findNextGlobalFunctionSymbol( context );
                         final SymbolTable symTable = context.currentSymbolTable().getTopLevelTable();

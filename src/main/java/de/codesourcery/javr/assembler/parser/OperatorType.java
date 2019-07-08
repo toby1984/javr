@@ -26,10 +26,11 @@ import de.codesourcery.javr.assembler.parser.ast.ASTNode;
 import de.codesourcery.javr.assembler.parser.ast.CharacterLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.CurrentAddressNode;
 import de.codesourcery.javr.assembler.parser.ast.ExpressionNode;
+import de.codesourcery.javr.assembler.parser.ast.FloatNumberLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.FunctionCallNode;
 import de.codesourcery.javr.assembler.parser.ast.IValueNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
-import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
+import de.codesourcery.javr.assembler.parser.ast.IntNumberLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
 import de.codesourcery.javr.assembler.parser.ast.Resolvable;
 import de.codesourcery.javr.assembler.parser.ast.StringLiteral;
@@ -227,9 +228,12 @@ public enum OperatorType
         if ( node instanceof CharacterLiteralNode) {
             return (int) ((CharacterLiteralNode) node).value;
         }        
-        if ( node instanceof NumberLiteralNode) {
-            return ((NumberLiteralNode) node).getValue();
-        }          
+        if ( node instanceof IntNumberLiteralNode) {
+            return ((IntNumberLiteralNode) node).getValue();
+        }
+        if ( node instanceof FloatNumberLiteralNode) {
+            return ((FloatNumberLiteralNode) node).getValue();
+        }
         if( node instanceof OperatorNode ) 
         {
             final OperatorType type = ((OperatorNode) node).type;
@@ -301,48 +305,54 @@ public enum OperatorType
                     // $$FALL-THROUGH
             }
             
-            final long num1 = value1 == null ? 0 : toLong( value1 );
-            final long num2 = value2 == null ? 0 : toLong( value2 );            
+            final Number num1 = value1 == null ? null : toNumber( value1 );
+            final Number num2 = value2 == null ? null : toNumber( value2 );
+            final boolean anyFloat = isFloat( num1 ) || isFloat(num2);
             switch( type ) 
             {
                 case SHIFT_LEFT:
-                    return num1 << num2;
+                    return num1.longValue() << num2.longValue();
                 case SHIFT_RIGHT:
-                    return num1 >>> num2;                    
+                    return num1.longValue() >>> num2.longValue();
                 case BINARY_MINUS:
-                    return num1 - num2;
+                    return anyFloat ? num1.doubleValue() - num2.doubleValue() : num1.longValue() - num2.longValue();
                 case BITWISE_AND:
-                    return num1 & num2;
+                    return num1.longValue() & num2.longValue();
                 case BITWISE_NEGATION:
-                    return ~num1;
+                    return ~num1.longValue();
                 case BITWISE_OR:
-                    return num1 | num2;
-                case DIVIDE:
-                    return num1 / num2;
+                    return num1.longValue() | num2.longValue();
                 case GT:
-                    return num1 > num2;
+                    return anyFloat ? num1.doubleValue() > num2.doubleValue() : num1.longValue() > num2.longValue();
                 case GTE:
-                    return num1 >= num2;
+                    return anyFloat ? num1.doubleValue() >= num2.doubleValue() : num1.longValue() >= num2.longValue();
                 case LT:
-                    return num1 < num2;
+                    return anyFloat ? num1.doubleValue() < num2.doubleValue() : num1.longValue() < num2.longValue();
                 case LTE:
-                    return num1 <= num2;
+                    return anyFloat ? num1.doubleValue() <= num2.doubleValue() : num1.longValue() <= num2.longValue();
+                case DIVIDE:
+                    return anyFloat ? num1.doubleValue() / num2.doubleValue() : num1.longValue() / num2.longValue();
                 case PLUS:
-                    return num1+num2;                    
+                    return anyFloat ? num1.doubleValue() + num2.doubleValue() : num1.longValue() + num2.longValue();
                 case TIMES:
-                    return num1*num2;
+                    return anyFloat ? num1.doubleValue() * num2.doubleValue() : num1.longValue() * num2.longValue();
                 case UNARY_MINUS:
-                    return -num1;
+                    return isFloat( num1 ) ? -num1.doubleValue() : -num1.longValue();
                 default:
             }
         }
         throw new RuntimeException("Internal error - don't know how to evaluate "+node.getClass().getName());
     }
-    
-    private static long toLong(Object o) 
+
+    private static boolean isFloat(Number n)
+    {
+        return n instanceof Double || n instanceof Float;
+    }
+
+    private static Number toNumber(Object o)
     {
         if ( o instanceof Number ) {
-            return ((Number) o).longValue();
+            return (Number) o;
         }
         if ( o instanceof Address ) {
             return ((Address) o).getByteAddress();

@@ -39,7 +39,7 @@ import java.util.stream.Stream;
 
 import de.codesourcery.javr.assembler.Instruction;
 import de.codesourcery.javr.assembler.parser.TextRegion;
-import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
+import de.codesourcery.javr.assembler.parser.ast.IntNumberLiteralNode;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
@@ -674,7 +674,7 @@ public abstract class AbstractArchitecture implements IArchitecture
             {
                 TextRegion region = insn.child(0).getTextRegion();
                 region = region == null ? new TextRegion(0,0,0,0) : region.createCopy();
-                insn.addChild( new NumberLiteralNode( 0xff, NumberLiteralNode.LiteralType.HEXADECIMAL, region) );
+                insn.addChild( new IntNumberLiteralNode( 0xff, IntNumberLiteralNode.LiteralType.HEXADECIMAL, region) );
             } else {
                 context.error( "SER accepts only one argument", originalInsn);
             }

@@ -40,7 +40,7 @@ import de.codesourcery.javr.assembler.parser.ast.IdentifierDefNode;
 import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
 import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
 import de.codesourcery.javr.assembler.parser.ast.LabelNode;
-import de.codesourcery.javr.assembler.parser.ast.NumberLiteralNode;
+import de.codesourcery.javr.assembler.parser.ast.IntNumberLiteralNode;
 import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
 import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
 import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
@@ -277,7 +277,7 @@ public class PrettyPrinter extends AbstractASTVisitor {
     }
 
     @Override
-    protected void visitNode(NumberLiteralNode node) 
+    protected void visitNode(IntNumberLiteralNode node)
     {
         final boolean isNegative = node.getValue() < 0;
         final int tmpValue = isNegative ? ~node.getValue() : node.getValue();
