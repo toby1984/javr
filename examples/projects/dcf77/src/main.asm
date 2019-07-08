@@ -51,9 +51,9 @@
   jmp onirq ; TIMER2_COMPB - timer/counter 2 compare match B
   jmp onirq ; TIMER2_OVF - timer/counter 2 overflow
   jmp onirq ; TIMER1_CAPT - timer/counter 1 capture event
-  jmp onirq ; TIMER1_COMPA
+  jmp timer1_overflow ; TIMER1_COMPA
   jmp onirq ; TIMER1_COMPB
-  jmp timer1_overflow ; TIMER1_OVF
+  jmp onirq ; TIMER1_OVF
   jmp onirq ; TIMER0_COMPA
   jmp onirq ; TIMER0_COMPB
   jmp timer0_overflow ; TIMER0_OVF
@@ -265,7 +265,7 @@ timer1_overflow:
   in r16,SREG
   push r16
 ;-- START IRQ routine
-  rcall red_led_on
+  rcall green_led_toggle
   ldi r17,0xff ; r17 contains value written to 'send_packet' flag
   lds r16, warmup_done
   tst r16
@@ -287,9 +287,17 @@ red_led_on:
   sbi PORTB, RED_LED_BIT
   ret
   
+green_led_on:
+  sbi PORTB, GREEN_LED_BIT
+  ret
+  
 red_led_off:
   cbi PORTB, RED_LED_BIT
   ret
+  
+red_led_toggle:
+  sbi PINB, RED_LED_BIT
+  ret   
   
 green_led_toggle:
   sbi PINB, GREEN_LED_BIT
@@ -358,8 +366,8 @@ timer0_overflow:
 ; ======================    
 setup_timer1:    
      
-; Enable IRQ on overflow
-  ldi r16,%1
+; Enable IRQ on OCR1A match
+  ldi r16,%10
   sts TIMSK1,r16
 ; set clk/1024 prescaler and CTC mode 4, start timer
   ldi r16,%1101 
@@ -387,6 +395,7 @@ restart_timers:
 ; clear any pending OVERFLOW interrupts 
   ldi r16,1
   out TIFR0, r16  
+  ldi r16,%10
   out TIFR1, r16 ; Clear TOV1/ Clear pending interrupts  
 ; re-enable prescaler for TIMER0 and TIMER1 (=start both at the same time)
   out GTCCR, r17
