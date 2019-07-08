@@ -1098,7 +1098,8 @@ public class Parser
         return null;
     }
 
-    private static ASTNode parseNumber(Lexer lexer) {
+    private static ASTNode parseNumber(Lexer lexer)
+    {
         final Token tok = lexer.peek();
         if ( tok.is( TokenType.DIGITS ) )
         {

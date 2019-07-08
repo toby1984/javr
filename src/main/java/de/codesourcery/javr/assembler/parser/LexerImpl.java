@@ -190,11 +190,14 @@ outer:
             return;
         }
         
-        boolean isOnlyDigits = true;
-        for ( int i = 0 , len=value.length() ; i < len ; i++ ) {
-            if ( ! Character.isDigit( value.charAt( i ) ) ) 
+        boolean isOnlyDigits = false;
+        for ( int i = 0 , len=value.length() ; i < len ; i++ )
+        {
+            final char c = value.charAt( i );
+            if ( Character.isDigit( c ) )
             {
-                isOnlyDigits=false;
+                isOnlyDigits = true;
+            } else if ( i == 0 || c != '_' ) {
                 break;
             }
         }

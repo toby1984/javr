@@ -29,6 +29,8 @@ import de.codesourcery.javr.ui.Project;
 import de.codesourcery.javr.ui.config.IConfig;
 import junit.framework.TestCase;
 
+import java.util.function.Predicate;
+
 public class ParseTestHelper extends TestCase 
 {
     private final IArchitecture arch = new ATMega88();
@@ -83,5 +85,14 @@ public class ParseTestHelper extends TestCase
             lexer = new LexerImpl(new Scanner(resource) );
         }
         return p.parse( compilationContext, unit , lexer );
+    }
+
+    protected final void assertError(String message)
+    {
+        final Predicate<Parser.CompilationMessage> pred = msg -> msg.severity == Parser.Severity.ERROR &&
+                                                               msg.message.equals( message );
+        if ( unit.getMessages(true ).stream().noneMatch(pred ) ) {
+            fail("Expected error '"+message+"' but compilation unit had no matching message");
+        }
     }
 }

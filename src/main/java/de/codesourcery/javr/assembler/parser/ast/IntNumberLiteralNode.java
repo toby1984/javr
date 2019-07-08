@@ -25,7 +25,7 @@ import de.codesourcery.javr.assembler.util.Misc;
 
 public class IntNumberLiteralNode extends AbstractASTNode implements IValueNode
 {
-    private static final Pattern HEX_PATTERN = Pattern.compile("^[0-9A-Fa-f]+$");
+    private static final Pattern HEX_PATTERN = Pattern.compile("^0x[0-9A-Fa-f]+(_*[0-9A-Fa-f]+)*$");
     
     public enum LiteralType
     {
@@ -36,7 +36,7 @@ public class IntNumberLiteralNode extends AbstractASTNode implements IValueNode
     
     private final LiteralType type;
     private final int value;
-    
+
     public IntNumberLiteralNode(int value, LiteralType type, TextRegion region) {
         super(region);
         Validate.notNull(type, "type must not be NULL");
@@ -50,16 +50,45 @@ public class IntNumberLiteralNode extends AbstractASTNode implements IValueNode
         if ( isHexadecimalNumber( value ) ) 
         {
             this.type = LiteralType.HEXADECIMAL;
-            this.value = Misc.parseHexInt( value.substring(2 ) );
+            this.value = Misc.parseHexInt( stripStartAndUnderscores(value,2) );
         } else if ( isBinaryNumber( value ) ) {
             this.type = LiteralType.BINARY;
-            this.value = Integer.parseInt(value.substring(1) , 2 );
+            this.value = Integer.parseInt( stripStartAndUnderscores(value, 1) , 2 );
         } else if ( isDecimalNumber( value ) ) {
             this.type = LiteralType.DECIMAL;
-            this.value = Integer.parseInt(value);
+            this.value = Integer.parseInt(stripStartAndUnderscores(value,0));
         } else {
             throw new IllegalArgumentException("Not a valid number literal: '"+value+"'");
         }
+    }
+
+    private static String stripStartAndUnderscores(String input,int charsAtStartToRemove) {
+
+        final int len = input.length();
+        if ( charsAtStartToRemove == 0 )
+        {
+            boolean containsUnderscore = false;
+            for (int i = 0; i < len; i++)
+            {
+                if (input.charAt(i) == '_')
+                {
+                    containsUnderscore = true;
+                    break;
+                }
+            }
+            if (!containsUnderscore)
+            {
+                return input;
+            }
+        }
+        final StringBuilder result = new StringBuilder(len);
+        for ( int i = charsAtStartToRemove ; i < len ; i++ ) {
+            final char c = input.charAt(i);
+            if ( c != '_' ) {
+                result.append(c);
+            }
+        }
+        return result.toString();
     }
     
     @Override
@@ -71,7 +100,7 @@ public class IntNumberLiteralNode extends AbstractASTNode implements IValueNode
     @Override
     public Integer getValue() 
     {
-        return Integer.valueOf( value );
+        return value;
     }    
     
     public LiteralType getType() {
@@ -80,45 +109,72 @@ public class IntNumberLiteralNode extends AbstractASTNode implements IValueNode
     
     public static boolean isValidNumberLiteral(String s) 
     {
-        return isHexadecimalNumber( s ) || isDecimalNumber( s ) || isBinaryNumber( s );
+        return isHexadecimalNumber( s ) || isBinaryNumber( s ) || isDecimalNumber( s );
     }
     
-    public static boolean isDecimalNumber(String s) 
+    private static boolean isDecimalNumber(String s)
     {
-        if ( StringUtils.isNotBlank( s ) ) 
+        if ( s != null && ! s.isEmpty() )
         {
-            for ( int i = 0 , len= s.length() ; i < len ; i++ ) {
-                if ( ! Character.isDigit( s.charAt( i ) ) ) {
-                    return false;
-                }
+            char c = s.charAt(0);
+            if ( c == '_' || ! Character.isDigit(c ) ) {
+                return false;
             }
-            return true;
-        }
-        return false;
-    }
-    
-    public static boolean isHexadecimalNumber(String s) 
-    {
-        if ( StringUtils.isNotBlank( s ) && s.startsWith("0x") && s.length() >= 3 ) 
-        {
-            return HEX_PATTERN.matcher( s.substring(2) ).matches();
-        }
-        return false;
-    }    
-    
-    public static boolean isBinaryNumber(String s) 
-    {
-        if ( StringUtils.isNotBlank( s ) && s.startsWith("%") && s.length() >= 2 ) 
-        {
-            for ( int i = 1 , len= s.length() ; i < len ; i++ ) 
+            final int len = s.length();
+            if ( s.charAt( len-1 ) == '_' ) {
+                return false;
+            }
+            for ( int i = 1  ; i < len ; i++ )
             {
-                final char c = s.charAt(i);
-                if ( c != '0' && c != '1' ) 
+                c = s.charAt(i);
+                if ( c != '_' && ! Character.isDigit(c) )
                 {
                     return false;
                 }
             }
             return true;
+        }
+        return false;
+    }
+    
+    private static boolean isHexadecimalNumber(String s)
+    {
+        if ( s != null && s.startsWith("0x") && s.length() >= 3 )
+        {
+            return HEX_PATTERN.matcher( s ).matches();
+        }
+        return false;
+    }    
+    
+    private static boolean isBinaryNumber(String s)
+    {
+        if (s != null)
+        {
+            final int len = s.length();
+            if ( len >= 2 && s.charAt(0) == '%')
+            {
+                if (s.charAt(1) == '_')
+                {
+                    return false;
+                }
+                if (s.charAt(len - 1) == '_')
+                {
+                    return false;
+                }
+                for (int i = 1; i < len; i++)
+                {
+                    switch (s.charAt(i))
+                    {
+                        case '_':
+                        case '0':
+                        case '1':
+                            break;
+                        default:
+                            return false;
+                    }
+                }
+                return true;
+            }
         }
         return false;
     }      

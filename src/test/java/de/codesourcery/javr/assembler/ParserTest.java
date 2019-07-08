@@ -17,6 +17,7 @@ package de.codesourcery.javr.assembler;
 
 import java.util.List;
 
+import de.codesourcery.javr.assembler.exceptions.ParseException;
 import de.codesourcery.javr.assembler.parser.ast.FloatNumberLiteralNode;
 import org.junit.Test;
 
@@ -59,14 +60,81 @@ public class ParserTest extends ParseTestHelper
     }
 
     @Test
+    public void testParseIntegralNumberWithUnderscore()
+    {
+        AST ast = parse("ldi r16, 12_34");
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() );
+
+        StatementNode stmt = (StatementNode) ast.child( 0);
+        final InstructionNode insn = (InstructionNode) stmt.child(0);
+        final RegisterNode rn = (RegisterNode) insn.child(0);
+        final IntNumberLiteralNode num = (IntNumberLiteralNode) insn.child(1);
+
+        assertEquals( 16, rn.register.getRegisterNumber() );
+        assertEquals( 1234, num.getValue().intValue() );
+    }
+
+    @Test
+    public void testParseBinaryNumberWithUnderscores()
+    {
+        AST ast = parse("ldi r16, %1101_0011");
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() );
+
+        StatementNode stmt = (StatementNode) ast.child( 0);
+        final InstructionNode insn = (InstructionNode) stmt.child(0);
+        final RegisterNode rn = (RegisterNode) insn.child(0);
+        final IntNumberLiteralNode num = (IntNumberLiteralNode) insn.child(1);
+
+        assertEquals( 16, rn.register.getRegisterNumber() );
+        assertEquals( 0b1_101_0011, num.getValue().intValue() );
+    }
+
+    @Test
+    public void testParseHexNumberWithUnderscores()
+    {
+        AST ast = parse("ldi r16, 0xff_ff");
+        assertNotNull(ast);
+        assertTrue( ast.hasChildren() );
+        assertEquals( 1 ,  ast.childCount() );
+
+        StatementNode stmt = (StatementNode) ast.child( 0);
+        final InstructionNode insn = (InstructionNode) stmt.child(0);
+        final RegisterNode rn = (RegisterNode) insn.child(0);
+        final IntNumberLiteralNode num = (IntNumberLiteralNode) insn.child(1);
+
+        assertEquals( 16, rn.register.getRegisterNumber() );
+        assertEquals( 0xff_ff, num.getValue().intValue() );
+    }
+
+    @Test
+    public void testNumberLiteralsWithLeadingOrTrailingUnderscoresFails() {
+
+        assertFails( "ldi r16, 0x_ff" );
+        assertFails( "ldi r16, 0xff_" );
+        assertFails( "ldi r16, %_1010" );
+        assertFails( "ldi r16, %1010_" );
+        assertFails( "ldi r16, _123" );
+        assertFails( "ldi r16, 123_" );
+    }
+
+    protected final void assertFails(String source)
+    {
+        parse( source );
+        if ( ! unit.hasErrors(true ) ) {
+            fail("Parsing should've failed");
+        }
+    }
+    @Test
     public void testParseFloatingPointNumber() {
         AST ast = parse(".equ a = 1.25");
         assertNotNull(ast);
         assertTrue( ast.hasChildren() );
 
         StatementNode stmt = (StatementNode) ast.child( 0);
-
-        System.out.println("GOT: ast = \n"+ast);
 
         final DirectiveNode directive = (DirectiveNode) stmt.child( 0 );
         assertEquals( Directive.EQU, directive.directive );

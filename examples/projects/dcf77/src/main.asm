@@ -17,7 +17,7 @@
   
 .equ TIMER1_TICKS_2_SECONDS = 2 * TIMER1_TICKS_PER_SECOND
   
-.equ TIMER1_THRESHOLD = (TIMER1_TICKS_PER_SECOND*80)/100
+.equ TIMER1_THRESHOLD = TIMER1_TICKS_PER_SECOND*0.2
   
 .equ TIMER1_2_SECONDS_LOW_THRESHOLD = TIMER1_TICKS_2_SECONDS - TIMER1_THRESHOLD
 .equ TIMER1_2_SECONDS_HIGH_THRESHOLD = TIMER1_TICKS_2_SECONDS + TIMER1_THRESHOLD
@@ -114,9 +114,9 @@ onirq:
 dcf77_init:  
   cli
   rcall dcf77_setup_acomp    
-;  rcall setup_timer0  
-;  rcall setup_timer1  
-;  rcall restart_timers
+  rcall setup_timer0  
+  rcall setup_timer1  
+  rcall restart_timers
   sei
   ret
   
@@ -125,13 +125,13 @@ dcf77_init:
 ; ======================  
 dcf77_setup_acomp:
 ; disable pull-ups
-;  ldi r16,0
-;  out DDRD,r16
-;  ldi r16,0
-;  out PORTD,r16  
+  ldi r16,0
+  out DDRD,r16
+  ldi r16,0
+  out PORTD,r16  
 ; disable digital input buffers  
-;  ldi r16,%11
-;  sts DIDR1,r16
+  ldi r16,%11
+  sts DIDR1,r16
   ; setup analog comparator    
   ldi r16,%00011011
   out ACSR,r16
@@ -167,7 +167,10 @@ dcf77_acomp_irq:
 ; gap to be detected
   lds r19, is_in_sync
   tst r19
-  breq check_two_seconds_elapsed    
+  brne cont
+  rcall red_led_on
+  rjmp check_two_seconds_elapsed    
+.cont
 ; TIMER1 is running at clk/1024 so will tick
 ; 15625 times a second (=every 0,064 ms) and thus 
 ; cover a time range of 0..4194,304 ms. 
