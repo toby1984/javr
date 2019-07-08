@@ -138,15 +138,18 @@ public class GenerateCodePhase extends AbstractPhase
                         }
                         if ( adrArgIdx != -1 )
                         {
-                            final Object value = ((IValueNode) node.child( adrArgIdx ) ).getValue();
+
+                            final IValueNode child = (IValueNode) node.child(adrArgIdx);
+                            System.out.println("Inspecting "+node);
+                            final Object value = child.getValue();
                             final long addr = AbstractArchitecture.toIntValue( value );
-                            if ( (addr & ~0b11111) == 0 )
+                            if ( (addr & ~0b111111) == 0 )
                             {
                                 final String alternative = "sts".equalsIgnoreCase( mnemonic ) ?
                                         "OUT" : "IN";
                                 context.message( CompilationMessage.warning(
                                         context.currentCompilationUnit(),
-                                        "Destination address fits in 5 bits, could use "+alternative+" instruction", node ) );
+                                        "Destination address fits in 6 bits, could use "+alternative+" instruction", node ) );
                             }
                         }
                     }

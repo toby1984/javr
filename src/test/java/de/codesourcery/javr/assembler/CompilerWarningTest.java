@@ -21,7 +21,7 @@ public class CompilerWarningTest extends AbstractCompilerTest
     public void testInOutCouldBeUsedWarningSTS() throws IOException
     {
         decorator = config -> config.setWarnIfInOutCanBeUsed( true );
-        compile( "sts 31,r16" );
+        compile( "sts 63,r16" );
         final List<Parser.CompilationMessage> messages =
                 compilationUnit.getMessages( false );
         assertTrue( messages.stream().anyMatch( x -> x.message.contains("could use OUT instruction") ) );
@@ -31,7 +31,7 @@ public class CompilerWarningTest extends AbstractCompilerTest
     public void testInOutCouldBeUsedWarningSTS2() throws IOException
     {
         decorator = config -> config.setWarnIfInOutCanBeUsed( true );
-        compile( "sts 32,r16" );
+        compile( "sts 64,r16" );
         final List<Parser.CompilationMessage> messages =
                 compilationUnit.getMessages( false );
         assertFalse( messages.stream().anyMatch( x -> x.message.contains("could use OUT instruction") ) );
@@ -41,7 +41,7 @@ public class CompilerWarningTest extends AbstractCompilerTest
     public void testInOutCouldBeUsedWarningLDS() throws IOException
     {
         decorator = config -> config.setWarnIfInOutCanBeUsed( true );
-        compile( "lds r16,31" );
+        compile( "lds r16,63" );
         final List<Parser.CompilationMessage> messages =
                 compilationUnit.getMessages( false );
         assertTrue( messages.stream().anyMatch( x -> x.message.contains("could use IN instruction") ) );
@@ -51,7 +51,7 @@ public class CompilerWarningTest extends AbstractCompilerTest
     public void testInOutCouldBeUsedWarningLDS2() throws IOException
     {
         decorator = config -> config.setWarnIfInOutCanBeUsed( true );
-        compile( "lds r16,32" );
+        compile( "lds r16,64" );
         final List<Parser.CompilationMessage> messages =
                 compilationUnit.getMessages( false );
         assertFalse( messages.stream().anyMatch( x -> x.message.contains("could use IN instruction") ) );

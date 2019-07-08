@@ -133,7 +133,7 @@ dcf77_setup_acomp:
   ldi r16,%11
   sts DIDR1,r16
   ; setup analog comparator    
-  ldi r16,%00011011
+  ldi r16,%0001_1011
   out ACSR,r16
   ret  
   
@@ -149,7 +149,7 @@ dcf77_acomp_irq:
 ;-- START IRQ routine  
   
 ; read current TIMER0 value  
-  lds r16, TCNT0
+  in r16, TCNT0
   lds r17, timer0_overflows
   lds r18, timer0_overflows+1
   rcall red_led_on
@@ -265,6 +265,7 @@ timer1_overflow:
   in r16,SREG
   push r16
 ;-- START IRQ routine
+  rcall red_led_on
   ldi r17,0xff ; r17 contains value written to 'send_packet' flag
   lds r16, warmup_done
   tst r16
@@ -283,7 +284,7 @@ timer1_overflow:
   rjmp leave_irq
   
 red_led_on:
-  sbi    PORTB, RED_LED_BIT
+  sbi PORTB, RED_LED_BIT
   ret
   
 red_led_off:
@@ -291,11 +292,11 @@ red_led_off:
   ret
   
 green_led_toggle:
-  sbi    PINB, GREEN_LED_BIT
+  sbi PINB, GREEN_LED_BIT
   ret      
 
 yellow_led_toggle:
-  sbi    PINB, YELLOW_LED_BIT
+  sbi PINB, YELLOW_LED_BIT
   ret
 ; ======================
 ; Setup TIMER0 to count up continously
@@ -317,12 +318,12 @@ setup_timer0:
   sts TIMSK0,r16   
 ; setup clk/256 prescaler and start timer
   ldi r16,%100
-  sts TCCR0B, r16    
+  out TCCR0B, r16    
   ret 
       
 timer0_overflow:
   push r24 ; preserve r24
-  lds r24,SREG
+  in r24,SREG
   push r24 ; preserve SREF
   push r25 ; preserve r25
   
@@ -339,7 +340,7 @@ timer0_overflow:
 ; end of IRQ handling
   pop r25 
   pop r24
-  sts SREG,r24
+  out SREG,r24
   pop r24
   reti  
   
@@ -368,10 +369,10 @@ setup_timer1:
 restart_timers:
 ; disable prescaler for TIMER0 and TIMER1 (=stop both timers)
   clr r17
-  ldi r16,%10000001
-  sts GTCCR, r16
+  ldi r16,%1000_0001
+  out GTCCR, r16
 ; reset 24-bit TIMER0 value
-  sts TCNT0,r17   
+  out TCNT0,r17   
 ; clear upper 2 bytes
   sts timer0_overflow,r17
   sts timer0_overflow+1,r17
@@ -388,7 +389,7 @@ restart_timers:
   out TIFR0, r16  
   out TIFR1, r16 ; Clear TOV1/ Clear pending interrupts  
 ; re-enable prescaler for TIMER0 and TIMER1 (=start both at the same time)
-  sts GTCCR, r17
+  out GTCCR, r17
   ret
     
 ; ======================
