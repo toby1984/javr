@@ -48,6 +48,8 @@ Note that for reasons unknown to me the AVR assembler duplicates a lot of prepro
   - arithmetic operators: -(unary+binary),+,/,*
   - bitwise operators: ~,<<,>>,|,&
   - logical operators: !,&&,||,>, <, >= , <= , == , !=
+- Expressions support floating-point numbers (careful, those will be silently truncated to integral numbers during code generation)
+- Number literals support the underscore ('_') character to improve readability ( %1010_1111, 0xff_ff_ff, 1234_5678 )
 - built-in functions: HIGH(x), LOW(x) that yield the upper/lower 8 bits of a 16-bit word
 - Assembler understands X / Y / Z as shorthand notation for r27:r26 / r29:r28 / r31:r30
 - Assembler currently will NOT accept just specifying the lower register when an instruction expects a combined / 'compound' register 

@@ -15,6 +15,99 @@
  */
 package de.codesourcery.javr.ui.panels;
 
+import de.codesourcery.javr.assembler.CompilationContext;
+import de.codesourcery.javr.assembler.CompilationUnit;
+import de.codesourcery.javr.assembler.CompilerSettings;
+import de.codesourcery.javr.assembler.ICompilationContext;
+import de.codesourcery.javr.assembler.IObjectCodeWriter;
+import de.codesourcery.javr.assembler.ObjectCodeWriter;
+import de.codesourcery.javr.assembler.PrettyPrinter;
+import de.codesourcery.javr.assembler.Segment;
+import de.codesourcery.javr.assembler.arch.AbstractArchitecture;
+import de.codesourcery.javr.assembler.exceptions.ParseException;
+import de.codesourcery.javr.assembler.parser.Identifier;
+import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
+import de.codesourcery.javr.assembler.parser.Parser.Severity;
+import de.codesourcery.javr.assembler.parser.TextRegion;
+import de.codesourcery.javr.assembler.parser.ast.AST;
+import de.codesourcery.javr.assembler.parser.ast.ASTNode;
+import de.codesourcery.javr.assembler.parser.ast.CommentNode;
+import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
+import de.codesourcery.javr.assembler.parser.ast.FunctionCallNode;
+import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
+import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
+import de.codesourcery.javr.assembler.parser.ast.IntNumberLiteralNode;
+import de.codesourcery.javr.assembler.parser.ast.LabelNode;
+import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
+import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
+import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
+import de.codesourcery.javr.assembler.parser.ast.StatementNode;
+import de.codesourcery.javr.assembler.phases.ParseSourcePhase;
+import de.codesourcery.javr.assembler.symbols.Symbol;
+import de.codesourcery.javr.assembler.symbols.Symbol.Type;
+import de.codesourcery.javr.assembler.symbols.SymbolTable;
+import de.codesourcery.javr.assembler.util.Resource;
+import de.codesourcery.javr.assembler.util.StringResource;
+import de.codesourcery.javr.ui.CaretPositionTracker;
+import de.codesourcery.javr.ui.CaretPositionTracker.CaretPosition;
+import de.codesourcery.javr.ui.EditorSettings.SourceElement;
+import de.codesourcery.javr.ui.IDEMain;
+import de.codesourcery.javr.ui.IProject;
+import de.codesourcery.javr.ui.config.IApplicationConfig;
+import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
+import de.codesourcery.javr.ui.frames.EditorFrame;
+import de.codesourcery.javr.ui.frames.MessageFrame;
+import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour;
+import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour.DefaultAutoCompleteCallback;
+import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour.InitialUserInput;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Validate;
+import org.apache.log4j.Logger;
+
+import javax.swing.DefaultListCellRenderer;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.JTextPane;
+import javax.swing.JToolBar;
+import javax.swing.JTree;
+import javax.swing.JViewport;
+import javax.swing.SwingUtilities;
+import javax.swing.event.AncestorEvent;
+import javax.swing.event.AncestorListener;
+import javax.swing.event.CaretEvent;
+import javax.swing.event.CaretListener;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.event.TableModelEvent;
+import javax.swing.event.TableModelListener;
+import javax.swing.event.TreeModelEvent;
+import javax.swing.event.TreeModelListener;
+import javax.swing.event.UndoableEditEvent;
+import javax.swing.event.UndoableEditListener;
+import javax.swing.table.TableModel;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultStyledDocument.AttributeUndoableEdit;
+import javax.swing.text.Document;
+import javax.swing.text.DocumentFilter;
+import javax.swing.text.JTextComponent;
+import javax.swing.text.Style;
+import javax.swing.text.StyleConstants;
+import javax.swing.text.StyleContext;
+import javax.swing.tree.DefaultTreeCellRenderer;
+import javax.swing.tree.TreeModel;
+import javax.swing.tree.TreePath;
+import javax.swing.undo.UndoManager;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -52,109 +145,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import javax.swing.DefaultListCellRenderer;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTable;
-import javax.swing.JTextArea;
-import javax.swing.JTextField;
-import javax.swing.JTextPane;
-import javax.swing.JToolBar;
-import javax.swing.JTree;
-import javax.swing.SwingUtilities;
-import javax.swing.event.AncestorEvent;
-import javax.swing.event.AncestorListener;
-import javax.swing.event.CaretEvent;
-import javax.swing.event.CaretListener;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
-import javax.swing.event.TableModelEvent;
-import javax.swing.event.TableModelListener;
-import javax.swing.event.TreeModelEvent;
-import javax.swing.event.TreeModelListener;
-import javax.swing.event.UndoableEditEvent;
-import javax.swing.event.UndoableEditListener;
-import javax.swing.table.TableModel;
-import javax.swing.text.AbstractDocument;
-import javax.swing.text.AttributeSet;
-import javax.swing.text.BadLocationException;
-import javax.swing.text.DefaultStyledDocument.AttributeUndoableEdit;
-import javax.swing.text.Document;
-import javax.swing.text.DocumentFilter;
-import javax.swing.text.JTextComponent;
-import javax.swing.text.Style;
-import javax.swing.text.StyleConstants;
-import javax.swing.text.StyleContext;
-import javax.swing.text.StyledDocument;
-import javax.swing.tree.DefaultTreeCellRenderer;
-import javax.swing.tree.TreeModel;
-import javax.swing.tree.TreePath;
-import javax.swing.undo.UndoManager;
-
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.Validate;
-import org.apache.log4j.Logger;
-
-import de.codesourcery.javr.assembler.CompilationContext;
-import de.codesourcery.javr.assembler.CompilationUnit;
-import de.codesourcery.javr.assembler.CompilerSettings;
-import de.codesourcery.javr.assembler.ICompilationContext;
-import de.codesourcery.javr.assembler.IObjectCodeWriter;
-import de.codesourcery.javr.assembler.ObjectCodeWriter;
-import de.codesourcery.javr.assembler.PrettyPrinter;
-import de.codesourcery.javr.assembler.Segment;
-import de.codesourcery.javr.assembler.arch.AbstractArchitecture;
-import de.codesourcery.javr.assembler.exceptions.ParseException;
-import de.codesourcery.javr.assembler.parser.Identifier;
-import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
-import de.codesourcery.javr.assembler.parser.Parser.Severity;
-import de.codesourcery.javr.assembler.parser.TextRegion;
-import de.codesourcery.javr.assembler.parser.ast.AST;
-import de.codesourcery.javr.assembler.parser.ast.ASTNode;
-import de.codesourcery.javr.assembler.parser.ast.ASTNode.IASTVisitor;
-import de.codesourcery.javr.assembler.parser.ast.ASTNode.IIterationContext;
-import de.codesourcery.javr.assembler.parser.ast.CommentNode;
-import de.codesourcery.javr.assembler.parser.ast.DirectiveNode;
-import de.codesourcery.javr.assembler.parser.ast.FunctionCallNode;
-import de.codesourcery.javr.assembler.parser.ast.IdentifierNode;
-import de.codesourcery.javr.assembler.parser.ast.InstructionNode;
-import de.codesourcery.javr.assembler.parser.ast.LabelNode;
-import de.codesourcery.javr.assembler.parser.ast.IntNumberLiteralNode;
-import de.codesourcery.javr.assembler.parser.ast.OperatorNode;
-import de.codesourcery.javr.assembler.parser.ast.PreprocessorNode;
-import de.codesourcery.javr.assembler.parser.ast.RegisterNode;
-import de.codesourcery.javr.assembler.parser.ast.StatementNode;
-import de.codesourcery.javr.assembler.phases.ParseSourcePhase;
-import de.codesourcery.javr.assembler.symbols.Symbol;
-import de.codesourcery.javr.assembler.symbols.Symbol.Type;
-import de.codesourcery.javr.assembler.symbols.SymbolTable;
-import de.codesourcery.javr.assembler.util.Resource;
-import de.codesourcery.javr.assembler.util.StringResource;
-import de.codesourcery.javr.ui.CaretPositionTracker;
-import de.codesourcery.javr.ui.CaretPositionTracker.CaretPosition;
-import de.codesourcery.javr.ui.EditorSettings.SourceElement;
-import de.codesourcery.javr.ui.IDEMain;
-import de.codesourcery.javr.ui.IProject;
-import de.codesourcery.javr.ui.config.IApplicationConfig;
-import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
-import de.codesourcery.javr.ui.frames.EditorFrame;
-import de.codesourcery.javr.ui.frames.MessageFrame;
-import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour;
-import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour.DefaultAutoCompleteCallback;
-import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour.InitialUserInput;
-
 public abstract class EditorPanel extends JPanel
 {
     private static final Logger LOG = Logger.getLogger(EditorFrame.class);
 
     public static final Duration RECOMPILATION_DELAY = Duration.ofMillis( 500 );
 
+    private final JScrollPane editorPane;
     private final JTextPane editor = new JTextPane();
 
     private final EditorFrame topLevelWindow;
@@ -167,6 +164,11 @@ public abstract class EditorPanel extends JPanel
     {
         setupStyles();
     };
+
+    private final ShadowDOM frontDOM = new ShadowDOM();
+    private final ShadowDOM backDOM = new ShadowDOM();
+
+    private ShadowDOM currentDOM = frontDOM;
 
     private boolean ignoreEditEvents;
     private final UndoManager undoManager = new UndoManager();
@@ -235,7 +237,8 @@ public abstract class EditorPanel extends JPanel
                             }
                             catch (IOException e1)
                             {
-                                e1.printStackTrace();
+                                LOG.error("mouseClicked(): Failed to open editor",e1);
+                                IDEMain.showError( "Failed to open editor", e1 );
                             }
                         }
                     }
@@ -295,7 +298,6 @@ public abstract class EditorPanel extends JPanel
                     final long value = AbstractArchitecture.toIntValue( symbol.getValue() );
                     if ( value != AbstractArchitecture.VALUE_UNAVAILABLE ) {
                         toolTipText = symbol.name()+" = "+value+" (0x"+Integer.toHexString( (int) value )+")";
-                        System.out.println("TOOLTIP: "+toolTipText);
                     }
                 }
             }
@@ -337,10 +339,8 @@ public abstract class EditorPanel extends JPanel
             }
             String text = editor.getText().toLowerCase();
             if ( currentPosition ==0 ) {
-                System.out.println("At start of text, starting from end");
                 currentPosition = text.length()-1;
             }
-            System.out.println("Starting to search  backwards @ "+currentPosition);
 
             int startIndex = 0;
             final String searchTerm = term.toLowerCase();
@@ -375,7 +375,6 @@ public abstract class EditorPanel extends JPanel
             editor.select( cursorPos , cursorPos+term.length() );
             editor.requestFocus();
             currentPosition = cursorPos+1;
-            System.out.println("Found match at "+cursorPos);
         }
 
         public boolean searchForward()
@@ -386,22 +385,18 @@ public abstract class EditorPanel extends JPanel
             }
             final String text = editor.getText();
             if ( currentPosition >= text.length()) {
-                System.out.println("At end of text, starting from 0");
                 currentPosition = 0;
             }
-            System.out.println("Starting to search @ "+currentPosition);
             final int nextMatch = text.substring( currentPosition , text.length() ).toLowerCase().indexOf( term.toLowerCase() );
             if ( nextMatch != -1 )
             {
                 gotoMatch( currentPosition + nextMatch );
                 return true;
             }
-            System.out.println("No more matches");
             return false;
         }
 
         public void startFromBeginning() {
-            System.out.println("Start from beginning");
             currentPosition = 0;
         }
 
@@ -509,7 +504,6 @@ public abstract class EditorPanel extends JPanel
 
         public void replace(FilterBypass fb, int offs, int length, String str, AttributeSet a) throws BadLocationException
         {
-
             if ( isNewline( str ) )
             {
                 str = "\n  ";
@@ -585,7 +579,6 @@ public abstract class EditorPanel extends JPanel
 
         public void documentChanged(DocumentEvent event)
         {
-            // new Exception("===============> Document changed").printStackTrace();
             synchronized ( SLEEP_LOCK )
             {
                 lastChange = System.currentTimeMillis();
@@ -885,7 +878,6 @@ public abstract class EditorPanel extends JPanel
             @Override
             public List<Symbol> getProposals(String input)
             {
-                System.out.println("*** Looking for >"+input+"<");
                 final String lower = input.toLowerCase();
 
                 final List<Symbol> globalMatches = new ArrayList<>();
@@ -990,6 +982,10 @@ public abstract class EditorPanel extends JPanel
             public void caretUpdate(CaretEvent e)
             {
                 cursorPositionLabel.setText( Integer.toString( e.getDot()  ) );
+                if ( currentUnit != null && ! ignoreEditEvents )
+                {
+                    caretTracker.rememberCaretPosition( e.getDot(), currentUnit );
+                }
             }
         });
         final MyMouseListener mouseListener = new MyMouseListener();
@@ -1105,14 +1101,9 @@ public abstract class EditorPanel extends JPanel
             @Override
             public void keyTyped(KeyEvent e)
             {
-                if ( isAltDown(e) ) {
-                    final byte[] bytes = Character.toString( e.getKeyChar() ).getBytes();
-                    System.out.println("Bytes: "+bytes.length+" , "+Integer.toHexString( bytes[0] ) );
-                }
-                else if ( isCtrlDown(e) )
+                if ( isCtrlDown(e) )
                 {
                     final byte[] bytes = Character.toString( e.getKeyChar() ).getBytes();
-                    System.out.println("Bytes: "+bytes.length+" , "+Integer.toHexString( bytes[0] ) );
                     if ( e.getKeyChar() == 6 ) // CTRL-F ... search
                     {
                         toggleSearchWindow();
@@ -1127,7 +1118,8 @@ public abstract class EditorPanel extends JPanel
                                 editor.getDocument().remove( editor.getCaretPosition() , line.end() - editor.getCaretPosition()-1 );
                             }
                             catch (BadLocationException e1) {
-                                e1.printStackTrace();
+                                LOG.error("keyTyped(): Failed to remove()",e1);
+                                IDEMain.showError( "Failed to remove()", e1 );
                             }
                         }
                     }
@@ -1143,7 +1135,8 @@ public abstract class EditorPanel extends JPanel
                                 }
                                 catch (BadLocationException e1)
                                 {
-                                    e1.printStackTrace();
+                                    LOG.error("keyTyped(): Failed to remove()",e1);
+                                    IDEMain.showError( "Failed to remove()", e1 );
                                 }
                             });
                         }
@@ -1167,7 +1160,7 @@ public abstract class EditorPanel extends JPanel
                         }
                         catch (IOException e1)
                         {
-                            IDEMain.fail(e1);
+                            IDEMain.showError("Failed to save file",e1);
                         }
                     } else if ( e.getKeyChar() == 0x1a && undoManager.canUndo() ) { // CTRL-Z
 
@@ -1224,7 +1217,7 @@ public abstract class EditorPanel extends JPanel
         cnstrs.gridwidth=1; cnstrs.gridheight = 1 ;
         cnstrs.gridx = 0; cnstrs.gridy = 1;
 
-        final JScrollPane editorPane = new JScrollPane( editor );
+        editorPane = new JScrollPane( editor );
         panel.add( editorPane , cnstrs );
 
         setLayout( new GridBagLayout() );
@@ -1280,7 +1273,6 @@ public abstract class EditorPanel extends JPanel
     private Style createStyle(String name,SourceElement sourceElement,StyleContext ctx)
     {
         final Color col = appConfigProvider.getApplicationConfig().getEditorSettings().getColor( sourceElement );
-        System.out.println("Element "+sourceElement+" has color "+col);
         final Style style = ctx.addStyle( name , STYLE_TOPLEVEL );
         style.addAttribute(StyleConstants.Foreground, col );
         return style;
@@ -1291,7 +1283,6 @@ public abstract class EditorPanel extends JPanel
         final Document doc = editor.getEditorKit().createDefaultDocument();
 
         // setup styles
-
         ignoreEditEvents = false;
 
         // setup auto-indent
@@ -1303,7 +1294,6 @@ public abstract class EditorPanel extends JPanel
             {
                 if ( ! ignoreEditEvents ) {
                     lastEditLocation = e.getOffset();
-                    caretTracker.rememberCaretPosition(e.getOffset(),currentUnit);
                     recompilationThread.documentChanged(e);
                 }
             }
@@ -1312,7 +1302,6 @@ public abstract class EditorPanel extends JPanel
                 if ( ! ignoreEditEvents )
                 {
                     lastEditLocation = e.getOffset();
-                    caretTracker.rememberCaretPosition(e.getOffset(),currentUnit);
                     recompilationThread.documentChanged(e);
                 }
             }
@@ -1320,7 +1309,6 @@ public abstract class EditorPanel extends JPanel
             {
                 if ( ! ignoreEditEvents ) {
                     lastEditLocation = e.getOffset();
-                    caretTracker.rememberCaretPosition(e.getOffset(),currentUnit);
                     recompilationThread.documentChanged(e);
                 }
             }
@@ -1330,14 +1318,12 @@ public abstract class EditorPanel extends JPanel
 
         doc.addUndoableEditListener( new UndoableEditListener()
         {
-
             @Override
             public void undoableEditHappened(UndoableEditEvent e)
             {
                 if ( ! ignoreEditEvents )
                 {
                     if ( e.getEdit() instanceof AttributeUndoableEdit || e.getEdit().getClass().getName().contains("StyleChangeUndoableEdit") ) {
-                        System.out.println("EDIT: "+e.getEdit());
                         return;
                     }
                     undoManager.undoableEditHappened( e );
@@ -1480,13 +1466,37 @@ public abstract class EditorPanel extends JPanel
                                          editor.requestFocus();
                                      }
                                  });
+        } else {
+            editor.requestFocus();
         }
     }
 
     private void setCaretPosition(CaretPosition position)
     {
-        if ( position != null ) {
-            setCaretPosition( position.offset );
+        boolean caretMoved = false;
+        if ( position != null )
+        {
+            if ( currentUnit.hasSameResourceAs( position.unit ) )
+            {
+                setCaretPosition( position.offset );
+                caretMoved = true;
+            }
+            else
+            {
+                // TODO: Switch to editor panel for the compilation unit the caret was in
+                try
+                {
+                    final EditorPanel editorPanel = topLevelWindow.openEditor( project, position.unit );
+                }
+                catch (IOException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+        }
+        if ( ! caretMoved )
+        {
+            editor.requestFocus();
         }
     }
 
@@ -1501,12 +1511,13 @@ public abstract class EditorPanel extends JPanel
             catch(Exception e)
             {
                 LOG.error("UPLOAD failed",e);
-                IDEMain.fail("Upload failed",e);
+                IDEMain.showError("Upload to uC failed",e);
             }
         }
         else
         {
-            JOptionPane.showMessageDialog(null, "Upload not possible", "Program upload", JOptionPane.INFORMATION_MESSAGE );
+            IDEMain.showError( "Program upload failed",
+                               "Compilation failed, project uses incompatible output format or no upload command configured " );
         }
     }
 
@@ -1545,6 +1556,7 @@ public abstract class EditorPanel extends JPanel
         {
             LOG.error("compile(): Failed to save changes",e);
             currentUnit.addMessage( CompilationMessage.error( currentUnit, "Failed to save changes: "+e.getMessage()) );
+            IDEMain.showError( "Failed to save changes", e );
             return;
         }
 
@@ -1567,8 +1579,11 @@ public abstract class EditorPanel extends JPanel
         }
         catch(Exception e) {
             LOG.error("Parsing source failed",e);
+            IDEMain.showError( "Parsing source failed", e );
         }
         astTreeModel.setAST( tmpUnit.getAST() );
+
+        // do syntax highlighting
 
         final long parseEnd =  System.currentTimeMillis();
 
@@ -1634,7 +1649,7 @@ public abstract class EditorPanel extends JPanel
                 try {
                     r.run();
                 } catch(Exception e) {
-                    e.printStackTrace();
+                    IDEMain.showError("Closure failed to execute: "+r,e);
                 }
             }
             afterCompilation.clear();
@@ -1651,30 +1666,57 @@ public abstract class EditorPanel extends JPanel
 
     private void doSyntaxHighlighting()
     {
-        doSyntaxHighlighting(astTreeModel.getAST());
+        doSyntaxHighlighting( astTreeModel.getAST() );
     }
 
     private void doSyntaxHighlighting(ASTNode subtree)
     {
+        updateShadowDOM( dom -> {
+            subtree.visitBreadthFirst( (node, ctx) -> setNodeStyle( node, dom ) );
+        });
+    }
+
+    private void updateShadowDOM(Consumer<ShadowDOM> domCallback)
+    {
+        final boolean oldState = ignoreEditEvents;
         ignoreEditEvents = true;
         try
         {
-            final StyledDocument doc = editor.getStyledDocument();
-            final IASTVisitor visitor = new IASTVisitor()
-            {
-                @Override
-                public void visit(ASTNode node, IIterationContext<?> ctx)
-                {
-                    setNodeStyle( node , doc );
-                }
-            };
-            subtree.visitBreadthFirst( visitor );
+            final ShadowDOM frontBuffer = currentDOM;
+            final ShadowDOM backBuffer = frontBuffer == frontDOM ? backDOM : frontDOM;
+
+            // render style to back buffer
+            domCallback.accept( backBuffer );
+            backBuffer.mergeAdjacentRegionsWithSameStyle();
+
+            // apply changes to StyledDocuments
+            backBuffer.applyDelta( editor.getStyledDocument(), frontBuffer );
+
+            // swap back & front buffer
+            currentDOM = backBuffer;
+        }
+        catch(RuntimeException e)
+        {
+            LOG.error("doSyntaxHighlighting(): Failed ",e);
+            IDEMain.showError( "Highlighting failed",e );
         } finally {
-            ignoreEditEvents = false;
+            ignoreEditEvents = oldState;
         }
     }
 
-    private void setNodeStyle(ASTNode node,StyledDocument styledDoc)
+    private TextRegion getVisibleRegion()
+    {
+        final JViewport viewport = editorPane.getViewport();
+        Point startPoint = viewport.getViewPosition();
+        Dimension size = viewport.getExtentSize();
+        Point endPoint = new Point(startPoint.x + size.width, startPoint.y + size.height);
+
+        int start = editor.viewToModel( startPoint );
+        int end = editor.viewToModel( endPoint );
+        return new TextRegion(start,end-start,0,0);
+    }
+
+    private void setNodeStyle(ASTNode node,ShadowDOM shadowDOM)
     {
         final TextRegion region = node.getTextRegion();
         if ( region != null )
@@ -1709,9 +1751,9 @@ public abstract class EditorPanel extends JPanel
             }
             if ( style != null )
             {
-                styledDoc.setCharacterAttributes( region.start(), region.length() , style , true );
+                shadowDOM.setCharacterAttributes( region, style );
             } else {
-                styledDoc.setCharacterAttributes( region.start(), region.length() , STYLE_TOPLEVEL , true );
+                shadowDOM.setCharacterAttributes( region, STYLE_TOPLEVEL );
             }
         }
     }
@@ -1731,17 +1773,15 @@ public abstract class EditorPanel extends JPanel
         }
 
         if ( this.highlight != null ) {
-            System.out.println("Clearing highlight @ "+this.highlight.getTextRegion());
             doSyntaxHighlighting( this.highlight );
         }
         this.highlight = newHighlight;
         if ( newHighlight != null )
         {
-            System.out.println("Highlighting "+newHighlight.getTextRegion());
             final TextRegion region = newHighlight.getTextRegion();
             ignoreEditEvents = true;
             try {
-                editor.getStyledDocument().setCharacterAttributes( region.start(), region.length() , STYLE_HIGHLIGHTED , true );
+                updateShadowDOM( dom -> dom.setCharacterAttributes( region, STYLE_HIGHLIGHTED ) );
             } finally {
                 ignoreEditEvents = false;
             }
@@ -1784,9 +1824,7 @@ public abstract class EditorPanel extends JPanel
 
     private void indentSources()
     {
-        restoreCaretPositionAfter( () -> {
-            editor.setText( indent( this.editor.getText() ) );
-        });
+        restoreCaretPositionAfter( () -> setText( indent( this.editor.getText() ) ) );
     }
 
     public static String indent(String text)
@@ -1826,7 +1864,6 @@ public abstract class EditorPanel extends JPanel
                 result.append("\n");
             }
         }
-        System.out.println("INDENTED: \n"+result);
         return result.toString();
     }
 
@@ -2170,7 +2207,7 @@ public abstract class EditorPanel extends JPanel
         autoComplete.detach();
         editor.setDocument( createDocument() );
         autoComplete.attachTo( editor );
-        editor.setText( source );
+        setText( source );
         editor.setCaretPosition( 0 );
     }
 
@@ -2240,12 +2277,25 @@ public abstract class EditorPanel extends JPanel
         }
     }
 
-    public void setCaretPosition(TextRegion region) {
-        setCaretPosition( region.start() );
+    private void setCaretPosition(int position)
+    {
+        runAfterCompilation( () ->
+                             {
+                                 ignoreEditEvents = true;
+                                 try
+                                 {
+                                     editor.setCaretPosition( position );
+                                 } finally {
+                                     ignoreEditEvents = false;
+                                 }
+                                 editor.requestFocus();
+                             } );
     }
 
-    public void setCaretPosition(int position)
+    private void setText(String text)
     {
-        runAfterCompilation( () -> editor.setCaretPosition( position ) );
+        backDOM.clear();
+        frontDOM.clear();
+        editor.setText( text );
     }
 }

@@ -264,8 +264,7 @@ public class ProjectConfiguration implements ResourceFactory
         for ( String key : props.stringPropertyNames() ) 
         {
             final String value = props.getProperty( key );
-            System.out.println("===> Got property: "+key+"="+value);
-            
+
             switch( key ) 
             {
                 case "projectName": config.setProjectName( value ); break;

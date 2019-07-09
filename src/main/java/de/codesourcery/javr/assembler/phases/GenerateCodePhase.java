@@ -140,7 +140,6 @@ public class GenerateCodePhase extends AbstractPhase
                         {
 
                             final IValueNode child = (IValueNode) node.child(adrArgIdx);
-                            System.out.println("Inspecting "+node);
                             final Object value = child.getValue();
                             final long addr = AbstractArchitecture.toIntValue( value );
                             if ( (addr & ~0b111111) == 0 )
