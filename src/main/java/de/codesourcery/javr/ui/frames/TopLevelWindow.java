@@ -191,7 +191,7 @@ public class TopLevelWindow implements IWindow
         catch (IOException e) 
         {
             LOG.error("openFile(): Failed to open "+file.getAbsolutePath());
-            IDEMain.fail( e );
+            IDEMain.showError( "Failed to open "+file.getAbsolutePath(),e );
         }
     }
 
@@ -203,7 +203,7 @@ public class TopLevelWindow implements IWindow
             try {
                 eventHandler.run();
             } catch (Exception e) {
-                IDEMain.fail(e);
+                IDEMain.showError("Event handler failed: "+eventHandler,e);
             } 
         });
         menu.add( item );
@@ -261,7 +261,7 @@ public class TopLevelWindow implements IWindow
                         }
                     } catch (Exception e) {
                         LOG.error("delete(): Failed to delete "+toDelete.getAbsolutePath(),e);
-                        IDEMain.fail(e);
+                        IDEMain.showError("Failed to delete "+toDelete.getAbsolutePath(),e);
                         return;
                     }          
                     try 
@@ -311,7 +311,7 @@ public class TopLevelWindow implements IWindow
                         }
                         catch (Exception e) {
                             LOG.error("newFile(): Failed to create file "+newFile.getAbsolutePath(),e);
-                            IDEMain.fail(e);
+                            IDEMain.showError("Failed to create file "+newFile.getAbsolutePath(),e);
                         }
                     }
                 });                
@@ -356,7 +356,7 @@ public class TopLevelWindow implements IWindow
                     project.setConfiguration( config );
                     config.save( out );
                 } catch(Exception e) {
-                    IDEMain.fail(e);
+                    IDEMain.showError("Failed to save project configuration to "+configFile.getAbsolutePath(),e);
                 }
                 dialog.dispose();
                 editorFrame.compile();
@@ -388,7 +388,7 @@ public class TopLevelWindow implements IWindow
                 {
                     realFile = new File( file , IProject.PROJECT_FILE );
                 } else {
-                    IDEMain.fail("You need to select a project directory");
+                    IDEMain.showError("You need to select a project directory");
                     return;
                 }
                 try ( FileInputStream in = new FileInputStream( realFile ) )
@@ -400,7 +400,7 @@ public class TopLevelWindow implements IWindow
                 } 
                 catch(Exception e) 
                 {
-                    IDEMain.fail("Failed ro read project configuration from "+realFile.getAbsolutePath(),e);
+                    IDEMain.showError("Failed ro read project configuration from "+realFile.getAbsolutePath(),e);
                 }
             };
             

@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
@@ -375,34 +376,33 @@ public class IDEMain
         return projects.stream().filter( p-> p.getConfiguration().getProjectName().equals(projName) ).findFirst().get();
     }
 
-    public static void fail(Exception e) 
+    public static  void showError(String message)
     {
-        fail("Error",e);
-    }
-    
-    public static void fail(String msg) 
-    {
-        fail(msg,null);
+        showError("An error occurred",message,null);
     }
 
-    public static void fail(String msg,Exception e) 
+    public static  void showError(String message,Throwable t)
     {
-        if ( e == null ) {
-            LOG.error("fail(): "+msg,e);
-        } else {
-            LOG.error("fail(): "+msg,e);
-        }
+        showError("An error occurred",message,t);
+    }
 
-        final String body;
-        if ( e == null ) 
-        {
-            body = msg;
-        } else {
-            final ByteArrayOutputStream out = new ByteArrayOutputStream();
-            final PrintWriter writer = new PrintWriter( out );
-            e.printStackTrace( writer );            
-            body = msg+"\n\nError: "+e.getMessage()+"\n\n"+new String( out.toByteArray() );
+    public static void showError(String title,String message) {
+        showError(title,message,null);
+    }
+
+    public static void showError(String title,String message,Throwable t)
+    {
+        StringBuilder error = new StringBuilder();
+        error.append("ERROR: "+message);
+        if ( t != null ) {
+            error.append("\n\n");
+            final StringWriter writer = new StringWriter();
+            try ( var pw = new PrintWriter(writer) )
+            {
+                t.printStackTrace( pw );
+            }
+            error.append( writer.getBuffer().toString() );
         }
-        JOptionPane.showMessageDialog(null, body , "Error", JOptionPane.ERROR_MESSAGE);
+        JOptionPane.showConfirmDialog( null,message,title , JOptionPane.ERROR_MESSAGE);
     }
 }

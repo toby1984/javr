@@ -31,7 +31,7 @@ public class CaretPositionTracker {
     
     public static final class CaretPosition 
     {
-        public final int offset;
+        public int offset;
         public final CompilationUnit unit;
         
         private CaretPosition(int offset, CompilationUnit unit) 
@@ -66,26 +66,34 @@ public class CaretPositionTracker {
         caretHistoryPtr = 0;
         caretPositionHistory.clear();
     }
+
+    private CaretPosition top()
+    {
+        return caretPositionHistory.isEmpty() ? null : caretPositionHistory.get( caretPositionHistory.size()-1 );
+    }
     
     public void rememberCaretPosition(int position,CompilationUnit unit) 
     {
-        final CaretPosition entry = new CaretPosition(position,unit);
-        
-        if ( ! caretPositionHistory.isEmpty() ) 
+        final CaretPosition lastAdded = top();
+        if ( lastAdded != null && lastAdded.unit.hasSameResourceAs(  unit ) )
         {
-            final CaretPosition latestEntry = caretPositionHistory.get( caretPositionHistory.size()-1 );
-            final int delta = Math.abs( latestEntry.offset - position );
-            if ( delta < 30 ) 
+            final int delta = Math.abs( lastAdded.offset - position );
+            if ( delta < 30 )
             {
-                LOG.info("rememberCaretPosition(): IGNORING caret position "+entry+" , delta: "+delta);
+                LOG.info("rememberCaretPosition(): IGNORING caret position "+lastAdded+" , delta: "+delta);
                 return;
             }
         }
-        LOG.info("rememberCaretPosition(): Adding caret position "+entry+" at index "+caretHistoryPtr);
-        caretPositionHistory.add( caretHistoryPtr , entry );
-        if ( caretHistoryPtr < caretPositionHistory.size()-1 ) 
+        final CaretPosition newEntry = new CaretPosition( position, unit );
+
+        LOG.info("rememberCaretPosition(): Adding caret position "+newEntry+" at index "+caretHistoryPtr);
+
+        if ( caretPositionHistory.size() > 1 && caretHistoryPtr < caretPositionHistory.size() )
         {
-            caretPositionHistory = new ArrayList<>( caretPositionHistory.subList( 0 , caretHistoryPtr+1 ) );
+            caretPositionHistory = new ArrayList<>( caretPositionHistory.subList( 0, caretHistoryPtr + 1 ) );
         }
+        caretPositionHistory.add( newEntry );
+        caretHistoryPtr = caretPositionHistory.size()-1;
+
     }
 }
