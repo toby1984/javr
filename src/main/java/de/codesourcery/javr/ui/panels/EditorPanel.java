@@ -1537,16 +1537,11 @@ public abstract class EditorPanel extends JPanel
 
     public void compile()
     {
-        // new Exception("##################################### COMPILE TRIGGERED ##################").printStackTrace();
-
         highlight = null;
 
         messageFrame.clearMessages();
         currentUnit.clearMessages();
         symbolModel.clear();
-
-        String text = editor.getText();
-        text = text == null ? "" : text;
 
         // save source to file
         try {
@@ -1560,12 +1555,14 @@ public abstract class EditorPanel extends JPanel
             return;
         }
 
-        // try to parse only this compilation unit
-        // to get an AST suitable for syntax highlighting
+        // parse only this compilation unit
+        // to get an AST suitable for syntax highlighting that does
+        // NOT nodes for expanded macros/includes like the regular compilation does
         astTreeModel.setAST( new AST() );
 
-        // do not use the current unit directly as this will break because
-        // all the symbols are already defined
+        // also do not use the current compilation unit here as this will
+        // trigger "duplicate symbol" errors during the actual compilation
+        // later on
         final CompilationUnit tmpUnit = new CompilationUnit( currentUnit.getResource() );
 
         final long parseStart =  System.currentTimeMillis();
@@ -1582,14 +1579,12 @@ public abstract class EditorPanel extends JPanel
             IDEMain.showError( "Parsing source failed", e );
         }
         astTreeModel.setAST( tmpUnit.getAST() );
-
-        // do syntax highlighting
-
         final long parseEnd =  System.currentTimeMillis();
 
+        // do syntax highlighting
         doSyntaxHighlighting();
-
         final long highlightEnd =  System.currentTimeMillis();
+
         // assemble
         final CompilationUnit root = project.getCompileRoot();
 
@@ -1600,13 +1595,14 @@ public abstract class EditorPanel extends JPanel
         }
         catch(Exception e)
         {
-            e.printStackTrace();
+            LOG.error("compile(): Compilation failed "+e.getMessage(), LOG.isDebugEnabled() ? e : null );
             currentUnit.addMessage( toCompilationMessage( currentUnit, e ) );
         }
         symbolModel.setSymbolTable( currentUnit.getSymbolTable() );
 
         final long compileEnd =  System.currentTimeMillis();
 
+        // generation info message about compilation outcome
         final long parseTime = parseEnd - parseStart;
         final long highlightTime = highlightEnd - parseEnd;
         final long compileTime = compileEnd - highlightEnd;
@@ -1626,6 +1622,8 @@ public abstract class EditorPanel extends JPanel
         gutterPanel.repaint();
 
         wasCompiledAtLeastOnce = true;
+
+        // execute deferred callbacks that were waiting on compilation to complete
         if ( ! afterCompilation.isEmpty() )
         {
             for ( Runnable r : afterCompilation ) {
