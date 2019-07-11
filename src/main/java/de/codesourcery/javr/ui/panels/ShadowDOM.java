@@ -40,6 +40,11 @@ public class ShadowDOM
             this.style = style;
         }
 
+        public boolean canBeMerged(Region other)
+        {
+            return this.style == other.style &&( this.end == other.start || this.start == other.end );
+        }
+
         public boolean contains(int start,int end)
         {
             return this.start <= start && end <= this.end;
@@ -78,73 +83,88 @@ public class ShadowDOM
 
         public Region[] intersect(Region other)
         {
-            if ( other.contains( this.start, this.end ) ) {
-                return EMPTY;
-            }
-            // case 3.)
-            if ( this.sameRange( other ) ) {
+            /*
+             * Case 0:
+             *  |------| this  [X]
+             *  |------| other
+             *
+             * Case 1:
+             *  |------| this  [X]
+             *  |-----------| other
+             *
+             *     |------| this [X]
+             *  |-----------| other
+             *
+             *       |------| this [X]
+             *  |-----------| other
+             *
+             * Case 2:
+             *  |--------| this [X]
+             *  |---| other
+             *
+             *  |--------| this  [X]
+             *     |---| other
+             *
+             *  |--------| this [x]
+             *       |---| other
+             *
+             * case 3:
+             *
+             * |------| this
+             *    |------| other
+             *
+             * case 4
+             *    |------| this
+             * |------|    other
+             */
+            if ( this.start == other.start && this.end == other.end ) {
+                // case 0
                 return EMPTY;
             }
 
-            Region first;
-            Region second;
-            if ( this.start == other.start )
-            {
-                // case 4.)
-                if ( length() < other.length() ) {
+            if ( this.start == other.start ) {
+                // case 1a or case 2a
+                if ( this.end < other.end ) {
+                    // case 1a
                     return EMPTY;
                 }
-                // case 5.)
-                return new Region[] { new Region( other.end, this.end, this.style ) };
+                // case 2a (this.end > other.end )
+                return new Region[]{ new Region(other.end,this.end,this.style)};
             }
-            if ( this.start < other.start ) {
-                first = this;
-                second = other;
-            } else {
-                first = other;
-                second = this;
+            if ( this.start > other.start && this.end < other.end ) {
+                // case 1b
+                return EMPTY;
             }
-
-            // case 0.)
-            if ( first.end <= second.start )
-            {
-                return EMPTY; // no intersection at all
+            if ( this.start > other.start && this.end == other.end ) {
+                // case 1c
+                return EMPTY;
+            }
+            if ( this.start < other.start && this.end > other.end ) {
+                // case 2b
+                return new Region[] { new Region(this.start,other.start,this.style), new Region(other.end,this.end,this.style)};
+            }
+            if ( this.start < other.start && this.end == other.end ) {
+                // case 2c
+                return new Region[]{ new Region(this.start,other.start,this.style) };
+            }
+            if ( this.start < other.start && other.start < this.end && other.end > this.end ) {
+                // case 3
+                return new Region[] { new Region(this.start, other.start, this.style) };
+            }
+            if ( this.start > other.start && this.start < other.end && this.end > other.end ) {
+                // case 4
+                return new Region[] { new Region(other.end, this.end, this.style) };
             }
             /*
-             * case 0.)
-             *        |-----|
-             *  |-----|
+             *  this = 2764 - 2768 (labelStyle)
+             *  other = 2765 - 2774 (labelStyle)
+             *   2764                   2768
+             *  |-----------------------|
              *
-             * case 1.)
-             *    |--|
-             *  |-----|
-             *
-             * case 2.)
-             *      |----|
-             *  |-----|
-             *
-             * case 3.)
-             *  |-----|
-             *  |-----|
-             *
-             * case 4.)
-             *  |------|
-             *  |----------|
-             *
-             *  case 5.)
-             *  |----------|
-             *  |------|
+             *      |----------------------|
+             *  2765                      2774
              */
-
-            if ( second.end >= first.end )
-            {
-                // case 2
-                return new Region[]{new Region( first.start, second.start, this.style )};
-            }
-
-            // case 1
-            return new Region[]{new Region( first.start, second.start, this.style ),
-                    new Region( second.end, first.end, this.style )};
+            throw new RuntimeException("Unreachable code reached: this = "+this+" | other = "+other);
         }
 
         public boolean sameRange(Region other) {
@@ -161,27 +181,6 @@ public class ShadowDOM
             final int newEnd = Math.max( this.end, other.end );
             this.start = newStart;
             this.end = newEnd;
-        }
-    }
-
-    public void mergeAdjacentRegionsWithSameStyle()
-    {
-        int size = regions.size();
-        for ( int left = 0 ; left < size ; left++ )
-        {
-            final Region mergeTarget = regions.get(left);
-            while ( (left+1) < size )
-            {
-                final Region candidate = regions.get(left+1);
-                if ( mergeTarget.end == candidate.start && mergeTarget.style == candidate.style )
-                {
-                    mergeTarget.merge( candidate );
-                    regions.remove(left+1);
-                    size--;
-                } else {
-                    break;
-                }
-            }
         }
     }
 
@@ -258,7 +257,7 @@ public class ShadowDOM
         final int idx = findOverlappingRegion( region.start(), region.end() );
         if ( idx != -1 )
         {
-            // found match, inspect surroundings
+            // found match, look for overlap with regions left and right of this one
             int left = idx;
             int right = idx;
             while ( left > 0 && regions.get(left-1).overlaps( region.start(), region.end() ) ) {
@@ -269,20 +268,20 @@ public class ShadowDOM
             }
             if ( left != right )
             {
-                final Region r = new Region( region, style );
+                // region overlaps with multiple other regions
+                final Region newRegion = new Region( region, style );
 
-                // multiple regions intersect
                 final List<Region> replacements = new ArrayList<>();
                 for ( int i = left ; i <= right ; i++ )
                 {
                     final Region toIntersect = regions.get(i);
-                    final Region[] intersection = toIntersect.intersect( r );
+                    final Region[] intersection = toIntersect.intersect( newRegion );
                     for (int j = 0, len = intersection.length; j < len; j++)
                     {
                         replacements.add( intersection[j] );
                     }
                 }
-                insertRegion( r, replacements );
+                insertRegion( newRegion, replacements );
 
                 for ( int count = (right-left)+1 ; count > 0 ; count-- ) {
                     regions.remove(left);
@@ -290,10 +289,12 @@ public class ShadowDOM
                 for ( int i = replacements.size()-1 ; i >= 0 ; i-- ) {
                     regions.add( left, replacements.get(i) );
                 }
+                tryMergeLeft( left );
+                tryMergeRight( left+replacements.size() );
             }
             else
             {
-                // exactly one region intersected
+                // overlaps with exactly one region
                 final Region toSplit = regions.get( idx );
                 if ( toSplit.sameRange( region.start(), region.end() ) )
                 {
@@ -301,43 +302,81 @@ public class ShadowDOM
                     return;
                 }
                 if ( toSplit.contains( region.start(), region.end() ) && toSplit.style == style ) {
+                    // overlapping region fully contains the new region AND has the same style -> do nothing
                     return;
                 }
 
-                final Region r = new Region( region, style );
+                final Region newRegion = new Region( region, style );
 
                 // retain only the non-overlapping parts
-                final Region[] split = toSplit.intersect( r );
+                final Region[] split = toSplit.intersect( newRegion );
                 final List<Region> splitList = new ArrayList<>( split.length );
                 for (int i = 0, splitLength = split.length; i < splitLength; i++)
                 {
                     splitList.add( split[i] );
                 }
                 regions.remove( left );
-                insertRegion( r, splitList );
+                insertRegion( newRegion, splitList );
 
                 for ( int i = splitList.size()-1 ; i >= 0 ; i-- ) {
                     regions.add( left, splitList.get(i));
                 }
+                tryMergeLeft(left);
+                tryMergeRight(left+splitList.size());
             }
         }
         else
         {
             // no match found
-            insertRegion( new Region( region, style ) );
+            final int insertPos = insertRegion( new Region( region, style ) );
+            tryMergeLeft(insertPos);
+            tryMergeRight(insertPos);
         }
     }
 
-    private void insertRegion(Region toInsert)
+    private void tryMergeLeft(int startIdx)
     {
-        insertRegion(toInsert,regions);
+        for ( int currentIdx = startIdx ; currentIdx > 0 && currentIdx < regions.size() ; )
+        {
+            final Region current = regions.get(currentIdx);
+            final Region left = regions.get(currentIdx-1);
+            if ( left.canBeMerged( current ) )
+            {
+                left.merge( current );
+                regions.remove(currentIdx);
+            } else {
+                currentIdx--;
+            }
+        }
     }
 
-    private static void insertRegion(Region toInsert,List<Region> regions)
+    private void tryMergeRight(int startIdx)
     {
-        if ( regions.isEmpty() ) {
+        for ( int currentIdx = startIdx ; (currentIdx+1) < regions.size() ; )
+        {
+            final Region current = regions.get(currentIdx);
+            final Region right = regions.get(currentIdx+1);
+            if ( right.canBeMerged( current ) )
+            {
+                right.merge(current);
+                regions.remove(currentIdx);
+            } else {
+                currentIdx++;
+            }
+        }
+    }
+
+    private int insertRegion(Region toInsert)
+    {
+        return insertRegion(toInsert,regions);
+    }
+
+    private static int insertRegion(Region toInsert,List<Region> regions)
+    {
+        if ( regions.isEmpty() )
+        {
             regions.add(toInsert);
-            return;
+            return 0;
         }
         int low = 0;
         int high = regions.size() - 1;
@@ -357,15 +396,16 @@ public class ShadowDOM
             {
                 high = mid - 1;
             } else {
-                throw new IllegalArgumentException( "List already contains a region with start "+
+                throw new IllegalArgumentException( "List already contains a region with start offset "+
                         toInsert.start+": "+regions );
             }
         }
         if ( toInsert.start < midVal.start ) {
             regions.add( mid,toInsert);
-        } else {
-            regions.add( mid+1,toInsert);
+            return mid;
         }
+        regions.add( mid+1,toInsert);
+        return mid+1;
     }
 
     private int findOverlappingRegion(int start, int end)
@@ -373,7 +413,8 @@ public class ShadowDOM
         int low = 0;
         int high = regions.size() - 1;
 
-        while (low <= high) {
+        while (low <= high)
+        {
             int mid = (low + high) >>> 1;
             Region midVal = regions.get(mid);
 

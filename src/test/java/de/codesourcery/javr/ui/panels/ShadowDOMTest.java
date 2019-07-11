@@ -145,7 +145,6 @@ public class ShadowDOMTest extends TestCase
             return null;
         }).anyTimes();
         replay( doc );
-        dom.mergeAdjacentRegionsWithSameStyle();
         dom.applyDelta( doc, new ShadowDOM() );
         return buffer.toString();
     }

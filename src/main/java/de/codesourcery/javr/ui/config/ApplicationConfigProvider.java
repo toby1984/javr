@@ -39,23 +39,25 @@ import com.cedarsoftware.util.io.JsonWriter;
 public class ApplicationConfigProvider implements IApplicationConfigProvider {
 
     private static final Logger LOG = Logger.getLogger(ApplicationConfigProvider.class);
-    
+
     private IApplicationConfig applicationConfig = new ApplicationConfig();
-    
+
     // @GuardedBy( listeners )
     private final List<Consumer<IApplicationConfig>> listeners = new ArrayList<>();
-    
-    public static IApplicationConfig load(InputStream in) throws IOException 
+
+    public static IApplicationConfig load(InputStream in) throws IOException
     {
         final String json;
-        try ( BufferedReader reader = new BufferedReader( new InputStreamReader(in,"utf8" ) ) ) 
+        try ( BufferedReader reader = new BufferedReader( new InputStreamReader(in,"utf8" ) ) )
         {
             json = reader.lines().collect( Collectors.joining() );
         }
         final IApplicationConfig result = (IApplicationConfig) JsonReader.jsonToJava( json );
 
         // TODO: Hack -- brute-force fix colors that are hardly readable
-        LOG.error("load(): Overriding colors for LABEL and COMMENT");
+        LOG.error( "load(): ---------------------------------------" );
+        LOG.error( "load(): Overriding colors for LABEL and COMMENT" );
+        LOG.error( "load(): ---------------------------------------" );
         final EditorSettings settings = result.getEditorSettings();
         settings.setColor(EditorSettings.SourceElement.LABEL , new Color( 0x039b38) );
         settings.setColor(EditorSettings.SourceElement.COMMENT, new Color( 0xffb200) );
@@ -63,37 +65,37 @@ public class ApplicationConfigProvider implements IApplicationConfigProvider {
         // TODO: End hack
         return result;
     }
-    
-    public static void save(IApplicationConfig config,OutputStream out) throws UnsupportedEncodingException, IOException 
+
+    public static void save(IApplicationConfig config,OutputStream out) throws UnsupportedEncodingException, IOException
     {
         final String json = JsonWriter.objectToJson(config);
         try ( BufferedWriter writer = new BufferedWriter( new OutputStreamWriter( out , "utf8" ) ) ) {
             writer.write( json );
         }
     }
-    
+
     @Override
     public IApplicationConfig getApplicationConfig() {
         return applicationConfig;
     }
 
     @Override
-    public void setApplicationConfig(IApplicationConfig config) 
+    public void setApplicationConfig(IApplicationConfig config)
     {
         this.applicationConfig = config.createCopy();
-        
-        final List<Consumer<IApplicationConfig>> copy; 
+
+        final List<Consumer<IApplicationConfig>> copy;
         synchronized (listeners) {
             copy = new ArrayList<>(listeners);
         }
-        
+
         final IApplicationConfig configCopy = config.createCopy();
-        for ( Consumer<IApplicationConfig> l : copy ) 
+        for ( Consumer<IApplicationConfig> l : copy )
         {
             try {
                 l.accept( configCopy );
-            } 
-            catch(Exception e) 
+            }
+            catch(Exception e)
             {
                 LOG.error("setApplicationConfig(): Listener "+l+" failed",e);
             }
@@ -101,7 +103,7 @@ public class ApplicationConfigProvider implements IApplicationConfigProvider {
     }
 
     @Override
-    public void addChangeListener(Consumer<IApplicationConfig> listener) 
+    public void addChangeListener(Consumer<IApplicationConfig> listener)
     {
         Validate.notNull(listener, "listener must not be NULL");
         synchronized (listeners) {
@@ -110,7 +112,7 @@ public class ApplicationConfigProvider implements IApplicationConfigProvider {
     }
 
     @Override
-    public void removeChangeListener(Consumer<IApplicationConfig> listener) 
+    public void removeChangeListener(Consumer<IApplicationConfig> listener)
     {
         Validate.notNull(listener, "listener must not be NULL");
         synchronized (listeners) {

@@ -78,7 +78,7 @@ public class Parser
     
     private LabelNode previousGlobalLabel;
 
-    public static enum Severity 
+    public enum Severity
     {
         INFO(0),WARNING(1),ATTENTION(3),ERROR(2);
         public final int level;
@@ -95,7 +95,12 @@ public class Parser
 
     public static final class CompilationMessage 
     {
-    	public final long timestamp = System.currentTimeMillis();
+        /**
+         * Comparator that compares messages ascending by severity.
+         */
+        public static final Comparator<CompilationMessage> ASC_BY_SEVERITY = (a,b) -> Integer.compare( a.severity.level, b.severity.level );
+
+        public final long timestamp = System.currentTimeMillis();
         public final Severity severity;
         public final String message;
         public final TextRegion region;
@@ -105,6 +110,10 @@ public class Parser
         public static Comparator<CompilationMessage> compareSeverityDescending() 
         {
             return (a,b) -> Integer.compare(b.severity.level,a.severity.level);
+        }
+
+        public boolean isWithinOffset(int startOffsetInclusive,int endOffsetExclusive) {
+            return region != null && region.start() >= startOffsetInclusive && region.end() <= endOffsetExclusive;
         }
         
         public ZonedDateTime getTimestamp() {

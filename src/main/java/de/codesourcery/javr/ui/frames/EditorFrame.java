@@ -79,7 +79,7 @@ public class EditorFrame extends JInternalFrame implements IWindow
         }
 	}
 	
-	private Optional<EditorPanel>  getEditor(CompilationUnit unit ) 
+	private Optional<EditorPanel>  getEditor(CompilationUnit unit)
 	{
 		return editors.stream().filter( ed -> ed.getCompilationUnit().hasSameResourceAs( unit ) ).findFirst();
 	}
@@ -125,7 +125,7 @@ public class EditorFrame extends JInternalFrame implements IWindow
 	    };
 	}
 	
-	private EditorPanel currentEditor() 
+	public EditorPanel currentEditor()
 	{
 	    return (EditorPanel ) tabbedPane.getSelectedComponent();
 	}

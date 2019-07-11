@@ -17,7 +17,10 @@ package de.codesourcery.javr.ui.config;
 
 import java.awt.Dimension;
 import java.awt.Point;
+import java.util.Optional;
+import java.util.function.Consumer;
 
+import de.codesourcery.javr.ui.GlobalSettings;
 import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.ui.EditorSettings;
@@ -76,10 +79,27 @@ public interface IApplicationConfig
     EditorSettings getEditorSettings();
     
     void setEditorSettings(EditorSettings settings);
+
+    GlobalSettings getGlobalSettings();
+
+    void setGlobalSettings(GlobalSettings settings);
     
     IApplicationConfig createCopy();
     
     void apply(IWindow window);
     
     void save(IWindow window);
+
+    default void updateGlobalSettings(Consumer<GlobalSettings> updater) {
+        final GlobalSettings settings = getGlobalSettings();
+        updater.accept( settings );
+        setGlobalSettings( settings );
+    }
+
+    default void updateEditorSettings(Consumer<EditorSettings> updater)
+    {
+        final EditorSettings settings = getEditorSettings();
+        updater.accept( settings );
+        setEditorSettings( settings );
+    }
 }

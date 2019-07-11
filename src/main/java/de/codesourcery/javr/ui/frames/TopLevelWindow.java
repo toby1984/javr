@@ -40,6 +40,7 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
 
+import de.codesourcery.javr.ui.GlobalConfigurationWindow;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
@@ -152,21 +153,30 @@ public class TopLevelWindow implements IWindow
         LOG.info("quit(): Shutting down...");
         try 
         {
-            final IApplicationConfig config = applicationConfigProvider.getApplicationConfig();
-            config.save( editorFrame );
-            config.save( navigator );
-            config.save( messageFrame );
-            config.save( outlineFrame);
-            config.save( TopLevelWindow.this );
-            applicationConfigProvider.setApplicationConfig( config );
-            try {
-                IDEMain.getInstance().save( config );
-            } catch (IOException e1) {
-                LOG.error("windowClosing(): Failed to save configuration",e1);
-            } 
+            saveConfig();
         } finally {
             System.exit(0);
         }        
+    }
+
+    public void saveConfig()
+    {
+        saveConfig(applicationConfigProvider.getApplicationConfig());
+    }
+
+    public void saveConfig(IApplicationConfig config)
+    {
+        config.save( editorFrame );
+        config.save( navigator );
+        config.save( messageFrame );
+        config.save( outlineFrame);
+        config.save( TopLevelWindow.this );
+        applicationConfigProvider.setApplicationConfig( config );
+        try {
+            IDEMain.getInstance().save( config );
+        } catch (IOException e1) {
+            IDEMain.showError( "Failed to save configuration",e1 );
+        }
     }
 
     private void addMenuItem(JPopupMenu menu,String label,Runnable action) {
@@ -339,6 +349,18 @@ public class TopLevelWindow implements IWindow
         pane.add( frame );
     }
 
+    private void editGlobalConfiguration()
+    {
+        new GlobalConfigurationWindow(applicationConfigProvider) {
+
+            @Override
+            protected void saveConfiguration(IApplicationConfig config)
+            {
+                saveConfig(config);
+            }
+        };
+    }
+
     private void editProjectConfiguration() 
     {
         final JDialog dialog = new JDialog( (Frame) null, "Edit project configuration", true );
@@ -379,7 +401,7 @@ public class TopLevelWindow implements IWindow
         final JMenu menu = new JMenu("File");
         result.add( menu );
 
-        addItem( menu , "Open project" , () -> 
+        addItem( menu , "Open project..." , () ->
         {
             final ThrowingConsumer<File> handler = file ->
             {
@@ -408,7 +430,8 @@ public class TopLevelWindow implements IWindow
             doWithFile( "Open project" , true , selectedFile , handler);
         });
 
-        addItem( menu , "Edit project configuration" , () -> editProjectConfiguration() );        
+        addItem( menu , "Settings..." , () -> editGlobalConfiguration() );
+        addItem( menu , "Project configuration..." , () -> editProjectConfiguration() );
 
         addItem( menu , "Disassemble" , () -> doWithFile( "Select raw binary to disassemble" , true , lastDisassembledFile, file -> 
         {
@@ -429,8 +452,8 @@ public class TopLevelWindow implements IWindow
                 lastSourceFile = file;
             });
         };
-        addItem( menu , "Save source" , eventHandler);  
-        addItem( menu , "Load source" , () -> doWithFile( "Load source" , true , lastSourceFile, file -> 
+        addItem( menu , "Save source..." , eventHandler);
+        addItem( menu , "Load source..." , () -> doWithFile( "Load source" , true , lastSourceFile, file ->
         {
             final IProject project = currentProject();
             final CompilationUnit unit = project.getCompilationUnit( new FileResource(file , Resource.ENCODING_UTF ) );

@@ -30,7 +30,10 @@ import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
@@ -342,23 +345,50 @@ public class IDEMain
 
         projects.addAll( findProjects( workspaceDir ) );
 
-        final IProject currentProject = selectProjectToOpen( workspaceDir );
+        final Optional<String> optDefaultProject =
+            applicationConfigProvider.getApplicationConfig().getGlobalSettings().getDefaultProjectToOpen();
+
+        final IProject currentProject = optDefaultProject
+                                        .flatMap( name -> projects.stream().filter( p -> p.getConfiguration().getProjectName().equals(name ) ).findFirst() )
+                                        .orElseGet( () -> selectProjectToOpen( workspaceDir ) );
+
+        final String defaultProject = applicationConfigProvider.getApplicationConfig().getGlobalSettings().getDefaultProjectToOpen().orElse( null );
+
+        boolean saveConfig = false;
+        if ( ! Objects.equals( defaultProject, currentProject.getConfiguration().getProjectName() ) )
+        {
+            final IApplicationConfig config = applicationConfigProvider.getApplicationConfig();
+            config.updateGlobalSettings( x -> x.setDefaultProjectToOpen( currentProject.getConfiguration().getProjectName() ) );
+            applicationConfigProvider.setApplicationConfig( config );
+            saveConfig = true;
+        }
         LOG.info("run(): Opening project "+currentProject.getConfiguration().getBaseDir().getAbsolutePath());
         assertCompilationRootExists( currentProject ); // required so that editor can display something to the user
 
         // FIXME: Setting the project here before anybody had a chance to register themselves
         // FIXME: as a IProjectListener is obviously a problem....
         projectProvider.setProject( currentProject );
-        
-        new TopLevelWindow( projectProvider , applicationConfigProvider );
+
+        final TopLevelWindow topLevelWindow = new TopLevelWindow( projectProvider, applicationConfigProvider );
         projectProvider.setProject( currentProject );
+
+        if ( saveConfig ) {
+            topLevelWindow.saveConfig();
+        }
     }
 
-    public IProject selectProjectToOpen(File workspaceDir) throws IOException 
+    public IProject selectProjectToOpen(File workspaceDir)
     {
         if ( projects.isEmpty() ) 
         {
-            final IProject project = createNewProject(workspaceDir);
+            final IProject project;
+            try
+            {
+                project = createNewProject(workspaceDir);
+            } catch (IOException e)
+            {
+                throw new RuntimeException( e );
+            }
             projects.add(project);
             return project;
         } 
@@ -392,17 +422,19 @@ public class IDEMain
 
     public static void showError(String title,String message,Throwable t)
     {
-        StringBuilder error = new StringBuilder();
-        error.append("ERROR: "+message);
+        LOG.error( message,t);
+
+        StringBuilder errorMsg = new StringBuilder();
+        errorMsg.append("ERROR: "+message);
         if ( t != null ) {
-            error.append("\n\n");
+            errorMsg.append("\n\n");
             final StringWriter writer = new StringWriter();
             try ( var pw = new PrintWriter(writer) )
             {
                 t.printStackTrace( pw );
             }
-            error.append( writer.getBuffer().toString() );
+            errorMsg.append( writer.getBuffer().toString() );
         }
-        JOptionPane.showConfirmDialog( null,message,title , JOptionPane.ERROR_MESSAGE);
+        JOptionPane.showMessageDialog( null,errorMsg,title , JOptionPane.ERROR_MESSAGE);
     }
 }

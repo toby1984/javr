@@ -53,6 +53,7 @@ import de.codesourcery.javr.ui.CaretPositionTracker.CaretPosition;
 import de.codesourcery.javr.ui.EditorSettings.SourceElement;
 import de.codesourcery.javr.ui.IDEMain;
 import de.codesourcery.javr.ui.IProject;
+import de.codesourcery.javr.ui.SourceMap;
 import de.codesourcery.javr.ui.config.IApplicationConfig;
 import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
 import de.codesourcery.javr.ui.frames.EditorFrame;
@@ -107,7 +108,6 @@ import javax.swing.text.StyleContext;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreePath;
-import javax.swing.undo.UndoManager;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -153,6 +153,7 @@ public abstract class EditorPanel extends JPanel
 
     private final JScrollPane editorPane;
     private final JTextPane editor = new JTextPane();
+    private final GutterPanel gutterPanel;
 
     private final EditorFrame topLevelWindow;
 
@@ -165,13 +166,15 @@ public abstract class EditorPanel extends JPanel
         setupStyles();
     };
 
+    private final SourceMap sourceMap = new SourceMap( editor::getText );
+
     private final ShadowDOM frontDOM = new ShadowDOM();
     private final ShadowDOM backDOM = new ShadowDOM();
 
     private ShadowDOM currentDOM = frontDOM;
 
     private boolean ignoreEditEvents;
-    private final UndoManager undoManager = new UndoManager();
+    private final UndoManagerWrapper undoManager = new UndoManagerWrapper();
 
     private IProject project;
 
@@ -1184,14 +1187,28 @@ public abstract class EditorPanel extends JPanel
 
         // add toolbar
         GridBagConstraints cnstrs = new GridBagConstraints();
-        cnstrs.fill = GridBagConstraints.HORIZONTAL;
-        cnstrs.weightx = 1.0; cnstrs.weighty=0;
-        cnstrs.gridwidth=1; cnstrs.gridheight = 1 ;
         cnstrs.gridx = 0; cnstrs.gridy = 0;
+        cnstrs.gridwidth=2; cnstrs.gridheight = 1 ;
+        cnstrs.weightx = 1.0; cnstrs.weighty=0;
+        cnstrs.fill = GridBagConstraints.HORIZONTAL;
 
         panel.add( createToolbar() , cnstrs );
 
-        // editor        
+        // gutter
+        editorPane = new JScrollPane( editor );
+        gutterPanel = new GutterPanel( editorPane, this );
+
+        gutterPanel.setMinimumSize( new Dimension(50,10) );
+        gutterPanel.setMaximumSize( new Dimension(50,5000) );
+
+        cnstrs = new GridBagConstraints();
+        cnstrs.insets = new Insets(0,0,0,0);
+        cnstrs.gridx = 0; cnstrs.gridy = 1;
+        cnstrs.gridwidth=1; cnstrs.gridheight = 1 ;
+        cnstrs.weightx = 0; cnstrs.weighty=1;
+        cnstrs.fill = GridBagConstraints.VERTICAL;
+        panel.add( gutterPanel, cnstrs );
+        // editor
 
         // ugly hack to adjust splitpane size after it has become visible
         addAncestorListener( new AncestorListener() {
@@ -1212,20 +1229,20 @@ public abstract class EditorPanel extends JPanel
         });
 
         cnstrs = new GridBagConstraints();
-        cnstrs.fill = GridBagConstraints.BOTH;
-        cnstrs.weightx = 1.0; cnstrs.weighty=1;
+        cnstrs.insets = new Insets(0,0,0,0);
+        cnstrs.gridx = 1; cnstrs.gridy = 1;
         cnstrs.gridwidth=1; cnstrs.gridheight = 1 ;
-        cnstrs.gridx = 0; cnstrs.gridy = 1;
-
-        editorPane = new JScrollPane( editor );
+        cnstrs.weightx = 1.0; cnstrs.weighty=1;
+        cnstrs.fill = GridBagConstraints.BOTH;
         panel.add( editorPane , cnstrs );
 
         setLayout( new GridBagLayout() );
+
         cnstrs = new GridBagConstraints();
-        cnstrs.fill = GridBagConstraints.BOTH;
-        cnstrs.weightx = 1.0; cnstrs.weighty=1;
-        cnstrs.gridwidth=1; cnstrs.gridheight = 1 ;
         cnstrs.gridx = 0; cnstrs.gridy = 0;
+        cnstrs.gridwidth=1; cnstrs.gridheight = 1 ;
+        cnstrs.weightx = 1.0; cnstrs.weighty=1;
+        cnstrs.fill = GridBagConstraints.BOTH;
 
         add( panel , cnstrs );
 
@@ -1296,6 +1313,7 @@ public abstract class EditorPanel extends JPanel
                     lastEditLocation = e.getOffset();
                     recompilationThread.documentChanged(e);
                 }
+                sourceMap.invalidate();
             }
             @Override public void removeUpdate(DocumentEvent e)
             {
@@ -1304,6 +1322,7 @@ public abstract class EditorPanel extends JPanel
                     lastEditLocation = e.getOffset();
                     recompilationThread.documentChanged(e);
                 }
+                sourceMap.invalidate();
             }
             @Override public void changedUpdate(DocumentEvent e)
             {
@@ -1311,6 +1330,7 @@ public abstract class EditorPanel extends JPanel
                     lastEditLocation = e.getOffset();
                     recompilationThread.documentChanged(e);
                 }
+                sourceMap.invalidate();
             }
         });
 
@@ -1642,6 +1662,8 @@ public abstract class EditorPanel extends JPanel
 
         messageFrame.addAll( allMessages );
 
+        gutterPanel.repaint();
+
         wasCompiledAtLeastOnce = true;
         if ( ! afterCompilation.isEmpty() )
         {
@@ -1687,7 +1709,6 @@ public abstract class EditorPanel extends JPanel
 
             // render style to back buffer
             domCallback.accept( backBuffer );
-            backBuffer.mergeAdjacentRegionsWithSameStyle();
 
             // apply changes to StyledDocuments
             backBuffer.applyDelta( editor.getStyledDocument(), frontBuffer );
@@ -2297,5 +2318,17 @@ public abstract class EditorPanel extends JPanel
         backDOM.clear();
         frontDOM.clear();
         editor.setText( text );
+    }
+
+    public AST getAST() {
+        return astTreeModel.getAST();
+    }
+
+    public CompilationUnit currentUnit() {
+        return currentUnit;
+    }
+
+    public SourceMap getSourceMap() {
+        return sourceMap;
     }
 }

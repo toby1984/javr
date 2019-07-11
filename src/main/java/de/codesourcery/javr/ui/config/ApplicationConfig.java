@@ -21,13 +21,15 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import de.codesourcery.javr.ui.EditorSettings;
+import de.codesourcery.javr.ui.GlobalSettings;
 import de.codesourcery.javr.ui.frames.IWindow;
 
 public class ApplicationConfig implements IApplicationConfig 
 {
     private EditorSettings editorSettings = new EditorSettings();
+    private GlobalSettings globalSettings = new GlobalSettings();
     private List<WindowProperties> windowProperties = new ArrayList<>();
-    
+
     public ApplicationConfig() {
     }
     
@@ -35,6 +37,7 @@ public class ApplicationConfig implements IApplicationConfig
     {
         this.editorSettings = other.editorSettings.createCopy();
         this.windowProperties = other.windowProperties.stream().map( WindowProperties::createCopy ).collect( Collectors.toCollection( ArrayList::new ) );
+        this.globalSettings = other.globalSettings.createCopy();
     }
     
     @Override
@@ -45,6 +48,18 @@ public class ApplicationConfig implements IApplicationConfig
     @Override
     public void setEditorSettings(EditorSettings settings) {
         this.editorSettings = settings.createCopy();
+    }
+
+    @Override
+    public GlobalSettings getGlobalSettings()
+    {
+        return globalSettings.createCopy();
+    }
+
+    @Override
+    public void setGlobalSettings(GlobalSettings settings)
+    {
+        this.globalSettings = settings.createCopy();
     }
 
     @Override
