@@ -18,6 +18,7 @@ package de.codesourcery.javr.assembler;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
@@ -41,7 +42,7 @@ public class Assembler
 
     private CompilationContext compilationContext;
 
-    public boolean compile(IProject project,IObjectCodeWriter codeWriter,ResourceFactory rf, IConfigProvider config) throws IOException 
+    public boolean compile(IProject project,IObjectCodeWriter codeWriter,ResourceFactory rf, IConfigProvider config) throws IOException
     {
         Validate.notNull(project, "project must not be NULL");
         Validate.notNull(codeWriter, "codeWriter must not be NULL");

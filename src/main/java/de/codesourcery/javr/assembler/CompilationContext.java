@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.IdentityHashMap;
 import java.util.Stack;
 
+import de.codesourcery.javr.assembler.phases.Phase;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
@@ -42,13 +43,13 @@ public final class CompilationContext implements ICompilationContext
     private final IObjectCodeWriter objectCodeWriter;
     
     private final ResourceFactory resourceFactory;
-    
+
     private boolean generateLocations;
     
     private final IConfig config;        
     
     // stack to keep track of the current compilation unit while processing #include directives
-    private final Stack<CompilationUnit> compilationUnits = new Stack<CompilationUnit>();
+    private final Stack<CompilationUnit> compilationUnits = new Stack<>();
     
     // the compilation unit that was passed to start the compilation process
     private final CompilationUnit rootCompilationUnit;

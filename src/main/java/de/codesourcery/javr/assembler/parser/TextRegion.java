@@ -22,8 +22,8 @@ package de.codesourcery.javr.assembler.parser;
  */
 public class TextRegion 
 {
-    private int line;
-    private int column;
+    private int line; // line number, first line == 1 !!
+    private int column; // column number, first column == 1 !!
     private int start;
     private int len;
     

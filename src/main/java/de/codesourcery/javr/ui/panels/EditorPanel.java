@@ -1063,66 +1063,16 @@ public abstract class EditorPanel extends JPanel
              */
             private TextRegion getLineAt(int caretPosition)
             {
-                final String text = editor.getText();
-                final int len = text.length();
-
-                if ( len == 0 || caretPosition > len ) {
+                final Optional<SourceMap.Line> line = sourceMap.getLineByOffset(caretPosition);
+                return line.map(l ->
+                {
+                    final int col = 1 + caretPosition - l.startOffset;
+                    return new TextRegion(l.startOffset,l.endOffset-l.startOffset,l.lineNum,col);
+                }).orElseGet(() ->
+                {
+                    LOG.error("getLineAt(): Found no line for caret position "+caretPosition);
                     return null;
-                }
-
-                final boolean atStartOfLine;
-                if ( caretPosition == 0 ) {
-                    atStartOfLine = true;
-                } else {
-                    atStartOfLine = text.charAt( caretPosition-1 ) == 'n';
-                }
-
-                if ( atStartOfLine )
-                {
-                    // search ahead
-                    int end = caretPosition;
-                    while ( (end+1) < len )
-                    {
-                        end++;
-                        if ( text.charAt( end ) == '\n') {
-                            break;
-                        }
-                    }
-                    return new TextRegion(caretPosition , (end-caretPosition)+1 , 1 , 1);
-                }
-
-                final boolean atEndOfLine;
-                if ( caretPosition < len ) {
-                    atEndOfLine = text.charAt( caretPosition ) == '\n';
-                } else {
-                    atEndOfLine = true;
-                    caretPosition--;
-                }
-
-                if ( atEndOfLine )
-                {
-                    // search backwards
-                    int start = caretPosition;
-                    while ( (start-1) >= 0 && text.charAt( start-1 ) != '\n' ) {
-                        start--;
-                    }
-                    return new TextRegion(start,(caretPosition-start)+1,1,1);
-                }
-
-                // somewhere in-between, search forwards and backwards
-                int end = caretPosition;
-                while ( (end+1) < len )
-                {
-                    end++;
-                    if ( text.charAt( end ) == '\n') {
-                        break;
-                    }
-                }
-                int start = caretPosition;
-                while ( (start-1) >= 0 && text.charAt( start-1 ) != '\n' ) {
-                    start--;
-                }
-                return new TextRegion(start,(end-start)+1,1,1);
+                });
             }
 
             @Override
@@ -1142,7 +1092,8 @@ public abstract class EditorPanel extends JPanel
                         {
                             try
                             {
-                                editor.getDocument().remove( editor.getCaretPosition() , line.end() - editor.getCaretPosition()-1 );
+                                final int toRemove = line.end() - editor.getCaretPosition();
+                                editor.getDocument().remove( editor.getCaretPosition() , toRemove );
                             }
                             catch (BadLocationException e1) {
                                 LOG.error("keyTyped(): Failed to remove()",e1);
@@ -1158,7 +1109,7 @@ public abstract class EditorPanel extends JPanel
                             restoreCaretPositionAfter( () -> {
                                 try
                                 {
-                                    editor.getDocument().remove( line.start(), line.length() );
+                                    editor.getDocument().remove( line.start(), line.length()+1 );
                                 }
                                 catch (BadLocationException e1)
                                 {
@@ -1650,14 +1601,11 @@ public abstract class EditorPanel extends JPanel
         catch(Exception e)
         {
             e.printStackTrace();
-            root.addMessage( toCompilationMessage( currentUnit, e ) );
+            currentUnit.addMessage( toCompilationMessage( currentUnit, e ) );
         }
         symbolModel.setSymbolTable( currentUnit.getSymbolTable() );
 
         final long compileEnd =  System.currentTimeMillis();
-
-        final String success = compilationSuccessful ? "successful" : "failed";
-        final DateTimeFormatter df = DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss");
 
         final long parseTime = parseEnd - parseStart;
         final long highlightTime = highlightEnd - parseEnd;
@@ -1665,26 +1613,12 @@ public abstract class EditorPanel extends JPanel
 
         final String assembleTime = "parsing: "+parseTime+" ms,highlighting: "+highlightTime+" ms,compile: "+compileTime+" ms";
 
+        final String success = compilationSuccessful ? "successful" : "failed";
+        final DateTimeFormatter df = DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss");
         currentUnit.addMessage( CompilationMessage.info(currentUnit,"Compilation "+success+" ("+assembleTime+") on "+df.format( ZonedDateTime.now() ) ) );
 
         if ( isPrettyPrintShown() ) {
             showPrettyPrint( prettyPrintWindow.gnuSyntax );
-        }
-
-        // create warnings for symbols defined in this unit but not used anywhere
-        if ( compilationSuccessful )
-        {
-            project.getGlobalSymbolTable().visitSymbols( (symbol) ->
-            {
-                if ( symbol.getCompilationUnit().hasSameResourceAs( this.currentUnit ) )
-                {
-                    if ( !symbol.isReferenced() )
-                    {
-                        currentUnit.addMessage( CompilationMessage.warning( currentUnit, "Symbol '" + symbol.name() + "' is not referenced", symbol.getNode() ) );
-                    }
-                }
-                return true;
-            });
         }
 
         messageFrame.addAll( root.getMessages(true) );

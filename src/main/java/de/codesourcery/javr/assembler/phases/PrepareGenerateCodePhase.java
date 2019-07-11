@@ -17,6 +17,8 @@ package de.codesourcery.javr.assembler.phases;
 
 import java.util.Optional;
 
+import de.codesourcery.javr.assembler.CompilationUnit;
+import de.codesourcery.javr.assembler.parser.Parser;
 import org.apache.log4j.Logger;
 
 import de.codesourcery.javr.assembler.ICompilationContext;
@@ -191,5 +193,19 @@ public class PrepareGenerateCodePhase extends GenerateCodePhase
             }
         };
         ast.visitBreadthFirst( unresolvedSymbolsVisitor );
+
+        // generate warnings for unused symbols
+        final CompilationUnit currentUnit = context.currentCompilationUnit();
+        context.globalSymbolTable().visitSymbols( (symbol) ->
+        {
+            if ( symbol.getCompilationUnit().hasSameResourceAs( currentUnit ) )
+            {
+                if ( !symbol.isReferenced() )
+                {
+                    currentUnit.addMessage( Parser.CompilationMessage.warning( currentUnit, "Symbol '" + symbol.name() + "' is not referenced", symbol.getNode() ) );
+                }
+            }
+            return true;
+        });
     }
 }
