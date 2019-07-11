@@ -174,6 +174,8 @@ public abstract class EditorPanel extends JPanel
     private ShadowDOM currentDOM = frontDOM;
 
     private boolean ignoreEditEvents;
+    private boolean indentFilterEnabled=true;
+
     private final UndoManagerWrapper undoManager = new UndoManagerWrapper();
 
     private IProject project;
@@ -494,7 +496,12 @@ public abstract class EditorPanel extends JPanel
 
         public void insertString(FilterBypass fb, int offs, String str, AttributeSet a) throws BadLocationException
         {
-            super.insertString(fb, offs, replaceTabs(str) , a);
+            if ( indentFilterEnabled )
+            {
+                super.insertString(fb, offs, replaceTabs(str), a);
+            } else {
+                super.insertString(fb,offs,str,a);
+            }
         }
 
         private boolean isNewline(String s) {
@@ -508,9 +515,14 @@ public abstract class EditorPanel extends JPanel
         @Override
         public void remove(FilterBypass fb, int offset, int length) throws BadLocationException
         {
-            final int oldLength = editor.getDocument().getLength();
-            fb.remove( offset, length );
-            documentLengthDecreased( oldLength -length );
+            if ( indentFilterEnabled )
+            {
+                final int oldLength = editor.getDocument().getLength();
+                fb.remove(offset, length);
+                documentLengthDecreased(oldLength - length);
+            } else {
+                super.remove(fb,offset,length);
+            }
         }
 
         private void documentLengthDecreased(int newLength) {
@@ -521,6 +533,11 @@ public abstract class EditorPanel extends JPanel
         @Override
         public void replace(FilterBypass fb, int offs, int toDeleteLength, String origReplacement, AttributeSet a) throws BadLocationException
         {
+            if ( ! indentFilterEnabled ) {
+                super.replace(fb,offs,toDeleteLength,origReplacement,a);
+                return;
+            }
+
             final String newReplacement;
             if ( isNewline( origReplacement ) )
             {
@@ -2187,7 +2204,9 @@ public abstract class EditorPanel extends JPanel
         autoComplete.detach();
         editor.setDocument( createDocument() );
         autoComplete.attachTo( editor );
-        setText( source );
+
+        setText(source);
+        undoManager.discardAllEdits();
         editor.setCaretPosition( 0 );
     }
 
@@ -2276,7 +2295,14 @@ public abstract class EditorPanel extends JPanel
     {
         backDOM.clear();
         frontDOM.clear();
-        editor.setText( text );
+
+        indentFilterEnabled = false;
+        try
+        {
+            editor.setText(text);
+        } finally {
+            indentFilterEnabled = true;
+        }
     }
 
     public AST getAST() {

@@ -116,6 +116,8 @@ but with SPM you need to write
 
 ## Known issues
 
+- Auto-indent is crude and buggy (sometimes corrupts files)
+- Gutter icon is off by one line for some compilation messages
 - Generated relocation information when output format is ELF is not complete yet (see failing unit tests) 
 - Syntax coloring is off when using MSDOS-style line endings (won't fix this since it is related to the fact that Swing text components internally convert all EOL sequences to '\n' but my parser uses the 'true' text offsets)
 - parsing #define is currently broken when trying to #define stuff like (a+b)/c (gets irritated by the leading parens)
