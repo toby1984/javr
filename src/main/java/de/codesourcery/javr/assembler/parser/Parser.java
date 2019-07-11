@@ -80,7 +80,7 @@ public class Parser
 
     public enum Severity
     {
-        INFO(0),WARNING(1),ATTENTION(3),ERROR(2);
+        INFO(0),WARNING(1),ATTENTION(2),ERROR(3);
         public final int level;
         
         private Severity(int level) {
