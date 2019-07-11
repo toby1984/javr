@@ -430,8 +430,8 @@ public class TopLevelWindow implements IWindow
             doWithFile( "Open project" , true , selectedFile , handler);
         });
 
-        addItem( menu , "Settings..." , () -> editGlobalConfiguration() );
         addItem( menu , "Project configuration..." , () -> editProjectConfiguration() );
+        addItem( menu , "Settings..." , () -> editGlobalConfiguration() );
 
         addItem( menu , "Disassemble" , () -> doWithFile( "Select raw binary to disassemble" , true , lastDisassembledFile, file -> 
         {

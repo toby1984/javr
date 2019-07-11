@@ -9,6 +9,7 @@ import javax.swing.text.StyledDocument;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 
 public class ShadowDOM
 {
@@ -42,7 +43,7 @@ public class ShadowDOM
 
         public boolean canBeMerged(Region other)
         {
-            return this.style == other.style &&( this.end == other.start || this.start == other.end );
+            return Objects.equals(this.style,other.style) &&( this.end == other.start || this.start == other.end );
         }
 
         public boolean contains(int start,int end)
@@ -76,7 +77,7 @@ public class ShadowDOM
         public boolean equals(Object object)
         {
             if ( object instanceof Region) {
-                return this.style == ( (Region) object ).style && sameRange( (Region) object);
+                return Objects.equals(this.style , ( (Region) object ).style ) && sameRange( (Region) object);
             }
             return false;
         }
@@ -187,7 +188,8 @@ public class ShadowDOM
     private static final class BackwardsIterator implements Iterator<Region> {
 
         private final List<Region> list;
-        private int ptr;
+        public int ptr;
+        private int previousIdx=-1;
 
         private BackwardsIterator(List<Region> list)
         {
@@ -202,9 +204,19 @@ public class ShadowDOM
         }
 
         @Override
+        public void remove()
+        {
+            if ( previousIdx == -1 ) {
+                throw new IllegalStateException( "You need to call next() first" );
+            }
+            list.remove( previousIdx );
+        }
+
+        @Override
         public Region next()
         {
-            return list.get(ptr--);
+            previousIdx = ptr;
+            return list.get( ptr-- );
         }
     }
 
@@ -301,7 +313,7 @@ public class ShadowDOM
                     toSplit.style = style;
                     return;
                 }
-                if ( toSplit.contains( region.start(), region.end() ) && toSplit.style == style ) {
+                if ( toSplit.contains( region.start(), region.end() ) && Objects.equals(toSplit.style,style ) ) {
                     // overlapping region fully contains the new region AND has the same style -> do nothing
                     return;
                 }
@@ -432,6 +444,25 @@ public class ShadowDOM
             }
         }
         return -1;
+    }
+
+    public void truncate(int maxOffset)
+    {
+        if ( regions.isEmpty() || regions.get( regions.size() - 1 ).end <= maxOffset )
+        {
+            return;
+        }
+        regions.removeIf( region -> region.start >= maxOffset );
+
+        if ( ! regions.isEmpty() )
+        {
+            // truncate remaining region if necessary
+            final Region last = regions.get( regions.size() - 1 );
+            if ( last.end > maxOffset )
+            {
+                last.end = maxOffset;
+            }
+        }
     }
 
     public void clear() {

@@ -505,17 +505,41 @@ public abstract class EditorPanel extends JPanel
             return in.replace("\t" ,  project.getConfig().getEditorIndentString() );
         }
 
-        public void replace(FilterBypass fb, int offs, int length, String str, AttributeSet a) throws BadLocationException
+        @Override
+        public void remove(FilterBypass fb, int offset, int length) throws BadLocationException
         {
-            if ( isNewline( str ) )
+            final int oldLength = editor.getDocument().getLength();
+            fb.remove( offset, length );
+            documentLengthDecreased( oldLength -length );
+        }
+
+        private void documentLengthDecreased(int newLength) {
+            frontDOM.truncate( newLength );
+            backDOM.truncate( newLength);
+        }
+
+        @Override
+        public void replace(FilterBypass fb, int offs, int toDeleteLength, String origReplacement, AttributeSet a) throws BadLocationException
+        {
+            final String newReplacement;
+            if ( isNewline( origReplacement ) )
             {
-                str = "\n  ";
+                newReplacement = "\n  ";
             }
             else
             {
-                str = replaceTabs( str );
+                newReplacement = replaceTabs( origReplacement );
+
             }
-            super.replace( fb, offs, length, str, a );
+            final int oldLength = editor.getDocument().getLength();
+
+            super.replace( fb, offs, toDeleteLength, newReplacement, a );
+
+            if ( toDeleteLength > newReplacement.length() )
+            {
+                final int delta = toDeleteLength - newReplacement.length();
+                documentLengthDecreased( oldLength - delta );
+            }
         }
     }
 
@@ -1307,7 +1331,8 @@ public abstract class EditorPanel extends JPanel
 
         doc.addDocumentListener( new DocumentListener()
         {
-            @Override public void insertUpdate(DocumentEvent e)
+            @Override
+            public void insertUpdate(DocumentEvent e)
             {
                 if ( ! ignoreEditEvents ) {
                     lastEditLocation = e.getOffset();
@@ -1315,7 +1340,9 @@ public abstract class EditorPanel extends JPanel
                 }
                 sourceMap.invalidate();
             }
-            @Override public void removeUpdate(DocumentEvent e)
+
+            @Override
+            public void removeUpdate(DocumentEvent e)
             {
                 if ( ! ignoreEditEvents )
                 {
@@ -1324,7 +1351,9 @@ public abstract class EditorPanel extends JPanel
                 }
                 sourceMap.invalidate();
             }
-            @Override public void changedUpdate(DocumentEvent e)
+
+            @Override
+            public void changedUpdate(DocumentEvent e)
             {
                 if ( ! ignoreEditEvents ) {
                     lastEditLocation = e.getOffset();
@@ -1642,25 +1671,23 @@ public abstract class EditorPanel extends JPanel
             showPrettyPrint( prettyPrintWindow.gnuSyntax );
         }
 
-        final List<CompilationMessage> allMessages = root.getMessages(true);
-
         // create warnings for symbols defined in this unit but not used anywhere
         if ( compilationSuccessful )
         {
             project.getGlobalSymbolTable().visitSymbols( (symbol) ->
-                                                         {
-                                                             if ( symbol.getCompilationUnit().hasSameResourceAs( this.currentUnit ) )
-                                                             {
-                                                                 if ( ! symbol.isReferenced() )
-                                                                 {
-                                                                     allMessages.add( CompilationMessage.warning( currentUnit, "Symbol '"+symbol.name()+"' is not referenced" , symbol.getNode() ) );
-                                                                 }
-                                                             }
-                                                             return true;
-                                                         });
+            {
+                if ( symbol.getCompilationUnit().hasSameResourceAs( this.currentUnit ) )
+                {
+                    if ( !symbol.isReferenced() )
+                    {
+                        currentUnit.addMessage( CompilationMessage.warning( currentUnit, "Symbol '" + symbol.name() + "' is not referenced", symbol.getNode() ) );
+                    }
+                }
+                return true;
+            });
         }
 
-        messageFrame.addAll( allMessages );
+        messageFrame.addAll( root.getMessages(true) );
 
         gutterPanel.repaint();
 
