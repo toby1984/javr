@@ -2,6 +2,7 @@ package de.codesourcery.javr.ui.panels;
 
 import de.codesourcery.javr.assembler.parser.Parser;
 import de.codesourcery.javr.ui.SourceMap;
+import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
@@ -39,6 +40,7 @@ public class GutterPanel extends JPanel
     private final JScrollPane scrollpane;
     private final EditorPanel editorPanel;
 
+    private boolean displayLineNumbers;
     private int startingOffset;
     private int endOffset;
 
@@ -67,10 +69,13 @@ public class GutterPanel extends JPanel
         }
     }
 
-    public GutterPanel(JScrollPane scrollpane,EditorPanel editorPanel)
+    public GutterPanel(JScrollPane scrollpane, EditorPanel editorPanel, IApplicationConfigProvider configProvider)
     {
         this.scrollpane = scrollpane;
         this.editorPanel = editorPanel;
+
+        this.displayLineNumbers = configProvider.getApplicationConfig().getEditorSettings().isDisplayLineNumbers();
+        configProvider.addChangeListener( newConfig -> this.displayLineNumbers = newConfig.getEditorSettings().isDisplayLineNumbers() );
 
         ToolTipManager.sharedInstance().setInitialDelay( 150 );
         ToolTipManager.sharedInstance().registerComponent( this );
@@ -155,10 +160,12 @@ public class GutterPanel extends JPanel
         {
             final Optional<SourceMap.Line> firstLine = editorPanel.getSourceMap().getLineByOffset( startingOffset );
 
+            firstLine.ifPresent( line -> {
+                System.out.println("Line @ ( "+startingOffset+" - "+endOffset+" )  -> "+line);
+            } );
             // TODO: the next check should not be necessary , fix the root cause !!
             if ( firstLine.isPresent() )
             {
-
                 // find compilation messages for each line we're displaying on the gutter
                 final Map<Integer, List<Parser.CompilationMessage>> messagesByLineNumber = new HashMap<>();
 
@@ -167,6 +174,7 @@ public class GutterPanel extends JPanel
                 final SourceMap sourceMap = editorPanel.getSourceMap();
                 sourceMap.visitLinesByOffset( startingOffset, endOffset, line ->
                 {
+                    System.out.println("VISITING: "+line);
                     final List<Parser.CompilationMessage> list =
                     messages.stream().filter( msg -> msg.isWithinOffset( line.startOffset, line.endOffset ) ).collect( Collectors.toList() );
                     if ( !list.isEmpty() )
@@ -192,10 +200,11 @@ public class GutterPanel extends JPanel
                     // render gutter
 
                     // calculate the number of visible rows we need to render
-                    final int visibleRows = Math.round( getHeight() / (float) textHeight );
+                    final int viewportHeight = scrollpane.getViewport().getHeight();
+                    final int visibleRows = (int) Math.ceil( (viewportHeight - yOffset ) / (float) textHeight );
 
                     gfx.setColor( Color.RED );
-                    for (int rowNum = 0, lineNum = firstLine.get().lineNum , y = yOffset ; rowNum < visibleRows; rowNum++, lineNum++, y += textHeight)
+                    for (int rowNum = 0, lineNum = firstLine.get().lineNum , y = yOffset+textHeight ; rowNum < visibleRows; rowNum++, lineNum++, y += textHeight)
                     {
                         final List<Parser.CompilationMessage> onThisLine = messagesByLineNumber.get( lineNum );
                         if ( DEBUG_RENDER_LINE_BOUNDARIES )
@@ -235,6 +244,19 @@ public class GutterPanel extends JPanel
                             gfx.setColor( color );
                             gfx.fillRect( 0,y, getWidth(), textHeight );
                             gutterIcons.add( new GutterIcon( new Rectangle( 0,y,getWidth(), textHeight) , lineNum ) );
+                        }
+
+                        gfx.setColor(Color.BLACK);
+                        gfx.drawRect( 0,y, getWidth(), textHeight );
+
+                        // render line number
+                        if ( displayLineNumbers )
+                        {
+                            final int yText = 1+ (int) Math.ceil(y + textHeight/2.0f - gfx.getFontMetrics().getAscent());
+
+                            final String lineNumString = Integer.toString( lineNum );
+                            final Rectangle2D bounds = gfx.getFontMetrics().getStringBounds( lineNumString, gfx );
+                            gfx.drawString( lineNumString, (int) Math.ceil( getWidth() - bounds.getWidth() ) , yText );
                         }
                     }
                 }

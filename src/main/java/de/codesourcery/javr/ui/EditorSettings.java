@@ -41,6 +41,8 @@ public class EditorSettings
         DEFAULT_COLORS.put( SourceElement.PREPROCESSOR, Color.PINK);
         DEFAULT_COLORS.put( SourceElement.TODO, Color.RED);     
     }
+
+    private boolean displayLineNumbers=true;
     
     public static enum SourceElement 
     {
@@ -60,7 +62,17 @@ public class EditorSettings
         this.colors.putAll( editorSettings.colors );
     }
 
-    public String getIndentString() 
+    public boolean isDisplayLineNumbers()
+    {
+        return displayLineNumbers;
+    }
+
+    public void setDisplayLineNumbers(boolean displayLineNumbers)
+    {
+        this.displayLineNumbers = displayLineNumbers;
+    }
+
+    public String getIndentString()
     {
         return indentString;
     }

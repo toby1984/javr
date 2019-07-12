@@ -144,21 +144,9 @@ outer:
                 case '.':  parseBuffer(startOffset, startColumn) ; addToken( TokenType.DOT   , c , scanner.offset()-1 , line ,column);    break outer;
                 case '#':  parseBuffer(startOffset, startColumn) ; addToken( TokenType.HASH , c , scanner.offset()-1 , line ,column);    break outer;
                 case ',':  parseBuffer(startOffset, startColumn) ; addToken( TokenType.COMMA , c , scanner.offset()-1 , line ,column);    break outer;
+                // hint: carriage return can never be seen by the lexer as Scanner#isSkipCarriageReturn() is TRUE by default
                 case '\n': parseBuffer(startOffset, startColumn) ; addToken( TokenType.EOL   , c , scanner.offset()-1 , line ,column);    break outer;
                 case ':':  parseBuffer(startOffset, startColumn) ; addToken( TokenType.COLON , ':' , scanner.offset()-1 , line ,column);  break outer;
-                case '\r':
-                    parseBuffer(startOffset,startColumn);
-                    if ( ! scanner.eof() && scanner.peek() == '\n' ) 
-                    {
-                        scanner.next();
-                        addToken( TokenType.EOL ,"\r\n" , scanner.offset()-2 , line ,column);
-                        column++;
-                    } else { 
-                        addToken( TokenType.EOL ,"\r" , scanner.offset()-1 , line ,column );
-                    }
-                    line++;
-                    column = 0;
-                    break outer;
                 default:
                     buffer.append( c );
             }

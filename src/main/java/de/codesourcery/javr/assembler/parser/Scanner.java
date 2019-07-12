@@ -15,15 +15,14 @@
  */
 package de.codesourcery.javr.assembler.parser;
 
+import de.codesourcery.javr.assembler.exceptions.ParseException;
+import de.codesourcery.javr.assembler.util.Resource;
+import org.apache.commons.lang3.Validate;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
-
-import org.apache.commons.lang3.Validate;
-
-import de.codesourcery.javr.assembler.exceptions.ParseException;
-import de.codesourcery.javr.assembler.util.Resource;
 
 /**
  * Reads single characters from a {@link Resource}.
@@ -42,7 +41,11 @@ import de.codesourcery.javr.assembler.util.Resource;
  * <p>This class uses a ring buffer and two special min/max pointers to keep
  * track of the region inside the buffer that may be jumped around in using
  * {@link #setOffset(int)} with no special support required by the <code>InputStream</code>
- * this scanner operates on.</p> 
+ * this scanner operates on.</p>
+ *
+ * <p>
+ * <b>IMPORTANT: By default this scanner will skip over carriage return characters (see {@link #isSkipCarriageReturn()}}.</b>
+ * </p>
  *
  * @author tobias.gierke@code-sourcery.de
  */
@@ -53,6 +56,12 @@ public class Scanner
     // size of char buffer
     private int bufferSize;
     private final char[] buffer;
+
+    // skipping CR is intentionally enabled by default as Java TextComponent
+    // classes internally always use \r regardless of the actual newline character
+    // sequence and otherwise offsets returned by the editor UI component would not
+    // line up with text regions in the AST
+    private boolean skipCarriageReturn = true;
     
     // how many bytes to read from the underlying
     // input stream when the buffer runs empty.
@@ -147,19 +156,19 @@ public class Scanner
             int bytesRead;
             if ( (writePtr+bytesToRead) <= bufferSize ) 
             {
-                bytesRead = input.read( buffer , writePtr , bytesToRead );
-            }  
+                bytesRead = populateBuffer( writePtr, bytesToRead );
+            }
             else 
             {
 	            final int firstSliceLen = bufferSize - writePtr;
-	            bytesRead = input.read( buffer , writePtr , firstSliceLen );
-	            if ( bytesRead <= 0 ) 
+	            bytesRead = populateBuffer( writePtr, firstSliceLen );
+	            if ( bytesRead <= 0 )
 	            {
 	                closeQuietly();
 	                return;
-	            }
+                }
 	            final int secondSliceLen = bytesToRead - firstSliceLen;
-	            final int len = input.read( buffer , 0 , secondSliceLen );
+	            final int len = populateBuffer(0,secondSliceLen );
 	            if ( len > 0 ) {
 	                bytesRead += len;
 	            } else {
@@ -196,6 +205,60 @@ public class Scanner
             throw new ParseException("Failed to read input stream @ "+offset,offset,e);
         }
     }
+
+    private int populateBuffer(int dstOffsetInBuffer, int numBytesToRead) throws IOException
+    {
+        int bytesRead;
+        if ( numBytesToRead == 1 )
+        {
+            int c;
+            do
+            {
+                c = input.read();
+                if ( c < 0 )
+                {
+                    return -1;
+                }
+            } while ( skipCarriageReturn && (char) c == '\r' );
+            buffer[dstOffsetInBuffer] = (char) c;
+            bytesRead = 1;
+        }
+        else
+        {
+            bytesRead = input.read( buffer, dstOffsetInBuffer, numBytesToRead );
+            if ( skipCarriageReturn && bytesRead > 0 )
+            {
+                bytesRead = removeCarriageReturns( bytesRead );
+            }
+        }
+        return bytesRead;
+    }
+
+    private int removeCarriageReturns(int bytesRead)
+    {
+        int realBytesRead = bytesRead;
+        for ( int i = 0 , ptr = writePtr ; i < realBytesRead ; i++ , ptr++ )
+        {
+            final char c = buffer[ptr];
+            if ( c == '\r' ) {
+
+                if ( i == (realBytesRead-1) )
+                {
+                    // last character is \r , just truncate length
+                    realBytesRead--;
+                    break;
+                }
+                // shift remaining bytes left by one
+                final int toCopy = bytesRead - i - 1;
+                System.arraycopy( buffer, ptr+1, buffer, ptr, toCopy );
+                // decrement bytesRead
+                realBytesRead--;
+                ptr--;
+                i--;
+            }
+        }
+        return realBytesRead;
+    }
     
     private void closeQuietly() 
     {
@@ -206,7 +269,7 @@ public class Scanner
     /**
      * Returns whether this scanner reached eof.
      * 
-     * Trying to {@link peek()} or {@link #next()} on a scanner
+     * Trying to {@link #peek()} or {@link #next()} on a scanner
      * whose <code>eof()</code> method returned false
      * will throw an {@link ParseException}.
      * 
@@ -316,5 +379,15 @@ public class Scanner
         readPtr = newPtr;
         bytesAvailable -= delta;
         this.offset=offset;
+    }
+
+    public boolean isSkipCarriageReturn()
+    {
+        return skipCarriageReturn;
+    }
+
+    public void setSkipCarriageReturn(boolean skipCarriageReturn)
+    {
+        this.skipCarriageReturn = skipCarriageReturn;
     }
 }

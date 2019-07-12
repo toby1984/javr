@@ -34,6 +34,18 @@ public class SourceMap
         {
             return "Line no. " + lineNum + "(start=" + startOffset + ", end=" + endOffset + ")";
         }
+
+        /**
+         * Returns the column number of a given offset on this line
+         * @param offset
+         * @return column number, first column is 1
+         */
+        public int columnNumber(int offset) {
+            if ( offset > endOffset ) {
+                throw new IllegalArgumentException( "Offset not inside this line's boundaries, offset: "+offset+", line: "+this );
+            }
+            return 1+(offset-startOffset);
+        }
     }
 
     private final Supplier<String> textSupplier;
@@ -139,13 +151,13 @@ public class SourceMap
             char c = text.charAt( ptr1 );
             if ( isNewline( c ) )
             {
-                result.add( new Line( lineNum++, ptr0, ptr1 ) );
-                // advance to start of next line
+                // skip over all newLines
                 while ( ptr1 < len && isNewline( text.charAt( ptr1 ) ) )
                 {
+                    result.add( new Line( lineNum++, ptr0, ptr1 ) );
+                    ptr0 = ptr1;
                     ptr1++;
                 }
-                ptr0 = ptr1;
             }
         }
         if ( ptr0 != ptr1 )
@@ -178,17 +190,23 @@ public class SourceMap
         return Optional.ofNullable( result[0] );
     }
 
-    public Optional<Line> getLineByOffset(int startingOffset)
+    public Optional<Line> getLineByOffset(int offset)
     {
+        final Line[] endOffsetLine = {null};
         final int idx = binarySearch( line -> {
-            if ( line.contains( startingOffset ) )
+            if ( line.contains( offset ) )
             {
                 return 0;
+            } else if ( line.endOffset == offset ) {
+                endOffsetLine[0] = line;
             }
-            return Integer.compare( line.startOffset, startingOffset );
-        } );
+            return Integer.compare( line.startOffset, offset );
+        });
         if ( idx == -1 )
         {
+            if ( endOffsetLine[0] != null ) {
+                return Optional.of( endOffsetLine[0] );
+            }
             return Optional.empty();
         }
         return Optional.of( lines[idx] );
