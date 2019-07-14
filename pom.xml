@@ -37,6 +37,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
       <version>4.3.0</version>
     </dependency>
     <dependency>
+      <groupId>com.fifesoft</groupId>
+      <artifactId>rsyntaxtextarea</artifactId>
+      <version>3.0.3</version>
+    </dependency>
+    <dependency>
       <groupId>de.codesourcery.hex2raw</groupId>
       <artifactId>hex2raw</artifactId>
       <version>1.0.0</version>

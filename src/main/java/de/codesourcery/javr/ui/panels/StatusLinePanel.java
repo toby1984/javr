@@ -1,6 +1,7 @@
 package de.codesourcery.javr.ui.panels;
 
 import de.codesourcery.javr.ui.SourceMap;
+import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
 
 import javax.swing.JPanel;
 import javax.swing.JTextPane;
@@ -10,10 +11,10 @@ import java.util.Optional;
 public class StatusLinePanel extends JPanel
 {
     private final SourceMap sourceMap;
-    private final JTextPane editor;
+    private final RSyntaxTextArea editor;
     private int caretPosition;
 
-    public StatusLinePanel(SourceMap sourceMap,JTextPane editor) {
+    public StatusLinePanel(SourceMap sourceMap,RSyntaxTextArea editor) {
         this.sourceMap = sourceMap;
 
         this.editor = editor;

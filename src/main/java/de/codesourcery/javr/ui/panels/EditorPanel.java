@@ -26,8 +26,11 @@ import de.codesourcery.javr.assembler.Segment;
 import de.codesourcery.javr.assembler.arch.AbstractArchitecture;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
 import de.codesourcery.javr.assembler.parser.Identifier;
+import de.codesourcery.javr.assembler.parser.Lexer;
+import de.codesourcery.javr.assembler.parser.LexerImpl;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.Parser.Severity;
+import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
@@ -61,10 +64,20 @@ import de.codesourcery.javr.ui.frames.MessageFrame;
 import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour;
 import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour.DefaultAutoCompleteCallback;
 import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour.InitialUserInput;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
+import org.fife.ui.rsyntaxtextarea.AbstractTokenMaker;
+import org.fife.ui.rsyntaxtextarea.AbstractTokenMakerFactory;
+import org.fife.ui.rsyntaxtextarea.RSyntaxDocument;
+import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
+import org.fife.ui.rsyntaxtextarea.RSyntaxTextAreaHighlighter;
+import org.fife.ui.rsyntaxtextarea.SyntaxScheme;
+import org.fife.ui.rsyntaxtextarea.Token;
+import org.fife.ui.rsyntaxtextarea.TokenMaker;
+import org.fife.ui.rsyntaxtextarea.TokenMakerFactory;
+import org.fife.ui.rsyntaxtextarea.TokenMap;
+import org.fife.ui.rtextarea.RTextScrollPane;
 
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.JButton;
@@ -77,10 +90,8 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
-import javax.swing.JTextPane;
 import javax.swing.JToolBar;
 import javax.swing.JTree;
-import javax.swing.JViewport;
 import javax.swing.SwingUtilities;
 import javax.swing.event.AncestorEvent;
 import javax.swing.event.AncestorListener;
@@ -88,6 +99,8 @@ import javax.swing.event.CaretEvent;
 import javax.swing.event.CaretListener;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.event.HyperlinkEvent;
+import javax.swing.event.HyperlinkListener;
 import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.event.TreeModelEvent;
@@ -95,12 +108,12 @@ import javax.swing.event.TreeModelListener;
 import javax.swing.event.UndoableEditEvent;
 import javax.swing.event.UndoableEditListener;
 import javax.swing.table.TableModel;
-import javax.swing.text.AbstractDocument;
-import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.DefaultStyledDocument.AttributeUndoableEdit;
 import javax.swing.text.Document;
-import javax.swing.text.DocumentFilter;
+import javax.swing.text.Element;
+import javax.swing.text.Highlighter;
 import javax.swing.text.JTextComponent;
 import javax.swing.text.Style;
 import javax.swing.text.StyleConstants;
@@ -130,11 +143,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.nio.file.Files;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -153,11 +164,31 @@ public abstract class EditorPanel extends JPanel
 {
     private static final Logger LOG = Logger.getLogger(EditorFrame.class);
 
-    public static final Duration RECOMPILATION_DELAY = Duration.ofMillis( 500 );
+    private static final int TOKEN_TEXT = Token.RESERVED_WORD;
 
-    private final JScrollPane editorPane;
-    private final JTextPane editor = new JTextPane();
-    private final GutterPanel gutterPanel;
+    public enum MyStyle
+    {
+        STYLE_PREPROCESSOR(Token.PREPROCESSOR),
+        STYLE_REGISTER(Token.RESERVED_WORD),
+        STYLE_MNEMONIC(Token.RESERVED_WORD),
+        STYLE_TODO(Token.ANNOTATION),
+        STYLE_COMMENT(Token.COMMENT_EOL),
+        STYLE_LABEL(Token.IDENTIFIER),
+        STYLE_NUMBER(Token.LITERAL_NUMBER_DECIMAL_INT);
+
+        public final int tokenType;
+
+        MyStyle(int tokenType)
+        {
+            this.tokenType = tokenType;
+        }
+    }
+
+    public static final Duration RECOMPILATION_DELAY = Duration.ofMillis( 500 );
+    public static final String SYNTAX_STYLE = "text/javr";
+
+    private final RTextScrollPane editorPane;
+    private final RSyntaxTextArea editor = new RSyntaxTextArea();
     private final StatusLinePanel statusLinePanel;
 
     private final EditorFrame topLevelWindow;
@@ -173,13 +204,7 @@ public abstract class EditorPanel extends JPanel
 
     private final SourceMap sourceMap = new SourceMap( editor::getText );
 
-    private final ShadowDOM frontDOM = new ShadowDOM();
-    private final ShadowDOM backDOM = new ShadowDOM();
-
-    private ShadowDOM currentDOM = frontDOM;
-
     private boolean ignoreEditEvents;
-    private boolean indentFilterEnabled=true;
 
     private final UndoManagerWrapper undoManager = new UndoManagerWrapper();
 
@@ -495,76 +520,6 @@ public abstract class EditorPanel extends JPanel
         }
     }
 
-    protected class IndentFilter extends DocumentFilter
-    {
-        private static final String NEWLINE = "\n";
-
-        public void insertString(FilterBypass fb, int offs, String str, AttributeSet a) throws BadLocationException
-        {
-            if ( indentFilterEnabled )
-            {
-                super.insertString(fb, offs, replaceTabs(str), a);
-            } else {
-                super.insertString(fb,offs,str,a);
-            }
-        }
-
-        private boolean isNewline(String s) {
-            return NEWLINE.equals( s );
-        }
-
-        private String replaceTabs(String in) {
-            return in.replace("\t" ,  project.getConfig().getEditorIndentString() );
-        }
-
-        @Override
-        public void remove(FilterBypass fb, int offset, int length) throws BadLocationException
-        {
-            if ( indentFilterEnabled )
-            {
-                final int oldLength = editor.getDocument().getLength();
-                fb.remove(offset, length);
-                documentLengthDecreased(oldLength - length);
-            } else {
-                super.remove(fb,offset,length);
-            }
-        }
-
-        private void documentLengthDecreased(int newLength) {
-            frontDOM.truncate( newLength );
-            backDOM.truncate( newLength);
-        }
-
-        @Override
-        public void replace(FilterBypass fb, int offs, int toDeleteLength, String origReplacement, AttributeSet a) throws BadLocationException
-        {
-            if ( ! indentFilterEnabled ) {
-                super.replace(fb,offs,toDeleteLength,origReplacement,a);
-                return;
-            }
-
-            final String newReplacement;
-            if ( isNewline( origReplacement ) )
-            {
-                newReplacement = "\n  ";
-            }
-            else
-            {
-                newReplacement = replaceTabs( origReplacement );
-
-            }
-            final int oldLength = editor.getDocument().getLength();
-
-            super.replace( fb, offs, toDeleteLength, newReplacement, a );
-
-            if ( toDeleteLength > newReplacement.length() )
-            {
-                final int delta = toDeleteLength - newReplacement.length();
-                documentLengthDecreased( oldLength - delta );
-            }
-        }
-    }
-
     protected final class RecompilationThread extends Thread {
 
         private long lastChange = -1;
@@ -837,7 +792,7 @@ public abstract class EditorPanel extends JPanel
         }
     }
 
-    public EditorPanel(IProject project, EditorFrame topLevelWindow , CompilationUnit unit,IApplicationConfigProvider appConfigProvider,MessageFrame messageFrame,
+    public EditorPanel(IProject project, EditorFrame topLevelWindow , CompilationUnit unit, IApplicationConfigProvider appConfigProvider, MessageFrame messageFrame,
                        CaretPositionTracker caretTracker) throws IOException
     {
         Validate.notNull(project, "project must not be NULL");
@@ -934,32 +889,32 @@ public abstract class EditorPanel extends JPanel
 
                 final SymbolTable globalTable = currentUnit.getSymbolTable().getTopLevelTable();
                 globalTable.visitSymbols( (symbol) ->
-                                          {
-                                              switch( symbol.getType() )
-                                              {
-                                                  case ADDRESS_LABEL:
-                                                      if ( matches(symbol , lower ) )
-                                                      {
-                                                          if ( symbol.isLocalLabel() ) {
-                                                              localMatches.add(symbol);
-                                                          } else {
-                                                              globalMatches.add(symbol);
-                                                          }
-                                                      }
-                                                      break;
-                                                  case EQU:
-                                                  case PREPROCESSOR_MACRO:
-                                                      if ( symbol.name().value.toLowerCase().contains( lower ) )
-                                                      {
-                                                          globalMatches.add( symbol );
-                                                      }
-                                                      break;
-                                                  default:
-                                                      break;
-                                              }
+                {
+                    switch( symbol.getType() )
+                    {
+                        case ADDRESS_LABEL:
+                            if ( matches(symbol , lower ) )
+                            {
+                                if ( symbol.isLocalLabel() ) {
+                                    localMatches.add(symbol);
+                                } else {
+                                    globalMatches.add(symbol);
+                                }
+                            }
+                            break;
+                        case EQU:
+                        case PREPROCESSOR_MACRO:
+                            if ( symbol.name().value.toLowerCase().contains( lower ) )
+                            {
+                                globalMatches.add( symbol );
+                            }
+                            break;
+                        default:
+                            break;
+                    }
 
-                                              return Boolean.TRUE;
-                                          });
+                    return Boolean.TRUE;
+                });
 
                 globalMatches.sort( (a,b) -> a.name().value.compareTo( b.name().value ) );
                 localMatches.sort( (a,b) -> a.getLocalNamePart().value.compareTo( b.getLocalNamePart().value ) );
@@ -988,21 +943,21 @@ public abstract class EditorPanel extends JPanel
                 {
                     final SymbolTable globalTable = currentUnit.getSymbolTable().getTopLevelTable();
                     node.searchBackwards( n ->
-                                          {
-                                              if ( n instanceof LabelNode)
-                                              {
-                                                  if ( ((LabelNode) n).isGlobal() )
-                                                  {
-                                                      final Optional<Symbol> symbol = globalTable.maybeGet( ((LabelNode) n).identifier , Type.ADDRESS_LABEL );
-                                                      if ( symbol.isPresent() )
-                                                      {
-                                                          previousGlobalSymbol = symbol.get();
-                                                          return true;
-                                                      }
-                                                  }
-                                              }
-                                              return false;
-                                          } );
+                    {
+                        if ( n instanceof LabelNode)
+                        {
+                            if ( ((LabelNode) n).isGlobal() )
+                            {
+                                final Optional<Symbol> symbol = globalTable.maybeGet( ((LabelNode) n).identifier , Type.ADDRESS_LABEL );
+                                if ( symbol.isPresent() )
+                                {
+                                    previousGlobalSymbol = symbol.get();
+                                    return true;
+                                }
+                            }
+                        }
+                        return false;
+                    } );
                 } else {
                     System.err.println("Failed to find AST node for current offset ?");
                 }
@@ -1024,6 +979,57 @@ public abstract class EditorPanel extends JPanel
         autoComplete.setInitialPopupSize( new Dimension(250,200 ) );
         autoComplete.setVisibleRowCount( 10 );
 
+        TokenMakerFactory.setDefaultInstance(new AbstractTokenMakerFactory()
+        {
+            @Override
+            protected void initTokenMakerMap()
+            {
+            }
+
+            @Override
+            protected TokenMaker getTokenMakerImpl(String key)
+            {
+                if ( "text/javr".equals( key ) ) {
+                    return new MyTokenMaker();
+                }
+                return super.getTokenMakerImpl(key);
+            }
+        });
+
+        editor.setSyntaxEditingStyle("text/javr");
+
+        editor.setHyperlinksEnabled(true);
+        editor.addHyperlinkListener(new HyperlinkListener()
+        {
+            @Override
+            public void hyperlinkUpdate(HyperlinkEvent e)
+            {
+                final Element element = e.getSourceElement();
+                final int offset = element.getStartOffset();
+            }
+        });
+        editor.setAntiAliasingEnabled(true);
+        editor.setEOLMarkersVisible(false);
+
+        final SyntaxScheme syntaxScheme = new SyntaxScheme(true );
+
+        /*
+        STYLE_PREPROCESSOR(Token.PREPROCESSOR),
+        STYLE_REGISTER(Token.RESERVED_WORD),
+        STYLE_MNEMONIC(Token.RESERVED_WORD),
+        STYLE_TODO(Token.ANNOTATION),
+        STYLE_COMMENT(Token.COMMENT_EOL),
+        STYLE_LABEL(Token.IDENTIFIER),
+        STYLE_NUMBER(Token.LITERAL_NUMBER_DECIMAL_INT);
+         */
+        syntaxScheme.setStyle(TOKEN_TEXT, new org.fife.ui.rsyntaxtextarea.Style(Color.BLACK));
+        syntaxScheme.setStyle(Token.IDENTIFIER, new org.fife.ui.rsyntaxtextarea.Style(Color.BLACK));
+        syntaxScheme.setStyle(Token.RESERVED_WORD, new org.fife.ui.rsyntaxtextarea.Style(Color.BLUE));
+        syntaxScheme.setStyle(Token.OPERATOR, new org.fife.ui.rsyntaxtextarea.Style(Color.BLACK));
+        syntaxScheme.setStyle(Token.LITERAL_NUMBER_DECIMAL_INT, new org.fife.ui.rsyntaxtextarea.Style(Color.BLACK));
+
+        editor.setSyntaxScheme(syntaxScheme);
+
         editor.setFont( new Font(Font.MONOSPACED, Font.PLAIN, 12) );
         editor.addCaretListener( new CaretListener()
         {
@@ -1043,7 +1049,6 @@ public abstract class EditorPanel extends JPanel
         editor.addMouseListener( mouseListener );
         editor.addKeyListener( new KeyAdapter()
         {
-
             @Override
             public void keyPressed(KeyEvent e)
             {
@@ -1102,7 +1107,6 @@ public abstract class EditorPanel extends JPanel
             {
                 if ( isCtrlDown(e) )
                 {
-                    final byte[] bytes = Character.toString( e.getKeyChar() ).getBytes();
                     if ( e.getKeyChar() == 6 ) // CTRL-F ... search
                     {
                         toggleSearchWindow();
@@ -1191,23 +1195,8 @@ public abstract class EditorPanel extends JPanel
 
         panel.add( createToolbar() , cnstrs );
 
-        // gutter
-        editorPane = new JScrollPane( editor );
-        gutterPanel = new GutterPanel( editorPane, this, appConfigProvider );
-
-        final int gutterWidth = 50;
-        gutterPanel.setMinimumSize( new Dimension(gutterWidth,10) );
-        gutterPanel.setMaximumSize( new Dimension(gutterWidth,5000) );
-
-        cnstrs = new GridBagConstraints();
-        cnstrs.insets = new Insets(0,0,0,0);
-        cnstrs.gridx = 0; cnstrs.gridy = 1;
-        cnstrs.gridwidth=1; cnstrs.gridheight = 1 ;
-        cnstrs.weightx = 0; cnstrs.weighty=1;
-        cnstrs.fill = GridBagConstraints.VERTICAL;
-        panel.add( gutterPanel, cnstrs );
-
         // editor
+        editorPane = new RTextScrollPane( editor );
 
         // ugly hack to adjust splitpane size after it has become visible
         addAncestorListener( new AncestorListener() {
@@ -1312,13 +1301,10 @@ public abstract class EditorPanel extends JPanel
 
     private Document createDocument()
     {
-        final Document doc = editor.getEditorKit().createDefaultDocument();
+        final Document doc = new RSyntaxDocument( SYNTAX_STYLE );
 
         // setup styles
         ignoreEditEvents = false;
-
-        // setup auto-indent
-        ((AbstractDocument) doc).setDocumentFilter( new IndentFilter() );
 
         doc.addDocumentListener( new DocumentListener()
         {
@@ -1499,13 +1485,13 @@ public abstract class EditorPanel extends JPanel
         if ( lastEditLocation != -1 )
         {
             runAfterCompilation( () ->
-                                 {
-                                     if ( lastEditLocation != -1 )
-                                     {
-                                         editor.setCaretPosition( lastEditLocation );
-                                         editor.requestFocus();
-                                     }
-                                 });
+            {
+                if ( lastEditLocation != -1 )
+                {
+                    editor.setCaretPosition( lastEditLocation );
+                    editor.requestFocus();
+                }
+            });
         } else {
             editor.requestFocus();
         }
@@ -1557,7 +1543,7 @@ public abstract class EditorPanel extends JPanel
         else
         {
             IDEMain.showError( "Program upload failed",
-                               "Compilation failed, project uses incompatible output format or no upload command configured " );
+                "Compilation failed, project uses incompatible output format or no upload command configured " );
         }
     }
 
@@ -1619,11 +1605,9 @@ public abstract class EditorPanel extends JPanel
             IDEMain.showError( "Parsing source failed", e );
         }
         astTreeModel.setAST( tmpUnit.getAST() );
-        final long parseEnd =  System.currentTimeMillis();
+        editor.repaint();
 
-        // do syntax highlighting
-        doSyntaxHighlighting();
-        final long highlightEnd =  System.currentTimeMillis();
+        final long parseEnd =  System.currentTimeMillis();
 
         // assemble
         final CompilationUnit root = project.getCompileRoot();
@@ -1644,10 +1628,9 @@ public abstract class EditorPanel extends JPanel
 
         // generation info message about compilation outcome
         final long parseTime = parseEnd - parseStart;
-        final long highlightTime = highlightEnd - parseEnd;
-        final long compileTime = compileEnd - highlightEnd;
+        final long compileTime = compileEnd - parseEnd;
 
-        final String assembleTime = "parsing: "+parseTime+" ms,highlighting: "+highlightTime+" ms,compile: "+compileTime+" ms";
+        final String assembleTime = "parsing: "+parseTime+" ms,compile: "+compileTime+" ms";
 
         final String success = compilationSuccessful ? "successful" : "failed";
         final DateTimeFormatter df = DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:ss");
@@ -1658,8 +1641,6 @@ public abstract class EditorPanel extends JPanel
         }
 
         messageFrame.addAll( root.getMessages(true) );
-
-        gutterPanel.repaint();
 
         wasCompiledAtLeastOnce = true;
 
@@ -1683,57 +1664,6 @@ public abstract class EditorPanel extends JPanel
             return new CompilationMessage(unit,Severity.ERROR , e.getMessage() , new TextRegion( ((ParseException ) e).getOffset() , 0 ,-1 , -1 ) );
         }
         return new CompilationMessage(unit,Severity.ERROR , e.getMessage() );
-    }
-
-    private void doSyntaxHighlighting()
-    {
-        doSyntaxHighlighting( astTreeModel.getAST() );
-    }
-
-    private void doSyntaxHighlighting(ASTNode subtree)
-    {
-        updateShadowDOM( dom -> {
-            subtree.visitBreadthFirst( (node, ctx) -> setNodeStyle( node, dom ) );
-        });
-    }
-
-    private void updateShadowDOM(Consumer<ShadowDOM> domCallback)
-    {
-        final boolean oldState = ignoreEditEvents;
-        ignoreEditEvents = true;
-        try
-        {
-            final ShadowDOM frontBuffer = currentDOM;
-            final ShadowDOM backBuffer = frontBuffer == frontDOM ? backDOM : frontDOM;
-
-            // render style to back buffer
-            domCallback.accept( backBuffer );
-
-            // apply changes to StyledDocuments
-            backBuffer.applyDelta( editor.getStyledDocument(), frontBuffer );
-
-            // swap back & front buffer
-            currentDOM = backBuffer;
-        }
-        catch(RuntimeException e)
-        {
-            LOG.error("doSyntaxHighlighting(): Failed ",e);
-            IDEMain.showError( "Highlighting failed",e );
-        } finally {
-            ignoreEditEvents = oldState;
-        }
-    }
-
-    private TextRegion getVisibleRegion()
-    {
-        final JViewport viewport = editorPane.getViewport();
-        Point startPoint = viewport.getViewPosition();
-        Dimension size = viewport.getExtentSize();
-        Point endPoint = new Point(startPoint.x + size.width, startPoint.y + size.height);
-
-        int start = editor.viewToModel( startPoint );
-        int end = editor.viewToModel( endPoint );
-        return new TextRegion(start,end-start,0,0);
     }
 
     private void setNodeStyle(ASTNode node,ShadowDOM shadowDOM)
@@ -1781,29 +1711,37 @@ public abstract class EditorPanel extends JPanel
     private void setHighlight(ASTNode newHighlight)
     {
         if ( this.highlight == newHighlight ) {
+            // nothing changed
             return;
         }
+
+
 
         if ( newHighlight != null && newHighlight.getTextRegion() == null ) {
             throw new IllegalStateException("Cannot highlight a node that has no text region assigned");
         }
 
         if ( this.highlight != null && newHighlight != null && this.highlight.getTextRegion().equals( newHighlight.getTextRegion() ) ) {
+            // same region highlighted
             return;
         }
 
+        // clear old highlight
+        final Highlighter hl = (RSyntaxTextAreaHighlighter) editor.getHighlighter();
         if ( this.highlight != null ) {
-            doSyntaxHighlighting( this.highlight );
+            hl.removeAllHighlights();
         }
         this.highlight = newHighlight;
         if ( newHighlight != null )
         {
             final TextRegion region = newHighlight.getTextRegion();
-            ignoreEditEvents = true;
-            try {
-                updateShadowDOM( dom -> dom.setCharacterAttributes( region, STYLE_HIGHLIGHTED ) );
-            } finally {
-                ignoreEditEvents = false;
+            try
+            {
+                hl.addHighlight(region.start(), region.end(), new DefaultHighlighter.DefaultHighlightPainter(Color.BLUE) );
+            }
+            catch (BadLocationException e)
+            {
+                LOG.error("Caught ",e);
             }
         }
     }
@@ -1919,25 +1857,6 @@ public abstract class EditorPanel extends JPanel
         });
 
         final JTree tree = new JTree( astTreeModel );
-
-        final MouseAdapter mouseListener = new MouseAdapter()
-        {
-            public void mouseClicked(MouseEvent e)
-            {
-                if ( e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1 )
-                {
-                    final TreePath path = tree.getClosestPathForLocation( e.getX() ,  e.getY() );
-                    if ( path != null && path.getPath() != null && path.getPath().length >= 1 )
-                    {
-                        final ASTNode node = (ASTNode) path.getLastPathComponent();
-                        if ( node.getTextRegion() != null ) {
-                            setSelection( node.getTextRegion() );
-                        }
-                    }
-                }
-            }
-        };
-        tree.addMouseListener( mouseListener);
 
         tree.setCellRenderer( new DefaultTreeCellRenderer()
         {
@@ -2068,26 +1987,26 @@ public abstract class EditorPanel extends JPanel
             }
         });
         filterField.addActionListener( ev ->
-                                       {
-                                           searchHelper.setTerm( filterField.getText() );
-                                           boolean foundMatch  = false;
-                                           if ( searchHelper.canSearch() )
-                                           {
-                                               foundMatch = searchHelper.searchForward();
-                                               if ( ! foundMatch && wrap[0] )
-                                               {
-                                                   searchHelper.startFromBeginning();
-                                                   foundMatch = searchHelper.searchForward();
-                                               }
-                                           }
-                                           frame.toFront();
-                                           filterField.requestFocus();
-                                           if ( foundMatch ) {
-                                               label.setText("Hit enter to continue searching");
-                                           } else {
-                                               label.setText("No (more) matches.");
-                                           }
-                                       });
+        {
+            searchHelper.setTerm( filterField.getText() );
+            boolean foundMatch  = false;
+            if ( searchHelper.canSearch() )
+            {
+                foundMatch = searchHelper.searchForward();
+                if ( ! foundMatch && wrap[0] )
+                {
+                    searchHelper.startFromBeginning();
+                    foundMatch = searchHelper.searchForward();
+                }
+            }
+            frame.toFront();
+            filterField.requestFocus();
+            if ( foundMatch ) {
+                label.setText("Hit enter to continue searching");
+            } else {
+                label.setText("No (more) matches.");
+            }
+        });
 
         final JPanel panel = new JPanel();
         panel.setLayout( new GridBagLayout() );
@@ -2104,9 +2023,9 @@ public abstract class EditorPanel extends JPanel
         // add 'wrap?' checkbox
         final JCheckBox wrapCheckbox = new JCheckBox("Wrap?" , wrap[0] );
         wrapCheckbox.addActionListener( ev ->
-                                        {
-                                            wrap[0] = wrapCheckbox.isSelected();
-                                        });
+        {
+            wrap[0] = wrapCheckbox.isSelected();
+        });
         cnstrs = new GridBagConstraints();
         cnstrs.weightx = 1.0; cnstrs.weightx = 0.33;
         cnstrs.gridheight = 1 ; cnstrs.gridwidth = 1;
@@ -2143,9 +2062,9 @@ public abstract class EditorPanel extends JPanel
         final JTextField filterField = new JTextField();
 
         filterField.addActionListener( ev ->
-                                       {
-                                           symbolModel.setFilterString( filterField.getText() );
-                                       });
+        {
+            symbolModel.setFilterString( filterField.getText() );
+        });
         filterField.getDocument().addDocumentListener( new DocumentListener() {
 
             @Override
@@ -2309,30 +2228,21 @@ public abstract class EditorPanel extends JPanel
     private void setCaretPosition(int position)
     {
         runAfterCompilation( () ->
-                             {
-                                 ignoreEditEvents = true;
-                                 try
-                                 {
-                                     editor.setCaretPosition( position );
-                                 } finally {
-                                     ignoreEditEvents = false;
-                                 }
-                                 editor.requestFocus();
-                             } );
+        {
+            ignoreEditEvents = true;
+            try
+            {
+                editor.setCaretPosition( position );
+            } finally {
+                ignoreEditEvents = false;
+            }
+            editor.requestFocus();
+        } );
     }
 
     private void setText(String text)
     {
-        backDOM.clear();
-        frontDOM.clear();
-
-        indentFilterEnabled = false;
-        try
-        {
-            editor.setText(text);
-        } finally {
-            indentFilterEnabled = true;
-        }
+        editor.setText(text);
     }
 
     public AST getAST() {
@@ -2345,5 +2255,162 @@ public abstract class EditorPanel extends JPanel
 
     public SourceMap getSourceMap() {
         return sourceMap;
+    }
+
+    public final class MyTokenMaker extends AbstractTokenMaker
+    {
+        private Scanner scanner;
+        private Lexer lexer;
+
+        public MyTokenMaker() {
+            System.out.println("--- my token maker created ---");
+        }
+
+        @Override
+        public TokenMap getWordsToHighlight()
+        {
+            final TokenMap tokenMap = new TokenMap();
+            tokenMap.put(".equ",  Token.RESERVED_WORD);
+            return tokenMap;
+        }
+
+        private MyStyle getStyleByASTNode(ASTNode node)
+        {
+            if (node instanceof PreprocessorNode)
+            {
+                return MyStyle.STYLE_PREPROCESSOR;
+            }
+            if (node instanceof RegisterNode)
+            {
+                return MyStyle.STYLE_REGISTER;
+            }
+            if (node instanceof InstructionNode)
+            {
+                return MyStyle.STYLE_MNEMONIC;
+            }
+            if (node instanceof CommentNode)
+            {
+                final String comment = ((CommentNode) node).value;
+                if (comment.contains("TODO"))
+                {
+                    return MyStyle.STYLE_TODO;
+                }
+                return MyStyle.STYLE_COMMENT;
+            }
+            if (node instanceof LabelNode || node instanceof IdentifierNode)
+            {
+                return MyStyle.STYLE_LABEL;
+            }
+            if (node instanceof IntNumberLiteralNode)
+            {
+                return MyStyle.STYLE_NUMBER;
+            }
+            return null;
+        }
+
+        @Override
+        public Token getTokenList(javax.swing.text.Segment text, int initialTokenType, int lineStartOffset)
+        {
+            resetTokenList();
+            if ( text.count == 0 ) {
+                addNullToken();
+                return firstToken;
+            }
+
+            setupLexer( text.array, text.offset, text.length() );
+
+            final AST ast = astTreeModel.getAST();
+            while ( ! lexer.eof() )
+            {
+                final de.codesourcery.javr.assembler.parser.Token tok = lexer.next();
+                if ( tok.isEOLorEOF() ) {
+                    break;
+                }
+                System.out.println("GOT: "+tok);
+                final ASTNode astNode = ast == null ? null : ast.getNodeAtOffset(tok.offset);
+
+                int tokenType = -1;
+                if ( astNode != null && astNode.getTextRegion() != null )
+                {
+                    final MyStyle style = getStyleByASTNode(astNode);
+                    if ( style != null ) {
+                        tokenType = style.tokenType;
+                    }
+                    else
+                    {
+                        tokenType = getStyleByTokenType(tok );
+                    }
+                }
+                else
+                {
+                    tokenType = getStyleByTokenType( tok );
+                }
+                super.addToken( text.array,
+                    text.offset + tok.offset,
+                    text.offset + tok.offset + tok.len()-1,
+                    tokenType,
+                    lineStartOffset - text.offset + tok.offset);
+            }
+            addNullToken();
+            return firstToken;
+        }
+
+        private int getStyleByTokenType(de.codesourcery.javr.assembler.parser.Token tok)
+        {
+            switch (tok.type)
+            {
+                case WHITESPACE:
+                    return Token.WHITESPACE;
+                case TEXT:
+                    if (Identifier.isValidIdentifier(tok.value))
+                    {
+                        return Token.IDENTIFIER;
+                    }
+                    return Token.RESERVED_WORD;
+                case DIGITS:
+                    return Token.LITERAL_NUMBER_DECIMAL_INT;
+                case OPERATOR:
+                    return Token.OPERATOR;
+                case EOF:
+                    return TOKEN_TEXT;
+                case EOL:
+                    return TOKEN_TEXT;
+                case PARENS_OPEN:
+                    return Token.OPERATOR;
+                case PARENS_CLOSE:
+                    return Token.OPERATOR;
+                case HASH:
+                    return TOKEN_TEXT;
+                case EQUALS:
+                    return Token.OPERATOR;
+                case COLON:
+                    return TOKEN_TEXT;
+                case SEMICOLON:
+                    return Token.COMMENT_EOL;
+                case DOT:
+                    return TOKEN_TEXT;
+                case COMMA:
+                    return Token.OPERATOR;
+                case SINGLE_QUOTE:
+                    return Token.LITERAL_STRING_DOUBLE_QUOTE;
+                case DOUBLE_QUOTE:
+                    return Token.LITERAL_STRING_DOUBLE_QUOTE;
+                default:
+                    return TOKEN_TEXT;
+            }
+        }
+
+        private void setupLexer(char[] data,int offset,int len)
+        {
+            final Resource r = Resource.charArray( data,offset,len);
+            if ( scanner == null ) {
+                scanner = new Scanner(r);
+                lexer = new LexerImpl( scanner );
+            } else {
+                scanner.setResource(r);
+                lexer.setScanner( scanner );
+            }
+            lexer.setIgnoreWhitespace(false); // MUST be called after setScanner() since this resets the flag
+        }
     }
 }

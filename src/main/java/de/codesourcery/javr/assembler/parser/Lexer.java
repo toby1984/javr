@@ -82,4 +82,10 @@ public interface Lexer
 	 * @param tok
 	 */
 	void pushBack(Token tok);
+
+	/**
+	 * Resets this lexer and stars using a new scanner.
+	 * @param scanner
+	 */
+	void setScanner(Scanner scanner);
 }

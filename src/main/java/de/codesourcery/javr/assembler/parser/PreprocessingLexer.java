@@ -922,6 +922,12 @@ public class PreprocessingLexer implements Lexer
         tokens.add( 0, tok );
     }
 
+    @Override
+    public void setScanner(Scanner scanner)
+    {
+        throw new UnsupportedOperationException( "PreprocessingLexer does not support changing the scanner" );
+    }
+
     private Object evaluateExpression(IValueNode node) 
     {
         node.visitDepthFirst( (n,ctx) -> 
@@ -1021,7 +1027,13 @@ public class PreprocessingLexer implements Lexer
         {
             Validate.notNull(tok, "tok must not be NULL");
             tokens.add(0,tok);
-        }	    
+        }
+
+        @Override
+        public void setScanner(Scanner scanner)
+        {
+            throw new UnsupportedOperationException( "WrappingLexer does not support changing the scanner" );
+        }
     }
 
     @Override

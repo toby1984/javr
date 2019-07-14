@@ -29,7 +29,7 @@ public class LexerImpl implements Lexer
 {
     public static final boolean DEBUG = false;
     
-    private final Scanner scanner;
+    private Scanner scanner;
     
     private final List<Token> tokens = new ArrayList<>();
     
@@ -38,7 +38,7 @@ public class LexerImpl implements Lexer
     private boolean ignoreWhitespace = true;
     
     private int line = 1;
-    private int column = 0;
+    private int column = 1;
     
     public LexerImpl(Scanner s) {
         Validate.notNull(s,"Scanner must not be null");
@@ -263,5 +263,17 @@ outer:
     {
         parseTokens();
         return tokens.get(0).toString();
+    }
+
+    @Override
+    public void setScanner(Scanner scanner)
+    {
+        Validate.notNull( scanner, "scanner must not be null" );
+        this.scanner = scanner;
+        this.tokens.clear();
+        this.buffer.setLength( 0 );
+        this.ignoreWhitespace = true;
+        this.line = 1;
+        this.column = 0;
     }
 }

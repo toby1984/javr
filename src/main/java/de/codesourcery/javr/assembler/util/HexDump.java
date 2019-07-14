@@ -134,4 +134,15 @@ public class HexDump
         this.byteDelimiter = byteDelimiter;
         return this;
     }
+
+    public static String toHex(byte[] input,int offset,int len) {
+
+        final StringBuilder buffer = new StringBuilder();
+        for ( int i=offset,l = len ; l > 0 ; l-- ) {
+            byte v = input[i++];
+            buffer.append( chars[ (v & 0xf0)>>>4]);
+            buffer.append( chars[ (v & 0x0f)    ]);
+        }
+        return buffer.toString();
+    }
 }

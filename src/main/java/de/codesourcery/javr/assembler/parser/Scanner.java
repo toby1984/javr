@@ -53,22 +53,23 @@ public class Scanner
 {
     public static final boolean DEBUG = false;
     
-    // size of char buffer
-    private int bufferSize;
     private final char[] buffer;
+
+    // size of char buffer
+    private final int bufferSize;
+
+    // how many bytes to read from the underlying
+    // input stream when the buffer runs empty.
+    // This value is always half of the actual buffer size
+    // so that back-tracking from the current read offset
+    // by at least half a buffer is always possible.
+    private final int fetchSize;
 
     // skipping CR is intentionally enabled by default as Java TextComponent
     // classes internally always use \r regardless of the actual newline character
     // sequence and otherwise offsets returned by the editor UI component would not
     // line up with text regions in the AST
     private boolean skipCarriageReturn = true;
-    
-    // how many bytes to read from the underlying
-    // input stream when the buffer runs empty.
-    // This value is always half of the actual buffer size
-    // so that back-tracking from the current read offset
-    // by at least half a buffer is always possible.
-    private int fetchSize;
 
     // valid offset range for setOffset(int) calls
     private int minOffset;
@@ -76,6 +77,7 @@ public class Scanner
     
     // where to read the next character in the buffer
     private int readPtr;
+
     // where to write the next character in the buffer
     private int writePtr;
     
@@ -85,7 +87,7 @@ public class Scanner
     private int bytesAvailable;    
     
     // underlying input stream
-    private final Reader input;
+    private Reader input;
     
     // marker so we know that reading from the underlying input stream
     // is pointless (and it's in fact already closed)
@@ -124,13 +126,34 @@ public class Scanner
      */    
     public Scanner(Resource res,int bufferSize) 
     {
-        Validate.notNull(res, "res must not be NULL");
         if ( bufferSize < 3 ) {
             throw new RuntimeException("Buffer size needs to be at least 3 bytes");
         }
         this.bufferSize = bufferSize;
         this.buffer = new char[bufferSize];
         this.fetchSize = this.bufferSize/2;
+        setResource(res);
+    }
+
+    /**
+     * Resets this scanner and starts to use a new resource;
+     * @param res
+     */
+    public void setResource(Resource res)
+    {
+        Validate.notNull(res, "res must not be NULL");
+        if ( bufferSize < 3 ) {
+            throw new RuntimeException("Buffer size needs to be at least 3 bytes");
+        }
+        this.skipCarriageReturn = true;
+        this.minOffset=0;
+        this.maxOffset=0;
+        this.readPtr=0;
+        this.writePtr=0;
+        this.bytesAvailable=0;
+        this.eofReached = false;
+        this.offset=0;
+
         try {
             this.input = new InputStreamReader( res.createInputStream() , res.getEncoding() );
             fillBuffer();
@@ -138,7 +161,7 @@ public class Scanner
             throw new ParseException("Failed to read input stream",0,e);
         }
     }
-    
+
     private void fillBuffer() 
     {
         if ( eofReached ) 

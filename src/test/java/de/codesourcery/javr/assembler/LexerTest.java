@@ -183,7 +183,13 @@ public class LexerTest {
         assertEquals( token(TokenType.DIGITS,"34" , 3) , tokens.get(1) );        
         assertEquals( token(TokenType.DIGITS,"56" , 6) , tokens.get(2) );        
         assertEOF();
-    }     
+    }
+
+    @Test
+    public void testWhitespace() {
+        final List<Token> tokens = lexAll("#include \"test.file\"", false);
+        tokens.forEach(System.out::println );
+    }
     
     private Token token(TokenType t,String value,int offset) {
         return new Token(t,value,offset,-1,-1);

@@ -65,4 +65,10 @@ public class DebugLexer implements Lexer {
         System.out.println("DEBUG: pushBack("+tok+")");
         delegate.pushBack( tok );
     }
+
+    @Override
+    public void setScanner(Scanner scanner)
+    {
+        delegate.setScanner( scanner );
+    }
 }

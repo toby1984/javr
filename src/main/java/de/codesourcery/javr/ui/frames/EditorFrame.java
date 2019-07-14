@@ -94,9 +94,9 @@ public class EditorFrame extends JInternalFrame implements IWindow
 		return false;
 	}
 	
-	public EditorPanel openEditor(IProject project,CompilationUnit unit) throws IOException 
+	public EditorPanel openEditor(IProject project, CompilationUnit unit) throws IOException
 	{
-	    Optional<EditorPanel> existing = editors.stream().filter( editor -> editor.getProject().equals( project ) && 
+	    Optional<EditorPanel> existing = editors.stream().filter(editor -> editor.getProject().equals( project ) &&
 	                                                                    editor.getCompilationUnit().hasSameResourceAs( unit ) ).findFirst();	
 	    if ( ! existing.isPresent() ) {
 	        existing = Optional.of( addEditor(project,unit ) );
@@ -106,7 +106,7 @@ public class EditorFrame extends JInternalFrame implements IWindow
         return existing.get();
 	}
 	
-	private EditorPanel addEditor(IProject project,CompilationUnit unit) throws IOException 
+	private EditorPanel addEditor(IProject project, CompilationUnit unit) throws IOException
 	{
 	    final EditorPanel result = createEditor(project,unit);
 	    this.editors.add( result );
@@ -114,7 +114,7 @@ public class EditorFrame extends JInternalFrame implements IWindow
 	    return result;
 	}
  	
-	private EditorPanel createEditor(IProject project,CompilationUnit compUnit) throws IOException
+	private EditorPanel createEditor(IProject project, CompilationUnit compUnit) throws IOException
 	{
 	    return new EditorPanel(project, this , compUnit,appConfigProvider,messageFrame,caretTracker) {
 	        @Override
@@ -127,7 +127,7 @@ public class EditorFrame extends JInternalFrame implements IWindow
 	
 	public EditorPanel currentEditor()
 	{
-	    return (EditorPanel ) tabbedPane.getSelectedComponent();
+	    return (EditorPanel) tabbedPane.getSelectedComponent();
 	}
 	
 	public void save(File file) throws FileNotFoundException 

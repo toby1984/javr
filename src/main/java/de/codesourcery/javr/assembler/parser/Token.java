@@ -89,6 +89,10 @@ public final class Token
     public int endOffset() {
         return offset+value.length();
     }
+
+    public int len() {
+        return value.length();
+    }
     
     public boolean equals(Object o) 
     {
