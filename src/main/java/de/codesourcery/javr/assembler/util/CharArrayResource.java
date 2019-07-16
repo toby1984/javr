@@ -19,9 +19,9 @@ public class CharArrayResource implements Resource
         if ( len < 0 ) {
             throw new IllegalArgumentException( "len must be >= 0" );
         }
-//        if ( startOffset >= len ) {
-//            throw new IllegalArgumentException( "Start offset must be < len, start: "+startOffset+", len: "+len );
-//        }
+        if ( startOffset+len >= array.length ) {
+            throw new IllegalArgumentException( "Start offset + len must be less than array length, start: "+startOffset+", len: "+len );
+        }
         this.startOffset = startOffset;
         this.len = len;
     }

@@ -23,14 +23,12 @@ import de.codesourcery.javr.assembler.IObjectCodeWriter;
 import de.codesourcery.javr.assembler.ObjectCodeWriter;
 import de.codesourcery.javr.assembler.PrettyPrinter;
 import de.codesourcery.javr.assembler.Segment;
+import de.codesourcery.javr.assembler.antl4.AvrLexer;
 import de.codesourcery.javr.assembler.arch.AbstractArchitecture;
 import de.codesourcery.javr.assembler.exceptions.ParseException;
 import de.codesourcery.javr.assembler.parser.Identifier;
-import de.codesourcery.javr.assembler.parser.Lexer;
-import de.codesourcery.javr.assembler.parser.LexerImpl;
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 import de.codesourcery.javr.assembler.parser.Parser.Severity;
-import de.codesourcery.javr.assembler.parser.Scanner;
 import de.codesourcery.javr.assembler.parser.TextRegion;
 import de.codesourcery.javr.assembler.parser.ast.AST;
 import de.codesourcery.javr.assembler.parser.ast.ASTNode;
@@ -64,6 +62,9 @@ import de.codesourcery.javr.ui.frames.MessageFrame;
 import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour;
 import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour.DefaultAutoCompleteCallback;
 import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour.InitialUserInput;
+import org.antlr.v4.runtime.ANTLRInputStream;
+import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.CodePointCharStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
@@ -1023,7 +1024,7 @@ public abstract class EditorPanel extends JPanel
         STYLE_NUMBER(Token.LITERAL_NUMBER_DECIMAL_INT);
          */
         syntaxScheme.setStyle(TOKEN_TEXT, new org.fife.ui.rsyntaxtextarea.Style(Color.BLACK));
-        syntaxScheme.setStyle(Token.IDENTIFIER, new org.fife.ui.rsyntaxtextarea.Style(Color.BLACK));
+        syntaxScheme.setStyle(Token.IDENTIFIER, new org.fife.ui.rsyntaxtextarea.Style(Color.GREEN));
         syntaxScheme.setStyle(Token.RESERVED_WORD, new org.fife.ui.rsyntaxtextarea.Style(Color.BLUE));
         syntaxScheme.setStyle(Token.OPERATOR, new org.fife.ui.rsyntaxtextarea.Style(Color.BLACK));
         syntaxScheme.setStyle(Token.LITERAL_NUMBER_DECIMAL_INT, new org.fife.ui.rsyntaxtextarea.Style(Color.BLACK));
@@ -2259,8 +2260,7 @@ public abstract class EditorPanel extends JPanel
 
     public final class MyTokenMaker extends AbstractTokenMaker
     {
-        private Scanner scanner;
-        private Lexer lexer;
+        private AvrLexer lexer;
 
         public MyTokenMaker() {
             System.out.println("--- my token maker created ---");
@@ -2269,43 +2269,7 @@ public abstract class EditorPanel extends JPanel
         @Override
         public TokenMap getWordsToHighlight()
         {
-            final TokenMap tokenMap = new TokenMap();
-            tokenMap.put(".equ",  Token.RESERVED_WORD);
-            return tokenMap;
-        }
-
-        private MyStyle getStyleByASTNode(ASTNode node)
-        {
-            if (node instanceof PreprocessorNode)
-            {
-                return MyStyle.STYLE_PREPROCESSOR;
-            }
-            if (node instanceof RegisterNode)
-            {
-                return MyStyle.STYLE_REGISTER;
-            }
-            if (node instanceof InstructionNode)
-            {
-                return MyStyle.STYLE_MNEMONIC;
-            }
-            if (node instanceof CommentNode)
-            {
-                final String comment = ((CommentNode) node).value;
-                if (comment.contains("TODO"))
-                {
-                    return MyStyle.STYLE_TODO;
-                }
-                return MyStyle.STYLE_COMMENT;
-            }
-            if (node instanceof LabelNode || node instanceof IdentifierNode)
-            {
-                return MyStyle.STYLE_LABEL;
-            }
-            if (node instanceof IntNumberLiteralNode)
-            {
-                return MyStyle.STYLE_NUMBER;
-            }
-            return null;
+            return new TokenMap();
         }
 
         @Override
@@ -2319,82 +2283,38 @@ public abstract class EditorPanel extends JPanel
 
             setupLexer( text.array, text.offset, text.length() );
 
-            final AST ast = astTreeModel.getAST();
-            while ( ! lexer.eof() )
+            org.antlr.v4.runtime.Token token;
+            while ( true )
             {
-                final de.codesourcery.javr.assembler.parser.Token tok = lexer.next();
-                if ( tok.isEOLorEOF() ) {
+                token = lexer.nextToken();
+                if ( token.getType() == org.antlr.v4.runtime.Token.EOF ) {
                     break;
                 }
-                System.out.println("GOT: "+tok);
-                final ASTNode astNode = ast == null ? null : ast.getNodeAtOffset(tok.offset);
-
-                int tokenType = -1;
-                if ( astNode != null && astNode.getTextRegion() != null )
-                {
-                    final MyStyle style = getStyleByASTNode(astNode);
-                    if ( style != null ) {
-                        tokenType = style.tokenType;
-                    }
-                    else
-                    {
-                        tokenType = getStyleByTokenType(tok );
-                    }
-                }
-                else
-                {
-                    tokenType = getStyleByTokenType( tok );
-                }
+                final int tokenType = getStyleByTokenType( token );
+                final int tokenStart = token.getStartIndex();
+                final int tokenEnd = token.getStopIndex();
+                final String value = new String(text.array, tokenStart, tokenEnd-tokenStart);
+                System.out.println("GOT: >"+value+"<");
+                final int len = token.getStopIndex() - tokenStart;
                 super.addToken( text.array,
-                    text.offset + tok.offset,
-                    text.offset + tok.offset + tok.len()-1,
+                    text.offset + tokenStart,
+                    text.offset + tokenStart + len -1,
                     tokenType,
-                    lineStartOffset - text.offset + tok.offset);
+                    lineStartOffset - text.offset + tokenStart );
             }
             addNullToken();
             return firstToken;
         }
 
-        private int getStyleByTokenType(de.codesourcery.javr.assembler.parser.Token tok)
+        private int getStyleByTokenType(org.antlr.v4.runtime.Token tok)
         {
-            switch (tok.type)
-            {
-                case WHITESPACE:
+            switch( tok.getType() ) {
+                case AvrLexer.OPERATORS:
+                    return Token.OPERATOR;
+                case AvrLexer.IDENTIFIER:
+                    return Token.IDENTIFIER;
+                case AvrLexer.WS:
                     return Token.WHITESPACE;
-                case TEXT:
-                    if (Identifier.isValidIdentifier(tok.value))
-                    {
-                        return Token.IDENTIFIER;
-                    }
-                    return Token.RESERVED_WORD;
-                case DIGITS:
-                    return Token.LITERAL_NUMBER_DECIMAL_INT;
-                case OPERATOR:
-                    return Token.OPERATOR;
-                case EOF:
-                    return TOKEN_TEXT;
-                case EOL:
-                    return TOKEN_TEXT;
-                case PARENS_OPEN:
-                    return Token.OPERATOR;
-                case PARENS_CLOSE:
-                    return Token.OPERATOR;
-                case HASH:
-                    return TOKEN_TEXT;
-                case EQUALS:
-                    return Token.OPERATOR;
-                case COLON:
-                    return TOKEN_TEXT;
-                case SEMICOLON:
-                    return Token.COMMENT_EOL;
-                case DOT:
-                    return TOKEN_TEXT;
-                case COMMA:
-                    return Token.OPERATOR;
-                case SINGLE_QUOTE:
-                    return Token.LITERAL_STRING_DOUBLE_QUOTE;
-                case DOUBLE_QUOTE:
-                    return Token.LITERAL_STRING_DOUBLE_QUOTE;
                 default:
                     return TOKEN_TEXT;
             }
@@ -2402,15 +2322,12 @@ public abstract class EditorPanel extends JPanel
 
         private void setupLexer(char[] data,int offset,int len)
         {
-            final Resource r = Resource.charArray( data,offset,len);
-            if ( scanner == null ) {
-                scanner = new Scanner(r);
-                lexer = new LexerImpl( scanner );
+            final CodePointCharStream input = CharStreams.fromString( new String( data, offset, len ) );
+            if ( lexer == null ) {
+                lexer = new AvrLexer( input );
             } else {
-                scanner.setResource(r);
-                lexer.setScanner( scanner );
+                lexer.setInputStream( input );
             }
-            lexer.setIgnoreWhitespace(false); // MUST be called after setScanner() since this resets the flag
         }
     }
 }
