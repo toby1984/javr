@@ -101,7 +101,7 @@ public class LexerImpl implements Lexer
 outer:      
         while ( ! scanner.eof() )
         {
-            final char c = scanner.next();
+            char c = scanner.next();
             if ( isWhitespace( c ) ) {
                 scanner.pushBack();
                 break;
@@ -114,26 +114,40 @@ outer:
                 addToken( TokenType.OPERATOR , c , scanner.offset()-1 , line , column ); 
                 break outer;
             }
-            
-            if ( OperatorType.mayBeOperator( buffer.toString() + c ) ) 
+
+            if ( OperatorType.mayBeOperator(c) )
             {
-                buffer.append( c );
-                continue;
-            }
-            else if ( OperatorType.getExactMatch( buffer.toString() ) != null ) 
-            {
-                addToken( TokenType.OPERATOR , buffer.toString() , startOffset , line , startColumn );
-                buffer.setLength(0);
-                scanner.pushBack();
-                column--;
-                break;
-            } else if ( OperatorType.mayBeOperator( c ) ) {
-                scanner.pushBack();
-                column--;
-                break;
+                final int opStartCol = column;
+                final int opStartOffset = scanner.offset()-1;
+                final StringBuilder tmp = new StringBuilder();
+                while ( OperatorType.mayBeOperator(tmp.toString() + c ) ) {
+                    tmp.append(c);
+                    if ( scanner.eof() ) {
+                        break;
+                    }
+                    c = scanner.next();
+                    column++;
+                }
+                final OperatorType op = OperatorType.getExactMatch(tmp.toString());
+                if ( ! scanner.eof() || (scanner.eof() && ! tmp.toString().endsWith(String.valueOf(c) ) ) ) {
+                    // we aborted parsing because tmp.toString() +c is not a valid operator
+                    scanner.pushBack();
+                    column--;
+                }
+                if ( op != null ) {
+                    parseBuffer(startOffset, startColumn);
+                    addToken(TokenType.OPERATOR,tmp.toString(),opStartOffset,line,opStartCol);
+                    break;
+                }
+                for (int i = 0, len = tmp.length() ; i < len; i++ ) {
+                    scanner.pushBack();
+                    column--;
+                }
+                c = scanner.next();
+                column++;
             }
             
-            switch( c ) 
+            switch( c )
             {
                 case '(':  parseBuffer(startOffset, startColumn) ; addToken( TokenType.PARENS_OPEN, c , scanner.offset()-1 , line ,column ); break outer;
                 case ')':  parseBuffer(startOffset, startColumn) ; addToken( TokenType.PARENS_CLOSE, c , scanner.offset()-1 , line ,column); break outer;
@@ -178,14 +192,13 @@ outer:
             return;
         }
         
-        boolean isOnlyDigits = false;
-        for ( int i = 0 , len=value.length() ; i < len ; i++ )
+        boolean isOnlyDigits = Character.isDigit( value.charAt(0) );
+        for ( int i = 1 , len=value.length() ; i < len ; i++ )
         {
             final char c = value.charAt( i );
-            if ( Character.isDigit( c ) )
+            if ( ! Character.isDigit( c ) && c != '_' )
             {
-                isOnlyDigits = true;
-            } else if ( i == 0 || c != '_' ) {
+                isOnlyDigits = false;
                 break;
             }
         }
@@ -203,16 +216,21 @@ outer:
         final Token token = new Token( t , Character.toString( value ) , offset ,line,column);
         if ( DEBUG ) {
             System.out.println("PARSED: "+token);
-        }        
-        tokens.add( token );
-    }    
+        }
+        addToken(token);
+    }
     
     private void addToken(TokenType t, String value,int offset,int line,int column) {
         final Token token = new Token( t , value , offset , line , column );
         if ( DEBUG ) {
             System.out.println("PARSED: "+token);
         }
-        tokens.add( token );
+        addToken(token);
+    }
+
+    private void addToken(Token t) {
+        System.out.println("---> adding "+t);
+        this.tokens.add(t);
     }
     
     /* (non-Javadoc)
@@ -261,7 +279,9 @@ outer:
     
     public String toString() 
     {
-        parseTokens();
+        if ( tokens.isEmpty() ) {
+            return "< no tokens >, scanner @ "+(scanner.eof()?"EOF" : "'"+scanner.peek()+"'");
+        }
         return tokens.get(0).toString();
     }
 }

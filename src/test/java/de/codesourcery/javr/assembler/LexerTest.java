@@ -47,7 +47,7 @@ public class LexerTest {
         lexAll("");
         assertEOF();
     }
-    
+
     @Test
     public void testLexOperators2() 
     {
@@ -75,14 +75,6 @@ public class LexerTest {
     }    
     
     @Test
-    public void testLexWindowsEOL() 
-    {
-        final List<Token> tokens = lexAll("\r\n");
-        assertEquals(1,tokens.size());
-        assertEquals( token(TokenType.EOL,"\r\n",0) , tokens.get(0) );
-    }     
-    
-    @Test
     public void testLexSingleCharacters() 
     {
         final List<Token> tokens = lexAll(":.,\"';#");
@@ -106,6 +98,12 @@ public class LexerTest {
         assertEquals( token(TokenType.WHITESPACE, "    " , 1) , tokens.get(1) );        
         assertEquals( token(TokenType.TEXT,"b" , 5) , tokens.get(2) );
         assertEOF();
+    }
+
+    @Test
+    public void testLexDef() {
+        final List<Token> tokens = lexAll(".def  a=r1");
+        tokens.forEach(System.out::println);
     }
     
     @Test

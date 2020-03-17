@@ -633,7 +633,7 @@ public class Parser
 	            	if ( lexer.peek().isValidIdentifier() ) 
 	            	{
 	            		final Token tok = lexer.next();
-	            		final IdentifierDefNode dn = new IdentifierDefNode( Identifier.of( tok.value.toLowerCase() ) , tok.region() );
+	            		final IdentifierDefNode dn = new IdentifierDefNode( Identifier.of( tok.value ) , tok.region() );
 	            		
 	            		if ( ! lexer.peek(TokenType.EQUALS ) ) {
 	            		    throw new ParseException("Expected an equals sign", lexer.peek() );

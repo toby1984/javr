@@ -105,7 +105,6 @@ public class SubstituteRegisterAliases implements Phase
                                 if ( ! context.error( "'"+alias.name+"' is already defined as a symbol" , alias ) ) 
                                 {
                                     ctx.stop();
-
                                 }
                             }
                         }

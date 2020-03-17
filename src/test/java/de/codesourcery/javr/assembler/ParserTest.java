@@ -59,6 +59,12 @@ public class ParserTest extends ParseTestHelper
         assertEquals( 0 ,  ast.childCount() );        
     }
 
+    public void testParseDef() {
+        AST ast = parse(".def  dres16uL=r16");
+        assertFalse(unit.hasErrors(true));
+        System.out.println( ast.getAsString() );
+    }
+
     @Test
     public void testParseIntegralNumberWithUnderscore()
     {
@@ -336,7 +342,7 @@ public class ParserTest extends ParseTestHelper
         final IdentifierDefNode name = (IdentifierDefNode) ins.child(0);
         final RegisterNode register = (RegisterNode) ins.child(1);
         
-        assertEquals( Identifier.of("test") , name.name );
+        assertEquals( Identifier.of("TEST") , name.name );
         assertEquals( new Register("r16",false,false), register.register );
     }
     

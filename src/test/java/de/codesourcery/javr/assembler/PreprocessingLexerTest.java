@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Stack;
 import java.util.function.Function;
 
+import de.codesourcery.javr.assembler.parser.ast.AST;
 import org.apache.commons.lang3.Validate;
 import org.junit.Before;
 import org.junit.Test;
@@ -200,7 +201,15 @@ public class PreprocessingLexerTest extends TestCase
         public void addRelocation(Relocation reloc) {
         }
     };
-    
+
+    @Test
+    public void testParseDef() {
+        final Iterator<Token> it = lex(".def  a=r1");
+        while ( it.hasNext() ) {
+            it.next();
+        }
+    }
+
     @Test
     public void testEmptyString() 
     {
