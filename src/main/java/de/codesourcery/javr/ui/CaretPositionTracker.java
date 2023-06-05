@@ -17,9 +17,7 @@ package de.codesourcery.javr.ui;
 
 import java.util.ArrayList;
 import java.util.List;
-
 import org.apache.log4j.Logger;
-
 import de.codesourcery.javr.assembler.CompilationUnit;
 
 public class CaretPositionTracker {

@@ -25,16 +25,13 @@ import java.util.ArrayList;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
-
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableModel;
-
 import org.apache.commons.lang3.Validate;
-
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.parser.Identifier;
 import de.codesourcery.javr.assembler.symbols.Symbol;

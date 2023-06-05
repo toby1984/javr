@@ -24,7 +24,6 @@ import java.awt.event.WindowEvent;
 import java.io.InputStream;
 import java.util.List;
 import java.util.stream.Collectors;
-
 import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
@@ -32,9 +31,7 @@ import javax.swing.JLabel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.SwingUtilities;
-
 import org.apache.log4j.Logger;
-
 import de.codesourcery.javr.ui.panels.AsyncStreamReaderPanel;
 
 public class ProcessWindow extends JDialog 

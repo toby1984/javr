@@ -28,7 +28,6 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-
 import javax.swing.JDesktopPane;
 import javax.swing.JDialog;
 import javax.swing.JFileChooser;
@@ -37,20 +36,17 @@ import javax.swing.JInternalFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
-import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
-
-import de.codesourcery.javr.ui.GlobalConfigurationWindow;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
-
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.arch.IArchitecture.DisassemblerSettings;
 import de.codesourcery.javr.assembler.util.FileResource;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.assembler.util.StringResource;
 import de.codesourcery.javr.ui.CaretPositionTracker;
+import de.codesourcery.javr.ui.GlobalConfigurationWindow;
 import de.codesourcery.javr.ui.IDEMain;
 import de.codesourcery.javr.ui.IDEMain.ThrowingConsumer;
 import de.codesourcery.javr.ui.IDEMain.ThrowingFunction;

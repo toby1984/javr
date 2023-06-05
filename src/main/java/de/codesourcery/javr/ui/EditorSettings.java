@@ -18,7 +18,6 @@ package de.codesourcery.javr.ui;
 import java.awt.Color;
 import java.util.HashMap;
 import java.util.Map;
-
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
 
@@ -44,7 +43,7 @@ public class EditorSettings
 
     private boolean displayLineNumbers=true;
     
-    public static enum SourceElement 
+    public enum SourceElement
     {
         LABEL,NUMBER,REGISTER,MNEMONIC,COMMENT,PREPROCESSOR,TODO
     }

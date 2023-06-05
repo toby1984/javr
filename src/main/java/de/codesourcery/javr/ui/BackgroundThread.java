@@ -16,9 +16,7 @@
 package de.codesourcery.javr.ui;
 
 import java.util.concurrent.ArrayBlockingQueue;
-
 import javax.swing.SwingUtilities;
-
 import org.apache.log4j.Logger;
 
 /**

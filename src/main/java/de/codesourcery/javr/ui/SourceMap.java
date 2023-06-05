@@ -15,13 +15,12 @@
  */
 package de.codesourcery.javr.ui;
 
-import org.apache.commons.lang3.Validate;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import org.apache.commons.lang3.Validate;
 
 public class SourceMap
 {

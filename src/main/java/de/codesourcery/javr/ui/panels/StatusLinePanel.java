@@ -15,12 +15,11 @@
  */
 package de.codesourcery.javr.ui.panels;
 
-import de.codesourcery.javr.ui.SourceMap;
-
-import javax.swing.JPanel;
-import javax.swing.JTextPane;
 import java.awt.Graphics;
 import java.util.Optional;
+import javax.swing.JPanel;
+import javax.swing.JTextPane;
+import de.codesourcery.javr.ui.SourceMap;
 
 public class StatusLinePanel extends JPanel
 {

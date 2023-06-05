@@ -15,8 +15,8 @@
  */
 package de.codesourcery.javr.ui;
 
+import java.awt.Frame;
 import java.io.BufferedWriter;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -33,22 +33,21 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
-
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
-
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.util.Resource;
 import de.codesourcery.javr.ui.config.ApplicationConfigProvider;
 import de.codesourcery.javr.ui.config.IApplicationConfig;
 import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
+import de.codesourcery.javr.ui.config.IModel;
+import de.codesourcery.javr.ui.config.Model;
 import de.codesourcery.javr.ui.config.ProjectConfiguration;
+import de.codesourcery.javr.ui.frames.SelectProjectDialog;
 import de.codesourcery.javr.ui.frames.TopLevelWindow;
 
 public class IDEMain 
@@ -293,9 +292,13 @@ public class IDEMain
         return workspaceDir;        
     }
     
-    private IProject createNewProject(File workspaceDir) throws FileNotFoundException, IOException 
+    private IProject createNewProject(String projectName, File workspaceDir) throws IOException
     {
         final ProjectConfiguration config = new ProjectConfiguration();
+        if ( projectName != null && ! projectName.isBlank() )
+        {
+            config.setProjectName( projectName );
+        }
         config.setUploadCommand("/usr/bin/avrdude -F -V -c stk500v2 -p ATMEGA328P -P /dev/ttyACM1 -b 115200 -U flash:w:%f");
         final File projDir = new File( workspaceDir , config.getProjectName() );
         if ( ! projDir.mkdirs() ) {
@@ -384,26 +387,31 @@ public class IDEMain
             final IProject project;
             try
             {
-                project = createNewProject(workspaceDir);
+                project = createNewProject(null, workspaceDir);
             } catch (IOException e)
             {
                 throw new RuntimeException( e );
             }
             projects.add(project);
             return project;
-        } 
-        if ( projects.size() == 1 )
+        }
+
+        final IModel<List<IProject>> projectsModel = () -> projects;
+        final IModel<IProject> selectedProjectModel = new Model<>();
+        if ( ! projects.isEmpty() )
         {
             return projects.get(0);
-        } 
-         String projName = (String) JOptionPane.showInputDialog( null , "Choose project" , "Choose project" , JOptionPane.QUESTION_MESSAGE , null, 
-                    projects.stream().map( p -> p.getConfiguration().getProjectName() ).collect( Collectors.toList() ).toArray( new String[0] ) , null );
-        if ( StringUtils.isBlank( projName ) ) 
+        }
+
+        final SelectProjectDialog dialog = new SelectProjectDialog( null, projectsModel, selectedProjectModel );
+        dialog.setVisible( true );
+
+        if ( selectedProjectModel.getObject() == null )
         {
             System.out.println("No project selected, terminating.");
             System.exit(1);
-        }
-        return projects.stream().filter( p-> p.getConfiguration().getProjectName().equals(projName) ).findFirst().get();
+        } 
+        return selectedProjectModel.getObject();
     }
 
     public static  void showError(String message)

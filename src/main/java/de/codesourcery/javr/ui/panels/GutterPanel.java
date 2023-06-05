@@ -15,18 +15,6 @@
  */
 package de.codesourcery.javr.ui.panels;
 
-import de.codesourcery.javr.assembler.parser.Parser;
-import de.codesourcery.javr.ui.SourceMap;
-import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
-
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTextPane;
-import javax.swing.JViewport;
-import javax.swing.ToolTipManager;
-import javax.swing.text.BadLocationException;
 import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -45,6 +33,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextPane;
+import javax.swing.JViewport;
+import javax.swing.ToolTipManager;
+import javax.swing.text.BadLocationException;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
+import de.codesourcery.javr.assembler.parser.Parser;
+import de.codesourcery.javr.ui.SourceMap;
+import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
 
 public class GutterPanel extends JPanel
 {

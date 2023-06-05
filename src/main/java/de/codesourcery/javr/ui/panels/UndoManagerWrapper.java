@@ -15,21 +15,20 @@
  */
 package de.codesourcery.javr.ui.panels;
 
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
-
-import javax.swing.SwingUtilities;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.UndoableEditEvent;
-import javax.swing.text.AbstractDocument;
-import javax.swing.undo.UndoManager;
-import javax.swing.undo.UndoableEdit;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import javax.swing.SwingUtilities;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.UndoableEditEvent;
+import javax.swing.text.AbstractDocument;
+import javax.swing.undo.UndoManager;
+import javax.swing.undo.UndoableEdit;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 
 public class UndoManagerWrapper
 {

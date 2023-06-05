@@ -15,6 +15,90 @@
  */
 package de.codesourcery.javr.ui.panels;
 
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Container;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
+import java.awt.Point;
+import java.awt.event.ActionListener;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.time.Duration;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.AbstractList;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import javax.swing.DefaultListCellRenderer;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.JTextPane;
+import javax.swing.JToolBar;
+import javax.swing.JTree;
+import javax.swing.JViewport;
+import javax.swing.SwingUtilities;
+import javax.swing.event.AncestorEvent;
+import javax.swing.event.AncestorListener;
+import javax.swing.event.CaretEvent;
+import javax.swing.event.CaretListener;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.event.TableModelEvent;
+import javax.swing.event.TableModelListener;
+import javax.swing.event.TreeModelEvent;
+import javax.swing.event.TreeModelListener;
+import javax.swing.event.UndoableEditEvent;
+import javax.swing.event.UndoableEditListener;
+import javax.swing.table.TableModel;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultStyledDocument.AttributeUndoableEdit;
+import javax.swing.text.Document;
+import javax.swing.text.DocumentFilter;
+import javax.swing.text.JTextComponent;
+import javax.swing.text.Style;
+import javax.swing.text.StyleConstants;
+import javax.swing.text.StyleContext;
+import javax.swing.tree.DefaultTreeCellRenderer;
+import javax.swing.tree.TreeModel;
+import javax.swing.tree.TreePath;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Validate;
+import org.apache.log4j.Logger;
 import de.codesourcery.javr.assembler.CompilationContext;
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.CompilerSettings;
@@ -61,93 +145,6 @@ import de.codesourcery.javr.ui.frames.MessageFrame;
 import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour;
 import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour.DefaultAutoCompleteCallback;
 import de.codesourcery.swing.autocomplete.AutoCompleteBehaviour.InitialUserInput;
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.Validate;
-import org.apache.log4j.Logger;
-
-import javax.swing.DefaultListCellRenderer;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTable;
-import javax.swing.JTextArea;
-import javax.swing.JTextField;
-import javax.swing.JTextPane;
-import javax.swing.JToolBar;
-import javax.swing.JTree;
-import javax.swing.JViewport;
-import javax.swing.SwingUtilities;
-import javax.swing.event.AncestorEvent;
-import javax.swing.event.AncestorListener;
-import javax.swing.event.CaretEvent;
-import javax.swing.event.CaretListener;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
-import javax.swing.event.TableModelEvent;
-import javax.swing.event.TableModelListener;
-import javax.swing.event.TreeModelEvent;
-import javax.swing.event.TreeModelListener;
-import javax.swing.event.UndoableEditEvent;
-import javax.swing.event.UndoableEditListener;
-import javax.swing.table.TableModel;
-import javax.swing.text.AbstractDocument;
-import javax.swing.text.AttributeSet;
-import javax.swing.text.BadLocationException;
-import javax.swing.text.DefaultStyledDocument.AttributeUndoableEdit;
-import javax.swing.text.Document;
-import javax.swing.text.DocumentFilter;
-import javax.swing.text.JTextComponent;
-import javax.swing.text.Style;
-import javax.swing.text.StyleConstants;
-import javax.swing.text.StyleContext;
-import javax.swing.tree.DefaultTreeCellRenderer;
-import javax.swing.tree.TreeModel;
-import javax.swing.tree.TreePath;
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Component;
-import java.awt.Container;
-import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
-import java.awt.Point;
-import java.awt.event.ActionListener;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.nio.file.Files;
-import java.time.Duration;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.AbstractList;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 public abstract class EditorPanel extends JPanel
 {
@@ -299,15 +296,36 @@ public abstract class EditorPanel extends JPanel
         @Override
         public void mouseMoved(MouseEvent e)
         {
-            final IdentifierNode node = getNode( e );
+            final IdentifierNode node = getIdentifierNode( e );
             String toolTipText = null;
             if ( node != null )
             {
                 final Symbol symbol = getSymbol( node );
                 if ( symbol != null ) {
                     final long value = AbstractArchitecture.toIntValue( symbol.getValue() );
-                    if ( value != AbstractArchitecture.VALUE_UNAVAILABLE ) {
-                        toolTipText = symbol.name()+" = "+value+" (0x"+Integer.toHexString( (int) value )+")";
+                    if ( value != AbstractArchitecture.VALUE_UNAVAILABLE )
+                    {
+                        final List<String> commentLines = new ArrayList<>();
+                        final String msg = symbol.name() + " = " + value + " (0x" + Integer.toHexString( (int) value ) + ")";
+                        if ( symbol.getNode() != null )
+                        {
+                            Optional<ASTNode> predecessor = symbol.getNode().getStatement().getPredecessor();
+                            while (predecessor.isPresent() && predecessor.get() instanceof StatementNode s && s.isCommentOnlyLine())
+                            {
+                                commentLines.add( s.children().stream().map( x -> ((CommentNode) x).value ).collect( Collectors.joining() ) );
+                                predecessor = s.getPredecessor();
+                            }
+                            Collections.reverse( commentLines );
+                        }
+                        if ( commentLines.isEmpty() )
+                        {
+                            toolTipText = msg;
+                        }
+                        else
+                        {
+                            final String comments = commentLines.stream().map( EditorPanel::htmlEscape ).collect( Collectors.joining("<br>"));
+                            toolTipText = "<html>" + comments + "<br>" + htmlEscape(msg) + "</html>";
+                        }
                     }
                 }
             }
@@ -317,7 +335,7 @@ public abstract class EditorPanel extends JPanel
             }
         }
 
-        private IdentifierNode getNode(MouseEvent e)
+        private IdentifierNode getIdentifierNode(MouseEvent e)
         {
             point.x = e.getX();
             point.y = e.getY();
@@ -332,7 +350,7 @@ public abstract class EditorPanel extends JPanel
 
         private IdentifierNode getNodeOnlyIfCtrl(MouseEvent e)
         {
-            return controlKeyPressed ? getNode( e ) : null;
+            return controlKeyPressed ? getIdentifierNode( e ) : null;
         }
     }
 
@@ -2345,5 +2363,22 @@ public abstract class EditorPanel extends JPanel
 
     public SourceMap getSourceMap() {
         return sourceMap;
+    }
+
+    private static String htmlEscape(String input) {
+        if ( input == null || input.isBlank() ) {
+            return input;
+        }
+        final StringBuilder buffer = new StringBuilder(input.length());
+        for ( char c : input.toCharArray() )
+        {
+            switch( c ) {
+                case '&' -> buffer.append( "&amp;" );
+                case '<' -> buffer.append( "&lt;" );
+                case '>' -> buffer.append( "&gt;" );
+                default -> buffer.append( c );
+            }
+        }
+        return buffer.toString();
     }
 }

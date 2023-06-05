@@ -30,12 +30,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
-
 import de.codesourcery.hex2raw.IntelHex;
 import de.codesourcery.javr.assembler.Assembler;
 import de.codesourcery.javr.assembler.Buffer;

@@ -17,6 +17,7 @@ package de.codesourcery.javr.assembler.parser.ast;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Predicate;
 
 import de.codesourcery.javr.assembler.Address;
@@ -410,4 +411,13 @@ public interface ASTNode
      * @throws ClassCastException 
      */
     public OperatorNode asOperator();
+
+    /**
+     * Returns the predecessor of this node (the child node at the same depth
+     * level as this one but right before in the parent node's child collection).
+     *
+     * @return predecessor or <code>Optional.empty()</code> if this node has no
+     * parent or already is the very first node of its parent's child collection
+     */
+    Optional<ASTNode> getPredecessor();
 }

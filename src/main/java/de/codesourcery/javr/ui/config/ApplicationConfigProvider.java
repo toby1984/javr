@@ -23,18 +23,15 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-
-import de.codesourcery.javr.ui.EditorSettings;
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
-
-import com.cedarsoftware.util.io.JsonReader;
-import com.cedarsoftware.util.io.JsonWriter;
+import de.codesourcery.javr.ui.EditorSettings;
+import de.codesourcery.javr.ui.ObjectMapperFactory;
 
 public class ApplicationConfigProvider implements IApplicationConfigProvider {
 
@@ -48,11 +45,12 @@ public class ApplicationConfigProvider implements IApplicationConfigProvider {
     public static IApplicationConfig load(InputStream in) throws IOException
     {
         final String json;
-        try ( BufferedReader reader = new BufferedReader( new InputStreamReader(in,"utf8" ) ) )
+        try ( BufferedReader reader = new BufferedReader( new InputStreamReader(in, StandardCharsets.UTF_8 ) ) )
         {
             json = reader.lines().collect( Collectors.joining() );
         }
-        final IApplicationConfig result = (IApplicationConfig) JsonReader.jsonToJava( json );
+
+        final IApplicationConfig result = ObjectMapperFactory.getObjectMapper().readValue( json, ApplicationConfig.class );
 
         // TODO: Hack -- brute-force fix colors that are hardly readable
         LOG.error( "load(): ---------------------------------------" );
@@ -66,10 +64,10 @@ public class ApplicationConfigProvider implements IApplicationConfigProvider {
         return result;
     }
 
-    public static void save(IApplicationConfig config,OutputStream out) throws UnsupportedEncodingException, IOException
+    public static void save(IApplicationConfig config,OutputStream out) throws IOException
     {
-        final String json = JsonWriter.objectToJson(config);
-        try ( BufferedWriter writer = new BufferedWriter( new OutputStreamWriter( out , "utf8" ) ) ) {
+        final String json = ObjectMapperFactory.getObjectMapper().writeValueAsString(  config );
+        try ( BufferedWriter writer = new BufferedWriter( new OutputStreamWriter( out , StandardCharsets.UTF_8 ) ) ) {
             writer.write( json );
         }
     }

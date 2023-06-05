@@ -20,10 +20,8 @@ import java.awt.GridBagLayout;
 import java.io.File;
 import java.util.function.Consumer;
 import java.util.function.Function;
-
 import javax.swing.JInternalFrame;
 import javax.swing.JPopupMenu;
-
 import de.codesourcery.javr.ui.IProject;
 import de.codesourcery.javr.ui.IProjectProvider;
 import de.codesourcery.javr.ui.IProjectProvider.IProjectListener;

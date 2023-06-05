@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Consumer;
-
 import javax.swing.JInternalFrame;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
@@ -37,9 +36,7 @@ import javax.swing.event.TableModelListener;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableModel;
-
 import org.apache.commons.lang3.Validate;
-
 import de.codesourcery.javr.assembler.parser.Parser.CompilationMessage;
 
 public class MessageFrame extends JInternalFrame implements IWindow 

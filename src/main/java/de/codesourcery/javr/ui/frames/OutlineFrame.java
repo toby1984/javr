@@ -22,7 +22,6 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.util.Arrays;
 import java.util.function.Consumer;
-
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JInternalFrame;
@@ -30,7 +29,6 @@ import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.symbols.Symbol;
 import de.codesourcery.javr.ui.IProject;

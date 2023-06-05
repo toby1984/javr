@@ -19,7 +19,6 @@ import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
-
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
@@ -27,9 +26,7 @@ import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
-
 import org.apache.commons.lang3.Validate;
-
 import de.codesourcery.javr.assembler.CompilerSettings;
 import de.codesourcery.javr.assembler.arch.Architecture;
 import de.codesourcery.javr.ui.config.ProjectConfiguration;

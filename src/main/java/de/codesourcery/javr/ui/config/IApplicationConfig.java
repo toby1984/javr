@@ -17,13 +17,10 @@ package de.codesourcery.javr.ui.config;
 
 import java.awt.Dimension;
 import java.awt.Point;
-import java.util.Optional;
 import java.util.function.Consumer;
-
-import de.codesourcery.javr.ui.GlobalSettings;
 import org.apache.log4j.Logger;
-
 import de.codesourcery.javr.ui.EditorSettings;
+import de.codesourcery.javr.ui.GlobalSettings;
 import de.codesourcery.javr.ui.frames.IWindow;
 
 public interface IApplicationConfig 

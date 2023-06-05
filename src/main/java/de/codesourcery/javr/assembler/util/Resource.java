@@ -27,7 +27,7 @@ import java.io.OutputStream;
  */
 public interface Resource 
 {
-    public static final String ENCODING_UTF = "utf8";
+    String ENCODING_UTF = "utf8";
     
     public static Resource file(File file) throws IOException 
     {

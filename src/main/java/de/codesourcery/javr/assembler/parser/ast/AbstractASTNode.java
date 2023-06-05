@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Predicate;
 
 import org.apache.commons.lang3.Validate;
@@ -563,5 +564,18 @@ public abstract class AbstractASTNode implements ASTNode
             current = current.getParent();
         }
         return (StatementNode) current;
+    }
+
+    @Override
+    public Optional<ASTNode> getPredecessor()
+    {
+        if ( hasNoParent() ) {
+            return Optional.empty();
+        }
+        final int idx = getParent().indexOf(this);
+        if ( idx == 0 ) {
+            return Optional.empty();
+        }
+        return Optional.of( getParent().child( idx - 1 ) );
     }
 }

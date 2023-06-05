@@ -19,7 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
-
+import org.apache.commons.lang3.Validate;
 import de.codesourcery.javr.ui.EditorSettings;
 import de.codesourcery.javr.ui.GlobalSettings;
 import de.codesourcery.javr.ui.frames.IWindow;
@@ -65,6 +65,17 @@ public class ApplicationConfig implements IApplicationConfig
     @Override
     public IApplicationConfig createCopy() {
         return new ApplicationConfig(this);
+    }
+
+    public List<WindowProperties> getWindowProperties()
+    {
+        return windowProperties;
+    }
+
+    public void setWindowProperties(List<WindowProperties> windowProperties)
+    {
+        Validate.notNull( windowProperties, "windowProperties must not be null" );
+        this.windowProperties = windowProperties;
     }
 
     @Override

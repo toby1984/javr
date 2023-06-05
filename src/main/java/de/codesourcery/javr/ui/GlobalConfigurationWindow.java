@@ -15,18 +15,17 @@
  */
 package de.codesourcery.javr.ui;
 
-import de.codesourcery.javr.ui.config.IApplicationConfig;
-import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
-
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.GridLayout;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.GridLayout;
+import de.codesourcery.javr.ui.config.IApplicationConfig;
+import de.codesourcery.javr.ui.config.IApplicationConfigProvider;
 
 public abstract class GlobalConfigurationWindow extends JDialog
 {

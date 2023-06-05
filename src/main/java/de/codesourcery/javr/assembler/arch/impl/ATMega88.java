@@ -415,13 +415,12 @@ public class ATMega88 extends AbstractArchitecture
     public int getSegmentSize(Segment seg) 
     {
         Validate.notNull(seg, "segment must not be NULL");
-        switch(seg) {
-            case EEPROM: return 512;
-            case FLASH: return 8192;
-            case SRAM: return 1024;
-            default:
-                throw new RuntimeException("Unhandled segment type: "+seg);
-        }
+        return switch( seg )
+        {
+            case EEPROM -> 512;
+            case FLASH -> 8192;
+            case SRAM -> 1024;
+        };
     }
     
     @Override

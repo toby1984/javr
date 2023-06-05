@@ -17,7 +17,6 @@ package de.codesourcery.javr.ui;
 
 import java.io.IOException;
 import java.util.Optional;
-
 import de.codesourcery.javr.assembler.CompilationUnit;
 import de.codesourcery.javr.assembler.IObjectCodeWriter;
 import de.codesourcery.javr.assembler.ResourceFactory;

@@ -23,10 +23,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Stream;
-
 import org.apache.commons.lang3.Validate;
 import org.apache.log4j.Logger;
-
 import de.codesourcery.javr.assembler.CompilerSettings;
 import de.codesourcery.javr.assembler.ResourceFactory;
 import de.codesourcery.javr.assembler.Segment;
@@ -42,7 +40,7 @@ public class ProjectConfiguration implements ResourceFactory
 {
     private static final Logger LOG = Logger .getLogger(ProjectConfiguration.OutputFormat.class);
     
-    public static enum OutputFormat 
+    public enum OutputFormat
     {
         RAW,
         INTEL_HEX,
